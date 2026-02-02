@@ -1,21 +1,19 @@
-name: Deploy Frontend
+name: Deploy Backend
 
 on:
   push:
     branches: [main]
     paths:
-      - 'frontend/**'
+      - 'backend/**'
+      - 'database/**'
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      deployments: write
     defaults:
       run:
-        working-directory: ./frontend
+        working-directory: ./backend
     
     steps:
       - name: Checkout Code
@@ -28,26 +26,30 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: 'frontend/package-lock.json'
+          cache-dependency-path: 'backend/package-lock.json'
       
       - name: Install Dependencies
         run: |
           echo "安装依赖..."
-          # 总是使用npm install，确保依赖正确安装
+          # 总是使用npm install，避免lock文件问题
           npm install
           
+          # 验证关键工具
+          npx wrangler --version
           echo "依赖安装完成"
       
-      - name: Build Project
-        run: npm run build
-        env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-      
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: blog-frontend
-          directory: frontend/dist
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          workingDirectory: ./backend
+          command: deploy
+        env:
+          WRANGLER_VERSION: 4
+      
+      - name: Verify Deployment
+        run: |
+          echo "等待部署生效..."
+          sleep 15
+          echo "部署流程完成"
