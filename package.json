@@ -1,0 +1,22 @@
+{
+  "name": "blog-system-v1",
+  "version": "1.0.0",
+  "description": "Modern personal blog system with Cloudflare Workers and Pages",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=frontend",
+    "dev:backend": "npm run dev --workspace=backend",
+    "build": "npm run build --workspaces",
+    "deploy": "npm run deploy --workspaces",
+    "init": "bash scripts/init.sh",
+    "migrate": "bash scripts/migrate.sh",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "keywords": ["blog", "cloudflare", "workers", "pages"],
+  "author": "",
+  "license": "MIT"
+}

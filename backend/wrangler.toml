@@ -1,0 +1,32 @@
+name = "blog-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# 需要替换为你的账号ID
+# account_id = "YOUR_ACCOUNT_ID"
+
+# D1 数据库
+[[d1_databases]]
+binding = "DB"
+database_name = "blog-db"
+database_id = "YOUR_D1_DATABASE_ID"
+
+# KV 缓存
+[[kv_namespaces]]
+binding = "CACHE"
+id = "YOUR_KV_ID"
+
+# R2 存储
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "blog-storage"
+
+# 环境变量
+[vars]
+ENVIRONMENT = "production"
+FRONTEND_URL = "https://YOUR_PROJECT.pages.dev"
+
+# Secrets (通过 wrangler secret put 设置)
+# JWT_SECRET
+# GITHUB_CLIENT_ID
+# GITHUB_CLIENT_SECRET

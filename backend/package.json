@@ -1,0 +1,21 @@
+{
+  "name": "blog-backend",
+  "version": "1.0.0",
+  "description": "Blog system backend API",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "hono": "^3.11.7",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20231218.0",
+    "@types/bcryptjs": "^2.4.6",
+    "wrangler": "^3.22.1",
+    "typescript": "^5.3.3"
+  }
+}
