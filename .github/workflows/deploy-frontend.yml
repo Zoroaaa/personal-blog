@@ -13,24 +13,44 @@ jobs:
     permissions:
       contents: read
       deployments: write
+    defaults:
+      run:
+        working-directory: ./frontend
+    
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+      
+      - name: Clean Install Dependencies
+        run: |
+          echo "清理并安装依赖..."
+          # 清理可能的缓存和旧依赖
+          if [ -d node_modules ]; then
+            rm -rf node_modules
+          fi
           
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm ci
-        
-      - name: Build
-        working-directory: frontend
+          # 如果有lock文件冲突，进行清理
+          if [ -f package-lock.json ] && [ ! -s package-lock.json ]; then
+            rm package-lock.json
+          fi
+          
+          # 安装依赖
+          npm ci
+      
+      - name: Build Project
         run: npm run build
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
-        
+      
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/pages-action@v1
         with:
