@@ -9,12 +9,12 @@ compatibility_date = "2024-01-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "blog-db"
-database_id = "YOUR_D1_DATABASE_ID"
+database_id = "1edddff8-c00a-48b5-b33b-e0e6c14ddff4"
 
 # KV 缓存
 [[kv_namespaces]]
-binding = "CACHE"
-id = "YOUR_KV_ID"
+binding = "69c0b7cfff1d48769cc2bd29f2d9711f"
+id = "69c0b7cfff1d48769cc2bd29f2d9711f"
 
 # R2 存储
 [[r2_buckets]]
