@@ -28,29 +28,15 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'backend/package-lock.json'
       
-      - name: Prepare Dependencies
-        run: |
-          echo "准备依赖安装环境..."
-          # 检查package-lock.json状态
-          if [ ! -f package-lock.json ]; then
-            echo "未找到package-lock.json，将生成新的lock文件"
-          elif [ ! -s package-lock.json ]; then
-            echo "package-lock.json为空文件，删除并重新生成"
-            rm package-lock.json
-          fi
-          
-          # 清理可能的旧依赖
-          if [ -d node_modules ]; then
-            rm -rf node_modules
-          fi
-      
       - name: Install Dependencies
         run: |
           echo "安装依赖..."
-          # 根据lock文件情况选择安装方式
+          # 检查是否存在package-lock.json
           if [ -f package-lock.json ]; then
+            echo "使用package-lock.json进行确定性安装"
             npm ci
           else
+            echo "未找到package-lock.json，使用npm install安装"
             npm install
           fi
           
