@@ -21,6 +21,22 @@ id = "69c0b7cfff1d48769cc2bd29f2d9711f"
 binding = "STORAGE"
 bucket_name = "blog-storage"
 
+# 日志
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = false
+persist = true
+head_sampling_rate = 1
+
 # 环境变量
 [vars]
 ENVIRONMENT = "production"
