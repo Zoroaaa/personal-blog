@@ -24,7 +24,7 @@ bucket_name = "blog-storage"
 # 环境变量
 [vars]
 ENVIRONMENT = "production"
-FRONTEND_URL = "https://YOUR_PROJECT.pages.dev"
+FRONTEND_URL = "https://blog.neutronx.uk"
 
 # Secrets (通过 wrangler secret put 设置)
 # JWT_SECRET
