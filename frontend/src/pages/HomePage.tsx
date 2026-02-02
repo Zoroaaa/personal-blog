@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Post } from '../types';
 import { api } from '../utils/api';
 import { format } from 'date-fns';
 
 export function HomePage() {
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -13,18 +14,18 @@ export function HomePage() {
     loadPosts();
   }, [page]);
   
-  const loadPosts = async () => {
-    try {
-      setLoading(true);
-      const data = await api.getPosts({ page, limit: 10 });
-      setPosts(data.posts);
-      setTotalPages(data.pagination.totalPages);
-    } catch (error) {
-      console.error('Failed to load posts:', error);
-    } finally {
-      setLoading(false);
+  // 使用新的API
+const loadPosts = async () => {
+  try {
+    const response = await api.getPosts({ page, limit: 10 });
+    if (response.success && response.data) {
+      setPosts(response.data.posts);
+      setTotalPages(response.data.pagination.totalPages);
     }
-  };
+  } catch (error) {
+    console.error('Failed to load posts:', error);
+  }
+};
   
   if (loading) {
     return (
