@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Post } from '../types';
 import { api } from '../utils/api';
 import { format } from 'date-fns';
 import { useAuthStore } from '../stores/authStore';
 
 export function PostPage() {
   const { slug } = useParams<{ slug: string }>();
-  const [post, setPost] = useState<any>(null);
+  const [post, setPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
@@ -21,16 +22,17 @@ export function PostPage() {
     }
   }, [slug]);
   
-  const loadPost = async () => {
-    try {
-      const data = await api.getPost(slug!);
-      setPost(data);
-    } catch (error) {
-      console.error('Failed to load post:', error);
-    } finally {
-      setLoading(false);
+  // 使用新的API
+const loadPost = async (slug: string) => {
+  try {
+    const response = await api.getPost(slug);
+    if (response.success && response.data) {
+      setPost(response.data);
     }
-  };
+  } catch (error) {
+    console.error('Failed to load post:', error);
+  }
+};
   
   const loadComments = async () => {
     try {
