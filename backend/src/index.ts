@@ -29,39 +29,79 @@ export type Env = {
 // 创建应用
 const app = new Hono<{ Bindings: Env }>();
 
-app.use(
-  cors({
-    origin: (origin, c) => {
-      // 允许的来源列表
-      const allowedOrigins = new Set([
-        'http://localhost:5173',
-        'http://localhost:3000',
-        'https://blog.neutronx.uk', // ← 直接写死，避免依赖 env（或确保 env 正确）
-      ]);
+// 日志中间件
+app.use('*', logger());
 
-      // 如果请求没有 Origin（如直接浏览器访问），允许（返回 true 表示反射 origin，但这里我们指定）
-      if (!origin) {
-        return 'https://blog.neutronx.uk'; // 或 '*'（不推荐，因用了 credentials）
-      }
+// CORS配置 - 修复版
+app.use('*', cors({
+  origin: (origin) => {
+    // 允许的来源列表
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'https://blog.neutronx.uk',
+      'https://www.blog.neutronx.uk'
+    ];
 
-      // 如果 origin 在白名单中，允许
-      if (allowedOrigins.has(origin)) {
-        return origin;
-      }
+    // 如果没有origin（服务器端请求或直接访问），允许
+    if (!origin) {
+      return 'https://blog.neutronx.uk';
+    }
 
-      // 否则拒绝（返回 false 或不设置 header）
-      return 'https://blog.neutronx.uk'; // 或 throw error，但 Hono 会忽略非法值
-    },
-    credentials: true,
-    exposeHeaders: ['X-Total-Count'],
-  })
-);
+    // 检查是否在白名单中
+    if (allowedOrigins.includes(origin)) {
+      return origin;
+    }
 
-// 健康检查
+    // 开发环境允许localhost的任意端口
+    if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+      return origin;
+    }
+
+    // 默认返回主域名
+    return 'https://blog.neutronx.uk';
+  },
+  credentials: true,
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposeHeaders: ['X-Total-Count', 'Content-Length'],
+  maxAge: 86400, // 24小时
+}));
+
+// 根路径健康检查
+app.get('/', (c) => {
+  return c.json({
+    name: 'Blog API',
+    version: '1.0.0',
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: '/health',
+      api: '/api/*'
+    }
+  });
+});
+
+// 健康检查端点
 app.get('/health', (c) => {
   return c.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
+    environment: c.env?.ENVIRONMENT || 'unknown',
+    services: {
+      database: c.env?.DB ? 'connected' : 'disconnected',
+      cache: c.env?.CACHE ? 'connected' : 'disconnected',
+      storage: c.env?.STORAGE ? 'connected' : 'disconnected'
+    }
+  });
+});
+
+// API健康检查
+app.get('/api/health', (c) => {
+  return c.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0'
   });
 });
 
@@ -74,15 +114,34 @@ app.route('/api/upload', uploadRoutes);
 
 // 404处理
 app.notFound((c) => {
-  return c.json({ error: 'Not found' }, 404);
+  const path = c.req.path;
+  return c.json({
+    error: 'Not found',
+    path,
+    message: `The requested endpoint ${path} does not exist`,
+    availableEndpoints: [
+      '/health',
+      '/api/auth/*',
+      '/api/posts/*',
+      '/api/comments/*',
+      '/api/categories/*',
+      '/api/upload/*'
+    ]
+  }, 404);
 });
 
 // 错误处理
 app.onError((err, c) => {
   console.error('Error:', err);
+  
+  // 详细的错误信息
+  const isDevelopment = c.env?.ENVIRONMENT === 'development';
+  
   return c.json({
     error: 'Internal server error',
-    message: c.env.ENVIRONMENT === 'development' ? err.message : undefined,
+    message: isDevelopment ? err.message : 'An unexpected error occurred',
+    stack: isDevelopment ? err.stack : undefined,
+    timestamp: new Date().toISOString()
   }, 500);
 });
 

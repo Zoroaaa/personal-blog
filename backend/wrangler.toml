@@ -2,8 +2,9 @@ name = "blog-api"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 
-# 需要替换为你的账号ID
-# account_id = "YOUR_ACCOUNT_ID"
+# Worker设置
+workers_dev = false
+route = { pattern = "apiblog.neutronx.uk/*", zone_name = "neutronx.uk" }
 
 # D1 数据库
 [[d1_databases]]
@@ -21,9 +22,9 @@ id = "69c0b7cfff1d48769cc2bd29f2d9711f"
 binding = "STORAGE"
 bucket_name = "blog-storage"
 
-# 日志
+# 日志配置
 [observability]
-enabled = false
+enabled = true
 head_sampling_rate = 1
 
 [observability.logs]
@@ -32,17 +33,19 @@ head_sampling_rate = 1
 persist = true
 invocation_logs = true
 
-[observability.traces]
-enabled = false
-persist = true
-head_sampling_rate = 1
-
-# 环境变量
+# 环境变量（公开的配置）
 [vars]
 ENVIRONMENT = "production"
 FRONTEND_URL = "https://blog.neutronx.uk"
 
-# Secrets (通过 wrangler secret put 设置)
-# JWT_SECRET
-# GITHUB_CLIENT_ID
-# GITHUB_CLIENT_SECRET
+# Secrets（需要通过命令行或Cloudflare Dashboard设置）
+# wrangler secret put JWT_SECRET
+# wrangler secret put GITHUB_CLIENT_ID
+# wrangler secret put GITHUB_CLIENT_SECRET
+
+# 或者在Cloudflare Dashboard设置:
+# Workers & Pages > blog-api > Settings > Variables
+# 添加以下环境变量（加密）：
+# - JWT_SECRET: 你的JWT密钥
+# - GITHUB_CLIENT_ID: GitHub OAuth Client ID
+# - GITHUB_CLIENT_SECRET: GitHub OAuth Client Secret
