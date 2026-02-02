@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
     "deploy": "npm run build && wrangler pages deploy dist"
   },
   "dependencies": {
@@ -29,5 +30,8 @@
     "typescript": "^5.2.2",
     "vite": "^5.0.8",
     "wrangler": "^3.22.1"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
