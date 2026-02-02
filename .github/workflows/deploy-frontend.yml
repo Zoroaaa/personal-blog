@@ -33,14 +33,10 @@ jobs:
       - name: Install Dependencies
         run: |
           echo "安装依赖..."
-          # 检查是否存在package-lock.json
-          if [ -f package-lock.json ]; then
-            echo "使用package-lock.json进行确定性安装"
-            npm ci
-          else
-            echo "未找到package-lock.json，使用npm install安装"
-            npm install
-          fi
+          # 总是使用npm install，确保依赖正确安装
+          npm install
+          
+          echo "依赖安装完成"
       
       - name: Build Project
         run: npm run build
