@@ -30,21 +30,17 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'frontend/package-lock.json'
       
-      - name: Clean Install Dependencies
+      - name: Install Dependencies
         run: |
-          echo "清理并安装依赖..."
-          # 清理可能的缓存和旧依赖
-          if [ -d node_modules ]; then
-            rm -rf node_modules
+          echo "安装依赖..."
+          # 检查是否存在package-lock.json
+          if [ -f package-lock.json ]; then
+            echo "使用package-lock.json进行确定性安装"
+            npm ci
+          else
+            echo "未找到package-lock.json，使用npm install安装"
+            npm install
           fi
-          
-          # 如果有lock文件冲突，进行清理
-          if [ -f package-lock.json ] && [ ! -s package-lock.json ]; then
-            rm package-lock.json
-          fi
-          
-          # 安装依赖
-          npm ci
       
       - name: Build Project
         run: npm run build
