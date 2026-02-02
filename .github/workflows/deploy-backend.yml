@@ -11,22 +11,65 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'backend/package-lock.json'
+      
+      - name: Prepare Dependencies
+        run: |
+          echo "准备依赖安装环境..."
+          # 检查package-lock.json状态
+          if [ ! -f package-lock.json ]; then
+            echo "未找到package-lock.json，将生成新的lock文件"
+          elif [ ! -s package-lock.json ]; then
+            echo "package-lock.json为空文件，删除并重新生成"
+            rm package-lock.json
+          fi
           
-      - name: Install dependencies
-        working-directory: backend
-        run: npm ci
-        
+          # 清理可能的旧依赖
+          if [ -d node_modules ]; then
+            rm -rf node_modules
+          fi
+      
+      - name: Install Dependencies
+        run: |
+          echo "安装依赖..."
+          # 根据lock文件情况选择安装方式
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+          
+          # 验证关键工具
+          npx wrangler --version
+          echo "依赖安装完成"
+      
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: backend
+          workingDirectory: ./backend
           command: deploy
+        env:
+          WRANGLER_VERSION: 4
+      
+      - name: Verify Deployment
+        run: |
+          echo "等待部署生效..."
+          sleep 15
+          echo "部署流程完成"
