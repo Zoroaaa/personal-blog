@@ -27,6 +27,8 @@ import { postRoutes } from './routes/posts';
 import { commentRoutes } from './routes/comments';
 import { categoryRoutes } from './routes/categories';
 import { uploadRoutes } from './routes/upload';
+import { analyticsRoutes } from './routes/analytics';
+import { adminRoutes } from './routes/admin';
 
 // 导入中间件
 import { rateLimiter } from './middleware/rateLimit';
@@ -318,6 +320,28 @@ app.route('/api/categories', categoryRoutes);
  * - DELETE /api/upload/:filename - 删除文件
  */
 app.route('/api/upload', uploadRoutes);
+
+/**
+ * 数据分析路由
+ * - GET /api/analytics/hot-posts - 获取热门文章
+ * - GET /api/analytics/stats - 获取基础统计数据
+ * - GET /api/analytics/post/:id - 获取单篇文章的详细分析
+ * - GET /api/analytics/users - 获取用户统计
+ * - POST /api/analytics/track - 记录页面访问
+ */
+app.route('/api/analytics', analyticsRoutes);
+
+/**
+ * 管理后台路由
+ * - GET /api/admin/comments - 获取评论列表
+ * - PUT /api/admin/comments/:id/status - 更新评论状态
+ * - DELETE /api/admin/comments/:id - 删除评论
+ * - GET /api/admin/users - 获取用户列表
+ * - PUT /api/admin/users/:id/status - 更新用户状态
+ * - PUT /api/admin/users/:id/role - 更新用户角色
+ * - GET /api/admin/settings - 获取系统设置
+ */
+app.route('/api/admin', adminRoutes);
 
 // ============= 错误处理 =============
 

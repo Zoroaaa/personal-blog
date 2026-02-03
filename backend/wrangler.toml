@@ -37,7 +37,7 @@ invocation_logs = true
 [vars]
 ENVIRONMENT = "production"
 FRONTEND_URL = "https://blog.neutronx.uk"
-STORAGE_PUBLIC_URL = "https://storage.neutronx.uk"
+STORAGE_PUBLIC_URL = "https://storage.blog.neutronx.uk"
 
 # Secrets（需要通过命令行或Cloudflare Dashboard设置）
 # wrangler secret put JWT_SECRET

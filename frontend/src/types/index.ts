@@ -171,6 +171,9 @@ export interface Post {
   categorySlug?: string;
   categoryColor?: string;
   tags?: Tag[];
+  
+  // 交互状态
+  isLiked?: boolean;
 }
 
 /**
@@ -331,7 +334,8 @@ export interface CreateCommentRequest {
  * 评论查询参数
  */
 export interface CommentQueryParams {
-  postId: number;
+  postId?: number;
+  userId?: string;
   page?: number;
   limit?: number;
   status?: CommentStatus;
