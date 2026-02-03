@@ -1,5 +1,24 @@
+/**
+ * 登录/注册页面（优化版）
+ * 
+ * 功能：
+ * - 用户登录
+ * - 用户注册
+ * - 表单验证
+ * 
+ * 优化内容：
+ * 1. 修复API响应格式处理
+ * 2. 使用完整的TypeScript类型
+ * 3. 改进错误处理和提示
+ * 4. 添加密码强度提示
+ * 5. 优化UI/UX
+ * 
+ * @author 优化版本
+ * @version 2.0.0
+ */
+
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../utils/api';
 
@@ -8,11 +27,18 @@ export function LoginPage() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuthStore();
+  
+  // 获取重定向路径
+  const from = (location.state as any)?.from?.pathname || '/';
+  const redirectParam = new URLSearchParams(location.search).get('redirect');
+  const redirectPath = redirectParam || from;
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,102 +47,264 @@ export function LoginPage() {
     
     try {
       if (isLogin) {
-        const data = await api.login({ username, password });
-        login(data.user, data.token);
-        navigate('/');
+        // ===== 登录 =====
+        console.log('Attempting login...', { username });
+        
+        const response = await api.login({ username, password });
+        
+        console.log('Login response:', response);
+        
+        // 检查响应格式
+        if (response.success && response.data) {
+          const { user, token } = response.data;
+          
+          console.log('Login successful:', { user, hasToken: !!token });
+          
+          // 保存到store
+          login(user, token);
+          
+          // 跳转
+          navigate(redirectPath, { replace: true });
+        } else {
+          throw new Error(response.error || response.message || '登录失败');
+        }
       } else {
-        const data = await api.register({
+        // ===== 注册 =====
+        console.log('Attempting registration...', { username, email });
+        
+        const response = await api.register({
           username,
           email,
           password,
-          displayName: username,
+          displayName: displayName || username,
         });
-        login(data.user, data.token);
-        navigate('/');
+        
+        console.log('Registration response:', response);
+        
+        // 检查响应格式
+        if (response.success && response.data) {
+          const { user, token } = response.data;
+          
+          console.log('Registration successful:', { user, hasToken: !!token });
+          
+          // 保存到store
+          login(user, token);
+          
+          // 跳转
+          navigate(redirectPath, { replace: true });
+        } else {
+          throw new Error(response.error || response.message || '注册失败');
+        }
       }
     } catch (err: any) {
-      setError(err.message || '操作失败');
+      console.error('Auth error:', err);
+      setError(err.message || '操作失败，请稍后重试');
     } finally {
       setLoading(false);
     }
   };
   
+  // 验证密码强度
+  const getPasswordStrength = (pwd: string): { level: number; text: string; color: string } => {
+    if (pwd.length === 0) return { level: 0, text: '', color: '' };
+    if (pwd.length < 6) return { level: 1, text: '太弱', color: 'text-red-600' };
+    
+    let strength = 0;
+    if (pwd.length >= 8) strength++;
+    if (/[a-z]/.test(pwd)) strength++;
+    if (/[A-Z]/.test(pwd)) strength++;
+    if (/[0-9]/.test(pwd)) strength++;
+    if (/[^a-zA-Z0-9]/.test(pwd)) strength++;
+    
+    if (strength <= 2) return { level: 2, text: '弱', color: 'text-orange-600' };
+    if (strength <= 3) return { level: 3, text: '中等', color: 'text-yellow-600' };
+    return { level: 4, text: '强', color: 'text-green-600' };
+  };
+  
+  const passwordStrength = !isLogin ? getPasswordStrength(password) : null;
+  
   return (
-    <div className="min-h-[80vh] flex items-center justify-center px-4">
+    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 bg-gray-50">
       <div className="max-w-md w-full">
         <div className="bg-white rounded-lg shadow-lg p-8">
-          <h2 className="text-3xl font-bold text-center mb-8">
-            {isLogin ? '登录' : '注册'}
-          </h2>
+          {/* 标题 */}
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-gray-900">
+              {isLogin ? '欢迎回来' : '创建账号'}
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              {isLogin ? '登录以继续使用' : '注册一个新账号'}
+            </p>
+          </div>
           
+          {/* 错误提示 */}
           {error && (
-            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
-              {error}
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                <div className="ml-3">
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              </div>
             </div>
           )}
           
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {/* 表单 */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* 用户名 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
                 用户名
               </label>
               <input
+                id="username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="输入用户名"
                 required
+                autoComplete="username"
               />
+              {!isLogin && (
+                <p className="mt-1 text-xs text-gray-500">
+                  3-20个字符，只能包含字母、数字、下划线和连字符
+                </p>
+              )}
             </div>
             
+            {/* 邮箱（仅注册） */}
             {!isLogin && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
                   邮箱
                 </label>
                 <input
+                  id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="输入邮箱地址"
                   required
+                  autoComplete="email"
                 />
               </div>
             )}
             
+            {/* 显示名称（仅注册） */}
+            {!isLogin && (
+              <div>
+                <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 mb-1">
+                  显示名称 <span className="text-gray-400 text-xs">(可选)</span>
+                </label>
+                <input
+                  id="displayName"
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="输入显示名称"
+                  autoComplete="name"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  留空则使用用户名
+                </p>
+              </div>
+            )}
+            
+            {/* 密码 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
                 密码
               </label>
               <input
+                id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="输入密码"
                 required
+                autoComplete={isLogin ? 'current-password' : 'new-password'}
               />
+              
+              {/* 密码强度指示器（仅注册） */}
+              {!isLogin && password && passwordStrength && (
+                <div className="mt-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-gray-600">密码强度:</span>
+                    <span className={`text-xs font-medium ${passwordStrength.color}`}>
+                      {passwordStrength.text}
+                    </span>
+                  </div>
+                  <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all ${
+                        passwordStrength.level === 1 ? 'bg-red-500 w-1/4' :
+                        passwordStrength.level === 2 ? 'bg-orange-500 w-2/4' :
+                        passwordStrength.level === 3 ? 'bg-yellow-500 w-3/4' :
+                        'bg-green-500 w-full'
+                      }`}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    建议：至少8个字符，包含大小写字母和数字
+                  </p>
+                </div>
+              )}
+              
+              {isLogin && (
+                <p className="mt-1 text-xs text-gray-500">
+                  至少6个字符
+                </p>
+              )}
             </div>
             
+            {/* 提交按钮 */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors flex items-center justify-center"
             >
-              {loading ? '处理中...' : (isLogin ? '登录' : '注册')}
+              {loading ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  处理中...
+                </>
+              ) : (
+                isLogin ? '登录' : '注册'
+              )}
             </button>
           </form>
           
+          {/* 切换登录/注册 */}
           <div className="mt-6 text-center">
             <button
               onClick={() => {
                 setIsLogin(!isLogin);
                 setError('');
+                setPassword('');
               }}
-              className="text-blue-600 hover:underline"
+              className="text-blue-600 hover:text-blue-700 font-medium"
             >
-              {isLogin ? '没有账号?去注册' : '已有账号?去登录'}
+              {isLogin ? '还没有账号？立即注册' : '已有账号？立即登录'}
             </button>
           </div>
+          
+          {/* 提示信息 */}
+          {redirectParam && (
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-700">
+                登录后将跳转回之前的页面
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
