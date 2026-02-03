@@ -1,20 +1,13 @@
 /**
- * 文章详情页面（优化版）
+ * 文章详情页面（修复日期错误版）
  * 
- * 功能：
- * - 显示文章详情
- * - 评论功能
- * - 点赞功能
- * 
- * 优化内容：
- * 1. 修复API响应格式处理
- * 2. 使用完整的TypeScript类型
- * 3. 修复评论API调用（使用postId而不是slug）
- * 4. 改进错误处理
- * 5. 添加点赞功能
+ * 修复内容：
+ * 1. 修复日期格式错误（Invalid time value）
+ * 2. 添加日期验证
+ * 3. 处理null/undefined日期
  * 
  * @author 优化版本
- * @version 2.0.0
+ * @version 2.0.1
  */
 
 import { useEffect, useState } from 'react';
@@ -25,6 +18,46 @@ import { api } from '../utils/api';
 import { format } from 'date-fns';
 import { useAuthStore } from '../stores/authStore';
 import type { Post, Comment } from '../types';
+
+// ============= 辅助函数 =============
+
+/**
+ * 安全的日期格式化函数
+ */
+function formatDate(date: any, formatStr: string = 'yyyy-MM-dd HH:mm'): string {
+  if (!date) return '未知时间';
+  
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    
+    // 检查日期是否有效
+    if (isNaN(dateObj.getTime())) {
+      console.warn('Invalid date:', date);
+      return '未知时间';
+    }
+    
+    return format(dateObj, formatStr);
+  } catch (error) {
+    console.error('Date format error:', error, 'Date:', date);
+    return '未知时间';
+  }
+}
+
+/**
+ * 检查日期是否有效
+ */
+function isValidDate(date: any): boolean {
+  if (!date) return false;
+  
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return !isNaN(dateObj.getTime());
+  } catch {
+    return false;
+  }
+}
+
+// ============= 组件 =============
 
 export function PostPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -107,7 +140,8 @@ export function PostPage() {
       
       if (response.success) {
         setNewComment('');
-        loadComments(post.id);
+        // 重新加载评论列表
+        await loadComments(post.id);
       } else {
         throw new Error(response.error || '发表评论失败');
       }
@@ -167,7 +201,8 @@ export function PostPage() {
               {comment.displayName || comment.username}
             </span>
             <span className="text-sm text-gray-500">
-              {format(new Date(comment.createdAt), 'yyyy-MM-dd HH:mm')}
+              {/* 使用安全的日期格式化 */}
+              {formatDate(comment.createdAt || comment.created_at)}
             </span>
           </div>
           <p className="text-gray-700 whitespace-pre-wrap">{comment.content}</p>
@@ -177,7 +212,7 @@ export function PostPage() {
               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
               </svg>
-              {comment.likeCount || 0}
+              {comment.likeCount || comment.like_count || 0}
             </button>
             
             {level < 3 && (
@@ -233,28 +268,35 @@ export function PostPage() {
         
         <div className="flex items-center text-sm text-gray-500 space-x-4 mb-8">
           <span className="flex items-center">
-            {post.authorAvatar ? (
-              <img src={post.authorAvatar} alt={post.authorName} className="w-6 h-6 rounded-full mr-2" />
+            {post.authorAvatar || post.author_avatar ? (
+              <img 
+                src={post.authorAvatar || post.author_avatar} 
+                alt={post.authorName || post.author_name} 
+                className="w-6 h-6 rounded-full mr-2" 
+              />
             ) : (
               <div className="w-6 h-6 rounded-full bg-gray-300 mr-2"></div>
             )}
-            {post.authorName || 'Unknown'}
+            {post.authorName || post.author_name || post.author_display_name || 'Unknown'}
           </span>
           <span>•</span>
-          <span>{post.publishedAt ? format(new Date(post.publishedAt), 'yyyy-MM-dd HH:mm') : '未发布'}</span>
+          <span>
+            {/* 使用安全的日期格式化 */}
+            {formatDate(post.publishedAt || post.published_at)}
+          </span>
           <span>•</span>
-          <span>{post.viewCount} 次阅读</span>
-          {post.readingTime && (
+          <span>{post.viewCount || post.view_count || 0} 次阅读</span>
+          {(post.readingTime || post.reading_time) && (
             <>
               <span>•</span>
-              <span>{post.readingTime} 分钟</span>
+              <span>{post.readingTime || post.reading_time} 分钟</span>
             </>
           )}
         </div>
         
-        {post.coverImage && (
+        {(post.coverImage || post.cover_image) && (
           <img
-            src={post.coverImage}
+            src={post.coverImage || post.cover_image}
             alt={post.title}
             className="w-full h-96 object-cover rounded-lg mb-8"
           />
@@ -306,14 +348,14 @@ export function PostPage() {
                   d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
                 />
               </svg>
-              <span>{post.likeCount}</span>
+              <span>{post.likeCount || post.like_count || 0}</span>
             </button>
             
             <div className="flex items-center space-x-2 text-gray-600">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
-              <span>{post.commentCount} 评论</span>
+              <span>{post.commentCount || post.comment_count || 0} 评论</span>
             </div>
           </div>
           
