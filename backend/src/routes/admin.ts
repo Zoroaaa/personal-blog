@@ -18,6 +18,9 @@ import { safeParseInt } from '../utils/validation';
 
 export const adminRoutes = new Hono<{ Bindings: Env }>();
 
+// 应用认证中间件到所有管理路由
+adminRoutes.use('*', requireAuth);
+
 // ============= 常量配置 =============
 
 const DEFAULT_PAGE_SIZE = 20;

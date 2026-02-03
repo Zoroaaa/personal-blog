@@ -19,6 +19,11 @@ import { safeParseInt } from '../utils/validation';
 
 export const analyticsRoutes = new Hono<{ Bindings: Env }>();
 
+// 为需要管理员权限的路由应用认证中间件
+analyticsRoutes.use('/stats', requireAuth);
+analyticsRoutes.use('/post/*', requireAuth);
+analyticsRoutes.use('/users', requireAuth);
+
 // ============= 常量配置 =============
 
 const DEFAULT_PAGE_SIZE = 10;
