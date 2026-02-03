@@ -442,6 +442,14 @@ export const api = {
     }),
   
   /**
+   * 删除用户
+   */
+  deleteUser: (id: number) =>
+    apiRequest<{ deleted: boolean }>(`/admin/users/${id}`, {
+      method: 'DELETE',
+    }),
+  
+  /**
    * 获取系统统计数据
    */
   getAnalytics: () =>
