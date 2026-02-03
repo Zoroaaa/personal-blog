@@ -170,6 +170,8 @@ export function PostPage() {
       
       const response = await api.likePost(post.id);
       
+      console.log('Like response:', response);
+      
       if (response.success && response.data) {
         // 更新文章点赞状态
         setPost({
@@ -177,9 +179,12 @@ export function PostPage() {
           isLiked: response.data.liked,
           likeCount: post.likeCount + (response.data.liked ? 1 : -1)
         });
+      } else {
+        console.error('Like post failed:', response.error);
       }
     } catch (error) {
       console.error('Failed to like post:', error);
+      alert('点赞失败，请重试');
     } finally {
       setLiking(false);
     }

@@ -49,7 +49,19 @@ export function HomePage() {
       
       // 检查响应格式
       if (response.success && response.data) {
-        setPosts(response.data.posts || []);
+        // 处理后端返回的字段名称，转换为前端期望的格式
+        const processedPosts = (response.data.posts || []).map((post: any) => ({
+          ...post,
+          authorName: post.author_name || post.author_display_name,
+          authorAvatar: post.author_avatar,
+          viewCount: post.view_count,
+          likeCount: post.like_count,
+          commentCount: post.comment_count,
+          publishedAt: post.published_at,
+          coverImage: post.cover_image
+        }));
+        
+        setPosts(processedPosts);
         
         if (response.data.pagination) {
           setTotalPages(response.data.pagination.totalPages);

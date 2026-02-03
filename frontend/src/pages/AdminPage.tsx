@@ -24,10 +24,17 @@ export function AdminPage() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [summary, setSummary] = useState('');
+  const [coverImage, setCoverImage] = useState('');
   const [postStatus, setPostStatus] = useState<'draft' | 'published'>('draft');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  
+  // 文章列表状态
+  const [posts, setPosts] = useState<any[]>([]);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [postsError, setPostsError] = useState('');
+  const [showCreateForm, setShowCreateForm] = useState(false);
   
   // 评论管理状态
   const [comments, setComments] = useState<any[]>([]);
@@ -75,6 +82,13 @@ export function AdminPage() {
     }
   }, [searchParams]);
   
+  // 加载文章列表
+  useEffect(() => {
+    if (activeTab === 'posts' && !showCreateForm) {
+      loadPosts();
+    }
+  }, [activeTab, showCreateForm]);
+  
   // 加载文章详情用于编辑
   const loadPostForEdit = async (postId: number) => {
     try {
@@ -86,11 +100,45 @@ export function AdminPage() {
         setTitle(response.data.title);
         setContent(response.data.content);
         setSummary(response.data.summary || '');
+        setCoverImage(response.data.coverImage || '');
         setPostStatus(response.data.status as 'draft' | 'published');
-        setActiveTab('posts');
+        setShowCreateForm(true);
       }
     } catch (err: any) {
       setError(err.message || '加载文章失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // 加载文章列表
+  const loadPosts = async () => {
+    try {
+      setPostsLoading(true);
+      setPostsError('');
+      
+      const response = await api.getPosts({ limit: '100' });
+      if (response.success && response.data) {
+        setPosts(response.data.posts || []);
+      }
+    } catch (err: any) {
+      setPostsError(err.message || '加载文章列表失败');
+    } finally {
+      setPostsLoading(false);
+    }
+  };
+  
+  // 删除文章
+  const handleDeletePost = async (postId: number) => {
+    if (!confirm('确定要删除这篇文章吗？')) return;
+    
+    try {
+      setLoading(true);
+      await api.deletePost(postId);
+      await loadPosts();
+      alert('文章删除成功');
+    } catch (err: any) {
+      setError(err.message || '删除失败');
     } finally {
       setLoading(false);
     }
@@ -229,6 +277,7 @@ export function AdminPage() {
         title,
         content,
         summary,
+        coverImage,
         status: postStatus,
       });
       
@@ -236,6 +285,7 @@ export function AdminPage() {
       setTitle('');
       setContent('');
       setSummary('');
+      setCoverImage('');
       setPostStatus('draft');
       
       setTimeout(() => setSuccess(false), 3000);
@@ -252,113 +302,257 @@ export function AdminPage() {
       case 'posts':
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold mb-4">创建文章</h2>
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">文章管理</h2>
+              <button
+                onClick={() => {
+                  setShowCreateForm(true);
+                  // 重置表单
+                  setTitle('');
+                  setContent('');
+                  setSummary('');
+                  setCoverImage('');
+                  setPostStatus('draft');
+                  setError('');
+                  setSuccess(false);
+                }}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                新建文章
+              </button>
+            </div>
             
-            {error && (
-              <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
-                {error}
-              </div>
-            )}
-            
-            {success && (
-              <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">
-                文章创建成功!
-              </div>
-            )}
-            
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  标题
-                </label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  摘要
-                </label>
-                <textarea
-                  value={summary}
-                  onChange={(e) => setSummary(e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
-                  rows={2}
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  封面图片
-                </label>
-                <div className="flex space-x-4">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        try {
-                          setLoading(true);
-                          const response = await api.uploadImage(file);
-                          if (response.success && response.data) {
-                            // 这里可以将上传的图片URL保存到状态中
-                            alert('图片上传成功: ' + response.data.url);
+            {showCreateForm ? (
+              <div className="space-y-6">
+                <h3 className="text-xl font-semibold mb-4">{title ? '编辑文章' : '创建文章'}</h3>
+                
+                {error && (
+                  <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
+                    {error}
+                  </div>
+                )}
+                
+                {success && (
+                  <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">
+                    文章创建成功!
+                  </div>
+                )}
+                
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  await handleSubmit(e);
+                  if (success) {
+                    setShowCreateForm(false);
+                  }
+                }} className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      标题
+                    </label>
+                    <input
+                      type="text"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      摘要
+                    </label>
+                    <textarea
+                      value={summary}
+                      onChange={(e) => setSummary(e.target.value)}
+                      className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                      rows={2}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      封面图片
+                    </label>
+                    <div className="flex space-x-4">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            try {
+                              setLoading(true);
+                              const response = await api.uploadImage(file);
+                              if (response.success && response.data) {
+                                // 保存上传的图片URL到状态中
+                                setCoverImage(response.data.url);
+                                alert('图片上传成功: ' + response.data.url);
+                              }
+                            } catch (error) {
+                              setError('上传失败: ' + (error instanceof Error ? error.message : '未知错误'));
+                            } finally {
+                              setLoading(false);
+                            }
                           }
-                        } catch (error) {
-                          setError('上传失败: ' + (error instanceof Error ? error.message : '未知错误'));
-                        } finally {
-                          setLoading(false);
+                        }}
+                        className="border rounded-lg px-3 py-2"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      内容 (支持Markdown)
+                    </label>
+                    <textarea
+                      value={content}
+                      onChange={(e) => setContent(e.target.value)}
+                      onPaste={async (e) => {
+                        const items = e.clipboardData.items;
+                        for (let i = 0; i < items.length; i++) {
+                          if (items[i].type.indexOf('image') === 0) {
+                            e.preventDefault();
+                            const file = items[i].getAsFile();
+                            if (file) {
+                              try {
+                                setLoading(true);
+                                const response = await api.uploadImage(file);
+                                if (response.success && response.data) {
+                                  // 将图片URL插入到内容中
+                                  const imageUrl = response.data.url;
+                                  const markdownImage = `![图片](${imageUrl})`;
+                                  setContent(prev => prev + markdownImage);
+                                  alert('图片粘贴成功');
+                                }
+                              } catch (error) {
+                                setError('图片粘贴失败: ' + (error instanceof Error ? error.message : '未知错误'));
+                              } finally {
+                                setLoading(false);
+                              }
+                            }
+                          }
                         }
-                      }
-                    }}
-                    className="border rounded-lg px-3 py-2"
-                  />
+                      }}
+                      className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 font-mono"
+                      rows={20}
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      状态
+                    </label>
+                    <select
+                      value={postStatus}
+                      onChange={(e) => setPostStatus(e.target.value as 'draft' | 'published')}
+                      className="border rounded-lg px-3 py-2"
+                    >
+                      <option value="draft">草稿</option>
+                      <option value="published">发布</option>
+                    </select>
+                  </div>
+                  
+                  <div className="flex space-x-4">
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {loading ? '保存中...' : (title ? '更新文章' : '创建文章')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateForm(false)}
+                      className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                    >
+                      取消
+                    </button>
+                  </div>
+                </form>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {postsError && (
+                  <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
+                    {postsError}
+                  </div>
+                )}
+                
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          标题
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          作者
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          状态
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          发布时间
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          操作
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {postsLoading ? (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-4 text-center">
+                            加载中...
+                          </td>
+                        </tr>
+                      ) : posts.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-4 text-center">
+                            暂无文章
+                          </td>
+                        </tr>
+                      ) : (
+                        posts.map((post) => (
+                          <tr key={post.id}>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {post.title}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {post.author_name || post.author_username || '未知'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 py-1 rounded text-xs ${post.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                {post.status === 'published' ? '已发布' : '草稿'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {post.published_at || '未发布'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <button
+                                onClick={() => loadPostForEdit(post.id)}
+                                className="text-blue-600 hover:text-blue-900 mr-4"
+                              >
+                                编辑
+                              </button>
+                              <button
+                                onClick={() => handleDeletePost(post.id)}
+                                className="text-red-600 hover:text-red-900"
+                              >
+                                删除
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  内容 (支持Markdown)
-                </label>
-                <textarea
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 font-mono"
-                  rows={20}
-                  required
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  状态
-                </label>
-                <select
-                  value={postStatus}
-                  onChange={(e) => setPostStatus(e.target.value as 'draft' | 'published')}
-                  className="border rounded-lg px-3 py-2"
-                >
-                  <option value="draft">草稿</option>
-                  <option value="published">发布</option>
-                </select>
-              </div>
-              
-              <div className="flex space-x-4">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {loading ? '创建中...' : '创建文章'}
-                </button>
-              </div>
-            </form>
+            )}
           </div>
         );
       
@@ -423,7 +617,7 @@ export function AdminPage() {
                           {comment.user?.username || comment.username || '未知用户'}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-500">
-                          {comment.post?.title || comment.postTitle || '未知文章'}
+                          {comment.post_title || comment.post?.title || comment.postTitle || '未知文章'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <select
@@ -531,7 +725,7 @@ export function AdminPage() {
                           </select>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(userItem.createdAt).toLocaleString()}
+                          {userItem.created_at ? new Date(userItem.created_at).toLocaleString() : userItem.createdAt ? new Date(userItem.createdAt).toLocaleString() : '未知'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <button
