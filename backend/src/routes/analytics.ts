@@ -24,6 +24,119 @@ analyticsRoutes.use('/stats', requireAuth);
 analyticsRoutes.use('/post/*', requireAuth);
 analyticsRoutes.use('/users', requireAuth);
 
+// ============= 系统统计数据 =============
+
+/**
+ * GET /api/analytics
+ * 获取系统统计数据（需要管理员权限）
+ * 兼容前端的getAnalytics调用
+ */
+analyticsRoutes.get('/', requireAdmin, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    // 尝试从缓存获取
+    const cacheKey = 'analytics:stats';
+    const cached = await c.env.CACHE.get(cacheKey);
+    
+    if (cached) {
+      logger.info('Stats served from cache');
+      return c.json(JSON.parse(cached));
+    }
+    
+    // 1. 总文章数
+    const totalPostsResult = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM posts WHERE status = ?'
+    ).bind('published').first() as any;
+    const totalPosts = totalPostsResult?.count || 0;
+    
+    // 2. 总用户数
+    const totalUsersResult = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM users WHERE status = ?'
+    ).bind('active').first() as any;
+    const totalUsers = totalUsersResult?.count || 0;
+    
+    // 3. 总评论数
+    const totalCommentsResult = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM comments WHERE status = ?'
+    ).bind('approved').first() as any;
+    const totalComments = totalCommentsResult?.count || 0;
+    
+    // 4. 总浏览量
+    const totalViewsResult = await c.env.DB.prepare(
+      'SELECT SUM(view_count) as total FROM posts'
+    ).first() as any;
+    const totalViews = totalViewsResult?.total || 0;
+    
+    // 5. 最近文章
+    const { results: recentPosts } = await c.env.DB.prepare(`
+      SELECT id, title, slug, published_at as createdAt
+      FROM posts 
+      WHERE status = 'published' 
+      ORDER BY published_at DESC 
+      LIMIT 5
+    `).all();
+    
+    // 6. 最近评论
+    const { results: recentComments } = await c.env.DB.prepare(`
+      SELECT c.id, c.content, c.created_at as createdAt, 
+             u.username as user_username
+      FROM comments c
+      LEFT JOIN users u ON c.user_id = u.id
+      WHERE c.status = 'approved'
+      ORDER BY c.created_at DESC
+      LIMIT 5
+    `).all();
+    
+    // 7. 浏览趋势
+    const viewTrend = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      date.setHours(0, 0, 0, 0);
+      
+      const nextDay = new Date(date);
+      nextDay.setDate(nextDay.getDate() + 1);
+      
+      const dayViewsResult = await c.env.DB.prepare(`
+        SELECT COUNT(*) as count FROM view_history 
+        WHERE created_at >= ? AND created_at < ?
+      `).bind(date.toISOString(), nextDay.toISOString()).first() as any;
+      
+      viewTrend.push({
+        date: date.toISOString().split('T')[0],
+        views: dayViewsResult?.count || 0
+      });
+    }
+    
+    const response = successResponse({
+      totalPosts,
+      totalComments,
+      totalUsers,
+      totalViews,
+      recentPosts,
+      recentComments,
+      viewTrend
+    });
+    
+    // 缓存结果
+    await c.env.CACHE.put(cacheKey, JSON.stringify(response), {
+      expirationTtl: CACHE_TTL.STATS
+    });
+    
+    logger.info('Stats fetched successfully');
+    
+    return c.json(response);
+    
+  } catch (error) {
+    logger.error('Get stats error', error);
+    return c.json(errorResponse(
+      'Failed to fetch stats',
+      'An error occurred while fetching statistics'
+    ), 500);
+  }
+});
+
 // ============= 常量配置 =============
 
 const DEFAULT_PAGE_SIZE = 10;
