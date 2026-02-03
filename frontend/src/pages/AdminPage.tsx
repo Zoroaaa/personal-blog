@@ -29,6 +29,7 @@ export function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [editingPostId, setEditingPostId] = useState<number | null>(null);
   
   // 文章列表状态
   const [posts, setPosts] = useState<any[]>([]);
@@ -102,6 +103,7 @@ export function AdminPage() {
         setSummary(response.data.summary || '');
         setCoverImage(response.data.coverImage || '');
         setPostStatus(response.data.status as 'draft' | 'published');
+        setEditingPostId(postId);
         setShowCreateForm(true);
       }
     } catch (err: any) {
@@ -135,7 +137,12 @@ export function AdminPage() {
     try {
       setLoading(true);
       await api.deletePost(postId);
-      await loadPosts();
+      // 先从本地状态中移除该文章，立即更新UI
+      setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
+      // 然后重新加载列表以确保数据一致性
+      setTimeout(() => {
+        loadPosts();
+      }, 500);
       alert('文章删除成功');
     } catch (err: any) {
       setError(err.message || '删除失败');
@@ -273,24 +280,49 @@ export function AdminPage() {
     setLoading(true);
     
     try {
-      await api.createPost({
-        title,
-        content,
-        summary,
-        coverImage,
-        status: postStatus,
-      });
-      
-      setSuccess(true);
-      setTitle('');
-      setContent('');
-      setSummary('');
-      setCoverImage('');
-      setPostStatus('draft');
-      
-      setTimeout(() => setSuccess(false), 3000);
+      if (editingPostId) {
+        // 编辑模式
+        await api.updatePost(editingPostId, {
+          title,
+          content,
+          summary,
+          coverImage,
+          status: postStatus,
+        });
+        setSuccess(true);
+        setTimeout(() => {
+          setSuccess(false);
+          setShowCreateForm(false);
+          setEditingPostId(null);
+          // 重置表单
+          setTitle('');
+          setContent('');
+          setSummary('');
+          setCoverImage('');
+          setPostStatus('draft');
+        }, 1000);
+      } else {
+        // 创建模式
+        await api.createPost({
+          title,
+          content,
+          summary,
+          coverImage,
+          status: postStatus,
+        });
+        setSuccess(true);
+        setTimeout(() => {
+          setSuccess(false);
+          // 重置表单
+          setTitle('');
+          setContent('');
+          setSummary('');
+          setCoverImage('');
+          setPostStatus('draft');
+        }, 1000);
+      }
     } catch (err: any) {
-      setError(err.message || '创建失败');
+      setError(err.message || '操作失败');
     } finally {
       setLoading(false);
     }
@@ -399,6 +431,12 @@ export function AdminPage() {
                         className="border rounded-lg px-3 py-2"
                       />
                     </div>
+                    {coverImage && (
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-600 mb-1">当前封面图片:</p>
+                        <img src={coverImage} alt="当前封面" className="max-w-xs h-auto rounded" />
+                      </div>
+                    )}
                   </div>
                   
                   <div>
@@ -729,7 +767,24 @@ export function AdminPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <button
-                            onClick={() => {/* 删除用户逻辑 */}}
+                            onClick={async () => {
+                              if (!confirm('确定要删除该用户吗？')) return;
+                              try {
+                                setUsersLoading(true);
+                                await api.deleteUser(userItem.id);
+                                // 先从本地状态中移除该用户，立即更新UI
+                                setUsers(prevUsers => prevUsers.filter(user => user.id !== userItem.id));
+                                // 然后重新加载列表以确保数据一致性
+                                setTimeout(() => {
+                                  loadUsers();
+                                }, 500);
+                                alert('用户删除成功');
+                              } catch (err: any) {
+                                setUsersError(err.message || '删除失败');
+                              } finally {
+                                setUsersLoading(false);
+                              }
+                            }}
                             className="text-red-600 hover:text-red-900"
                           >
                             删除
