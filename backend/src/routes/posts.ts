@@ -708,6 +708,205 @@ postRoutes.post('/:id/like', requireAuth, async (c) => {
   }
 });
 
+// ============= 搜索文章 =============
+
+/**
+ * GET /api/posts/search
+ * 搜索文章（公开）
+ * 
+ * 查询参数：
+ * - q: 搜索关键词
+ * - category: 分类slug
+ * - tag: 标签slug
+ * - page: 页码（默认1）
+ * - limit: 每页数量（默认10，最大50）
+ * - sort: 排序方式（published_at, view_count, like_count, comment_count, relevance）
+ * - order: 排序方向（asc, desc）
+ */
+postRoutes.get('/search', async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    // ===== 1. 解析和验证查询参数 =====
+    const q = c.req.query('q');
+    const category = c.req.query('category');
+    const tag = c.req.query('tag');
+    const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
+    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
+    const sort = c.req.query('sort') || 'published_at';
+    const order = c.req.query('order') === 'asc' ? 'ASC' : 'DESC';
+    const offset = (page - 1) * limit;
+    
+    // 验证排序字段
+    const allowedSortFields = ['published_at', 'view_count', 'like_count', 'comment_count', 'relevance'];
+    const finalSortBy = allowedSortFields.includes(sort) ? sort : 'published_at';
+    
+    // ===== 2. 尝试从缓存获取 =====
+    const cacheKey = `posts:search:${q || ''}:${category || ''}:${tag || ''}:${page}:${limit}:${finalSortBy}:${order}`;
+    const cached = await c.env.CACHE.get(cacheKey);
+    
+    if (cached) {
+      logger.info('Search results served from cache');
+      return c.json(JSON.parse(cached));
+    }
+    
+    // ===== 3. 构建查询 =====
+    let query = `
+      SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
+             p.view_count, p.like_count, p.comment_count, p.reading_time,
+             p.published_at, p.created_at,
+             u.username as author_name, u.display_name as author_display_name, 
+             u.avatar_url as author_avatar,
+             c.name as category_name, c.slug as category_slug, c.color as category_color
+      FROM posts p
+      LEFT JOIN users u ON p.author_id = u.id
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE p.status = 'published' AND p.visibility = 'public'
+    `;
+    
+    const params: any[] = [];
+    
+    // 搜索关键词
+    if (q) {
+      const searchTerm = `%${q}%`;
+      query += ` AND (p.title LIKE ? OR p.summary LIKE ? OR p.content LIKE ?)`;
+      params.push(searchTerm, searchTerm, searchTerm);
+    }
+    
+    // 分类过滤
+    if (category) {
+      query += ` AND c.slug = ?`;
+      params.push(category);
+    }
+    
+    // 标签过滤
+    if (tag) {
+      query += ` AND p.id IN (
+        SELECT pt.post_id FROM post_tags pt
+        JOIN tags t ON pt.tag_id = t.id
+        WHERE t.slug = ?
+      )`;
+      params.push(tag);
+    }
+    
+    // 排序
+    if (finalSortBy === 'relevance' && q) {
+      // 相关性排序（基于标题匹配权重更高）
+      query += ` ORDER BY 
+        CASE 
+          WHEN p.title LIKE ? THEN 0
+          WHEN p.summary LIKE ? THEN 1
+          WHEN p.content LIKE ? THEN 2
+          ELSE 3
+        END, p.published_at DESC LIMIT ? OFFSET ?`;
+      const searchTerm = `%${q}%`;
+      params.push(searchTerm, searchTerm, searchTerm, limit, offset);
+    } else {
+      query += ` ORDER BY p.${finalSortBy === 'relevance' ? 'published_at' : finalSortBy} ${order} LIMIT ? OFFSET ?`;
+      params.push(limit, offset);
+    }
+    
+    // ===== 4. 执行查询 =====
+    const { results } = await c.env.DB.prepare(query).bind(...params).all();
+    
+    // ===== 5. 获取总数 =====
+    let countQuery = `SELECT COUNT(*) as total FROM posts p 
+                      LEFT JOIN categories c ON p.category_id = c.id
+                      WHERE p.status = 'published' AND p.visibility = 'public'`;
+    const countParams: any[] = [];
+    
+    if (q) {
+      const searchTerm = `%${q}%`;
+      countQuery += ' AND (p.title LIKE ? OR p.summary LIKE ? OR p.content LIKE ?)';
+      countParams.push(searchTerm, searchTerm, searchTerm);
+    }
+    
+    if (category) {
+      countQuery += ' AND c.slug = ?';
+      countParams.push(category);
+    }
+    
+    if (tag) {
+      countQuery += ` AND p.id IN (
+        SELECT pt.post_id FROM post_tags pt
+        JOIN tags t ON pt.tag_id = t.id
+        WHERE t.slug = ?
+      )`;
+      countParams.push(tag);
+    }
+    
+    const countResult = await c.env.DB.prepare(countQuery).bind(...countParams).first() as any;
+    const total = countResult?.total || 0;
+    
+    // ===== 6. 为每篇文章获取标签（优化：批量查询） =====
+    const postIds = results.map((p: any) => p.id);
+    let postsWithTags = results;
+    
+    if (postIds.length > 0) {
+      const tagsQuery = `
+        SELECT pt.post_id, t.id, t.name, t.slug
+        FROM post_tags pt
+        JOIN tags t ON pt.tag_id = t.id
+        WHERE pt.post_id IN (${postIds.map(() => '?').join(',')})
+      `;
+      const { results: tagResults } = await c.env.DB.prepare(tagsQuery).bind(...postIds).all();
+      
+      // 组织标签数据
+      const tagsByPost = new Map();
+      (tagResults as any[]).forEach(tag => {
+        if (!tagsByPost.has(tag.post_id)) {
+          tagsByPost.set(tag.post_id, []);
+        }
+        tagsByPost.get(tag.post_id).push({
+          id: tag.id,
+          name: tag.name,
+          slug: tag.slug
+        });
+      });
+      
+      // 添加标签到文章
+      postsWithTags = results.map((post: any) => ({
+        ...post,
+        tags: tagsByPost.get(post.id) || []
+      }));
+    }
+    
+    // ===== 7. 构建响应 =====
+    const response = successResponse({
+      posts: postsWithTags,
+      total,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+    
+    // ===== 8. 缓存结果 =====
+    await c.env.CACHE.put(cacheKey, JSON.stringify(response), {
+      expirationTtl: CACHE_TTL.POST_LIST
+    });
+    
+    logger.info('Search completed successfully', { 
+      query: q,
+      category,
+      tag,
+      count: postsWithTags.length, 
+      total 
+    });
+    
+    return c.json(response);
+    
+  } catch (error) {
+    logger.error('Search error', error);
+    return c.json(errorResponse(
+      'Failed to search posts',
+      'An error occurred while searching posts'
+    ), 500);
+  }
+});
+
 // ============= 辅助函数 =============
 
 /**

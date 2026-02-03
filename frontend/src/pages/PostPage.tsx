@@ -14,10 +14,14 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
 import { api } from '../utils/api';
 import { format } from 'date-fns';
 import { useAuthStore } from '../stores/authStore';
 import type { Post, Comment } from '../types';
+
+// 导入代码高亮样式
+import 'highlight.js/styles/github.css';
 
 // ============= 辅助函数 =============
 
@@ -304,7 +308,26 @@ export function PostPage() {
         
         {/* 文章内容 */}
         <div className="prose prose-lg max-w-none mb-8">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <ReactMarkdown 
+            remarkPlugins={[remarkGfm]} 
+            rehypePlugins={[rehypeHighlight]}
+            components={{
+              code: ({ node, inline, className, children, ...props }) => {
+                const match = /language-(\w+)/.exec(className || '');
+                return !inline && match ? (
+                  <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
+                    <code className={className} {...props}>
+                      {children}
+                    </code>
+                  </pre>
+                ) : (
+                  <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono" {...props}>
+                    {children}
+                  </code>
+                );
+              }
+            }}
+          >
             {post.content}
           </ReactMarkdown>
         </div>
