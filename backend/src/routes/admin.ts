@@ -423,6 +423,54 @@ adminRoutes.put('/users/:id/role', requireAdmin, async (c) => {
   }
 });
 
+/**
+ * DELETE /api/admin/users/:id
+ * 删除用户（需要管理员权限）
+ */
+adminRoutes.delete('/users/:id', requireAdmin, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const userId = c.req.param('id');
+    
+    if (!userId) {
+      return c.json(errorResponse('Invalid user ID'), 400);
+    }
+    
+    // 检查用户是否存在
+    const user = await c.env.DB.prepare(
+      'SELECT id, username FROM users WHERE id = ?'
+    ).bind(userId).first() as any;
+    
+    if (!user) {
+      return c.json(errorResponse('User not found'), 404);
+    }
+    
+    // 不允许删除自己的账号
+    const currentUser = c.get('user') as any;
+    if (userId === currentUser.userId.toString()) {
+      return c.json(errorResponse(
+        'Cannot delete own account',
+        'You cannot delete your own account'
+      ), 403);
+    }
+    
+    // 删除用户
+    await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId).run();
+    
+    logger.info('User deleted by admin', { userId, username: user.username });
+    
+    return c.json(successResponse({ deleted: true }));
+    
+  } catch (error) {
+    logger.error('Delete user error', error);
+    return c.json(errorResponse(
+      'Failed to delete user',
+      'An error occurred while deleting user'
+    ), 500);
+  }
+});
+
 // ============= 系统设置 =============
 
 /**
