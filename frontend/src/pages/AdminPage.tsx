@@ -101,7 +101,8 @@ export function AdminPage() {
         setTitle(response.data.title);
         setContent(response.data.content);
         setSummary(response.data.summary || '');
-        setCoverImage(response.data.coverImage || '');
+        // 尝试从多个可能的字段中获取封面图片
+        setCoverImage(response.data.coverImage || response.data.cover_image || '');
         setPostStatus(response.data.status as 'draft' | 'published');
         setEditingPostId(postId);
         setShowCreateForm(true);
@@ -136,15 +137,14 @@ export function AdminPage() {
     
     try {
       setLoading(true);
-      await api.deletePost(postId);
       // 先从本地状态中移除该文章，立即更新UI
       setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
-      // 然后重新加载列表以确保数据一致性
-      setTimeout(() => {
-        loadPosts();
-      }, 500);
+      // 然后发送删除请求
+      await api.deletePost(postId);
       alert('文章删除成功');
     } catch (err: any) {
+      // 如果删除失败，重新加载列表以恢复正确的状态
+      await loadPosts();
       setError(err.message || '删除失败');
     } finally {
       setLoading(false);
@@ -300,6 +300,8 @@ export function AdminPage() {
           setSummary('');
           setCoverImage('');
           setPostStatus('draft');
+          // 重新加载文章列表，确保状态更新
+          loadPosts();
         }, 1000);
       } else {
         // 创建模式
@@ -319,6 +321,8 @@ export function AdminPage() {
           setSummary('');
           setCoverImage('');
           setPostStatus('draft');
+          // 重新加载文章列表，确保新文章显示
+          loadPosts();
         }, 1000);
       }
     } catch (err: any) {

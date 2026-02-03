@@ -165,6 +165,17 @@ export function PostPage() {
     
     if (!post || liking) return;
     
+    // 立即更新本地状态，提升用户体验
+    const newIsLiked = !post.isLiked;
+    const newLikeCount = post.likeCount + (newIsLiked ? 1 : -1);
+    
+    // 先更新UI
+    setPost({
+      ...post,
+      isLiked: newIsLiked,
+      likeCount: newLikeCount
+    });
+    
     try {
       setLiking(true);
       
@@ -172,18 +183,24 @@ export function PostPage() {
       
       console.log('Like response:', response);
       
-      if (response.success && response.data) {
-        // 更新文章点赞状态
+      if (!response.success) {
+        // 如果API请求失败，恢复原来的状态
         setPost({
           ...post,
-          isLiked: response.data.liked,
-          likeCount: post.likeCount + (response.data.liked ? 1 : -1)
+          isLiked: !newIsLiked,
+          likeCount: post.likeCount
         });
-      } else {
         console.error('Like post failed:', response.error);
+        alert('点赞失败，请重试');
       }
     } catch (error) {
       console.error('Failed to like post:', error);
+      // 如果网络错误，恢复原来的状态
+      setPost({
+        ...post,
+        isLiked: !newIsLiked,
+        likeCount: post.likeCount
+      });
       alert('点赞失败，请重试');
     } finally {
       setLiking(false);
