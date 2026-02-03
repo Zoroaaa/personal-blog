@@ -327,6 +327,9 @@ commentRoutes.delete('/:id', requireAuth, async (c) => {
     
     // 计数更新由触发器自动处理
     
+    // 清除数据分析缓存
+    await c.env.CACHE.delete('analytics:stats');
+    
     logger.info('Comment deleted successfully', { 
       commentId: id,
       postId: comment.post_id,

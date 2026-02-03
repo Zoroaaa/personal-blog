@@ -604,6 +604,97 @@ postRoutes.put('/:id', requireAuth, async (c) => {
   }
 });
 
+// ============= 管理员获取文章列表 =============
+
+/**
+ * GET /api/posts/admin
+ * 获取所有文章列表（用于管理后台，需要认证）
+ * 不限制状态，返回所有文章
+ */
+postRoutes.get('/admin', requireAuth, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
+    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
+    const offset = (page - 1) * limit;
+    
+    // 从数据库获取所有文章（不限制状态）
+    const { results } = await c.env.DB.prepare(`
+      SELECT p.id, p.title, p.slug, p.summary, p.cover_image, p.status,
+             p.view_count, p.like_count, p.comment_count, p.reading_time,
+             p.published_at, p.created_at, p.updated_at,
+             u.username as author_name, u.display_name as author_display_name, 
+             u.avatar_url as author_avatar,
+             c.name as category_name, c.slug as category_slug, c.color as category_color
+      FROM posts p
+      LEFT JOIN users u ON p.author_id = u.id
+      LEFT JOIN categories c ON p.category_id = c.id
+      ORDER BY p.created_at DESC
+      LIMIT ? OFFSET ?
+    `).bind(limit, offset).all();
+    
+    // 获取总数
+    const countResult = await c.env.DB.prepare('SELECT COUNT(*) as total FROM posts').first() as any;
+    const total = countResult?.total || 0;
+    
+    // 为每篇文章获取标签
+    const postIds = results.map((p: any) => p.id);
+    let postsWithTags = results;
+    
+    if (postIds.length > 0) {
+      const tagsQuery = `
+        SELECT pt.post_id, t.id, t.name, t.slug
+        FROM post_tags pt
+        JOIN tags t ON pt.tag_id = t.id
+        WHERE pt.post_id IN (${postIds.map(() => '?').join(',')})
+      `;
+      const { results: tagResults } = await c.env.DB.prepare(tagsQuery).bind(...postIds).all();
+      
+      // 组织标签数据
+      const tagsByPost = new Map();
+      (tagResults as any[]).forEach(tag => {
+        if (!tagsByPost.has(tag.post_id)) {
+          tagsByPost.set(tag.post_id, []);
+        }
+        tagsByPost.get(tag.post_id).push({
+          id: tag.id,
+          name: tag.name,
+          slug: tag.slug
+        });
+      });
+      
+      // 添加标签到文章
+      postsWithTags = results.map((post: any) => ({
+        ...post,
+        tags: tagsByPost.get(post.id) || []
+      }));
+    }
+    
+    // 构建响应
+    const response = successResponse({
+      posts: postsWithTags,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+    
+    logger.info('Admin posts fetched successfully', { count: postsWithTags.length, total });
+    
+    return c.json(response);
+    
+  } catch (error) {
+    logger.error('Get admin posts error', error);
+    return c.json(errorResponse(
+      'Failed to fetch posts',
+      'An error occurred while fetching posts'
+    ), 500);
+  }
+});
+
 // ============= 管理员获取文章详情 =============
 
 /**
@@ -720,6 +811,8 @@ postRoutes.delete('/:id', requireAuth, requireAdmin, async (c) => {
     // 清除缓存
     await c.env.CACHE.delete(`post:${post.slug}`);
     await clearPostListCache(c);
+    // 清除数据分析缓存
+    await c.env.CACHE.delete('analytics:stats');
     
     logger.info('Post deleted successfully', { postId: id });
     
