@@ -120,7 +120,7 @@ export function AdminPage() {
       setPostsLoading(true);
       setPostsError('');
       
-      const response = await api.getPosts({ limit: '100' });
+      const response = await api.getAdminPosts({ limit: '100' });
       if (response.success && response.data) {
         setPosts(response.data.posts || []);
       }
@@ -321,6 +321,8 @@ export function AdminPage() {
           setSummary('');
           setCoverImage('');
           setPostStatus('draft');
+          // 关闭创建表单，返回文章列表
+          setShowCreateForm(false);
           // 重新加载文章列表，确保新文章显示
           loadPosts();
         }, 1000);
