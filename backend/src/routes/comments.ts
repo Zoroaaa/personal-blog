@@ -45,7 +45,8 @@ const MAX_COMMENT_LENGTH = 1000;
  * 获取评论列表（公开，支持分页）
  * 
  * 查询参数：
- * - postId: 文章ID（必填）
+ * - postId: 文章ID（二选一）
+ * - userId: 用户ID（二选一，需要认证）
  * - page: 页码（默认1）
  * - limit: 每页数量（默认20，最大100）
  * - includeReplies: 是否包含回复（默认true）
@@ -56,49 +57,85 @@ commentRoutes.get('/', optionalAuth, async (c) => {
   try {
     // ===== 1. 解析和验证查询参数 =====
     const postId = c.req.query('postId');
+    const userId = c.req.query('userId');
     const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
     const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
     const includeReplies = c.req.query('includeReplies') !== 'false';
     const offset = (page - 1) * limit;
     
-    if (!postId) {
+    if (!postId && !userId) {
       return c.json(errorResponse(
-        'Missing postId',
-        'postId parameter is required'
+        'Missing required parameter',
+        'Either postId or userId is required'
       ), 400);
     }
     
-    // ===== 2. 检查文章是否存在 =====
-    const post = await c.env.DB.prepare(
-      'SELECT id FROM posts WHERE id = ?'
-    ).bind(postId).first();
-    
-    if (!post) {
-      return c.json(errorResponse('Post not found'), 404);
+    // 如果是按用户ID获取，需要验证权限
+    if (userId) {
+      const currentUser = c.get('user') as any;
+      if (!currentUser || currentUser.userId !== parseInt(userId)) {
+        return c.json(errorResponse(
+          'Forbidden',
+          'You can only view your own comments'
+        ), 403);
+      }
     }
     
-    // ===== 3. 获取评论（只获取顶级评论用于分页） =====
-    const { results } = await c.env.DB.prepare(`
-      SELECT c.*, u.username, u.display_name, u.avatar_url
-      FROM comments c
-      JOIN users u ON c.user_id = u.id
-      WHERE c.post_id = ? AND c.status = 'approved' AND c.parent_id IS NULL
-      ORDER BY c.created_at DESC
-      LIMIT ? OFFSET ?
-    `).bind(postId, limit, offset).all();
+    // ===== 3. 获取评论 =====
+    let query, params;
+    
+    if (postId) {
+      // 按文章ID获取评论
+      query = `
+        SELECT c.*, u.username, u.display_name, u.avatar_url
+        FROM comments c
+        JOIN users u ON c.user_id = u.id
+        WHERE c.post_id = ? AND c.status = 'approved' AND c.parent_id IS NULL
+        ORDER BY c.created_at DESC
+        LIMIT ? OFFSET ?
+      `;
+      params = [postId, limit, offset];
+    } else {
+      // 按用户ID获取评论
+      query = `
+        SELECT c.*, u.username, u.display_name, u.avatar_url
+        FROM comments c
+        JOIN users u ON c.user_id = u.id
+        WHERE c.user_id = ? AND c.status = 'approved'
+        ORDER BY c.created_at DESC
+        LIMIT ? OFFSET ?
+      `;
+      params = [userId, limit, offset];
+    }
+    
+    const { results } = await c.env.DB.prepare(query).bind(...params).all();
     
     // ===== 4. 获取评论总数 =====
-    const countResult = await c.env.DB.prepare(`
-      SELECT COUNT(*) as total FROM comments 
-      WHERE post_id = ? AND status = 'approved' AND parent_id IS NULL
-    `).bind(postId).first() as any;
+    let countQuery, countParams;
+    
+    if (postId) {
+      countQuery = `
+        SELECT COUNT(*) as total FROM comments 
+        WHERE post_id = ? AND status = 'approved' AND parent_id IS NULL
+      `;
+      countParams = [postId];
+    } else {
+      countQuery = `
+        SELECT COUNT(*) as total FROM comments 
+        WHERE user_id = ? AND status = 'approved'
+      `;
+      countParams = [userId];
+    }
+    
+    const countResult = await c.env.DB.prepare(countQuery).bind(...countParams).first() as any;
     
     const total = countResult?.total || 0;
     
-    // ===== 5. 如果需要包含回复，获取所有回复 =====
+    // ===== 5. 处理评论数据 =====
     let comments = results as any[];
     
-    if (includeReplies && comments.length > 0) {
+    // 对于按用户ID获取的评论，不需要构建回复树，因为所有评论都是用户自己的
+    if (postId && includeReplies && comments.length > 0) {
       const commentIds = comments.map(c => c.id);
       
       // 获取所有回复（递归获取所有层级）
@@ -125,6 +162,16 @@ commentRoutes.get('/', optionalAuth, async (c) => {
       
       // 构建评论树
       comments = buildCommentTree([...comments, ...replies as any[]]);
+    } else if (!postId) {
+      // 按用户ID获取的评论，添加文章信息
+      for (const comment of comments) {
+        const post = await c.env.DB.prepare(
+          'SELECT id, title, slug FROM posts WHERE id = ?'
+        ).bind(comment.post_id).first() as any;
+        if (post) {
+          comment.post = post;
+        }
+      }
     }
     
     // ===== 6. 检查当前用户的点赞状态 =====
