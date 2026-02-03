@@ -57,7 +57,7 @@ function getRandomAvatar(username: string): string {
 // ============= 组件 =============
 
 export function ProfilePage() {
-  const { user, logout } = useAuthStore();
+  const { user, logout, setUser } = useAuthStore();
   const navigate = useNavigate();
   
   // 状态管理
@@ -89,6 +89,7 @@ export function ProfilePage() {
   useEffect(() => {
     if (user) {
       loadUserInfo();
+      loadLikedPosts(); // 同时加载点赞数据，确保统计信息准确
     }
   }, [user]);
   
@@ -126,8 +127,8 @@ export function ProfilePage() {
       
       const response = await api.getComments({
         userId: user?.id.toString() || '',
-        page: '1',
-        limit: '20'
+        page: 1,
+        limit: 20
       });
       
       if (response.success && response.data) {
@@ -210,9 +211,13 @@ export function ProfilePage() {
         avatarUrl
       });
       
-      if (response.success) {
+      if (response.success && response.data) {
         setSuccessMessage('资料更新成功');
-        loadUserInfo(); // 重新加载用户信息
+        await loadUserInfo(); // 重新加载用户信息
+        // 更新authStore中的用户信息，确保页面上方的头像也能更新
+        if (response.data.user) {
+          setUser(response.data.user);
+        }
       }
     } catch (error) {
       console.error('Failed to update profile:', error);
@@ -234,15 +239,21 @@ export function ProfilePage() {
         return;
       }
       
-      // 这里需要后端提供修改密码的API
-      // 暂时使用模拟成功
-      setSuccessMessage('密码修改成功');
-      setFormData(prev => ({
-        ...prev,
-        password: '',
-        newPassword: '',
-        confirmPassword: ''
-      }));
+      // 调用修改密码API
+      const response = await api.changePassword({
+        currentPassword: formData.password,
+        newPassword: formData.newPassword
+      });
+      
+      if (response.success) {
+        setSuccessMessage('密码修改成功');
+        setFormData(prev => ({
+          ...prev,
+          password: '',
+          newPassword: '',
+          confirmPassword: ''
+        }));
+      }
     } catch (error) {
       console.error('Failed to change password:', error);
       setError('修改密码失败');
@@ -485,7 +496,7 @@ export function ProfilePage() {
         {likedPosts.map((post) => (
           <Link 
             key={post.id} 
-            to={`/posts/${post.slug}`} 
+            to={`/posts/${post.slug || post.id}`} 
             className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow group"
           >
             {post.coverImage && (
