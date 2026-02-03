@@ -234,10 +234,24 @@ export const api = {
     apiRequest<Post>(`/posts/${slug}`),
   
   /**
-   * 通过ID获取文章详情（用于编辑）
-   */
+ * 通过ID获取文章详情（用于编辑）
+ */
   getPostById: (id: number) => 
     apiRequest<Post>(`/posts/admin/${id}`),
+  
+  /**
+   * 获取所有文章列表（用于管理后台）
+   */
+  getAdminPosts: (params?: {
+    page?: string;
+    limit?: string;
+  }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return apiRequest<{
+      posts: PostListItem[];
+      pagination: { page: number; limit: number; total: number; totalPages: number }
+    }>(`/posts/admin${query}`);
+  },
   
   /**
    * 创建文章
