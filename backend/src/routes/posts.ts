@@ -604,6 +604,95 @@ postRoutes.put('/:id', requireAuth, async (c) => {
   }
 });
 
+// ============= 管理员获取文章详情 =============
+
+/**
+ * GET /api/posts/admin/:id
+ * 通过ID获取文章详情（用于编辑，需要认证）
+ */
+postRoutes.get('/admin/:id', requireAuth, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const id = c.req.param('id');
+    
+    if (!id) {
+      return c.json(errorResponse('Invalid post ID'), 400);
+    }
+    
+    // 从数据库获取文章（不限制状态）
+    const post = await c.env.DB.prepare(`
+      SELECT p.*, 
+             u.username as author_username,
+             u.display_name as author_name,
+             u.avatar_url as author_avatar,
+             u.bio as author_bio,
+             c.name as category_name, 
+             c.slug as category_slug,
+             c.color as category_color,
+             c.icon as category_icon
+      FROM posts p
+      LEFT JOIN users u ON p.author_id = u.id
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE p.id = ?
+    `).bind(id).first() as any;
+    
+    if (!post) {
+      logger.warn('Post not found', { id });
+      return c.json(errorResponse(
+        'Post not found',
+        'The requested post does not exist'
+      ), 404);
+    }
+    
+    // 权限检查
+    const user = c.get('user') as any;
+    if (post.author_id !== user.userId && user.role !== 'admin') {
+      return c.json(errorResponse(
+        'Forbidden',
+        'You do not have permission to view this post'
+      ), 403);
+    }
+    
+    // 获取标签
+    const { results: tags } = await c.env.DB.prepare(`
+      SELECT t.id, t.name, t.slug, t.post_count
+      FROM tags t
+      JOIN post_tags pt ON t.id = pt.tag_id
+      WHERE pt.post_id = ?
+    `).bind(post.id).all();
+    
+    // 构建响应
+    const result = {
+      ...post,
+      tags,
+      author: {
+        username: post.author_username,
+        displayName: post.author_name,
+        avatarUrl: post.author_avatar,
+        bio: post.author_bio
+      }
+    };
+    
+    // 清理冗余字段
+    delete result.author_username;
+    delete result.author_name;
+    delete result.author_avatar;
+    delete result.author_bio;
+    
+    logger.info('Admin post fetched successfully', { id: post.id });
+    
+    return c.json(successResponse(result));
+    
+  } catch (error) {
+    logger.error('Get admin post error', error);
+    return c.json(errorResponse(
+      'Failed to fetch post',
+      'An error occurred while fetching the post'
+    ), 500);
+  }
+});
+
 // ============= 删除文章 =============
 
 /**
