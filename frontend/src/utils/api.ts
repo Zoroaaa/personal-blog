@@ -214,6 +214,15 @@ export const api = {
       body: JSON.stringify(data),
     }),
   
+  /**
+   * 修改密码
+   */
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    apiRequest<{ success: boolean }>('/auth/password', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  
   // ============= 文章相关 =============
   
   /**
