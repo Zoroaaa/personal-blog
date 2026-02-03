@@ -288,6 +288,21 @@ export const api = {
     }),
   
   /**
+   * 获取用户点赞的文章列表
+   */
+  getLikedPosts: (params?: {
+    page?: string;
+    limit?: string;
+  }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return apiRequest<{
+      posts: PostListItem[];
+      total: number;
+      pagination: { page: number; limit: number; total: number; totalPages: number }
+    }>(`/posts/likes${query}`);
+  },
+  
+  /**
    * 搜索文章
    */
   searchPosts: (params: {
