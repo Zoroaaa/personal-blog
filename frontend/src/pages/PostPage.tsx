@@ -185,16 +185,113 @@ export function PostPage() {
     }
   };
   
+  // 评论状态管理
+  const [replyingTo, setReplyingTo] = useState<number | null>(null);
+  const [replyContent, setReplyContent] = useState('');
+  const [commentLiking, setCommentLiking] = useState<number | null>(null);
+  
+  // 处理评论点赞
+  const handleLikeComment = async (commentId: number) => {
+    if (!isAuthenticated) {
+      navigate('/login?redirect=' + encodeURIComponent(window.location.pathname));
+      return;
+    }
+    
+    if (commentLiking === commentId) return;
+    
+    try {
+      setCommentLiking(commentId);
+      
+      const response = await api.likeComment(commentId);
+      
+      if (response.success && response.data) {
+        // 更新评论点赞状态
+        setComments(prevComments => 
+          updateCommentInList(prevComments, commentId, response.data.liked)
+        );
+      }
+    } catch (error) {
+      console.error('Failed to like comment:', error);
+    } finally {
+      setCommentLiking(null);
+    }
+  };
+  
+  // 处理评论回复
+  const handleReply = (commentId: number) => {
+    setReplyingTo(replyingTo === commentId ? null : commentId);
+    setReplyContent('');
+  };
+  
+  // 处理回复提交
+  const handleSubmitReply = async (e: React.FormEvent, parentId: number) => {
+    e.preventDefault();
+    
+    if (!replyContent.trim() || !post) return;
+    
+    if (!isAuthenticated) {
+      navigate('/login?redirect=' + encodeURIComponent(window.location.pathname));
+      return;
+    }
+    
+    try {
+      setCommentLoading(true);
+      
+      const response = await api.createComment({
+        postId: post.id,
+        content: replyContent.trim(),
+        parentId,
+      });
+      
+      if (response.success) {
+        setReplyContent('');
+        setReplyingTo(null);
+        // 重新加载评论列表
+        await loadComments(post.id);
+      } else {
+        throw new Error(response.error || '发表回复失败');
+      }
+    } catch (error) {
+      console.error('Failed to create reply:', error);
+      alert(error instanceof Error ? error.message : '发表回复失败');
+    } finally {
+      setCommentLoading(false);
+    }
+  };
+  
+  // 辅助函数：更新评论列表中的评论
+  const updateCommentInList = (comments: Comment[], commentId: number, liked: boolean): Comment[] => {
+    return comments.map(comment => {
+      if (comment.id === commentId) {
+        return {
+          ...comment,
+          likeCount: comment.likeCount + (liked ? 1 : -1),
+        };
+      }
+      if (comment.replies) {
+        return {
+          ...comment,
+          replies: updateCommentInList(comment.replies, commentId, liked),
+        };
+      }
+      return comment;
+    });
+  };
+  
   // 渲染评论
   const renderComment = (comment: Comment, level = 0) => (
     <div key={comment.id} className={`${level > 0 ? 'ml-8' : ''} border-l-2 border-gray-200 pl-4 mb-4`}>
       <div className="flex items-start space-x-3">
-        {comment.avatarUrl ? (
-          <img src={comment.avatarUrl} alt={comment.displayName} className="w-10 h-10 rounded-full" />
+        {comment.avatarUrl || comment.user?.avatarUrl ? (
+          <img 
+            src={comment.avatarUrl || comment.user?.avatarUrl} 
+            alt={comment.displayName || comment.user?.displayName} 
+            className="w-10 h-10 rounded-full" 
+          />
         ) : (
           <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
             <span className="text-gray-600 font-medium">
-              {comment.displayName?.[0] || comment.username?.[0] || '?'}
+              {comment.displayName?.[0] || comment.user?.displayName?.[0] || comment.username?.[0] || '?'}
             </span>
           </div>
         )}
@@ -202,7 +299,7 @@ export function PostPage() {
         <div className="flex-1">
           <div className="flex items-center space-x-2 mb-1">
             <span className="font-medium text-gray-900">
-              {comment.displayName || comment.username}
+              {comment.displayName || comment.user?.displayName || comment.username}
             </span>
             <span className="text-sm text-gray-500">
               {/* 使用安全的日期格式化 */}
@@ -212,7 +309,11 @@ export function PostPage() {
           <p className="text-gray-700 whitespace-pre-wrap">{comment.content}</p>
           
           <div className="mt-2 flex items-center space-x-4 text-sm text-gray-500">
-            <button className="hover:text-blue-600 flex items-center">
+            <button
+              onClick={() => handleLikeComment(comment.id)}
+              disabled={commentLiking === comment.id}
+              className={`hover:text-blue-600 flex items-center ${commentLiking === comment.id ? 'opacity-50' : ''}`}
+            >
               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
               </svg>
@@ -220,9 +321,43 @@ export function PostPage() {
             </button>
             
             {level < 3 && (
-              <button className="hover:text-blue-600">回复</button>
+              <button 
+                onClick={() => handleReply(comment.id)}
+                className="hover:text-blue-600"
+              >
+                回复
+              </button>
             )}
           </div>
+          
+          {/* 回复表单 */}
+          {replyingTo === comment.id && (
+            <form 
+              onSubmit={(e) => handleSubmitReply(e, comment.id)}
+              className="mt-4 p-4 bg-gray-50 rounded-lg"
+            >
+              <textarea
+                value={replyContent}
+                onChange={(e) => setReplyContent(e.target.value)}
+                placeholder="写下你的回复..."
+                className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                rows={2}
+                maxLength={500}
+              />
+              <div className="mt-2 flex items-center justify-between">
+                <span className="text-xs text-gray-500">
+                  {replyContent.length}/500
+                </span>
+                <button
+                  type="submit"
+                  disabled={commentLoading || !replyContent.trim()}
+                  className="px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  {commentLoading ? '发表中...' : '发表回复'}
+                </button>
+              </div>
+            </form>
+          )}
           
           {/* 递归渲染回复 */}
           {comment.replies && comment.replies.length > 0 && (
@@ -272,16 +407,16 @@ export function PostPage() {
         
         <div className="flex items-center text-sm text-gray-500 space-x-4 mb-8">
           <span className="flex items-center">
-            {post.authorAvatar || post.author_avatar ? (
+            {post.author?.avatarUrl || post.authorAvatar || post.author_avatar ? (
               <img 
-                src={post.authorAvatar || post.author_avatar} 
-                alt={post.authorName || post.author_name} 
+                src={post.author?.avatarUrl || post.authorAvatar || post.author_avatar} 
+                alt={post.author?.displayName || post.authorName || post.author_name} 
                 className="w-6 h-6 rounded-full mr-2" 
               />
             ) : (
               <div className="w-6 h-6 rounded-full bg-gray-300 mr-2"></div>
             )}
-            {post.authorName || post.author_name || post.author_display_name || 'Unknown'}
+            {post.author?.displayName || post.authorName || post.author_name || post.author_display_name || 'Unknown'}
           </span>
           <span>•</span>
           <span>

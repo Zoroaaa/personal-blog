@@ -171,6 +171,9 @@ export interface Post {
   categorySlug?: string;
   categoryColor?: string;
   tags?: Tag[];
+  
+  // 交互状态
+  isLiked?: boolean;
 }
 
 /**

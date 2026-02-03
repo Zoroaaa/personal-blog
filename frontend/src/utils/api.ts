@@ -234,6 +234,12 @@ export const api = {
     apiRequest<Post>(`/posts/${slug}`),
   
   /**
+   * 通过ID获取文章详情（用于编辑）
+   */
+  getPostById: (id: number) => 
+    apiRequest<Post>(`/posts/admin/${id}`),
+  
+  /**
    * 创建文章
    */
   createPost: (data: CreatePostRequest) => 

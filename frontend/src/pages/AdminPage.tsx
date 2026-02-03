@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../stores/authStore';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../utils/api';
 
 // 定义管理后台的标签页类型
@@ -15,6 +15,7 @@ type UserRole = 'admin' | 'user';
 export function AdminPage() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   
   // 当前活动的标签页
   const [activeTab, setActiveTab] = useState<AdminTab>('posts');
@@ -65,6 +66,35 @@ export function AdminPage() {
       </div>
     );
   }
+  
+  // 处理编辑文章
+  useEffect(() => {
+    const editPostId = searchParams.get('edit');
+    if (editPostId) {
+      loadPostForEdit(parseInt(editPostId));
+    }
+  }, [searchParams]);
+  
+  // 加载文章详情用于编辑
+  const loadPostForEdit = async (postId: number) => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      const response = await api.getPostById(postId);
+      if (response.success && response.data) {
+        setTitle(response.data.title);
+        setContent(response.data.content);
+        setSummary(response.data.summary || '');
+        setPostStatus(response.data.status as 'draft' | 'published');
+        setActiveTab('posts');
+      }
+    } catch (err: any) {
+      setError(err.message || '加载文章失败');
+    } finally {
+      setLoading(false);
+    }
+  };
   
   // 加载评论数据
   useEffect(() => {
@@ -264,6 +294,36 @@ export function AdminPage() {
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  封面图片
+                </label>
+                <div className="flex space-x-4">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        try {
+                          setLoading(true);
+                          const response = await api.uploadImage(file);
+                          if (response.success && response.data) {
+                            // 这里可以将上传的图片URL保存到状态中
+                            alert('图片上传成功: ' + response.data.url);
+                          }
+                        } catch (error) {
+                          setError('上传失败: ' + (error instanceof Error ? error.message : '未知错误'));
+                        } finally {
+                          setLoading(false);
+                        }
+                      }
+                    }}
+                    className="border rounded-lg px-3 py-2"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   内容 (支持Markdown)
                 </label>
                 <textarea
@@ -360,10 +420,10 @@ export function AdminPage() {
                           {comment.content.substring(0, 50)}{comment.content.length > 50 ? '...' : ''}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {comment.user?.username || '未知用户'}
+                          {comment.user?.username || comment.username || '未知用户'}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-500">
-                          {comment.post?.title || '未知文章'}
+                          {comment.post?.title || comment.postTitle || '未知文章'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <select
@@ -378,7 +438,14 @@ export function AdminPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <button
-                            onClick={() => {/* 删除评论逻辑 */}}
+                            onClick={async () => {
+                              try {
+                                await api.deleteComment(comment.id);
+                                loadComments();
+                              } catch (error) {
+                                setCommentsError('删除失败');
+                              }
+                            }}
                             className="text-red-600 hover:text-red-900"
                           >
                             删除
