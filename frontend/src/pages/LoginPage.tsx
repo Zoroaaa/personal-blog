@@ -64,7 +64,7 @@ export function LoginPage() {
   }, []);
   
   // GitHub OAuth客户端ID
-  const GITHUB_CLIENT_ID = githubClientId || 'YOUR_GITHUB_CLIENT_ID';
+  const GITHUB_CLIENT_ID = githubClientId || 'Ov23liQMqAURv0GMYvb3';
   const GITHUB_REDIRECT_URI = window.location.origin + '/login';
   
   // 处理GitHub OAuth回调
@@ -412,3 +412,4 @@ export function LoginPage() {
     </div>
   );
 }
+
