@@ -400,14 +400,18 @@ authRoutes.post('/github', async (c) => {
       
       logger.info('GitHub user info response received', { status: userResponse.status });
       
-      if (!userResponse.ok) {
-        const errorData = await userResponse.json().catch(() => ({}));
-        logger.error('GitHub user info fetch failed', { status: userResponse.status, error: errorData });
-        return c.json(errorResponse(
-          'OAuth failed',
-          `Failed to get user information: ${errorData.message || `HTTP ${userResponse.status}`}`
-        ), 400);
-      }
+if (!userResponse.ok) {
+  const errorData = await userResponse.json().catch(() => ({}));
+  logger.error('GitHub user info fetch failed', { 
+    status: userResponse.status, 
+    error: errorData,
+    headers: userResponse.headers 
+  });
+  return c.json(errorResponse(
+    'OAuth failed',
+    `Failed to get user information: ${errorData.message || errorData.error || `HTTP ${userResponse.status}`}`
+  ), 400);
+}
       
       githubUser = await userResponse.json() as any;
       
@@ -795,4 +799,5 @@ authRoutes.delete('/account', requireAuth, async (c) => {
       'An error occurred while deleting your account'
     ), 500);
   }
+
 });
