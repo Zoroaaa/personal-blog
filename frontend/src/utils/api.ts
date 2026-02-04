@@ -308,7 +308,7 @@ export const api = {
       posts: PostListItem[];
       total: number;
       pagination: { page: number; limit: number; total: number; totalPages: number }
-    }>(`/posts/likes${query}`);
+    }>(`/posts/liked${query}`);
   },
   
   /**
