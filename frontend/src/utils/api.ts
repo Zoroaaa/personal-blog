@@ -308,7 +308,7 @@ export const api = {
       posts: PostListItem[];
       total: number;
       pagination: { page: number; limit: number; total: number; totalPages: number }
-    }>(`/posts/liked${query}`);
+    }>(`/posts/likes${query}`);
   },
   
   /**
@@ -578,3 +578,4 @@ export function getCurrentUser(): User | null {
 // ============= 导出 =============
 
 export default api;
+
