@@ -773,6 +773,92 @@ authRoutes.put('/profile', requireAuth, async (c) => {
   }
 });
 
+// ============= 修改密码 =============
+
+/**
+ * PUT /api/auth/password
+ * 修改当前用户的密码
+ * 
+ * 需要认证
+ * 
+ * 请求体：
+ * {
+ *   currentPassword: string,
+ *   newPassword: string
+ * }
+ */
+authRoutes.put('/password', requireAuth, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const currentUser = c.get('user') as any;
+    const { currentPassword, newPassword } = await c.req.json();
+    
+    // 验证必填字段
+    if (!currentPassword || !newPassword) {
+      return c.json(errorResponse(
+        'Missing required fields',
+        'Please provide current password and new password'
+      ), 400);
+    }
+    
+    // 获取用户信息
+    const user = await c.env.DB.prepare(
+      'SELECT password_hash FROM users WHERE id = ?'
+    ).bind(currentUser.userId).first() as any;
+    
+    // 验证用户存在
+    if (!user) {
+      return c.json(errorResponse('User not found'), 404);
+    }
+    
+    // 验证用户不是OAuth用户
+    if (!user.password_hash) {
+      return c.json(errorResponse(
+        'Invalid operation',
+        'This account uses OAuth login. Password change is not supported.'
+      ), 400);
+    }
+    
+    // 验证当前密码
+    const valid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!valid) {
+      return c.json(errorResponse(
+        'Invalid password',
+        'Current password is incorrect'
+      ), 401);
+    }
+    
+    // 验证新密码强度
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) {
+      return c.json(errorResponse('Weak password', passwordError), 400);
+    }
+    
+    // 加密新密码
+    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    
+    // 更新密码
+    await c.env.DB.prepare(
+      'UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+    ).bind(passwordHash, currentUser.userId).run();
+    
+    logger.info('Password updated', { userId: currentUser.userId });
+    
+    return c.json(successResponse(
+      { updated: true },
+      'Password updated successfully'
+    ));
+    
+  } catch (error) {
+    logger.error('Update password error', error);
+    return c.json(errorResponse(
+      'Failed to update password',
+      'An error occurred while updating your password'
+    ), 500);
+  }
+});
+
 /**
  * DELETE /api/auth/account
  * 删除用户账户（软删除或硬删除）
@@ -800,7 +886,13 @@ authRoutes.delete('/account', requireAuth, async (c) => {
       'SELECT password_hash FROM users WHERE id = ?'
     ).bind(currentUser.userId).first() as any;
     
-    if (user.password_hash && password) {
+    if (user.password_hash) {
+      if (!password) {
+        return c.json(errorResponse(
+          'Missing password',
+          'Password is required for account deletion'
+        ), 400);
+      }
       const valid = await bcrypt.compare(password, user.password_hash);
       if (!valid) {
         return c.json(errorResponse(
