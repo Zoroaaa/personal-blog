@@ -1137,6 +1137,27 @@ postRoutes.get('/likes', requireAuth, async (c) => {
       LIMIT ? OFFSET ?
     `).bind(user.userId, limit, offset).all();
     
+    // 转换为 camelCase 格式
+    const formattedResults = (results as any[]).map(post => ({
+      id: post.id,
+      title: post.title,
+      slug: post.slug,
+      summary: post.summary,
+      coverImage: post.cover_image,
+      viewCount: post.view_count,
+      likeCount: post.like_count,
+      commentCount: post.comment_count,
+      readingTime: post.reading_time,
+      publishedAt: post.published_at,
+      createdAt: post.created_at,
+      authorName: post.author_name,
+      authorDisplayName: post.author_display_name,
+      authorAvatar: post.author_avatar,
+      categoryName: post.category_name,
+      categorySlug: post.category_slug,
+      categoryColor: post.category_color
+    }));
+    
     // 获取总数
     const countResult = await c.env.DB.prepare(`
       SELECT COUNT(*) as total FROM posts p
@@ -1147,8 +1168,8 @@ postRoutes.get('/likes', requireAuth, async (c) => {
     const total = countResult?.total || 0;
     
     // 为每篇文章获取标签
-    const postIds = results.map((p: any) => p.id);
-    let postsWithTags = results;
+    const postIds = formattedResults.map((p: any) => p.id);
+    let postsWithTags = formattedResults;
     
     if (postIds.length > 0) {
       const tagsQuery = `
@@ -1173,7 +1194,7 @@ postRoutes.get('/likes', requireAuth, async (c) => {
       });
       
       // 添加标签到文章
-      postsWithTags = results.map((post: any) => ({
+      postsWithTags = formattedResults.map((post: any) => ({
         ...post,
         tags: tagsByPost.get(post.id) || []
       }));

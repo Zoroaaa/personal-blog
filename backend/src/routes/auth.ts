@@ -153,8 +153,11 @@ authRoutes.post('/register', async (c) => {
         username,
         email,
         displayName,
+        avatarUrl: null,
+        bio: null,
         role: 'user',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       },
       token
     }, 'Registration successful'), 201);
@@ -432,7 +435,10 @@ authRoutes.post('/github', async (c) => {
         email: user.email,
         displayName: user.display_name,
         avatarUrl: user.avatar_url,
+        bio: user.bio || null,
         role: user.role,
+        createdAt: user.created_at || new Date().toISOString(),
+        updatedAt: user.updated_at || new Date().toISOString()
       },
       token
     }, 'GitHub login successful'));
@@ -522,7 +528,15 @@ authRoutes.get('/me', requireAuth, async (c) => {
     
     // 构建完整的用户信息响应
     const userWithStats = {
-      ...user,
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      displayName: user.display_name,
+      avatarUrl: user.avatar_url,
+      bio: user.bio,
+      role: user.role,
+      createdAt: user.created_at,
+      updatedAt: user.updated_at,
       postCount: postCount?.count || 0,
       commentCount: commentCount?.count || 0
     };
@@ -619,9 +633,22 @@ authRoutes.put('/profile', requireAuth, async (c) => {
     });
     
     // 获取更新后的用户信息
-    const user = await c.env.DB.prepare(
+    const userData = await c.env.DB.prepare(
       'SELECT id, username, email, display_name, avatar_url, bio, role, created_at, updated_at FROM users WHERE id = ?'
-    ).bind(currentUser.userId).first();
+    ).bind(currentUser.userId).first() as any;
+    
+    // 转换为 camelCase 格式
+    const user = {
+      id: userData.id,
+      username: userData.username,
+      email: userData.email,
+      displayName: userData.display_name,
+      avatarUrl: userData.avatar_url,
+      bio: userData.bio,
+      role: userData.role,
+      createdAt: userData.created_at,
+      updatedAt: userData.updated_at
+    };
     
     return c.json(successResponse(
       { user },
