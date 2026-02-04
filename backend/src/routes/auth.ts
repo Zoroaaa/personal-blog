@@ -401,18 +401,14 @@ authRoutes.post('/github', async (c) => {
       
       logger.info('GitHub user info response received', { status: userResponse.status });
       
-if (!userResponse.ok) {
-  const errorData = await userResponse.json().catch(() => ({}));
-  logger.error('GitHub user info fetch failed', { 
-    status: userResponse.status, 
-    error: errorData,
-    headers: userResponse.headers 
-  });
-  return c.json(errorResponse(
-    'OAuth failed',
-    `Failed to get user information: ${errorData.message || errorData.error || `HTTP ${userResponse.status}`}`
-  ), 400);
-}
+      if (!userResponse.ok) {
+        const errorData = await userResponse.json().catch(() => ({}));
+        logger.error('GitHub user info fetch failed', { status: userResponse.status, error: errorData });
+        return c.json(errorResponse(
+          'OAuth failed',
+          `Failed to get user information: ${errorData.message || `HTTP ${userResponse.status}`}`
+        ), 400);
+      }
       
       githubUser = await userResponse.json() as any;
       
@@ -424,6 +420,37 @@ if (!userResponse.ok) {
           'OAuth failed',
           'Failed to get user information from GitHub'
         ), 400);
+      }
+      
+      // ===== 3. 获取GitHub用户邮箱 =====
+      logger.info('Fetching GitHub user emails');
+      let githubEmail = githubUser.email;
+      
+      try {
+        const emailResponse = await fetch('https://api.github.com/user/emails', {
+          headers: {
+            'Authorization': `Bearer ${tokenData.access_token}`,
+            'Accept': 'application/json',
+            'User-Agent': 'Personal Blog OAuth App',
+          },
+        });
+        
+        if (emailResponse.ok) {
+          const emails = await emailResponse.json() as any[];
+          logger.info('GitHub emails received', { emailCount: emails.length });
+          
+          // 找到主要邮箱
+          const primaryEmail = emails.find(e => e.primary && e.verified);
+          if (primaryEmail) {
+            githubEmail = primaryEmail.email;
+            logger.info('Found primary GitHub email', { email: githubEmail });
+          }
+        } else {
+          const errorData = await emailResponse.json().catch(() => ({}));
+          logger.warn('Failed to get GitHub emails', { status: emailResponse.status, error: errorData });
+        }
+      } catch (emailError) {
+        logger.warn('Error fetching GitHub emails', { error: emailError instanceof Error ? emailError.message : emailError });
       }
     } catch (error) {
       logger.error('GitHub OAuth network error', { error: error instanceof Error ? error.message : error });
@@ -442,7 +469,7 @@ if (!userResponse.ok) {
     if (!user) {
       // 创建新用户
       const username = githubUser.login;
-      const email = githubUser.email || `${githubUser.login}@github.oauth`;
+      const email = githubEmail || `${githubUser.login}@github.oauth`;
       
       // 检查用户名是否已存在
       const existing = await c.env.DB.prepare(
@@ -478,7 +505,8 @@ if (!userResponse.ok) {
         
         logger.info('New GitHub user created', { 
           userId: user.id, 
-          username: user.username 
+          username: user.username,
+          email 
         });
       } catch (dbError) {
         logger.error('Database error: Failed to create GitHub user', { 
@@ -800,6 +828,4 @@ authRoutes.delete('/account', requireAuth, async (c) => {
       'An error occurred while deleting your account'
     ), 500);
   }
-
 });
-
