@@ -57,19 +57,26 @@ const app = new Hono<{ Bindings: Env }>();
  */
 app.use('*', async (c, next) => {
   // 只在首次请求时验证（可以改进为启动时验证）
-  const requiredEnvVars = ['DB', 'STORAGE', 'JWT_SECRET'];
-  
-  for (const varName of requiredEnvVars) {
-    if (!c.env[varName as keyof Env]) {
-      console.error(`Missing required environment variable: ${varName}`);
-      return c.json<ApiResponse>({
-        success: false,
-        error: 'Server configuration error',
-        message: 'The server is not properly configured. Please contact the administrator.',
-        timestamp: new Date().toISOString()
-      }, 500);
+    const requiredEnvVars = ['DB', 'STORAGE', 'JWT_SECRET'];
+    const optionalEnvVars = ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET'];
+    
+    for (const varName of requiredEnvVars) {
+      if (!c.env[varName as keyof Env]) {
+        console.error(`Missing required environment variable: ${varName}`);
+        return c.json<ApiResponse>({
+          success: false,
+          error: 'Server configuration error',
+          message: 'The server is not properly configured. Please contact the administrator.',
+          timestamp: new Date().toISOString()
+        }, 500);
+      }
     }
-  }
+    
+    // 验证可选的环境变量（用于GitHub登录）
+    const hasGithubConfig = c.env.GITHUB_CLIENT_ID && c.env.GITHUB_CLIENT_SECRET;
+    if (!hasGithubConfig) {
+      console.warn('Missing GitHub OAuth configuration: GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET not set');
+    }
   
   await next();
 });
