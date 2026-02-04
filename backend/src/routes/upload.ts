@@ -24,6 +24,34 @@ import { requireAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { generateRandomString } from '../utils/validation';
 
+// 图像处理工具
+class ImageProcessor {
+  /**
+   * 生成缩略图（简单实现，实际项目中可能需要更复杂的图像处理）
+   */
+  static async generateThumbnail(arrayBuffer: ArrayBuffer, maxWidth: number = 300): Promise<ArrayBuffer> {
+    // 注意：在Cloudflare Workers环境中，完整的图像处理需要使用专门的库或服务
+    // 这里提供一个占位实现，实际项目中需要根据环境选择合适的方案
+    return arrayBuffer;
+  }
+
+  /**
+   * 转换为WebP格式
+   */
+  static async convertToWebP(arrayBuffer: ArrayBuffer): Promise<ArrayBuffer> {
+    // 同样，实际的WebP转换需要专门的实现
+    return arrayBuffer;
+  }
+
+  /**
+   * 压缩图片
+   */
+  static async compressImage(arrayBuffer: ArrayBuffer, quality: number = 0.8): Promise<ArrayBuffer> {
+    // 图片压缩需要专门的实现
+    return arrayBuffer;
+  }
+}
+
 export const uploadRoutes = new Hono<{ Bindings: Env }>();
 
 // ============= 常量配置 =============
@@ -115,8 +143,11 @@ uploadRoutes.post('/', requireAuth, async (c) => {
     const randomStr = generateRandomString(8);
     const filename = `${timestamp}-${randomStr}.${ext}`;
     
-    // ===== 6. 上传到R2 =====
+    // ===== 6. 图像处理 =====
+    const processedFiles = [];
+    
     try {
+      // 1. 上传原始文件
       await c.env.STORAGE.put(filename, arrayBuffer, {
         httpMetadata: {
           contentType: file.type,
@@ -124,9 +155,85 @@ uploadRoutes.post('/', requireAuth, async (c) => {
         customMetadata: {
           uploadedBy: user.userId.toString(),
           originalName: file.name,
-          uploadedAt: new Date().toISOString()
+          uploadedAt: new Date().toISOString(),
+          isOriginal: 'true'
         }
       });
+      processedFiles.push({
+        filename,
+        type: file.type,
+        url: `${c.env.STORAGE_PUBLIC_URL || 'https://storage.your-domain.com'}/${filename}`,
+        isOriginal: true
+      });
+      
+      // 2. 生成缩略图
+      const thumbnailFilename = `thumbnail-${filename}`;
+      const thumbnailBuffer = await ImageProcessor.generateThumbnail(arrayBuffer);
+      await c.env.STORAGE.put(thumbnailFilename, thumbnailBuffer, {
+        httpMetadata: {
+          contentType: file.type,
+        },
+        customMetadata: {
+          uploadedBy: user.userId.toString(),
+          originalName: file.name,
+          uploadedAt: new Date().toISOString(),
+          isThumbnail: 'true',
+          originalFilename: filename
+        }
+      });
+      processedFiles.push({
+        filename: thumbnailFilename,
+        type: file.type,
+        url: `${c.env.STORAGE_PUBLIC_URL || 'https://storage.your-domain.com'}/${thumbnailFilename}`,
+        isThumbnail: true
+      });
+      
+      // 3. 转换为WebP格式（如果不是WebP）
+      if (!file.type.includes('webp')) {
+        const webpFilename = filename.replace(/\.[^/.]+$/, '') + '.webp';
+        const webpBuffer = await ImageProcessor.convertToWebP(arrayBuffer);
+        await c.env.STORAGE.put(webpFilename, webpBuffer, {
+          httpMetadata: {
+            contentType: 'image/webp',
+          },
+          customMetadata: {
+            uploadedBy: user.userId.toString(),
+            originalName: file.name,
+            uploadedAt: new Date().toISOString(),
+            isWebP: 'true',
+            originalFilename: filename
+          }
+        });
+        processedFiles.push({
+          filename: webpFilename,
+          type: 'image/webp',
+          url: `${c.env.STORAGE_PUBLIC_URL || 'https://storage.your-domain.com'}/${webpFilename}`,
+          isWebP: true
+        });
+      }
+      
+      // 4. 压缩图片（生成压缩版本）
+      const compressedFilename = `compressed-${filename}`;
+      const compressedBuffer = await ImageProcessor.compressImage(arrayBuffer);
+      await c.env.STORAGE.put(compressedFilename, compressedBuffer, {
+        httpMetadata: {
+          contentType: file.type,
+        },
+        customMetadata: {
+          uploadedBy: user.userId.toString(),
+          originalName: file.name,
+          uploadedAt: new Date().toISOString(),
+          isCompressed: 'true',
+          originalFilename: filename
+        }
+      });
+      processedFiles.push({
+        filename: compressedFilename,
+        type: file.type,
+        url: `${c.env.STORAGE_PUBLIC_URL || 'https://storage.your-domain.com'}/${compressedFilename}`,
+        isCompressed: true
+      });
+      
     } catch (error) {
       logger.error('R2 upload failed', error);
       return c.json(errorResponse(
@@ -143,7 +250,8 @@ uploadRoutes.post('/', requireAuth, async (c) => {
       filename,
       size: file.size,
       type: file.type,
-      userId: user.userId 
+      userId: user.userId,
+      processedFilesCount: processedFiles.length
     });
     
     return c.json(successResponse({
@@ -151,7 +259,8 @@ uploadRoutes.post('/', requireAuth, async (c) => {
       filename,
       size: file.size,
       type: file.type,
-      uploadedAt: new Date().toISOString()
+      uploadedAt: new Date().toISOString(),
+      processedFiles
     }, 'File uploaded successfully'), 201);
     
   } catch (error) {
@@ -214,8 +323,25 @@ uploadRoutes.delete('/:filename', requireAuth, async (c) => {
       return c.json(errorResponse('File not found'), 404);
     }
     
-    // ===== 2. 删除文件 =====
+    // ===== 2. 删除文件及其相关处理文件 =====
     await c.env.STORAGE.delete(filename);
+    
+    // 删除相关的处理文件
+    const relatedFiles = [
+      `thumbnail-${filename}`,
+      filename.replace(/\.[^/.]+$/, '') + '.webp',
+      `compressed-${filename}`
+    ];
+    
+    for (const relatedFile of relatedFiles) {
+      try {
+        await c.env.STORAGE.delete(relatedFile);
+        logger.info('Related file deleted', { relatedFile });
+      } catch (error) {
+        // 忽略删除失败的错误，继续删除其他文件
+        console.error('Failed to delete related file:', relatedFile, error);
+      }
+    }
     
     logger.info('File deleted successfully', { 
       filename,

@@ -214,6 +214,15 @@ export const api = {
       body: JSON.stringify(data),
     }),
   
+  /**
+   * 修改密码
+   */
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    apiRequest<{ success: boolean }>('/auth/password', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  
   // ============= 文章相关 =============
   
   /**
@@ -232,6 +241,26 @@ export const api = {
    */
   getPost: (slug: string) => 
     apiRequest<Post>(`/posts/${slug}`),
+  
+  /**
+ * 通过ID获取文章详情（用于编辑）
+ */
+  getPostById: (id: number) => 
+    apiRequest<Post>(`/posts/admin/${id}`),
+  
+  /**
+   * 获取所有文章列表（用于管理后台）
+   */
+  getAdminPosts: (params?: {
+    page?: string;
+    limit?: string;
+  }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return apiRequest<{
+      posts: PostListItem[];
+      pagination: { page: number; limit: number; total: number; totalPages: number }
+    }>(`/posts/admin${query}`);
+  },
   
   /**
    * 创建文章
@@ -266,6 +295,40 @@ export const api = {
     apiRequest<{ liked: boolean }>(`/posts/${id}/like`, {
       method: 'POST',
     }),
+  
+  /**
+   * 获取用户点赞的文章列表
+   */
+  getLikedPosts: (params?: {
+    page?: string;
+    limit?: string;
+  }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return apiRequest<{
+      posts: PostListItem[];
+      total: number;
+      pagination: { page: number; limit: number; total: number; totalPages: number }
+    }>(`/posts/likes${query}`);
+  },
+  
+  /**
+   * 搜索文章
+   */
+  searchPosts: (params: {
+    q?: string;
+    category?: string;
+    tag?: string;
+    page?: string;
+    limit?: string;
+    sort?: string;
+  }) => {
+    const query = new URLSearchParams(params as any).toString();
+    return apiRequest<{ 
+      posts: PostListItem[]; 
+      total: number;
+      pagination: { page: number; limit: number; total: number; totalPages: number } 
+    }>(`/posts/search?${query}`);
+  },
   
   // ============= 评论相关 =============
   
@@ -365,6 +428,102 @@ export const api = {
     apiRequest<{ deleted: boolean }>(`/upload/${filename}`, {
       method: 'DELETE',
     }),
+  
+  // ============= 管理后台相关 =============
+  
+  /**
+   * 获取评论管理列表
+   */
+  getAdminComments: (params?: {
+    page?: string;
+    limit?: string;
+    status?: string;
+  }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return apiRequest<{
+      comments: Comment[];
+      pagination: { page: number; limit: number; total: number; totalPages: number }
+    }>(`/admin/comments${query}`);
+  },
+  
+  /**
+   * 更新评论状态
+   */
+  updateCommentStatus: (id: number, status: 'approved' | 'pending' | 'spam') =>
+    apiRequest<{ updated: boolean }>(`/admin/comments/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    }),
+  
+  /**
+   * 获取用户管理列表
+   */
+  getAdminUsers: (params?: {
+    page?: string;
+    limit?: string;
+    role?: string;
+  }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return apiRequest<{
+      users: User[];
+      pagination: { page: number; limit: number; total: number; totalPages: number }
+    }>(`/admin/users${query}`);
+  },
+  
+  /**
+   * 更新用户角色
+   */
+  updateUserRole: (id: number, role: 'admin' | 'user') =>
+    apiRequest<{ updated: boolean }>(`/admin/users/${id}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    }),
+  
+  /**
+   * 删除用户
+   */
+  deleteUser: (id: number) =>
+    apiRequest<{ deleted: boolean }>(`/admin/users/${id}`, {
+      method: 'DELETE',
+    }),
+  
+  /**
+   * 获取系统统计数据
+   */
+  getAnalytics: () =>
+    apiRequest<{
+      totalPosts: number;
+      totalComments: number;
+      totalUsers: number;
+      totalViews: number;
+      recentPosts: PostListItem[];
+      recentComments: Comment[];
+      viewTrend: Array<{
+        date: string;
+        views: number;
+      }>;
+    }>('/analytics'),
+  
+  /**
+   * 获取热门文章
+   */
+  getHotPosts: (limit?: number) =>
+    apiRequest<PostListItem[]>(`/analytics/hot-posts?limit=${limit || 5}`),
+  
+  /**
+   * 获取系统设置
+   */
+  getSystemSettings: () =>
+    apiRequest<Record<string, any>>('/admin/settings'),
+  
+  /**
+   * 更新系统设置
+   */
+  updateSystemSettings: (settings: Record<string, any>) =>
+    apiRequest<{ updated: boolean }>('/admin/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    }),
 };
 
 // ============= 辅助函数 =============
@@ -419,3 +578,4 @@ export function getCurrentUser(): User | null {
 // ============= 导出 =============
 
 export default api;
+

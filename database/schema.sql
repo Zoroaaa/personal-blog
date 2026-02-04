@@ -140,6 +140,9 @@ CREATE INDEX IF NOT EXISTS idx_posts_like_count ON posts(like_count DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_status_published ON posts(status, published_at DESC) 
     WHERE status = 'published';
 
+-- 复合索引：状态和可见性
+CREATE INDEX IF NOT EXISTS idx_posts_status_visibility ON posts(status, visibility);
+
 -- 全文搜索索引（如果D1支持FTS5）
 -- CREATE VIRTUAL TABLE IF NOT EXISTS posts_fts USING fts5(title, content, content=posts, content_rowid=id);
 

@@ -22,7 +22,7 @@
 
 import { Hono } from 'hono';
 import bcrypt from 'bcryptjs';
-import { Env, successResponse, errorResponse } from '../index';
+import { Env, successResponse, errorResponse, safeGetCache, safePutCache, safeDeleteCache } from '../index';
 import { generateToken } from '../utils/jwt';
 import { requireAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
@@ -153,8 +153,11 @@ authRoutes.post('/register', async (c) => {
         username,
         email,
         displayName,
+        avatarUrl: null,
+        bio: null,
         role: 'user',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       },
       token
     }, 'Registration successful'), 201);
@@ -198,7 +201,7 @@ authRoutes.post('/login', async (c) => {
     
     // ===== 2. 检查登录尝试次数（防暴力破解） =====
     const loginKey = `login_attempts:${username}`;
-    const attempts = await c.env.CACHE.get(loginKey);
+    const attempts = await safeGetCache(c.env, loginKey);
     const attemptCount = attempts ? parseInt(attempts, 10) : 0;
     
     if (attemptCount >= MAX_LOGIN_ATTEMPTS) {
@@ -246,7 +249,7 @@ authRoutes.post('/login', async (c) => {
     }
     
     // ===== 6. 清除失败尝试记录 =====
-    await c.env.CACHE.delete(loginKey);
+    await safeDeleteCache(c.env, loginKey);
     
     // ===== 7. 生成JWT Token =====
     const token = await generateToken(c.env.JWT_SECRET, {
@@ -299,7 +302,8 @@ async function recordLoginAttempt(
   key: string, 
   currentCount: number
 ): Promise<void> {
-  await c.env.CACHE.put(
+  await safePutCache(
+    c.env, 
     key, 
     (currentCount + 1).toString(), 
     { expirationTtl: LOGIN_BLOCK_DURATION }
@@ -431,7 +435,10 @@ authRoutes.post('/github', async (c) => {
         email: user.email,
         displayName: user.display_name,
         avatarUrl: user.avatar_url,
+        bio: user.bio || null,
         role: user.role,
+        createdAt: user.created_at || new Date().toISOString(),
+        updatedAt: user.updated_at || new Date().toISOString()
       },
       token
     }, 'GitHub login successful'));
@@ -465,7 +472,7 @@ authRoutes.post('/logout', requireAuth, async (c) => {
     const token = authHeader.substring(7); // 移除 "Bearer "
     
     // 将token加入黑名单，有效期7天（与token过期时间一致）
-    await c.env.CACHE.put(`blacklist:${token}`, '1', {
+    await safePutCache(c.env, `blacklist:${token}`, '1', {
       expirationTtl: 60 * 60 * 24 * 7,
     });
     
@@ -500,6 +507,7 @@ authRoutes.get('/me', requireAuth, async (c) => {
   try {
     const currentUser = c.get('user') as any;
     
+    // 获取用户基本信息
     const user = await c.env.DB.prepare(
       'SELECT id, username, email, display_name, avatar_url, bio, role, created_at, updated_at FROM users WHERE id = ?'
     ).bind(currentUser.userId).first() as any;
@@ -509,7 +517,31 @@ authRoutes.get('/me', requireAuth, async (c) => {
       return c.json(errorResponse('User not found'), 404);
     }
     
-    return c.json(successResponse({ user }));
+    // 获取用户统计数据
+    const postCount = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM posts WHERE author_id = ? AND status = ?'
+    ).bind(currentUser.userId, 'published').first() as any;
+    
+    const commentCount = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM comments WHERE user_id = ? AND status = ?'
+    ).bind(currentUser.userId, 'approved').first() as any;
+    
+    // 构建完整的用户信息响应
+    const userWithStats = {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      displayName: user.display_name,
+      avatarUrl: user.avatar_url,
+      bio: user.bio,
+      role: user.role,
+      createdAt: user.created_at,
+      updatedAt: user.updated_at,
+      postCount: postCount?.count || 0,
+      commentCount: commentCount?.count || 0
+    };
+    
+    return c.json(successResponse({ user: userWithStats }));
     
   } catch (error) {
     logger.error('Get user error', error);
@@ -601,9 +633,22 @@ authRoutes.put('/profile', requireAuth, async (c) => {
     });
     
     // 获取更新后的用户信息
-    const user = await c.env.DB.prepare(
+    const userData = await c.env.DB.prepare(
       'SELECT id, username, email, display_name, avatar_url, bio, role, created_at, updated_at FROM users WHERE id = ?'
-    ).bind(currentUser.userId).first();
+    ).bind(currentUser.userId).first() as any;
+    
+    // 转换为 camelCase 格式
+    const user = {
+      id: userData.id,
+      username: userData.username,
+      email: userData.email,
+      displayName: userData.display_name,
+      avatarUrl: userData.avatar_url,
+      bio: userData.bio,
+      role: userData.role,
+      createdAt: userData.created_at,
+      updatedAt: userData.updated_at
+    };
     
     return c.json(successResponse(
       { user },
