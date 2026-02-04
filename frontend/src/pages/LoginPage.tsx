@@ -1,20 +1,22 @@
 /**
- * 登录/注册页面（优化版）
+ * 登录/注册页面(优化版)
  * 
- * 功能：
+ * 功能:
  * - 用户登录
  * - 用户注册
  * - 表单验证
+ * - GitHub OAuth登录
  * 
- * 优化内容：
+ * 优化内容:
  * 1. 修复API响应格式处理
  * 2. 使用完整的TypeScript类型
  * 3. 改进错误处理和提示
  * 4. 添加密码强度提示
  * 5. 优化UI/UX
+ * 6. 移除硬编码的GITHUB_CLIENT_ID,通过API获取
  * 
  * @author 优化版本
- * @version 2.0.0
+ * @version 2.1.0
  */
 
 import { useState, useEffect } from 'react';
@@ -48,32 +50,18 @@ export function LoginPage() {
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        // 尝试从后端获取配置
-        const response = await fetch('/api/config');
+        const response = await api.getConfig();
         
-        // 检查响应是否成功
-        if (response.ok) {
-          // 检查响应类型是否为JSON
-          const contentType = response.headers.get('content-type');
-          if (contentType && contentType.includes('application/json')) {
-            try {
-              const data = await response.json();
-              if (data.success && data.data) {
-                setGithubClientId(data.data.githubClientId);
-                return;
-              }
-            } catch (jsonError) {
-              console.error('Failed to parse JSON:', jsonError);
-            }
-          }
+        if (response.success && response.data) {
+          setGithubClientId(response.data.githubClientId);
+          console.log('GitHub配置加载成功:', response.data.githubClientId);
+        } else {
+          console.error('获取配置失败:', response);
+          setError('无法获取GitHub配置,请稍后再试');
         }
-        
-        // 如果获取失败，使用硬编码的客户端ID
-        setGithubClientId('Ov23liQMqAURv0GMYvb3'); // 实际的GitHub客户端ID
       } catch (error) {
-        console.error('Failed to fetch config:', error);
-        // 即使获取失败，也设置一个默认值，确保登录按钮可以点击
-        setGithubClientId('Ov23liQMqAURv0GMYvb3'); // 实际的GitHub客户端ID
+        console.error('获取配置失败:', error);
+        setError('无法连接到服务器,请检查网络连接');
       } finally {
         setLoadingConfig(false);
       }
@@ -82,8 +70,7 @@ export function LoginPage() {
     fetchConfig();
   }, []);
   
-  // GitHub OAuth客户端ID
-  const GITHUB_CLIENT_ID = githubClientId || 'Ov23liQMqAURv0GMYvb3'; // 实际的GitHub客户端ID
+  // GitHub OAuth客户端ID和重定向URI
   const GITHUB_REDIRECT_URI = window.location.origin + '/login';
   
   // 处理GitHub OAuth回调
@@ -131,10 +118,15 @@ export function LoginPage() {
   
   // 处理GitHub登录
   const handleGitHubLogin = () => {
+    if (!githubClientId) {
+      setError('GitHub配置未加载,请刷新页面重试');
+      return;
+    }
+    
     const state = Math.random().toString(36).substring(2, 15);
     const scope = 'user:email';
     
-    const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(GITHUB_REDIRECT_URI)}&scope=${scope}&state=${state}`;
+    const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${githubClientId}&redirect_uri=${encodeURIComponent(GITHUB_REDIRECT_URI)}&scope=${scope}&state=${state}`;
     
     window.location.href = githubAuthUrl;
   };
@@ -197,7 +189,7 @@ export function LoginPage() {
       }
     } catch (err: any) {
       console.error('Auth error:', err);
-      setError(err.message || '操作失败，请稍后重试');
+      setError(err.message || '操作失败,请稍后重试');
     } finally {
       setLoading(false);
     }
@@ -215,8 +207,9 @@ export function LoginPage() {
     if (/[0-9]/.test(pwd)) strength++;
     if (/[^a-zA-Z0-9]/.test(pwd)) strength++;
     
-    if (strength <= 2) return { level: 2, text: '弱', color: 'text-orange-600' };
-    if (strength <= 3) return { level: 3, text: '中等', color: 'text-yellow-600' };
+    if (strength <= 1) return { level: 1, text: '弱', color: 'text-red-600' };
+    if (strength === 2) return { level: 2, text: '中', color: 'text-orange-600' };
+    if (strength === 3) return { level: 3, text: '较强', color: 'text-yellow-600' };
     return { level: 4, text: '强', color: 'text-green-600' };
   };
   
@@ -269,12 +262,12 @@ export function LoginPage() {
               />
               {!isLogin && (
                 <p className="mt-1 text-xs text-gray-500">
-                  3-20个字符，只能包含字母、数字、下划线和连字符
+                  3-20个字符,只能包含字母、数字、下划线和连字符
                 </p>
               )}
             </div>
             
-            {/* 邮箱（仅注册） */}
+            {/* 邮箱(仅注册) */}
             {!isLogin && (
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
@@ -293,7 +286,7 @@ export function LoginPage() {
               </div>
             )}
             
-            {/* 显示名称（仅注册） */}
+            {/* 显示名称(仅注册) */}
             {!isLogin && (
               <div>
                 <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 mb-1">
@@ -330,7 +323,7 @@ export function LoginPage() {
                 autoComplete={isLogin ? 'current-password' : 'new-password'}
               />
               
-              {/* 密码强度指示器（仅注册） */}
+              {/* 密码强度指示器(仅注册) */}
               {!isLogin && password && passwordStrength && (
                 <div className="mt-2">
                   <div className="flex items-center justify-between mb-1">
@@ -350,7 +343,7 @@ export function LoginPage() {
                     />
                   </div>
                   <p className="mt-1 text-xs text-gray-500">
-                    建议：至少8个字符，包含大小写字母和数字
+                    建议:至少8个字符,包含大小写字母和数字
                   </p>
                 </div>
               )}
@@ -414,7 +407,7 @@ export function LoginPage() {
               }}
               className="text-blue-600 hover:text-blue-700 font-medium"
             >
-              {isLogin ? '还没有账号？立即注册' : '已有账号？立即登录'}
+              {isLogin ? '还没有账号?立即注册' : '已有账号?立即登录'}
             </button>
           </div>
           
