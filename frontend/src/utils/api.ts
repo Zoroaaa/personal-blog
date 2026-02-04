@@ -540,6 +540,15 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(settings),
     }),
+
+  /**
+   * 删除账号
+   */
+  deleteAccount: (password: string) =>
+    apiRequest<{ deleted: boolean }>('/auth/delete', {
+      method: 'POST',
+      body: JSON.stringify({ password, confirmation: 'DELETE' }),
+    }),
 };
 
 // ============= 辅助函数 =============
