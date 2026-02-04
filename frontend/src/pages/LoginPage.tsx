@@ -124,7 +124,7 @@ export function LoginPage() {
     }
     
     const state = Math.random().toString(36).substring(2, 15);
-    const scope = 'user:email';
+    const scope = 'user:email user';
     
     const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${githubClientId}&redirect_uri=${encodeURIComponent(GITHUB_REDIRECT_URI)}&scope=${scope}&state=${state}`;
     
@@ -424,3 +424,4 @@ export function LoginPage() {
     </div>
   );
 }
+
