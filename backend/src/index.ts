@@ -37,33 +37,8 @@ import { requestLogger } from './middleware/requestLogger';
 
 // ============= 类型定义 =============
 
-/**
- * Cloudflare Workers环境绑定
- */
-export type Env = {
-  DB: D1Database;              // D1数据库
-  CACHE?: KVNamespace;         // KV缓存（可选）
-  STORAGE: R2Bucket;           // R2对象存储
-  JWT_SECRET: string;          // JWT密钥
-  GITHUB_CLIENT_ID: string;    // GitHub OAuth客户端ID
-  GITHUB_CLIENT_SECRET: string; // GitHub OAuth密钥
-  FRONTEND_URL: string;        // 前端URL
-  STORAGE_PUBLIC_URL: string;  // R2公开访问URL
-  ENVIRONMENT: string;         // 运行环境（development/production）
-  ENABLE_CACHE?: string;       // 是否启用缓存
-  CACHE_HOMEPAGE_ONLY?: string; // 是否只缓存首页
-};
-
-/**
- * 统一API响应格式
- */
-export interface ApiResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-  timestamp?: string;
-}
+// 导入类型定义
+import type { Env, ApiResponse } from './types';
 
 // ============= 常量配置 =============
 
@@ -441,31 +416,13 @@ app.onError((err, c) => {
 
 // ============= 导出 =============
 
+// 导入响应工具函数
+import { successResponse, errorResponse } from './utils/response';
+
 export default app;
 
-/**
- * 工具函数：创建成功响应
- */
-export function successResponse<T>(data: T, message?: string): ApiResponse<T> {
-  return {
-    success: true,
-    data,
-    message,
-    timestamp: new Date().toISOString()
-  };
-}
-
-/**
- * 工具函数：创建错误响应
- */
-export function errorResponse(error: string, message?: string): ApiResponse {
-  return {
-    success: false,
-    error,
-    message,
-    timestamp: new Date().toISOString()
-  };
-}
+// 重新导出响应工具函数，保持向后兼容
+export { successResponse, errorResponse };
 
 /**
  * 缓存辅助函数

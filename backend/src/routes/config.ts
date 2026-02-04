@@ -10,7 +10,8 @@
  */
 
 import { Hono } from 'hono';
-import { Env, successResponse } from '../index';
+import type { Env } from '../types';
+import { successResponse } from '../utils/response';
 
 export const configRoutes = new Hono<{ Bindings: Env }>();
 
