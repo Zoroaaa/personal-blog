@@ -29,6 +29,7 @@ import { categoryRoutes } from './routes/categories';
 import { uploadRoutes } from './routes/upload';
 import { analyticsRoutes } from './routes/analytics';
 import { adminRoutes } from './routes/admin';
+import { configRoutes } from './routes/config';
 
 // 导入中间件
 import { rateLimiter } from './middleware/rateLimit';
@@ -351,6 +352,12 @@ app.route('/api/analytics', analyticsRoutes);
  * - GET /api/admin/settings - 获取系统设置
  */
 app.route('/api/admin', adminRoutes);
+
+/**
+ * 配置路由
+ * - GET /api/config - 获取公开配置信息
+ */
+app.route('/api/config', configRoutes);
 
 // ============= 错误处理 =============
 
