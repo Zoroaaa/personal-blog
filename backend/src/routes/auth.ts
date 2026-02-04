@@ -395,6 +395,7 @@ authRoutes.post('/github', async (c) => {
         headers: {
           'Authorization': `Bearer ${tokenData.access_token}`,
           'Accept': 'application/json',
+          'User-Agent': 'Personal Blog OAuth App',
         },
       });
       
@@ -801,3 +802,4 @@ authRoutes.delete('/account', requireAuth, async (c) => {
   }
 
 });
+
