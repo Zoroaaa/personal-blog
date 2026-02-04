@@ -12,7 +12,7 @@
  */
 
 import { Hono } from 'hono';
-import { Env, successResponse, errorResponse } from '../index';
+import { Env, successResponse, errorResponse, safeGetCache, safePutCache } from '../index';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { safeParseInt } from '../utils/validation';
@@ -36,14 +36,7 @@ analyticsRoutes.get('/', requireAdmin, async (c) => {
   const logger = createLogger(c);
   
   try {
-    // 尝试从缓存获取
-    const cacheKey = 'analytics:stats';
-    const cached = await c.env.CACHE.get(cacheKey);
-    
-    if (cached) {
-      logger.info('Stats served from cache');
-      return c.json(JSON.parse(cached));
-    }
+    // 直接查询，不使用缓存（统计数据变化频繁）
     
     // 1. 总文章数
     const totalPostsResult = await c.env.DB.prepare(
@@ -120,10 +113,7 @@ analyticsRoutes.get('/', requireAdmin, async (c) => {
       viewTrend
     });
     
-    // 缓存结果
-    await c.env.CACHE.put(cacheKey, JSON.stringify(response), {
-      expirationTtl: CACHE_TTL.STATS
-    });
+    // 不缓存统计数据（变化频繁）
     
     logger.info('Stats fetched successfully');
     
@@ -166,7 +156,7 @@ analyticsRoutes.get('/hot-posts', async (c) => {
     
     // 尝试从缓存获取
     const cacheKey = `analytics:hot-posts:${limit}:${days}`;
-    const cached = await c.env.CACHE.get(cacheKey);
+    const cached = await safeGetCache(c.env, cacheKey);
     
     if (cached) {
       logger.info('Hot posts served from cache');
@@ -197,7 +187,7 @@ analyticsRoutes.get('/hot-posts', async (c) => {
     });
     
     // 缓存结果
-    await c.env.CACHE.put(cacheKey, JSON.stringify(response), {
+    await safePutCache(c.env, cacheKey, JSON.stringify(response), {
       expirationTtl: CACHE_TTL.HOT_POSTS
     });
     
@@ -224,14 +214,7 @@ analyticsRoutes.get('/stats', requireAdmin, async (c) => {
   const logger = createLogger(c);
   
   try {
-    // 尝试从缓存获取
-    const cacheKey = 'analytics:stats';
-    const cached = await c.env.CACHE.get(cacheKey);
-    
-    if (cached) {
-      logger.info('Stats served from cache');
-      return c.json(JSON.parse(cached));
-    }
+    // 直接查询，不使用缓存（统计数据变化频繁）
     
     // 1. 总文章数
     const totalPostsResult = await c.env.DB.prepare(
@@ -315,10 +298,7 @@ analyticsRoutes.get('/stats', requireAdmin, async (c) => {
       tagStats
     });
     
-    // 缓存结果
-    await c.env.CACHE.put(cacheKey, JSON.stringify(response), {
-      expirationTtl: CACHE_TTL.STATS
-    });
+    // 不缓存统计数据（变化频繁）
     
     logger.info('Stats fetched successfully');
     
@@ -453,14 +433,7 @@ analyticsRoutes.get('/users', requireAdmin, async (c) => {
   try {
     const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
     
-    // 尝试从缓存获取
-    const cacheKey = `analytics:users:${limit}`;
-    const cached = await c.env.CACHE.get(cacheKey);
-    
-    if (cached) {
-      logger.info('User analytics served from cache');
-      return c.json(JSON.parse(cached));
-    }
+    // 直接查询，不使用缓存（用户数据变化频繁）
     
     // 获取活跃用户（按文章数和评论数排序）
     const { results } = await c.env.DB.prepare(`
@@ -477,10 +450,7 @@ analyticsRoutes.get('/users', requireAdmin, async (c) => {
       limit
     });
     
-    // 缓存结果
-    await c.env.CACHE.put(cacheKey, JSON.stringify(response), {
-      expirationTtl: CACHE_TTL.STATS
-    });
+    // 不缓存用户数据（变化频繁）
     
     logger.info('User analytics fetched successfully', { count: results.length });
     

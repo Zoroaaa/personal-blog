@@ -22,7 +22,7 @@
 
 import { Hono } from 'hono';
 import bcrypt from 'bcryptjs';
-import { Env, successResponse, errorResponse } from '../index';
+import { Env, successResponse, errorResponse, safeGetCache, safePutCache, safeDeleteCache } from '../index';
 import { generateToken } from '../utils/jwt';
 import { requireAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
@@ -198,7 +198,7 @@ authRoutes.post('/login', async (c) => {
     
     // ===== 2. 检查登录尝试次数（防暴力破解） =====
     const loginKey = `login_attempts:${username}`;
-    const attempts = await c.env.CACHE.get(loginKey);
+    const attempts = await safeGetCache(c.env, loginKey);
     const attemptCount = attempts ? parseInt(attempts, 10) : 0;
     
     if (attemptCount >= MAX_LOGIN_ATTEMPTS) {
@@ -246,7 +246,7 @@ authRoutes.post('/login', async (c) => {
     }
     
     // ===== 6. 清除失败尝试记录 =====
-    await c.env.CACHE.delete(loginKey);
+    await safeDeleteCache(c.env, loginKey);
     
     // ===== 7. 生成JWT Token =====
     const token = await generateToken(c.env.JWT_SECRET, {
@@ -299,7 +299,8 @@ async function recordLoginAttempt(
   key: string, 
   currentCount: number
 ): Promise<void> {
-  await c.env.CACHE.put(
+  await safePutCache(
+    c.env, 
     key, 
     (currentCount + 1).toString(), 
     { expirationTtl: LOGIN_BLOCK_DURATION }
@@ -465,7 +466,7 @@ authRoutes.post('/logout', requireAuth, async (c) => {
     const token = authHeader.substring(7); // 移除 "Bearer "
     
     // 将token加入黑名单，有效期7天（与token过期时间一致）
-    await c.env.CACHE.put(`blacklist:${token}`, '1', {
+    await safePutCache(c.env, `blacklist:${token}`, '1', {
       expirationTtl: 60 * 60 * 24 * 7,
     });
     

@@ -41,7 +41,7 @@ import { requestLogger } from './middleware/requestLogger';
  */
 export type Env = {
   DB: D1Database;              // D1数据库
-  CACHE: KVNamespace;          // KV缓存
+  CACHE?: KVNamespace;         // KV缓存（可选）
   STORAGE: R2Bucket;           // R2对象存储
   JWT_SECRET: string;          // JWT密钥
   GITHUB_CLIENT_ID: string;    // GitHub OAuth客户端ID
@@ -49,6 +49,8 @@ export type Env = {
   FRONTEND_URL: string;        // 前端URL
   STORAGE_PUBLIC_URL: string;  // R2公开访问URL
   ENVIRONMENT: string;         // 运行环境（development/production）
+  ENABLE_CACHE?: string;       // 是否启用缓存
+  CACHE_HOMEPAGE_ONLY?: string; // 是否只缓存首页
 };
 
 /**
@@ -79,7 +81,7 @@ const app = new Hono<{ Bindings: Env }>();
  */
 app.use('*', async (c, next) => {
   // 只在首次请求时验证（可以改进为启动时验证）
-  const requiredEnvVars = ['DB', 'CACHE', 'STORAGE', 'JWT_SECRET'];
+  const requiredEnvVars = ['DB', 'STORAGE', 'JWT_SECRET'];
   
   for (const varName of requiredEnvVars) {
     if (!c.env[varName as keyof Env]) {
@@ -226,13 +228,17 @@ app.get('/health', async (c) => {
     console.error('Database health check failed:', error);
   }
 
-  // 检查KV缓存
-  try {
-    await c.env.CACHE.get('health-check');
-    services.cache = 'healthy';
-  } catch (error) {
-    services.cache = 'unhealthy';
-    console.error('Cache health check failed:', error);
+  // 检查KV缓存（可选）
+  if (c.env.CACHE) {
+    try {
+      await c.env.CACHE.get('health-check');
+      services.cache = 'healthy';
+    } catch (error) {
+      services.cache = 'unhealthy';
+      console.error('Cache health check failed:', error);
+    }
+  } else {
+    services.cache = 'not configured';
   }
 
   // 检查R2存储
@@ -244,7 +250,10 @@ app.get('/health', async (c) => {
     services.storage = 'healthy';
   }
 
-  const allHealthy = Object.values(services).every(status => status === 'healthy');
+  // 只有数据库和存储必须健康，缓存是可选的
+  const requiredServices = { ...services };
+  delete requiredServices.cache;
+  const allHealthy = Object.values(requiredServices).every(status => status === 'healthy');
 
   return c.json<ApiResponse>({
     success: allHealthy,
@@ -449,4 +458,66 @@ export function errorResponse(error: string, message?: string): ApiResponse {
     message,
     timestamp: new Date().toISOString()
   };
+}
+
+/**
+ * 缓存辅助函数
+ */
+
+/**
+ * 检查缓存是否启用
+ */
+export function isCacheEnabled(env: Env): boolean {
+  return env.ENABLE_CACHE !== 'false';
+}
+
+/**
+ * 安全地获取缓存
+ */
+export async function safeGetCache(env: Env, key: string): Promise<string | null> {
+  if (!isCacheEnabled(env) || !env.CACHE) {
+    return null;
+  }
+  
+  try {
+    return await env.CACHE.get(key);
+  } catch (error) {
+    console.error('Cache get error:', error);
+    return null;
+  }
+}
+
+/**
+ * 安全地写入缓存
+ */
+export async function safePutCache(
+  env: Env, 
+  key: string, 
+  value: string, 
+  options?: { expirationTtl?: number; expiration?: number }
+): Promise<void> {
+  if (!isCacheEnabled(env) || !env.CACHE) {
+    return;
+  }
+  
+  try {
+    await env.CACHE.put(key, value, options);
+  } catch (error) {
+    console.error('Cache put error:', error);
+  }
+}
+
+/**
+ * 安全地删除缓存
+ */
+export async function safeDeleteCache(env: Env, key: string): Promise<void> {
+  if (!isCacheEnabled(env) || !env.CACHE) {
+    return;
+  }
+  
+  try {
+    await env.CACHE.delete(key);
+  } catch (error) {
+    console.error('Cache delete error:', error);
+  }
 }
