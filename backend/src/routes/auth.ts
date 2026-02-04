@@ -345,49 +345,91 @@ authRoutes.post('/github', async (c) => {
       ), 500);
     }
     
+    logger.info('GitHub OAuth flow started', { hasClientId: !!c.env.GITHUB_CLIENT_ID, hasClientSecret: !!c.env.GITHUB_CLIENT_SECRET });
+    
     // ===== 1. 交换access token =====
-    const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({
-        client_id: c.env.GITHUB_CLIENT_ID,
-        client_secret: c.env.GITHUB_CLIENT_SECRET,
-        code,
-      }),
-    });
+    logger.info('Exchanging code for access token', { codeLength: code.length });
+    let tokenData: any;
+    let githubUser: any;
     
-    const tokenData = await tokenResponse.json() as any;
-    
-    if (!tokenData.access_token) {
-      logger.warn('GitHub OAuth failed: No access token', { tokenData });
+    try {
+      const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: c.env.GITHUB_CLIENT_ID,
+          client_secret: c.env.GITHUB_CLIENT_SECRET,
+          code,
+        }),
+      });
+      
+      logger.info('Token exchange response received', { status: tokenResponse.status });
+      
+      if (!tokenResponse.ok) {
+        const errorData = await tokenResponse.json().catch(() => ({}));
+        logger.error('GitHub token exchange failed', { status: tokenResponse.status, error: errorData });
+        return c.json(errorResponse(
+          'OAuth failed',
+          `Failed to exchange code for access token: ${errorData.error || `HTTP ${tokenResponse.status}`}`
+        ), 400);
+      }
+      
+      tokenData = await tokenResponse.json() as any;
+      
+      logger.info('Token exchange data', { hasAccessToken: !!tokenData.access_token, error: tokenData.error });
+      
+      if (!tokenData.access_token) {
+        logger.warn('GitHub OAuth failed: No access token', { tokenData });
+        return c.json(errorResponse(
+          'OAuth failed',
+          `Failed to get access token from GitHub: ${tokenData.error || 'Unknown error'}`
+        ), 400);
+      }
+      
+      // ===== 2. 获取GitHub用户信息 =====
+      logger.info('Fetching GitHub user information');
+      const userResponse = await fetch('https://api.github.com/user', {
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`,
+          'Accept': 'application/json',
+        },
+      });
+      
+      logger.info('GitHub user info response received', { status: userResponse.status });
+      
+      if (!userResponse.ok) {
+        const errorData = await userResponse.json().catch(() => ({}));
+        logger.error('GitHub user info fetch failed', { status: userResponse.status, error: errorData });
+        return c.json(errorResponse(
+          'OAuth failed',
+          `Failed to get user information: ${errorData.message || `HTTP ${userResponse.status}`}`
+        ), 400);
+      }
+      
+      githubUser = await userResponse.json() as any;
+      
+      logger.info('GitHub user data', { hasId: !!githubUser.id, login: githubUser.login });
+      
+      if (!githubUser || !githubUser.id) {
+        logger.error('GitHub API error: Invalid user data', { githubUser });
+        return c.json(errorResponse(
+          'OAuth failed',
+          'Failed to get user information from GitHub'
+        ), 400);
+      }
+    } catch (error) {
+      logger.error('GitHub OAuth network error', { error: error instanceof Error ? error.message : error });
       return c.json(errorResponse(
         'OAuth failed',
-        'Failed to get access token from GitHub'
-      ), 400);
-    }
-    
-    // ===== 2. 获取GitHub用户信息 =====
-    const userResponse = await fetch('https://api.github.com/user', {
-      headers: {
-        'Authorization': `Bearer ${tokenData.access_token}`,
-        'Accept': 'application/json',
-      },
-    });
-    
-    const githubUser = await userResponse.json() as any;
-    
-    if (!githubUser || !githubUser.id) {
-      logger.error('GitHub API error: Invalid user data', { githubUser });
-      return c.json(errorResponse(
-        'OAuth failed',
-        'Failed to get user information from GitHub'
-      ), 400);
+        'Network error when communicating with GitHub'
+      ), 500);
     }
     
     // ===== 3. 查找或创建用户 =====
+    logger.info('Finding or creating user', { githubId: githubUser.id, login: githubUser.login });
     let user = await c.env.DB.prepare(
       'SELECT * FROM users WHERE oauth_provider = ? AND oauth_id = ?'
     ).bind('github', githubUser.id.toString()).first() as any;
@@ -443,9 +485,12 @@ authRoutes.post('/github', async (c) => {
           'Failed to create user account. Please try again.'
         ), 500);
       }
+    } else {
+      logger.info('GitHub user found in database', { userId: user.id, username: user.username });
     }
     
     // ===== 4. 生成JWT Token =====
+    logger.info('Generating JWT token', { userId: user.id });
     const token = await generateToken(c.env.JWT_SECRET, {
       userId: user.id,
       username: user.username,
@@ -474,7 +519,7 @@ authRoutes.post('/github', async (c) => {
     }, 'GitHub login successful'));
     
   } catch (error) {
-    logger.error('GitHub OAuth error', error);
+    logger.error('GitHub OAuth error', { error: error instanceof Error ? error.message : error, stack: error instanceof Error ? error.stack : undefined });
     return c.json(errorResponse(
       'OAuth authentication failed',
       'An error occurred during GitHub authentication'
