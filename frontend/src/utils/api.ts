@@ -1,21 +1,22 @@
 /**
- * 前端API工具（优化版）
+ * 前端API工具(优化版)
  * 
- * 功能：
+ * 功能:
  * - 统一的API请求封装
  * - 完善的错误处理
  * - 使用TypeScript类型
  * - 自动token管理
  * 
- * 优化内容：
+ * 优化内容:
  * 1. 使用完整的TypeScript类型定义
  * 2. 改进错误处理和用户提示
  * 3. 添加请求拦截器
  * 4. 添加响应拦截器
  * 5. 统一API响应格式处理
+ * 6. 添加githubLogin方法和getConfig方法
  * 
  * @author 优化版本
- * @version 2.0.0
+ * @version 2.1.0
  */
 
 import type {
@@ -111,7 +112,7 @@ export async function apiRequest<T = any>(
     
     // 处理HTTP错误
     if (!response.ok) {
-      // Token过期，自动登出
+      // Token过期,自动登出
       if (response.status === 401) {
         handleUnauthorized();
       }
@@ -124,7 +125,7 @@ export async function apiRequest<T = any>(
   } catch (error) {
     // 网络错误
     if (error instanceof TypeError && error.message === 'Failed to fetch') {
-      throw new Error('无法连接到服务器，请检查网络连接');
+      throw new Error('无法连接到服务器,请检查网络连接');
     }
     
     // 其他错误
@@ -155,7 +156,7 @@ function handleUnauthorized(): void {
   // 清除本地存储的认证信息
   localStorage.removeItem('auth-storage');
   
-  // 跳转到登录页（如果不在登录页）
+  // 跳转到登录页(如果不在登录页)
   if (!window.location.pathname.includes('/login')) {
     window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
   }
@@ -223,6 +224,21 @@ export const api = {
       body: JSON.stringify(data),
     }),
   
+  /**
+   * GitHub OAuth登录
+   */
+  githubLogin: (code: string) =>
+    apiRequest<{ user: User; token: string }>('/auth/github', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
+  
+  /**
+   * 获取配置信息
+   */
+  getConfig: () =>
+    apiRequest<{ githubClientId: string; frontendUrl: string }>('/config'),
+  
   // ============= 文章相关 =============
   
   /**
@@ -243,13 +259,13 @@ export const api = {
     apiRequest<Post>(`/posts/${slug}`),
   
   /**
- * 通过ID获取文章详情（用于编辑）
+ * 通过ID获取文章详情(用于编辑)
  */
   getPostById: (id: number) => 
     apiRequest<Post>(`/posts/admin/${id}`),
   
   /**
-   * 获取所有文章列表（用于管理后台）
+   * 获取所有文章列表(用于管理后台)
    */
   getAdminPosts: (params?: {
     page?: string;
@@ -561,7 +577,7 @@ export function isAuthenticated(): boolean {
 }
 
 /**
- * 获取当前用户（从localStorage）
+ * 获取当前用户(从localStorage)
  */
 export function getCurrentUser(): User | null {
   try {
@@ -578,4 +594,3 @@ export function getCurrentUser(): User | null {
 // ============= 导出 =============
 
 export default api;
-
