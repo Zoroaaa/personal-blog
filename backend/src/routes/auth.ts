@@ -501,6 +501,7 @@ authRoutes.get('/me', requireAuth, async (c) => {
   try {
     const currentUser = c.get('user') as any;
     
+    // 获取用户基本信息
     const user = await c.env.DB.prepare(
       'SELECT id, username, email, display_name, avatar_url, bio, role, created_at, updated_at FROM users WHERE id = ?'
     ).bind(currentUser.userId).first() as any;
@@ -510,7 +511,23 @@ authRoutes.get('/me', requireAuth, async (c) => {
       return c.json(errorResponse('User not found'), 404);
     }
     
-    return c.json(successResponse({ user }));
+    // 获取用户统计数据
+    const postCount = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM posts WHERE author_id = ? AND status = ?'
+    ).bind(currentUser.userId, 'published').first() as any;
+    
+    const commentCount = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM comments WHERE user_id = ? AND status = ?'
+    ).bind(currentUser.userId, 'approved').first() as any;
+    
+    // 构建完整的用户信息响应
+    const userWithStats = {
+      ...user,
+      postCount: postCount?.count || 0,
+      commentCount: commentCount?.count || 0
+    };
+    
+    return c.json(successResponse({ user: userWithStats }));
     
   } catch (error) {
     logger.error('Get user error', error);
