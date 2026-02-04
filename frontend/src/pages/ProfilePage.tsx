@@ -304,7 +304,7 @@ export function ProfilePage() {
       return (
         <div className="text-center py-12">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-gray-600">加载中...</p>
+          <p className="mt-2 text-muted-foreground">加载中...</p>
         </div>
       );
     }
@@ -419,19 +419,19 @@ export function ProfilePage() {
       return (
         <div className="text-center py-12">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-gray-600">加载中...</p>
+          <p className="mt-2 text-muted-foreground">加载中...</p>
         </div>
       );
     }
     
     if (comments.length === 0) {
       return (
-        <div className="text-center py-16 bg-gray-50 rounded-lg">
-          <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="text-center py-16 bg-muted rounded-lg">
+          <svg className="mx-auto h-16 w-16 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
-          <h3 className="mt-4 text-lg font-medium text-gray-900">暂无评论</h3>
-          <p className="mt-2 text-gray-500">您还没有发表过评论</p>
+          <h3 className="mt-4 text-lg font-medium text-foreground">暂无评论</h3>
+          <p className="mt-2 text-muted-foreground">您还没有发表过评论</p>
         </div>
       );
     }
@@ -474,19 +474,19 @@ export function ProfilePage() {
       return (
         <div className="text-center py-12">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-gray-600">加载中...</p>
+          <p className="mt-2 text-muted-foreground">加载中...</p>
         </div>
       );
     }
     
     if (likedPosts.length === 0) {
       return (
-        <div className="text-center py-16 bg-gray-50 rounded-lg">
-          <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="text-center py-16 bg-muted rounded-lg">
+          <svg className="mx-auto h-16 w-16 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
           </svg>
-          <h3 className="mt-4 text-lg font-medium text-gray-900">暂无点赞</h3>
-          <p className="mt-2 text-gray-500">您还没有点赞过文章</p>
+          <h3 className="mt-4 text-lg font-medium text-foreground">暂无点赞</h3>
+          <p className="mt-2 text-muted-foreground">您还没有点赞过文章</p>
         </div>
       );
     }
