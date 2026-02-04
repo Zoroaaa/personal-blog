@@ -336,6 +336,15 @@ authRoutes.post('/github', async (c) => {
       ), 400);
     }
     
+    // 检查GitHub OAuth配置
+    if (!c.env.GITHUB_CLIENT_ID || !c.env.GITHUB_CLIENT_SECRET) {
+      logger.error('GitHub OAuth configuration missing');
+      return c.json(errorResponse(
+        'GitHub login not configured',
+        'GitHub login is not properly configured on the server. Please contact the administrator.'
+      ), 500);
+    }
+    
     // ===== 1. 交换access token =====
     const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
@@ -353,7 +362,7 @@ authRoutes.post('/github', async (c) => {
     const tokenData = await tokenResponse.json() as any;
     
     if (!tokenData.access_token) {
-      logger.warn('GitHub OAuth failed: No access token');
+      logger.warn('GitHub OAuth failed: No access token', { tokenData });
       return c.json(errorResponse(
         'OAuth failed',
         'Failed to get access token from GitHub'
@@ -369,6 +378,14 @@ authRoutes.post('/github', async (c) => {
     });
     
     const githubUser = await userResponse.json() as any;
+    
+    if (!githubUser || !githubUser.id) {
+      logger.error('GitHub API error: Invalid user data', { githubUser });
+      return c.json(errorResponse(
+        'OAuth failed',
+        'Failed to get user information from GitHub'
+      ), 400);
+    }
     
     // ===== 3. 查找或创建用户 =====
     let user = await c.env.DB.prepare(
@@ -389,32 +406,43 @@ authRoutes.post('/github', async (c) => {
         ? `${username}_${Date.now().toString(36)}` 
         : username;
       
-      const result = await c.env.DB.prepare(
-        `INSERT INTO users (username, email, display_name, avatar_url, oauth_provider, oauth_id, role, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
-      ).bind(
-        finalUsername,
-        email,
-        githubUser.name || finalUsername,
-        githubUser.avatar_url,
-        'github',
-        githubUser.id.toString(),
-        'user'
-      ).run();
-      
-      user = {
-        id: result.meta.last_row_id,
-        username: finalUsername,
-        email,
-        display_name: githubUser.name || finalUsername,
-        avatar_url: githubUser.avatar_url,
-        role: 'user',
-      };
-      
-      logger.info('New GitHub user created', { 
-        userId: user.id, 
-        username: user.username 
-      });
+      try {
+        const result = await c.env.DB.prepare(
+          `INSERT INTO users (username, email, display_name, avatar_url, oauth_provider, oauth_id, role, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+        ).bind(
+          finalUsername,
+          email,
+          githubUser.name || finalUsername,
+          githubUser.avatar_url,
+          'github',
+          githubUser.id.toString(),
+          'user'
+        ).run();
+        
+        user = {
+          id: result.meta.last_row_id,
+          username: finalUsername,
+          email,
+          display_name: githubUser.name || finalUsername,
+          avatar_url: githubUser.avatar_url,
+          role: 'user',
+        };
+        
+        logger.info('New GitHub user created', { 
+          userId: user.id, 
+          username: user.username 
+        });
+      } catch (dbError) {
+        logger.error('Database error: Failed to create GitHub user', { 
+          error: dbError, 
+          githubUserId: githubUser.id 
+        });
+        return c.json(errorResponse(
+          'Registration failed',
+          'Failed to create user account. Please try again.'
+        ), 500);
+      }
     }
     
     // ===== 4. 生成JWT Token =====
