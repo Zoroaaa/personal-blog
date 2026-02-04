@@ -1,23 +1,25 @@
 /**
- * 登录/注册页面（优化版）
+ * 登录/注册页面(优化版)
  * 
- * 功能：
+ * 功能:
  * - 用户登录
  * - 用户注册
  * - 表单验证
+ * - GitHub OAuth登录
  * 
- * 优化内容：
+ * 优化内容:
  * 1. 修复API响应格式处理
  * 2. 使用完整的TypeScript类型
  * 3. 改进错误处理和提示
  * 4. 添加密码强度提示
  * 5. 优化UI/UX
+ * 6. 移除硬编码的GITHUB_CLIENT_ID,通过API获取
  * 
  * @author 优化版本
- * @version 2.0.0
+ * @version 2.1.0
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../utils/api';
@@ -39,6 +41,95 @@ export function LoginPage() {
   const from = (location.state as any)?.from?.pathname || '/';
   const redirectParam = new URLSearchParams(location.search).get('redirect');
   const redirectPath = redirectParam || from;
+  
+  // GitHub OAuth配置
+  const [githubClientId, setGithubClientId] = useState('');
+  const [loadingConfig, setLoadingConfig] = useState(true);
+  
+  // 获取GitHub配置
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const response = await api.getConfig();
+        
+        if (response.success && response.data) {
+          setGithubClientId(response.data.githubClientId);
+          console.log('GitHub配置加载成功:', response.data.githubClientId);
+        } else {
+          console.error('获取配置失败:', response);
+          setError('无法获取GitHub配置,请稍后再试');
+        }
+      } catch (error) {
+        console.error('获取配置失败:', error);
+        setError('无法连接到服务器,请检查网络连接');
+      } finally {
+        setLoadingConfig(false);
+      }
+    };
+    
+    fetchConfig();
+  }, []);
+  
+  // GitHub OAuth客户端ID和重定向URI
+  const GITHUB_REDIRECT_URI = window.location.origin + '/login';
+  
+  // 处理GitHub OAuth回调
+  useEffect(() => {
+    const handleGitHubCallback = async () => {
+      const params = new URLSearchParams(location.search);
+      const code = params.get('code');
+      const errorParam = params.get('error');
+      
+      if (errorParam) {
+        setError(`GitHub授权失败: ${errorParam}`);
+        return;
+      }
+      
+      if (code) {
+        setLoading(true);
+        setError('');
+        
+        try {
+          // 调用后端API交换代码获取token
+          const response = await api.githubLogin(code);
+          
+          if (response.success && response.data) {
+            const { user, token } = response.data;
+            
+            // 保存到store
+            login(user, token);
+            
+            // 跳转
+            navigate(redirectPath, { replace: true });
+          } else {
+            throw new Error(response.error || 'GitHub登录失败');
+          }
+        } catch (err: any) {
+          console.error('GitHub login error:', err);
+          setError(err.message || 'GitHub登录失败');
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    
+    handleGitHubCallback();
+  }, [location.search, navigate, redirectPath, login]);
+  
+  // 处理GitHub登录
+  const handleGitHubLogin = () => {
+    if (!githubClientId) {
+      setError('GitHub配置未加载,请刷新页面重试');
+      return;
+    }
+    
+    const state = Math.random().toString(36).substring(2, 15);
+    const scope = 'user:email user';
+    
+    const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${githubClientId}&redirect_uri=${encodeURIComponent(GITHUB_REDIRECT_URI)}&scope=${scope}&state=${state}`;
+    
+    window.location.href = githubAuthUrl;
+  };
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +189,7 @@ export function LoginPage() {
       }
     } catch (err: any) {
       console.error('Auth error:', err);
-      setError(err.message || '操作失败，请稍后重试');
+      setError(err.message || '操作失败,请稍后重试');
     } finally {
       setLoading(false);
     }
@@ -116,8 +207,9 @@ export function LoginPage() {
     if (/[0-9]/.test(pwd)) strength++;
     if (/[^a-zA-Z0-9]/.test(pwd)) strength++;
     
-    if (strength <= 2) return { level: 2, text: '弱', color: 'text-orange-600' };
-    if (strength <= 3) return { level: 3, text: '中等', color: 'text-yellow-600' };
+    if (strength <= 1) return { level: 1, text: '弱', color: 'text-red-600' };
+    if (strength === 2) return { level: 2, text: '中', color: 'text-orange-600' };
+    if (strength === 3) return { level: 3, text: '较强', color: 'text-yellow-600' };
     return { level: 4, text: '强', color: 'text-green-600' };
   };
   
@@ -170,12 +262,12 @@ export function LoginPage() {
               />
               {!isLogin && (
                 <p className="mt-1 text-xs text-gray-500">
-                  3-20个字符，只能包含字母、数字、下划线和连字符
+                  3-20个字符,只能包含字母、数字、下划线和连字符
                 </p>
               )}
             </div>
             
-            {/* 邮箱（仅注册） */}
+            {/* 邮箱(仅注册) */}
             {!isLogin && (
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
@@ -194,7 +286,7 @@ export function LoginPage() {
               </div>
             )}
             
-            {/* 显示名称（仅注册） */}
+            {/* 显示名称(仅注册) */}
             {!isLogin && (
               <div>
                 <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 mb-1">
@@ -231,7 +323,7 @@ export function LoginPage() {
                 autoComplete={isLogin ? 'current-password' : 'new-password'}
               />
               
-              {/* 密码强度指示器（仅注册） */}
+              {/* 密码强度指示器(仅注册) */}
               {!isLogin && password && passwordStrength && (
                 <div className="mt-2">
                   <div className="flex items-center justify-between mb-1">
@@ -251,7 +343,7 @@ export function LoginPage() {
                     />
                   </div>
                   <p className="mt-1 text-xs text-gray-500">
-                    建议：至少8个字符，包含大小写字母和数字
+                    建议:至少8个字符,包含大小写字母和数字
                   </p>
                 </div>
               )}
@@ -283,6 +375,28 @@ export function LoginPage() {
             </button>
           </form>
           
+          {/* 分割线 */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">或使用</span>
+            </div>
+          </div>
+          
+          {/* GitHub登录按钮 */}
+          <button
+            onClick={handleGitHubLogin}
+            disabled={loading || loadingConfig || !githubClientId}
+            className="w-full flex items-center justify-center space-x-2 bg-gray-800 text-white py-3 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
+          >
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+            </svg>
+            <span>{loadingConfig ? '加载配置中...' : '使用GitHub登录'}</span>
+          </button>
+          
           {/* 切换登录/注册 */}
           <div className="mt-6 text-center">
             <button
@@ -293,7 +407,7 @@ export function LoginPage() {
               }}
               className="text-blue-600 hover:text-blue-700 font-medium"
             >
-              {isLogin ? '还没有账号？立即注册' : '已有账号？立即登录'}
+              {isLogin ? '还没有账号?立即注册' : '已有账号?立即登录'}
             </button>
           </div>
           
@@ -310,3 +424,4 @@ export function LoginPage() {
     </div>
   );
 }
+

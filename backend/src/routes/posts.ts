@@ -20,7 +20,7 @@
  */
 
 import { Hono } from 'hono';
-import { Env, successResponse, errorResponse } from '../index';
+import { Env, successResponse, errorResponse, safeGetCache, safePutCache, safeDeleteCache } from '../index';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import {
@@ -83,13 +83,18 @@ postRoutes.get('/', async (c) => {
     const allowedSortFields = ['published_at', 'view_count', 'like_count', 'comment_count', 'created_at'];
     const finalSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'published_at';
     
-    // ===== 2. 尝试从缓存获取 =====
-    const cacheKey = `posts:list:${page}:${limit}:${category || ''}:${tag || ''}:${author || ''}:${search || ''}:${finalSortBy}:${order}`;
-    const cached = await c.env.CACHE.get(cacheKey);
+    // ===== 2. 尝试从缓存获取（只缓存首页） =====
+    const shouldCache = page === 1 && !category && !tag && !author && !search;
+    let cached = null;
     
-    if (cached) {
-      logger.info('Posts list served from cache');
-      return c.json(JSON.parse(cached));
+    if (shouldCache) {
+      const cacheKey = `posts:homepage:${limit}:${finalSortBy}:${order}`;
+      cached = await safeGetCache(c.env, cacheKey);
+      
+      if (cached) {
+        logger.info('Homepage posts served from cache');
+        return c.json(JSON.parse(cached));
+      }
     }
     
     // ===== 3. 构建查询 =====
@@ -223,10 +228,13 @@ postRoutes.get('/', async (c) => {
       }
     });
     
-    // ===== 8. 缓存结果 =====
-    await c.env.CACHE.put(cacheKey, JSON.stringify(response), {
-      expirationTtl: CACHE_TTL.POST_LIST
-    });
+    // ===== 8. 缓存结果（只缓存首页） =====
+    if (shouldCache) {
+      const cacheKey = `posts:homepage:${limit}:${finalSortBy}:${order}`;
+      await safePutCache(c.env, cacheKey, JSON.stringify(response), {
+        expirationTtl: CACHE_TTL.POST_LIST
+      });
+    }
     
     logger.info('Posts list fetched successfully', { 
       count: postsWithTags.length, 
@@ -625,6 +633,130 @@ postRoutes.get('/search', async (c) => {
   }
 });
 
+// ============= 获取用户点赞文章 =============
+
+/**
+ * GET /api/posts/likes
+ * 获取当前用户点赞的文章列表（需要认证）
+ * 
+ * 查询参数：
+ * - page: 页码（默认1）
+ * - limit: 每页数量（默认10，最大50）
+ */
+postRoutes.get('/likes', requireAuth, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const user = c.get('user') as any;
+    const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
+    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
+    const offset = (page - 1) * limit;
+    
+    // 获取用户点赞的文章
+    const { results } = await c.env.DB.prepare(`
+      SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
+             p.view_count, p.like_count, p.comment_count, p.reading_time,
+             p.published_at, p.created_at,
+             u.username as author_name, u.display_name as author_display_name, 
+             u.avatar_url as author_avatar,
+             c.name as category_name, c.slug as category_slug, c.color as category_color
+      FROM posts p
+      JOIN likes l ON p.id = l.post_id
+      LEFT JOIN users u ON p.author_id = u.id
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE l.user_id = ? AND p.status = 'published' AND p.visibility = 'public'
+      ORDER BY l.created_at DESC
+      LIMIT ? OFFSET ?
+    `).bind(user.userId, limit, offset).all();
+    
+    // 转换为 camelCase 格式
+    const formattedResults = (results as any[]).map(post => ({
+      id: post.id,
+      title: post.title,
+      slug: post.slug,
+      summary: post.summary,
+      coverImage: post.cover_image,
+      viewCount: post.view_count,
+      likeCount: post.like_count,
+      commentCount: post.comment_count,
+      readingTime: post.reading_time,
+      publishedAt: post.published_at,
+      createdAt: post.created_at,
+      authorName: post.author_name,
+      authorDisplayName: post.author_display_name,
+      authorAvatar: post.author_avatar,
+      categoryName: post.category_name,
+      categorySlug: post.category_slug,
+      categoryColor: post.category_color
+    }));
+    
+    // 获取总数
+    const countResult = await c.env.DB.prepare(`
+      SELECT COUNT(*) as total FROM posts p
+      JOIN likes l ON p.id = l.post_id
+      WHERE l.user_id = ? AND p.status = 'published' AND p.visibility = 'public'
+    `).bind(user.userId).first() as any;
+    
+    const total = countResult?.total || 0;
+    
+    // 为每篇文章获取标签
+    const postIds = formattedResults.map((p: any) => p.id);
+    let postsWithTags = formattedResults;
+    
+    if (postIds.length > 0) {
+      const tagsQuery = `
+        SELECT pt.post_id, t.id, t.name, t.slug
+        FROM post_tags pt
+        JOIN tags t ON pt.tag_id = t.id
+        WHERE pt.post_id IN (${postIds.map(() => '?').join(',')})
+      `;
+      const { results: tagResults } = await c.env.DB.prepare(tagsQuery).bind(...postIds).all();
+      
+      // 组织标签数据
+      const tagsByPost = new Map();
+      (tagResults as any[]).forEach(tag => {
+        if (!tagsByPost.has(tag.post_id)) {
+          tagsByPost.set(tag.post_id, []);
+        }
+        tagsByPost.get(tag.post_id).push({
+          id: tag.id,
+          name: tag.name,
+          slug: tag.slug
+        });
+      });
+      
+      // 添加标签到文章
+      postsWithTags = formattedResults.map((post: any) => ({
+        ...post,
+        tags: tagsByPost.get(post.id) || []
+      }));
+    }
+    
+    logger.info('User liked posts fetched successfully', { 
+      userId: user.userId,
+      count: postsWithTags.length,
+      total 
+    });
+    
+    return c.json(successResponse({
+      posts: postsWithTags,
+      total,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    }));
+    
+  } catch (error) {
+    logger.error('Get liked posts error', error);
+    return c.json(errorResponse(
+      'Failed to fetch liked posts',
+      'An error occurred while fetching liked posts'
+    ), 500);
+  }
+});
 
 // ============= 文章详情 =============
 
@@ -644,7 +776,7 @@ postRoutes.get('/:slug', async (c) => {
     
     // ===== 1. 从缓存获取 =====
     const cacheKey = `post:${slug}`;
-    const cached = await c.env.CACHE.get(cacheKey);
+    const cached = await safeGetCache(c.env, cacheKey);
     
     if (cached) {
       // 异步增加浏览量
@@ -721,7 +853,7 @@ postRoutes.get('/:slug', async (c) => {
     const response = successResponse(result);
     
     // ===== 6. 缓存结果 =====
-    await c.env.CACHE.put(cacheKey, JSON.stringify(response), {
+    await safePutCache(c.env, cacheKey, JSON.stringify(response), {
       expirationTtl: CACHE_TTL.POST_DETAIL
     });
     
@@ -970,7 +1102,7 @@ postRoutes.put('/:id', requireAuth, async (c) => {
     }
     
     // ===== 7. 清除缓存 =====
-    await c.env.CACHE.delete(`post:${post.slug}`);
+    await safeDeleteCache(c.env, `post:${post.slug}`);
     await clearPostListCache(c);
     
     logger.info('Post updated successfully', { postId: id, userId: user.userId });
@@ -1012,10 +1144,10 @@ postRoutes.delete('/:id', requireAuth, requireAdmin, async (c) => {
     await c.env.DB.prepare('DELETE FROM posts WHERE id = ?').bind(id).run();
     
     // 清除缓存
-    await c.env.CACHE.delete(`post:${post.slug}`);
+    await safeDeleteCache(c.env, `post:${post.slug}`);
     await clearPostListCache(c);
     // 清除数据分析缓存
-    await c.env.CACHE.delete('analytics:stats');
+    await safeDeleteCache(c.env, 'analytics:stats');
     
     logger.info('Post deleted successfully', { postId: id });
     
@@ -1080,7 +1212,7 @@ postRoutes.post('/:id/like', requireAuth, async (c) => {
     }
     
     // 清除文章详情缓存
-    await c.env.CACHE.delete(`post:${post.slug}`);
+    await safeDeleteCache(c.env, `post:${post.slug}`);
     
     return c.json(successResponse({ liked }));
     
@@ -1093,109 +1225,7 @@ postRoutes.post('/:id/like', requireAuth, async (c) => {
   }
 });
 
-// ============= 获取用户点赞文章 =============
 
-/**
- * GET /api/posts/likes
- * 获取当前用户点赞的文章列表（需要认证）
- * 
- * 查询参数：
- * - page: 页码（默认1）
- * - limit: 每页数量（默认10，最大50）
- */
-postRoutes.get('/likes', requireAuth, async (c) => {
-  const logger = createLogger(c);
-  
-  try {
-    const user = c.get('user') as any;
-    const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
-    const offset = (page - 1) * limit;
-    
-    // 获取用户点赞的文章
-    const { results } = await c.env.DB.prepare(`
-      SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
-             p.view_count, p.like_count, p.comment_count, p.reading_time,
-             p.published_at, p.created_at,
-             u.username as author_name, u.display_name as author_display_name, 
-             u.avatar_url as author_avatar,
-             c.name as category_name, c.slug as category_slug, c.color as category_color
-      FROM posts p
-      JOIN likes l ON p.id = l.post_id
-      LEFT JOIN users u ON p.author_id = u.id
-      LEFT JOIN categories c ON p.category_id = c.id
-      WHERE l.user_id = ? AND p.status = 'published' AND p.visibility = 'public'
-      ORDER BY l.created_at DESC
-      LIMIT ? OFFSET ?
-    `).bind(user.userId, limit, offset).all();
-    
-    // 获取总数
-    const countResult = await c.env.DB.prepare(`
-      SELECT COUNT(*) as total FROM posts p
-      JOIN likes l ON p.id = l.post_id
-      WHERE l.user_id = ? AND p.status = 'published' AND p.visibility = 'public'
-    `).bind(user.userId).first() as any;
-    
-    const total = countResult?.total || 0;
-    
-    // 为每篇文章获取标签
-    const postIds = results.map((p: any) => p.id);
-    let postsWithTags = results;
-    
-    if (postIds.length > 0) {
-      const tagsQuery = `
-        SELECT pt.post_id, t.id, t.name, t.slug
-        FROM post_tags pt
-        JOIN tags t ON pt.tag_id = t.id
-        WHERE pt.post_id IN (${postIds.map(() => '?').join(',')})
-      `;
-      const { results: tagResults } = await c.env.DB.prepare(tagsQuery).bind(...postIds).all();
-      
-      // 组织标签数据
-      const tagsByPost = new Map();
-      (tagResults as any[]).forEach(tag => {
-        if (!tagsByPost.has(tag.post_id)) {
-          tagsByPost.set(tag.post_id, []);
-        }
-        tagsByPost.get(tag.post_id).push({
-          id: tag.id,
-          name: tag.name,
-          slug: tag.slug
-        });
-      });
-      
-      // 添加标签到文章
-      postsWithTags = results.map((post: any) => ({
-        ...post,
-        tags: tagsByPost.get(post.id) || []
-      }));
-    }
-    
-    logger.info('User liked posts fetched successfully', { 
-      userId: user.userId,
-      count: postsWithTags.length,
-      total 
-    });
-    
-    return c.json(successResponse({
-      posts: postsWithTags,
-      total,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
-      }
-    }));
-    
-  } catch (error) {
-    logger.error('Get liked posts error', error);
-    return c.json(errorResponse(
-      'Failed to fetch liked posts',
-      'An error occurred while fetching liked posts'
-    ), 500);
-  }
-});
 
 
 
@@ -1206,9 +1236,15 @@ postRoutes.get('/likes', requireAuth, async (c) => {
  */
 async function clearPostListCache(c: any): Promise<void> {
   try {
-    // 清除前3页的缓存（通常足够了）
-    for (let page = 1; page <= 3; page++) {
-      await c.env.CACHE.delete(`posts:list:${page}:${DEFAULT_PAGE_SIZE}::::published_at:DESC`);
+    // 清除首页缓存（现在只缓存首页）
+    const sortOptions = ['published_at', 'view_count', 'like_count'];
+    const orders = ['DESC', 'ASC'];
+    
+    for (const sortBy of sortOptions) {
+      for (const order of orders) {
+        await safeDeleteCache(c.env, `posts:homepage:${DEFAULT_PAGE_SIZE}:${sortBy}:${order}`);
+        await safeDeleteCache(c.env, `posts:homepage:${MAX_PAGE_SIZE}:${sortBy}:${order}`);
+      }
     }
   } catch (error) {
     console.error('Failed to clear post list cache:', error);

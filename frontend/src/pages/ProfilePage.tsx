@@ -69,7 +69,8 @@ export function ProfilePage() {
     user: true,
     comments: false,
     likes: false,
-    update: false
+    update: false,
+    delete: false
   });
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -287,14 +288,26 @@ export function ProfilePage() {
     }
     
     try {
-      // 这里需要后端提供删除账号的API
-      // 暂时使用模拟成功
-      alert('账号删除成功');
-      logout();
-      navigate('/');
+      // 弹出密码输入框
+      const password = prompt('请输入您的密码以确认删除账号：');
+      if (!password) {
+        return;
+      }
+      
+      setLoading(prev => ({ ...prev, delete: true }));
+      setError(null);
+      
+      const response = await api.deleteAccount(password);
+      if (response.success) {
+        alert('账号删除成功');
+        logout();
+        navigate('/');
+      }
     } catch (error) {
       console.error('Failed to delete account:', error);
-      setError('删除账号失败');
+      setError('删除账号失败，请检查密码是否正确');
+    } finally {
+      setLoading(prev => ({ ...prev, delete: false }));
     }
   };
   
@@ -304,7 +317,7 @@ export function ProfilePage() {
       return (
         <div className="text-center py-12">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-gray-600">加载中...</p>
+          <p className="mt-2 text-muted-foreground">加载中...</p>
         </div>
       );
     }
@@ -319,7 +332,7 @@ export function ProfilePage() {
               <img 
                 src={avatarPreview || userInfo?.avatarUrl || getRandomAvatar(userInfo?.username || '')} 
                 alt="用户头像" 
-                className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-lg"
+                className="w-32 h-32 rounded-full object-cover border-4 border-card shadow-lg"
               />
               <label 
                 htmlFor="avatar-upload" 
@@ -337,17 +350,17 @@ export function ProfilePage() {
                 />
               </label>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">{userInfo?.displayName}</h2>
-            <p className="text-gray-600">@{userInfo?.username}</p>
-            <p className="text-gray-500 text-sm mt-1">{userInfo?.email}</p>
+            <h2 className="text-2xl font-bold text-foreground">{formData.displayName || userInfo?.displayName}</h2>
+            <p className="text-muted-foreground">@{userInfo?.username}</p>
+            <p className="text-muted-foreground text-sm mt-1">{userInfo?.email}</p>
           </div>
           
           {/* 个人资料编辑 */}
           <div className="flex-1 w-full">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">个人资料</h3>
+            <h3 className="text-xl font-semibold text-foreground mb-4">个人资料</h3>
             <form className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   显示名称
                 </label>
                 <input
@@ -355,12 +368,12 @@ export function ProfilePage() {
                   name="displayName"
                   value={formData.displayName}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   个人简介
                 </label>
                 <textarea
@@ -368,9 +381,10 @@ export function ProfilePage() {
                   value={formData.bio}
                   onChange={handleInputChange}
                   rows={4}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="介绍一下自己..."
                 />
+                <p className="text-xs text-muted-foreground mt-1">个人简介会显示在您的公开资料页面，让其他用户了解您</p>
               </div>
               
               <div>
@@ -388,24 +402,24 @@ export function ProfilePage() {
         </div>
         
         {/* 用户统计信息 */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-xl font-semibold text-gray-900 mb-4">统计信息</h3>
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6">
+          <h3 className="text-xl font-semibold text-foreground mb-4">统计信息</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
+            <div className="text-center p-4 bg-muted rounded-lg">
               <p className="text-2xl font-bold text-blue-600">{userInfo?.postCount || 0}</p>
-              <p className="text-gray-600 text-sm">发布文章</p>
+              <p className="text-muted-foreground text-sm">发布文章</p>
             </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
+            <div className="text-center p-4 bg-muted rounded-lg">
               <p className="text-2xl font-bold text-green-600">{userInfo?.commentCount || 0}</p>
-              <p className="text-gray-600 text-sm">发表评论</p>
+              <p className="text-muted-foreground text-sm">发表评论</p>
             </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
+            <div className="text-center p-4 bg-muted rounded-lg">
               <p className="text-2xl font-bold text-red-600">{likedPosts.length}</p>
-              <p className="text-gray-600 text-sm">点赞文章</p>
+              <p className="text-muted-foreground text-sm">点赞文章</p>
             </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
+            <div className="text-center p-4 bg-muted rounded-lg">
               <p className="text-2xl font-bold text-purple-600">{userInfo ? 1 : 0}</p>
-              <p className="text-gray-600 text-sm">账号等级</p>
+              <p className="text-muted-foreground text-sm">账号等级</p>
             </div>
           </div>
         </div>
@@ -419,19 +433,19 @@ export function ProfilePage() {
       return (
         <div className="text-center py-12">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-gray-600">加载中...</p>
+          <p className="mt-2 text-muted-foreground">加载中...</p>
         </div>
       );
     }
     
     if (comments.length === 0) {
       return (
-        <div className="text-center py-16 bg-gray-50 rounded-lg">
-          <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="text-center py-16 bg-muted rounded-lg">
+          <svg className="mx-auto h-16 w-16 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
-          <h3 className="mt-4 text-lg font-medium text-gray-900">暂无评论</h3>
-          <p className="mt-2 text-gray-500">您还没有发表过评论</p>
+          <h3 className="mt-4 text-lg font-medium text-foreground">暂无评论</h3>
+          <p className="mt-2 text-muted-foreground">您还没有发表过评论</p>
         </div>
       );
     }
@@ -439,18 +453,18 @@ export function ProfilePage() {
     return (
       <div className="space-y-4">
         {comments.map((comment) => (
-          <div key={comment.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+          <div key={comment.id} className="border border-border rounded-lg p-4 hover:shadow-sm transition-shadow">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-gray-900 mb-2">{comment.content}</p>
-                <div className="flex items-center text-sm text-gray-500 space-x-4">
+                <p className="text-foreground mb-2">{comment.content}</p>
+                <div className="flex flex-col sm:flex-row sm:items-center text-sm space-y-2 sm:space-y-0 sm:space-x-4">
                   <Link 
-                    to={`/posts/${comment.postId}`} 
+                    to={`/posts/${comment.post?.slug || comment.postId}`} 
                     className="text-blue-600 hover:underline"
                   >
-                    查看文章
+                    {comment.post?.title || '查看文章'}
                   </Link>
-                  <span>{formatDate(comment.createdAt)}</span>
+                  <span className="text-muted-foreground">{formatDate(comment.createdAt || comment.created_at)}</span>
                 </div>
               </div>
               <button
@@ -474,19 +488,19 @@ export function ProfilePage() {
       return (
         <div className="text-center py-12">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-gray-600">加载中...</p>
+          <p className="mt-2 text-muted-foreground">加载中...</p>
         </div>
       );
     }
     
     if (likedPosts.length === 0) {
       return (
-        <div className="text-center py-16 bg-gray-50 rounded-lg">
-          <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="text-center py-16 bg-muted rounded-lg">
+          <svg className="mx-auto h-16 w-16 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
           </svg>
-          <h3 className="mt-4 text-lg font-medium text-gray-900">暂无点赞</h3>
-          <p className="mt-2 text-gray-500">您还没有点赞过文章</p>
+          <h3 className="mt-4 text-lg font-medium text-foreground">暂无点赞</h3>
+          <p className="mt-2 text-muted-foreground">您还没有点赞过文章</p>
         </div>
       );
     }
@@ -497,7 +511,7 @@ export function ProfilePage() {
           <Link 
             key={post.id} 
             to={`/posts/${post.slug || post.id}`} 
-            className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow group"
+            className="border border-border rounded-lg overflow-hidden hover:shadow-md transition-shadow group"
           >
             {post.coverImage && (
               <div className="h-40 overflow-hidden">
@@ -509,10 +523,10 @@ export function ProfilePage() {
               </div>
             )}
             <div className="p-4">
-              <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+              <h3 className="text-lg font-semibold text-foreground group-hover:text-blue-600 transition-colors">
                 {post.title}
               </h3>
-              <div className="flex items-center text-sm text-gray-500 mt-2">
+              <div className="flex items-center text-sm text-muted-foreground mt-2">
                 <span>{formatDate(post.publishedAt)}</span>
                 <span className="mx-2">•</span>
                 <span>{post.viewCount} 次阅读</span>
@@ -529,11 +543,11 @@ export function ProfilePage() {
     return (
       <div className="space-y-8">
         {/* 密码修改 */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-xl font-semibold text-gray-900 mb-4">密码修改</h3>
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6">
+          <h3 className="text-xl font-semibold text-foreground mb-4">密码修改</h3>
           <form className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 当前密码
               </label>
               <input
@@ -541,12 +555,12 @@ export function ProfilePage() {
                 name="password"
                 value={formData.password}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 新密码
               </label>
               <input
@@ -554,12 +568,12 @@ export function ProfilePage() {
                 name="newPassword"
                 value={formData.newPassword}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 确认新密码
               </label>
               <input
@@ -567,7 +581,7 @@ export function ProfilePage() {
                 name="confirmPassword"
                 value={formData.confirmPassword}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             
@@ -585,8 +599,8 @@ export function ProfilePage() {
         </div>
         
         {/* 账号删除 */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-xl font-semibold text-gray-900 mb-4">账号管理</h3>
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6">
+          <h3 className="text-xl font-semibold text-foreground mb-4">账号管理</h3>
           <div className="space-y-4">
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
               <h4 className="text-lg font-medium text-red-800 mb-2">删除账号</h4>
@@ -595,9 +609,10 @@ export function ProfilePage() {
               </p>
               <button
                 onClick={handleDeleteAccount}
-                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                disabled={loading.delete}
+                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                删除账号
+                {loading.delete ? '删除中...' : '删除账号'}
               </button>
             </div>
           </div>
@@ -611,8 +626,8 @@ export function ProfilePage() {
     <div className="max-w-6xl mx-auto px-4 py-12">
       {/* 页面标题 */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">个人中心</h1>
-        <p className="text-gray-600">管理您的个人信息和账号设置</p>
+        <h1 className="text-3xl font-bold text-foreground mb-2">个人中心</h1>
+        <p className="text-muted-foreground">管理您的个人信息和账号设置</p>
       </div>
       
       {/* 错误和成功消息 */}
@@ -629,29 +644,29 @@ export function ProfilePage() {
       )}
       
       {/* 标签页导航 */}
-      <div className="border-b border-gray-200 mb-6">
+      <div className="border-b border-border mb-6">
         <nav className="flex space-x-8">
           <button
             onClick={() => setActiveTab('info')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'info' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'info' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
           >
             个人信息
           </button>
           <button
             onClick={() => setActiveTab('comments')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'comments' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'comments' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
           >
             我的评论
           </button>
           <button
             onClick={() => setActiveTab('likes')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'likes' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'likes' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
           >
             我的点赞
           </button>
           <button
             onClick={() => setActiveTab('settings')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'settings' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'settings' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
           >
             账号设置
           </button>
@@ -659,7 +674,7 @@ export function ProfilePage() {
       </div>
       
       {/* 标签页内容 */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-card rounded-lg shadow-sm border border-border p-6">
         {activeTab === 'info' && renderInfoTab()}
         {activeTab === 'comments' && renderCommentsTab()}
         {activeTab === 'likes' && renderLikesTab()}

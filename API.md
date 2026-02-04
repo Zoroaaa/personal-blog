@@ -1,8 +1,8 @@
-# 📡 API 文档
+# 📡 API 文档 v2.0.0
 
 ## 基础信息
 
-**API 基础 URL**: `https://your-backend-worker.example.com`
+**API 基础 URL**: `https://your-backend-worker.example.com/api`
 
 **认证方式**: JWT Token (Bearer)
 
@@ -11,7 +11,27 @@
 {
   "success": true,
   "data": {...},
-  "error": null
+  "error": null,
+  "message": "",
+  "timestamp": "2024-01-01T00:00:00Z"
+}
+```
+
+## 健康检查
+
+### 健康检查
+
+**GET /health**
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "status": "healthy",
+    "version": "2.0.0",
+    "timestamp": "2024-01-01T00:00:00Z"
+  }
 }
 ```
 
@@ -26,7 +46,8 @@
 {
   "username": "testuser",
   "email": "test@example.com",
-  "password": "password123"
+  "password": "Password123",
+  "displayName": "Test User"
 }
 ```
 
@@ -39,10 +60,16 @@
       "id": 1,
       "username": "testuser",
       "email": "test@example.com",
-      "role": "user"
+      "displayName": "Test User",
+      "avatarUrl": null,
+      "bio": null,
+      "role": "user",
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-01T00:00:00Z"
     },
     "token": "jwt-token"
-  }
+  },
+  "message": "Registration successful"
 }
 ```
 
@@ -53,8 +80,8 @@
 请求体:
 ```json
 {
-  "email": "test@example.com",
-  "password": "password123"
+  "username": "testuser",
+  "password": "Password123"
 }
 ```
 
@@ -67,16 +94,64 @@
       "id": 1,
       "username": "testuser",
       "email": "test@example.com",
+      "displayName": "Test User",
+      "avatarUrl": null,
+      "bio": null,
       "role": "user"
     },
     "token": "jwt-token"
-  }
+  },
+  "message": "Login successful"
 }
 ```
 
 ### GitHub OAuth
 
-**GET /auth/github**
+**POST /auth/github**
+
+请求体:
+```json
+{
+  "code": "github-authorization-code"
+}
+```
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": 1,
+      "username": "githubuser",
+      "email": "user@github.com",
+      "displayName": "GitHub User",
+      "avatarUrl": "https://github.com/avatar.jpg",
+      "bio": null,
+      "role": "user"
+    },
+    "token": "jwt-token"
+  },
+  "message": "GitHub login successful"
+}
+```
+
+### 登出
+
+**POST /auth/logout**
+
+需要认证: ✅
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "loggedOut": true
+  },
+  "message": "Logout successful"
+}
+```
 
 ### 获取当前用户
 
@@ -93,9 +168,52 @@
       "id": 1,
       "username": "testuser",
       "email": "test@example.com",
-      "role": "user"
+      "displayName": "Test User",
+      "avatarUrl": null,
+      "bio": null,
+      "role": "user",
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-01T00:00:00Z",
+      "postCount": 10,
+      "commentCount": 20
     }
   }
+}
+```
+
+### 更新用户资料
+
+**PUT /auth/profile**
+
+需要认证: ✅
+
+请求体:
+```json
+{
+  "displayName": "Updated Name",
+  "bio": "This is my bio",
+  "avatarUrl": "https://example.com/avatar.jpg"
+}
+```
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": 1,
+      "username": "testuser",
+      "email": "test@example.com",
+      "displayName": "Updated Name",
+      "avatarUrl": "https://example.com/avatar.jpg",
+      "bio": "This is my bio",
+      "role": "user",
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-01T00:00:00Z"
+    }
+  },
+  "message": "Profile updated successfully"
 }
 ```
 
@@ -107,9 +225,13 @@
 
 查询参数:
 - `page`: 页码 (默认 1)
-- `limit`: 每页数量 (默认 10)
+- `limit`: 每页数量 (默认 10, 最大 50)
 - `category`: 分类 slug
 - `tag`: 标签 slug
+- `author`: 作者用户名
+- `search`: 搜索关键词
+- `sortBy`: 排序字段 (published_at, view_count, like_count, comment_count)
+- `order`: 排序方向 (asc, desc)
 
 响应:
 ```json
@@ -122,10 +244,19 @@
         "title": "Test Post",
         "slug": "test-post",
         "summary": "Test summary",
-        "createdAt": "2024-01-01T00:00:00Z",
-        "readingTime": "2 min",
+        "coverImage": "https://example.com/image.jpg",
         "viewCount": 100,
-        "tags": [{ "name": "test", "slug": "test" }]
+        "likeCount": 20,
+        "commentCount": 10,
+        "readingTime": 2,
+        "publishedAt": "2024-01-01T00:00:00Z",
+        "createdAt": "2024-01-01T00:00:00Z",
+        "authorName": "testuser",
+        "authorDisplayName": "Test User",
+        "authorAvatar": null,
+        "categoryName": "General",
+        "categorySlug": "general",
+        "tags": [{ "id": 1, "name": "test", "slug": "test" }]
       }
     ],
     "pagination": {
@@ -151,18 +282,25 @@
     "title": "Test Post",
     "slug": "test-post",
     "content": "# Test Content",
-    "htmlContent": "<h1>Test Content</h1>",
     "summary": "Test summary",
+    "coverImage": "https://example.com/image.jpg",
+    "viewCount": 100,
+    "likeCount": 20,
+    "commentCount": 10,
+    "readingTime": 2,
+    "publishedAt": "2024-01-01T00:00:00Z",
     "createdAt": "2024-01-01T00:00:00Z",
     "updatedAt": "2024-01-01T00:00:00Z",
-    "readingTime": "2 min",
-    "viewCount": 100,
+    "isLiked": false,
     "author": {
-      "id": 1,
-      "username": "testuser"
+      "username": "testuser",
+      "displayName": "Test User",
+      "avatarUrl": null,
+      "bio": null
     },
-    "tags": [{ "name": "test", "slug": "test" }],
-    "category": { "name": "General", "slug": "general" }
+    "tags": [{ "id": 1, "name": "test", "slug": "test" }],
+    "categoryName": "General",
+    "categorySlug": "general"
   }
 }
 ```
@@ -179,9 +317,11 @@
   "title": "Test Post",
   "content": "# Test Content",
   "summary": "Test summary",
-  "status": "published",
   "categoryId": 1,
-  "tagIds": [1, 2]
+  "tags": [1, 2],
+  "coverImage": "https://example.com/image.jpg",
+  "status": "published",
+  "visibility": "public"
 }
 ```
 
@@ -192,6 +332,113 @@
   "data": {
     "id": 1,
     "slug": "test-post"
+  },
+  "message": "Post created successfully"
+}
+```
+
+### 更新文章
+
+**PUT /posts/{id}**
+
+需要认证: ✅
+
+请求体:
+```json
+{
+  "title": "Updated Post",
+  "content": "# Updated Content",
+  "summary": "Updated summary",
+  "categoryId": 1,
+  "tags": [1, 2, 3],
+  "coverImage": "https://example.com/new-image.jpg",
+  "status": "published",
+  "visibility": "public"
+}
+```
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "updated": true
+  },
+  "message": "Post updated successfully"
+}
+```
+
+### 删除文章
+
+**DELETE /posts/{id}**
+
+需要认证: ✅
+需要角色: admin
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "deleted": true
+  },
+  "message": "Post deleted successfully"
+}
+```
+
+### 点赞文章
+
+**POST /posts/{id}/like**
+
+需要认证: ✅
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "liked": true
+  }
+}
+```
+
+### 获取用户点赞的文章
+
+**GET /posts/likes**
+
+需要认证: ✅
+
+查询参数:
+- `page`: 页码 (默认 1)
+- `limit`: 每页数量 (默认 10, 最大 50)
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "posts": [
+      {
+        "id": 1,
+        "title": "Test Post",
+        "slug": "test-post",
+        "summary": "Test summary",
+        "coverImage": "https://example.com/image.jpg",
+        "viewCount": 100,
+        "likeCount": 20,
+        "commentCount": 10,
+        "readingTime": 2,
+        "publishedAt": "2024-01-01T00:00:00Z",
+        "createdAt": "2024-01-01T00:00:00Z"
+      }
+    ],
+    "total": 1,
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "total": 1,
+      "totalPages": 1
+    }
   }
 }
 ```
@@ -205,8 +452,9 @@
 - `category`: 分类 slug
 - `tag`: 标签 slug
 - `page`: 页码 (默认 1)
-- `limit`: 每页数量 (默认 10)
-- `sort`: 排序方式 (relevance, newest, oldest)
+- `limit`: 每页数量 (默认 10, 最大 50)
+- `sort`: 排序方式 (relevance, published_at, view_count, like_count, comment_count)
+- `order`: 排序方向 (asc, desc)
 
 响应:
 ```json
@@ -219,10 +467,13 @@
         "title": "Test Post",
         "slug": "test-post",
         "summary": "Test summary",
-        "createdAt": "2024-01-01T00:00:00Z",
-        "readingTime": "2 min",
+        "coverImage": "https://example.com/image.jpg",
         "viewCount": 100,
-        "tags": [{ "name": "test", "slug": "test" }]
+        "likeCount": 20,
+        "commentCount": 10,
+        "readingTime": 2,
+        "publishedAt": "2024-01-01T00:00:00Z",
+        "createdAt": "2024-01-01T00:00:00Z"
       }
     ],
     "total": 1,
@@ -244,8 +495,10 @@
 
 查询参数:
 - `postId`: 文章 ID
+- `userId`: 用户 ID (需要认证)
 - `page`: 页码 (默认 1)
-- `limit`: 每页数量 (默认 20)
+- `limit`: 每页数量 (默认 20, 最大 100)
+- `includeReplies`: 是否包含回复 (默认 true)
 
 响应:
 ```json
@@ -256,13 +509,27 @@
       {
         "id": 1,
         "content": "Test comment",
-        "htmlContent": "<p>Test comment</p>",
         "createdAt": "2024-01-01T00:00:00Z",
         "user": {
           "id": 1,
-          "username": "testuser"
+          "username": "testuser",
+          "displayName": "Test User",
+          "avatarUrl": null
         },
-        "replies": []
+        "replies": [
+          {
+            "id": 2,
+            "content": "Test reply",
+            "createdAt": "2024-01-01T00:00:00Z",
+            "user": {
+              "id": 2,
+              "username": "user2",
+              "displayName": "User 2",
+              "avatarUrl": null
+            },
+            "replies": []
+          }
+        ]
       }
     ],
     "pagination": {
@@ -296,7 +563,25 @@
   "success": true,
   "data": {
     "id": 1
-  }
+  },
+  "message": "Comment created successfully"
+}
+```
+
+### 删除评论
+
+**DELETE /comments/{id}**
+
+需要认证: ✅
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "deleted": true
+  },
+  "message": "Comment deleted successfully"
 }
 ```
 
@@ -582,6 +867,23 @@
 }
 ```
 
+### 删除用户
+
+**DELETE /admin/users/{id}**
+
+需要认证: ✅
+需要角色: admin
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "deleted": true
+  }
+}
+```
+
 ### 获取系统设置
 
 **GET /admin/settings**
@@ -627,23 +929,6 @@
   "success": true,
   "data": {
     "updated": true
-  }
-}
-```
-
-## 健康检查
-
-### 健康检查
-
-**GET /health**
-
-响应:
-```json
-{
-  "success": true,
-  "data": {
-    "status": "ok",
-    "version": "1.0.0"
   }
 }
 ```

@@ -22,7 +22,9 @@
 
 import { Hono } from 'hono';
 import bcrypt from 'bcryptjs';
-import { Env, successResponse, errorResponse } from '../index';
+import type { Env } from '../types';
+import { successResponse, errorResponse } from '../utils/response';
+import { safeGetCache, safePutCache, safeDeleteCache } from '../index';
 import { generateToken } from '../utils/jwt';
 import { requireAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
@@ -153,8 +155,11 @@ authRoutes.post('/register', async (c) => {
         username,
         email,
         displayName,
+        avatarUrl: null,
+        bio: null,
         role: 'user',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       },
       token
     }, 'Registration successful'), 201);
@@ -198,7 +203,7 @@ authRoutes.post('/login', async (c) => {
     
     // ===== 2. 检查登录尝试次数（防暴力破解） =====
     const loginKey = `login_attempts:${username}`;
-    const attempts = await c.env.CACHE.get(loginKey);
+    const attempts = await safeGetCache(c.env, loginKey);
     const attemptCount = attempts ? parseInt(attempts, 10) : 0;
     
     if (attemptCount >= MAX_LOGIN_ATTEMPTS) {
@@ -246,7 +251,7 @@ authRoutes.post('/login', async (c) => {
     }
     
     // ===== 6. 清除失败尝试记录 =====
-    await c.env.CACHE.delete(loginKey);
+    await safeDeleteCache(c.env, loginKey);
     
     // ===== 7. 生成JWT Token =====
     const token = await generateToken(c.env.JWT_SECRET, {
@@ -299,7 +304,8 @@ async function recordLoginAttempt(
   key: string, 
   currentCount: number
 ): Promise<void> {
-  await c.env.CACHE.put(
+  await safePutCache(
+    c.env, 
     key, 
     (currentCount + 1).toString(), 
     { expirationTtl: LOGIN_BLOCK_DURATION }
@@ -330,41 +336,133 @@ authRoutes.post('/github', async (c) => {
       ), 400);
     }
     
-    // ===== 1. 交换access token =====
-    const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({
-        client_id: c.env.GITHUB_CLIENT_ID,
-        client_secret: c.env.GITHUB_CLIENT_SECRET,
-        code,
-      }),
-    });
-    
-    const tokenData = await tokenResponse.json() as any;
-    
-    if (!tokenData.access_token) {
-      logger.warn('GitHub OAuth failed: No access token');
+    // 检查GitHub OAuth配置
+    if (!c.env.GITHUB_CLIENT_ID || !c.env.GITHUB_CLIENT_SECRET) {
+      logger.error('GitHub OAuth configuration missing');
       return c.json(errorResponse(
-        'OAuth failed',
-        'Failed to get access token from GitHub'
-      ), 400);
+        'GitHub login not configured',
+        'GitHub login is not properly configured on the server. Please contact the administrator.'
+      ), 500);
     }
     
-    // ===== 2. 获取GitHub用户信息 =====
-    const userResponse = await fetch('https://api.github.com/user', {
-      headers: {
-        'Authorization': `Bearer ${tokenData.access_token}`,
-        'Accept': 'application/json',
-      },
-    });
+    logger.info('GitHub OAuth flow started', { hasClientId: !!c.env.GITHUB_CLIENT_ID, hasClientSecret: !!c.env.GITHUB_CLIENT_SECRET });
     
-    const githubUser = await userResponse.json() as any;
+    // ===== 1. 交换access token =====
+    logger.info('Exchanging code for access token', { codeLength: code.length });
+    let tokenData: any;
+    let githubUser: any;
+    let githubEmail: string | undefined;
+    
+    try {
+      const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: c.env.GITHUB_CLIENT_ID,
+          client_secret: c.env.GITHUB_CLIENT_SECRET,
+          code,
+        }),
+      });
+      
+      logger.info('Token exchange response received', { status: tokenResponse.status });
+      
+      if (!tokenResponse.ok) {
+        const errorData = await tokenResponse.json().catch(() => ({}));
+        logger.error('GitHub token exchange failed', { status: tokenResponse.status, error: errorData });
+        return c.json(errorResponse(
+          'OAuth failed',
+          `Failed to exchange code for access token: ${errorData.error || `HTTP ${tokenResponse.status}`}`
+        ), 400);
+      }
+      
+      tokenData = await tokenResponse.json() as any;
+      
+      logger.info('Token exchange data', { hasAccessToken: !!tokenData.access_token, error: tokenData.error });
+      
+      if (!tokenData.access_token) {
+        logger.warn('GitHub OAuth failed: No access token', { tokenData });
+        return c.json(errorResponse(
+          'OAuth failed',
+          `Failed to get access token from GitHub: ${tokenData.error || 'Unknown error'}`
+        ), 400);
+      }
+      
+      // ===== 2. 获取GitHub用户信息 =====
+      logger.info('Fetching GitHub user information');
+      const userResponse = await fetch('https://api.github.com/user', {
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`,
+          'Accept': 'application/json',
+          'User-Agent': 'Personal Blog OAuth App',
+        },
+      });
+      
+      logger.info('GitHub user info response received', { status: userResponse.status });
+      
+      if (!userResponse.ok) {
+        const errorData = await userResponse.json().catch(() => ({}));
+        logger.error('GitHub user info fetch failed', { status: userResponse.status, error: errorData });
+        return c.json(errorResponse(
+          'OAuth failed',
+          `Failed to get user information: ${errorData.message || `HTTP ${userResponse.status}`}`
+        ), 400);
+      }
+      
+      githubUser = await userResponse.json() as any;
+      
+      logger.info('GitHub user data', { hasId: !!githubUser.id, login: githubUser.login });
+      
+      if (!githubUser || !githubUser.id) {
+        logger.error('GitHub API error: Invalid user data', { githubUser });
+        return c.json(errorResponse(
+          'OAuth failed',
+          'Failed to get user information from GitHub'
+        ), 400);
+      }
+      
+      // ===== 3. 获取GitHub用户邮箱 =====
+      logger.info('Fetching GitHub user emails');
+      githubEmail = githubUser.email;
+      
+      try {
+        const emailResponse = await fetch('https://api.github.com/user/emails', {
+          headers: {
+            'Authorization': `Bearer ${tokenData.access_token}`,
+            'Accept': 'application/json',
+            'User-Agent': 'Personal Blog OAuth App',
+          },
+        });
+        
+        if (emailResponse.ok) {
+          const emails = await emailResponse.json() as any[];
+          logger.info('GitHub emails received', { emailCount: emails.length });
+          
+          // 找到主要邮箱
+          const primaryEmail = emails.find(e => e.primary && e.verified);
+          if (primaryEmail) {
+            githubEmail = primaryEmail.email;
+            logger.info('Found primary GitHub email', { email: githubEmail });
+          }
+        } else {
+          const errorData = await emailResponse.json().catch(() => ({}));
+          logger.warn('Failed to get GitHub emails', { status: emailResponse.status, error: errorData });
+        }
+      } catch (emailError) {
+        logger.warn('Error fetching GitHub emails', { error: emailError instanceof Error ? emailError.message : emailError });
+      }
+    } catch (error) {
+      logger.error('GitHub OAuth network error', { error: error instanceof Error ? error.message : error });
+      return c.json(errorResponse(
+        'OAuth failed',
+        'Network error when communicating with GitHub'
+      ), 500);
+    }
     
     // ===== 3. 查找或创建用户 =====
+    logger.info('Finding or creating user', { githubId: githubUser.id, login: githubUser.login });
     let user = await c.env.DB.prepare(
       'SELECT * FROM users WHERE oauth_provider = ? AND oauth_id = ?'
     ).bind('github', githubUser.id.toString()).first() as any;
@@ -372,7 +470,7 @@ authRoutes.post('/github', async (c) => {
     if (!user) {
       // 创建新用户
       const username = githubUser.login;
-      const email = githubUser.email || `${githubUser.login}@github.oauth`;
+      const email = githubEmail || `${githubUser.login}@github.oauth`;
       
       // 检查用户名是否已存在
       const existing = await c.env.DB.prepare(
@@ -383,35 +481,50 @@ authRoutes.post('/github', async (c) => {
         ? `${username}_${Date.now().toString(36)}` 
         : username;
       
-      const result = await c.env.DB.prepare(
-        `INSERT INTO users (username, email, display_name, avatar_url, oauth_provider, oauth_id, role, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
-      ).bind(
-        finalUsername,
-        email,
-        githubUser.name || finalUsername,
-        githubUser.avatar_url,
-        'github',
-        githubUser.id.toString(),
-        'user'
-      ).run();
-      
-      user = {
-        id: result.meta.last_row_id,
-        username: finalUsername,
-        email,
-        display_name: githubUser.name || finalUsername,
-        avatar_url: githubUser.avatar_url,
-        role: 'user',
-      };
-      
-      logger.info('New GitHub user created', { 
-        userId: user.id, 
-        username: user.username 
-      });
+      try {
+        const result = await c.env.DB.prepare(
+          `INSERT INTO users (username, email, display_name, avatar_url, oauth_provider, oauth_id, role, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+        ).bind(
+          finalUsername,
+          email,
+          githubUser.name || finalUsername,
+          githubUser.avatar_url,
+          'github',
+          githubUser.id.toString(),
+          'user'
+        ).run();
+        
+        user = {
+          id: result.meta.last_row_id,
+          username: finalUsername,
+          email,
+          display_name: githubUser.name || finalUsername,
+          avatar_url: githubUser.avatar_url,
+          role: 'user',
+        };
+        
+        logger.info('New GitHub user created', { 
+          userId: user.id, 
+          username: user.username,
+          email 
+        });
+      } catch (dbError) {
+        logger.error('Database error: Failed to create GitHub user', { 
+          error: dbError, 
+          githubUserId: githubUser.id 
+        });
+        return c.json(errorResponse(
+          'Registration failed',
+          'Failed to create user account. Please try again.'
+        ), 500);
+      }
+    } else {
+      logger.info('GitHub user found in database', { userId: user.id, username: user.username });
     }
     
     // ===== 4. 生成JWT Token =====
+    logger.info('Generating JWT token', { userId: user.id });
     const token = await generateToken(c.env.JWT_SECRET, {
       userId: user.id,
       username: user.username,
@@ -431,13 +544,16 @@ authRoutes.post('/github', async (c) => {
         email: user.email,
         displayName: user.display_name,
         avatarUrl: user.avatar_url,
+        bio: user.bio || null,
         role: user.role,
+        createdAt: user.created_at || new Date().toISOString(),
+        updatedAt: user.updated_at || new Date().toISOString()
       },
       token
     }, 'GitHub login successful'));
     
   } catch (error) {
-    logger.error('GitHub OAuth error', error);
+    logger.error('GitHub OAuth error', { error: error instanceof Error ? error.message : error, stack: error instanceof Error ? error.stack : undefined });
     return c.json(errorResponse(
       'OAuth authentication failed',
       'An error occurred during GitHub authentication'
@@ -465,7 +581,7 @@ authRoutes.post('/logout', requireAuth, async (c) => {
     const token = authHeader.substring(7); // 移除 "Bearer "
     
     // 将token加入黑名单，有效期7天（与token过期时间一致）
-    await c.env.CACHE.put(`blacklist:${token}`, '1', {
+    await safePutCache(c.env, `blacklist:${token}`, '1', {
       expirationTtl: 60 * 60 * 24 * 7,
     });
     
@@ -500,6 +616,7 @@ authRoutes.get('/me', requireAuth, async (c) => {
   try {
     const currentUser = c.get('user') as any;
     
+    // 获取用户基本信息
     const user = await c.env.DB.prepare(
       'SELECT id, username, email, display_name, avatar_url, bio, role, created_at, updated_at FROM users WHERE id = ?'
     ).bind(currentUser.userId).first() as any;
@@ -509,7 +626,31 @@ authRoutes.get('/me', requireAuth, async (c) => {
       return c.json(errorResponse('User not found'), 404);
     }
     
-    return c.json(successResponse({ user }));
+    // 获取用户统计数据
+    const postCount = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM posts WHERE author_id = ? AND status = ?'
+    ).bind(currentUser.userId, 'published').first() as any;
+    
+    const commentCount = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM comments WHERE user_id = ? AND status = ?'
+    ).bind(currentUser.userId, 'approved').first() as any;
+    
+    // 构建完整的用户信息响应
+    const userWithStats = {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      displayName: user.display_name,
+      avatarUrl: user.avatar_url,
+      bio: user.bio,
+      role: user.role,
+      createdAt: user.created_at,
+      updatedAt: user.updated_at,
+      postCount: postCount?.count || 0,
+      commentCount: commentCount?.count || 0
+    };
+    
+    return c.json(successResponse({ user: userWithStats }));
     
   } catch (error) {
     logger.error('Get user error', error);
@@ -601,9 +742,22 @@ authRoutes.put('/profile', requireAuth, async (c) => {
     });
     
     // 获取更新后的用户信息
-    const user = await c.env.DB.prepare(
+    const userData = await c.env.DB.prepare(
       'SELECT id, username, email, display_name, avatar_url, bio, role, created_at, updated_at FROM users WHERE id = ?'
-    ).bind(currentUser.userId).first();
+    ).bind(currentUser.userId).first() as any;
+    
+    // 转换为 camelCase 格式
+    const user = {
+      id: userData.id,
+      username: userData.username,
+      email: userData.email,
+      displayName: userData.display_name,
+      avatarUrl: userData.avatar_url,
+      bio: userData.bio,
+      role: userData.role,
+      createdAt: userData.created_at,
+      updatedAt: userData.updated_at
+    };
     
     return c.json(successResponse(
       { user },
@@ -615,6 +769,92 @@ authRoutes.put('/profile', requireAuth, async (c) => {
     return c.json(errorResponse(
       'Failed to update profile',
       'An error occurred while updating your profile'
+    ), 500);
+  }
+});
+
+// ============= 修改密码 =============
+
+/**
+ * PUT /api/auth/password
+ * 修改当前用户的密码
+ * 
+ * 需要认证
+ * 
+ * 请求体：
+ * {
+ *   currentPassword: string,
+ *   newPassword: string
+ * }
+ */
+authRoutes.put('/password', requireAuth, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const currentUser = c.get('user') as any;
+    const { currentPassword, newPassword } = await c.req.json();
+    
+    // 验证必填字段
+    if (!currentPassword || !newPassword) {
+      return c.json(errorResponse(
+        'Missing required fields',
+        'Please provide current password and new password'
+      ), 400);
+    }
+    
+    // 获取用户信息
+    const user = await c.env.DB.prepare(
+      'SELECT password_hash FROM users WHERE id = ?'
+    ).bind(currentUser.userId).first() as any;
+    
+    // 验证用户存在
+    if (!user) {
+      return c.json(errorResponse('User not found'), 404);
+    }
+    
+    // 验证用户不是OAuth用户
+    if (!user.password_hash) {
+      return c.json(errorResponse(
+        'Invalid operation',
+        'This account uses OAuth login. Password change is not supported.'
+      ), 400);
+    }
+    
+    // 验证当前密码
+    const valid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!valid) {
+      return c.json(errorResponse(
+        'Invalid password',
+        'Current password is incorrect'
+      ), 401);
+    }
+    
+    // 验证新密码强度
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) {
+      return c.json(errorResponse('Weak password', passwordError), 400);
+    }
+    
+    // 加密新密码
+    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    
+    // 更新密码
+    await c.env.DB.prepare(
+      'UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+    ).bind(passwordHash, currentUser.userId).run();
+    
+    logger.info('Password updated', { userId: currentUser.userId });
+    
+    return c.json(successResponse(
+      { updated: true },
+      'Password updated successfully'
+    ));
+    
+  } catch (error) {
+    logger.error('Update password error', error);
+    return c.json(errorResponse(
+      'Failed to update password',
+      'An error occurred while updating your password'
     ), 500);
   }
 });
@@ -646,7 +886,139 @@ authRoutes.delete('/account', requireAuth, async (c) => {
       'SELECT password_hash FROM users WHERE id = ?'
     ).bind(currentUser.userId).first() as any;
     
-    if (user.password_hash && password) {
+    if (user.password_hash) {
+      if (!password) {
+        return c.json(errorResponse(
+          'Missing password',
+          'Password is required for account deletion'
+        ), 400);
+      }
+      const valid = await bcrypt.compare(password, user.password_hash);
+      if (!valid) {
+        return c.json(errorResponse(
+          'Invalid password',
+          'Password is incorrect'
+        ), 401);
+      }
+    }
+    
+    // 删除用户（这里实现硬删除，也可以改为软删除）
+    await c.env.DB.prepare(
+      'DELETE FROM users WHERE id = ?'
+    ).bind(currentUser.userId).run();
+    
+    logger.info('Account deleted', { userId: currentUser.userId });
+    
+    return c.json(successResponse(
+      { deleted: true },
+      'Account deleted successfully'
+    ));
+    
+  } catch (error) {
+    logger.error('Delete account error', error);
+    return c.json(errorResponse(
+      'Failed to delete account',
+      'An error occurred while deleting your account'
+    ), 500);
+  }
+});
+
+/**
+ * DELETE /api/auth/delete
+ * 删除用户账户（别名路由，兼容前端请求）
+ * 
+ * 需要认证
+ */
+authRoutes.delete('/delete', requireAuth, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const currentUser = c.get('user') as any;
+    const { password, confirmation } = await c.req.json();
+    
+    // 要求确认
+    if (confirmation !== 'DELETE') {
+      return c.json(errorResponse(
+        'Confirmation required',
+        'Please type DELETE to confirm account deletion'
+      ), 400);
+    }
+    
+    // 验证密码（OAuth用户跳过）
+    const user = await c.env.DB.prepare(
+      'SELECT password_hash FROM users WHERE id = ?'
+    ).bind(currentUser.userId).first() as any;
+    
+    if (user.password_hash) {
+      if (!password) {
+        return c.json(errorResponse(
+          'Missing password',
+          'Password is required for account deletion'
+        ), 400);
+      }
+      const valid = await bcrypt.compare(password, user.password_hash);
+      if (!valid) {
+        return c.json(errorResponse(
+          'Invalid password',
+          'Password is incorrect'
+        ), 401);
+      }
+    }
+    
+    // 删除用户（这里实现硬删除，也可以改为软删除）
+    await c.env.DB.prepare(
+      'DELETE FROM users WHERE id = ?'
+    ).bind(currentUser.userId).run();
+    
+    logger.info('Account deleted', { userId: currentUser.userId });
+    
+    return c.json(successResponse(
+      { deleted: true },
+      'Account deleted successfully'
+    ));
+    
+  } catch (error) {
+    logger.error('Delete account error', error);
+    return c.json(errorResponse(
+      'Failed to delete account',
+      'An error occurred while deleting your account'
+    ), 500);
+  }
+});
+
+/**
+ * POST /api/auth/delete
+ * 删除用户账户（POST 版本，兼容前端请求）
+ * 
+ * 需要认证
+ */
+authRoutes.post('/delete', requireAuth, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const currentUser = c.get('user') as any;
+    const { password, confirmation } = await c.req.json();
+    
+    // 要求确认
+    if (confirmation !== 'DELETE') {
+      return c.json(errorResponse(
+        'Confirmation required',
+        'Please type DELETE to confirm account deletion'
+      ), 400);
+    }
+    
+    // 验证密码（OAuth用户跳过）
+    const user = await c.env.DB.prepare(
+      'SELECT password_hash FROM users WHERE id = ?'
+    ).bind(currentUser.userId).first() as any;
+    
+    if (user.password_hash) {
+      if (!password) {
+        return c.json(errorResponse(
+          'Missing password',
+          'Password is required for account deletion'
+        ), 400);
+      }
       const valid = await bcrypt.compare(password, user.password_hash);
       if (!valid) {
         return c.json(errorResponse(

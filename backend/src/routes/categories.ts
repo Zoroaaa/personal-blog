@@ -17,7 +17,7 @@
  */
 
 import { Hono } from 'hono';
-import { Env, successResponse, errorResponse } from '../index';
+import { Env, successResponse, errorResponse, safeGetCache, safePutCache, safeDeleteCache } from '../index';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import {
@@ -45,7 +45,7 @@ categoryRoutes.get('/', async (c) => {
   try {
     // 尝试从缓存获取
     const cacheKey = 'categories:all';
-    const cached = await c.env.CACHE.get(cacheKey);
+    const cached = await safeGetCache(c.env, cacheKey);
     
     if (cached) {
       logger.info('Categories served from cache');
@@ -61,7 +61,7 @@ categoryRoutes.get('/', async (c) => {
     const response = successResponse({ categories: results });
     
     // 缓存结果
-    await c.env.CACHE.put(cacheKey, JSON.stringify(response), {
+    await safePutCache(c.env, cacheKey, JSON.stringify(response), {
       expirationTtl: CACHE_TTL
     });
     
@@ -90,7 +90,7 @@ categoryRoutes.get('/tags', async (c) => {
   try {
     // 尝试从缓存获取
     const cacheKey = 'tags:all';
-    const cached = await c.env.CACHE.get(cacheKey);
+    const cached = await safeGetCache(c.env, cacheKey);
     
     if (cached) {
       logger.info('Tags served from cache');
@@ -106,7 +106,7 @@ categoryRoutes.get('/tags', async (c) => {
     const response = successResponse({ tags: results });
     
     // 缓存结果
-    await c.env.CACHE.put(cacheKey, JSON.stringify(response), {
+    await safePutCache(c.env, cacheKey, JSON.stringify(response), {
       expirationTtl: CACHE_TTL
     });
     
@@ -188,7 +188,7 @@ categoryRoutes.post('/', requireAuth, requireAdmin, async (c) => {
     }
     
     // 清除缓存
-    await c.env.CACHE.delete('categories:all');
+    await safeDeleteCache(c.env, 'categories:all');
     
     logger.info('Category created', { 
       categoryId: result.meta.last_row_id,
@@ -261,7 +261,7 @@ categoryRoutes.post('/tags', requireAuth, requireAdmin, async (c) => {
     }
     
     // 清除缓存
-    await c.env.CACHE.delete('tags:all');
+    await safeDeleteCache(c.env, 'tags:all');
     
     logger.info('Tag created', { 
       tagId: result.meta.last_row_id,
@@ -322,7 +322,7 @@ categoryRoutes.put('/:id', requireAuth, requireAdmin, async (c) => {
     ).run();
     
     // 清除缓存
-    await c.env.CACHE.delete('categories:all');
+    await safeDeleteCache(c.env, 'categories:all');
     
     logger.info('Category updated', { categoryId: id });
     
@@ -367,7 +367,7 @@ categoryRoutes.delete('/:id', requireAuth, requireAdmin, async (c) => {
     await c.env.DB.prepare('DELETE FROM categories WHERE id = ?').bind(id).run();
     
     // 清除缓存
-    await c.env.CACHE.delete('categories:all');
+    await safeDeleteCache(c.env, 'categories:all');
     
     logger.info('Category deleted', { categoryId: id });
     
@@ -404,7 +404,7 @@ categoryRoutes.delete('/tags/:id', requireAuth, requireAdmin, async (c) => {
     await c.env.DB.prepare('DELETE FROM tags WHERE id = ?').bind(id).run();
     
     // 清除缓存
-    await c.env.CACHE.delete('tags:all');
+    await safeDeleteCache(c.env, 'tags:all');
     
     logger.info('Tag deleted', { tagId: id });
     

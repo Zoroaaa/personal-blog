@@ -302,7 +302,7 @@ export function PostPage() {
   
   // 渲染评论
   const renderComment = (comment: Comment, level = 0) => (
-    <div key={comment.id} className={`${level > 0 ? 'ml-8' : ''} border-l-2 border-gray-200 pl-4 mb-4`}>
+    <div key={comment.id} className={`${level > 0 ? 'ml-8' : ''} border-l-2 border-border pl-4 mb-4`}>
       <div className="flex items-start space-x-3">
         {comment.avatarUrl || comment.user?.avatarUrl ? (
           <img 
@@ -311,8 +311,8 @@ export function PostPage() {
             className="w-10 h-10 rounded-full" 
           />
         ) : (
-          <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
-            <span className="text-gray-600 font-medium">
+          <div className="w-10 h-10 rounded-full bg-border flex items-center justify-center">
+            <span className="text-foreground font-medium">
               {comment.displayName?.[0] || comment.user?.displayName?.[0] || comment.username?.[0] || '?'}
             </span>
           </div>
@@ -320,17 +320,17 @@ export function PostPage() {
         
         <div className="flex-1">
           <div className="flex items-center space-x-2 mb-1">
-            <span className="font-medium text-gray-900">
+            <span className="font-medium text-foreground">
               {comment.displayName || comment.user?.displayName || comment.username}
             </span>
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-muted-foreground">
               {/* 使用安全的日期格式化 */}
               {formatDate(comment.createdAt || comment.created_at)}
             </span>
           </div>
-          <p className="text-gray-700 whitespace-pre-wrap">{comment.content}</p>
+          <p className="text-foreground whitespace-pre-wrap">{comment.content}</p>
           
-          <div className="mt-2 flex items-center space-x-4 text-sm text-gray-500">
+          <div className="mt-2 flex items-center space-x-4 text-sm text-muted-foreground">
             <button
               onClick={() => handleLikeComment(comment.id)}
               disabled={commentLiking === comment.id}
@@ -356,18 +356,18 @@ export function PostPage() {
           {replyingTo === comment.id && (
             <form 
               onSubmit={(e) => handleSubmitReply(e, comment.id)}
-              className="mt-4 p-4 bg-gray-50 rounded-lg"
+              className="mt-4 p-4 bg-muted rounded-lg"
             >
               <textarea
                 value={replyContent}
                 onChange={(e) => setReplyContent(e.target.value)}
                 placeholder="写下你的回复..."
-                className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-border bg-card rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 rows={2}
                 maxLength={500}
               />
               <div className="mt-2 flex items-center justify-between">
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-muted-foreground">
                   {replyContent.length}/500
                 </span>
                 <button
@@ -425,9 +425,9 @@ export function PostPage() {
     <div className="max-w-4xl mx-auto px-4 py-12">
       {/* 文章头部 */}
       <article>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">{post.title}</h1>
+        <h1 className="text-4xl font-bold text-foreground mb-4">{post.title}</h1>
         
-        <div className="flex items-center text-sm text-gray-500 space-x-4 mb-8">
+        <div className="flex items-center text-sm text-muted-foreground space-x-4 mb-8">
           <span className="flex items-center">
             {post.author?.avatarUrl || post.authorAvatar || post.author_avatar ? (
               <img 
@@ -436,7 +436,7 @@ export function PostPage() {
                 className="w-6 h-6 rounded-full mr-2" 
               />
             ) : (
-              <div className="w-6 h-6 rounded-full bg-gray-300 mr-2"></div>
+              <div className="w-6 h-6 rounded-full bg-border mr-2"></div>
             )}
             {post.author?.displayName || post.authorName || post.author_name || post.author_display_name || 'Unknown'}
           </span>
@@ -495,7 +495,7 @@ export function PostPage() {
             {post.tags.map((tag) => (
               <span
                 key={tag.id}
-                className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200 cursor-pointer"
+                className="px-3 py-1 bg-muted text-foreground rounded-full text-sm hover:bg-border cursor-pointer"
               >
                 #{tag.name}
               </span>
@@ -504,7 +504,7 @@ export function PostPage() {
         )}
         
         {/* 文章操作 */}
-        <div className="mt-8 pt-8 border-t flex items-center justify-between">
+        <div className="mt-8 pt-8 border-t border-border flex items-center justify-between">
           <div className="flex items-center space-x-6">
             <button
               onClick={handleLike}
@@ -512,7 +512,7 @@ export function PostPage() {
               className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
                 post.isLiked
                   ? 'bg-red-50 text-red-600'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-muted text-foreground hover:bg-border'
               } disabled:opacity-50`}
             >
               <svg
@@ -531,7 +531,7 @@ export function PostPage() {
               <span>{post.likeCount || post.like_count || 0}</span>
             </button>
             
-            <div className="flex items-center space-x-2 text-gray-600">
+            <div className="flex items-center space-x-2 text-muted-foreground">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
@@ -551,8 +551,8 @@ export function PostPage() {
       </article>
       
       {/* 评论区 */}
-      <div className="mt-16 border-t pt-8">
-        <h2 className="text-2xl font-bold mb-6">评论 ({comments.length})</h2>
+      <div className="mt-16 border-t border-border pt-8">
+        <h2 className="text-2xl font-bold text-foreground mb-6">评论 ({comments.length})</h2>
         
         {/* 发表评论 */}
         {isAuthenticated ? (
@@ -561,12 +561,12 @@ export function PostPage() {
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               placeholder="写下你的评论..."
-              className="w-full border border-gray-300 rounded-lg p-4 mb-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full border border-border bg-card rounded-lg p-4 mb-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               rows={4}
               maxLength={1000}
             />
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">
+              <span className="text-sm text-muted-foreground">
                 {newComment.length}/1000
               </span>
               <button
@@ -579,8 +579,8 @@ export function PostPage() {
             </div>
           </form>
         ) : (
-          <div className="mb-8 p-6 bg-gray-50 border border-gray-200 rounded-lg text-center">
-            <p className="text-gray-600 mb-4">请先登录后再发表评论</p>
+          <div className="mb-8 p-6 bg-muted border border-border rounded-lg text-center">
+            <p className="text-muted-foreground mb-4">请先登录后再发表评论</p>
             <button
               onClick={() => navigate('/login?redirect=' + encodeURIComponent(window.location.pathname))}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -596,11 +596,11 @@ export function PostPage() {
             {comments.map((comment) => renderComment(comment))}
           </div>
         ) : (
-          <div className="text-center py-12 bg-gray-50 rounded-lg">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="text-center py-12 bg-muted rounded-lg">
+            <svg className="mx-auto h-12 w-12 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
-            <p className="mt-2 text-gray-500">暂无评论，来发表第一条评论吧！</p>
+            <p className="mt-2 text-muted-foreground">暂无评论，来发表第一条评论吧！</p>
           </div>
         )}
       </div>

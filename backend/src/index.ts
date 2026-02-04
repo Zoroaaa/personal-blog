@@ -29,6 +29,7 @@ import { categoryRoutes } from './routes/categories';
 import { uploadRoutes } from './routes/upload';
 import { analyticsRoutes } from './routes/analytics';
 import { adminRoutes } from './routes/admin';
+import { configRoutes } from './routes/config';
 
 // 导入中间件
 import { rateLimiter } from './middleware/rateLimit';
@@ -36,31 +37,8 @@ import { requestLogger } from './middleware/requestLogger';
 
 // ============= 类型定义 =============
 
-/**
- * Cloudflare Workers环境绑定
- */
-export type Env = {
-  DB: D1Database;              // D1数据库
-  CACHE: KVNamespace;          // KV缓存
-  STORAGE: R2Bucket;           // R2对象存储
-  JWT_SECRET: string;          // JWT密钥
-  GITHUB_CLIENT_ID: string;    // GitHub OAuth客户端ID
-  GITHUB_CLIENT_SECRET: string; // GitHub OAuth密钥
-  FRONTEND_URL: string;        // 前端URL
-  STORAGE_PUBLIC_URL: string;  // R2公开访问URL
-  ENVIRONMENT: string;         // 运行环境（development/production）
-};
-
-/**
- * 统一API响应格式
- */
-export interface ApiResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-  timestamp?: string;
-}
+// 导入类型定义
+import type { Env, ApiResponse } from './types';
 
 // ============= 常量配置 =============
 
@@ -79,19 +57,26 @@ const app = new Hono<{ Bindings: Env }>();
  */
 app.use('*', async (c, next) => {
   // 只在首次请求时验证（可以改进为启动时验证）
-  const requiredEnvVars = ['DB', 'CACHE', 'STORAGE', 'JWT_SECRET'];
-  
-  for (const varName of requiredEnvVars) {
-    if (!c.env[varName as keyof Env]) {
-      console.error(`Missing required environment variable: ${varName}`);
-      return c.json<ApiResponse>({
-        success: false,
-        error: 'Server configuration error',
-        message: 'The server is not properly configured. Please contact the administrator.',
-        timestamp: new Date().toISOString()
-      }, 500);
+    const requiredEnvVars = ['DB', 'STORAGE', 'JWT_SECRET'];
+    const optionalEnvVars = ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET'];
+    
+    for (const varName of requiredEnvVars) {
+      if (!c.env[varName as keyof Env]) {
+        console.error(`Missing required environment variable: ${varName}`);
+        return c.json<ApiResponse>({
+          success: false,
+          error: 'Server configuration error',
+          message: 'The server is not properly configured. Please contact the administrator.',
+          timestamp: new Date().toISOString()
+        }, 500);
+      }
     }
-  }
+    
+    // 验证可选的环境变量（用于GitHub登录）
+    const hasGithubConfig = c.env.GITHUB_CLIENT_ID && c.env.GITHUB_CLIENT_SECRET;
+    if (!hasGithubConfig) {
+      console.warn('Missing GitHub OAuth configuration: GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET not set');
+    }
   
   await next();
 });
@@ -226,13 +211,17 @@ app.get('/health', async (c) => {
     console.error('Database health check failed:', error);
   }
 
-  // 检查KV缓存
-  try {
-    await c.env.CACHE.get('health-check');
-    services.cache = 'healthy';
-  } catch (error) {
-    services.cache = 'unhealthy';
-    console.error('Cache health check failed:', error);
+  // 检查KV缓存（可选）
+  if (c.env.CACHE) {
+    try {
+      await c.env.CACHE.get('health-check');
+      services.cache = 'healthy';
+    } catch (error) {
+      services.cache = 'unhealthy';
+      console.error('Cache health check failed:', error);
+    }
+  } else {
+    services.cache = 'not configured';
   }
 
   // 检查R2存储
@@ -244,7 +233,10 @@ app.get('/health', async (c) => {
     services.storage = 'healthy';
   }
 
-  const allHealthy = Object.values(services).every(status => status === 'healthy');
+  // 只有数据库和存储必须健康，缓存是可选的
+  const requiredServices = { ...services };
+  delete requiredServices.cache;
+  const allHealthy = Object.values(requiredServices).every(status => status === 'healthy');
 
   return c.json<ApiResponse>({
     success: allHealthy,
@@ -343,6 +335,12 @@ app.route('/api/analytics', analyticsRoutes);
  */
 app.route('/api/admin', adminRoutes);
 
+/**
+ * 配置路由
+ * - GET /api/config - 获取公开配置信息
+ */
+app.route('/api/config', configRoutes);
+
 // ============= 错误处理 =============
 
 /**
@@ -425,28 +423,72 @@ app.onError((err, c) => {
 
 // ============= 导出 =============
 
+// 导入响应工具函数
+import { successResponse, errorResponse } from './utils/response';
+
 export default app;
 
+// 重新导出响应工具函数，保持向后兼容
+export { successResponse, errorResponse };
+
 /**
- * 工具函数：创建成功响应
+ * 缓存辅助函数
  */
-export function successResponse<T>(data: T, message?: string): ApiResponse<T> {
-  return {
-    success: true,
-    data,
-    message,
-    timestamp: new Date().toISOString()
-  };
+
+/**
+ * 检查缓存是否启用
+ */
+export function isCacheEnabled(env: Env): boolean {
+  return env.ENABLE_CACHE !== 'false';
 }
 
 /**
- * 工具函数：创建错误响应
+ * 安全地获取缓存
  */
-export function errorResponse(error: string, message?: string): ApiResponse {
-  return {
-    success: false,
-    error,
-    message,
-    timestamp: new Date().toISOString()
-  };
+export async function safeGetCache(env: Env, key: string): Promise<string | null> {
+  if (!isCacheEnabled(env) || !env.CACHE) {
+    return null;
+  }
+  
+  try {
+    return await env.CACHE.get(key);
+  } catch (error) {
+    console.error('Cache get error:', error);
+    return null;
+  }
+}
+
+/**
+ * 安全地写入缓存
+ */
+export async function safePutCache(
+  env: Env, 
+  key: string, 
+  value: string, 
+  options?: { expirationTtl?: number; expiration?: number }
+): Promise<void> {
+  if (!isCacheEnabled(env) || !env.CACHE) {
+    return;
+  }
+  
+  try {
+    await env.CACHE.put(key, value, options);
+  } catch (error) {
+    console.error('Cache put error:', error);
+  }
+}
+
+/**
+ * 安全地删除缓存
+ */
+export async function safeDeleteCache(env: Env, key: string): Promise<void> {
+  if (!isCacheEnabled(env) || !env.CACHE) {
+    return;
+  }
+  
+  try {
+    await env.CACHE.delete(key);
+  } catch (error) {
+    console.error('Cache delete error:', error);
+  }
 }
