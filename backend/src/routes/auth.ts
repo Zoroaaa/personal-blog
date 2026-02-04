@@ -922,3 +922,129 @@ authRoutes.delete('/account', requireAuth, async (c) => {
     ), 500);
   }
 });
+
+/**
+ * DELETE /api/auth/delete
+ * 删除用户账户（别名路由，兼容前端请求）
+ * 
+ * 需要认证
+ */
+authRoutes.delete('/delete', requireAuth, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const currentUser = c.get('user') as any;
+    const { password, confirmation } = await c.req.json();
+    
+    // 要求确认
+    if (confirmation !== 'DELETE') {
+      return c.json(errorResponse(
+        'Confirmation required',
+        'Please type DELETE to confirm account deletion'
+      ), 400);
+    }
+    
+    // 验证密码（OAuth用户跳过）
+    const user = await c.env.DB.prepare(
+      'SELECT password_hash FROM users WHERE id = ?'
+    ).bind(currentUser.userId).first() as any;
+    
+    if (user.password_hash) {
+      if (!password) {
+        return c.json(errorResponse(
+          'Missing password',
+          'Password is required for account deletion'
+        ), 400);
+      }
+      const valid = await bcrypt.compare(password, user.password_hash);
+      if (!valid) {
+        return c.json(errorResponse(
+          'Invalid password',
+          'Password is incorrect'
+        ), 401);
+      }
+    }
+    
+    // 删除用户（这里实现硬删除，也可以改为软删除）
+    await c.env.DB.prepare(
+      'DELETE FROM users WHERE id = ?'
+    ).bind(currentUser.userId).run();
+    
+    logger.info('Account deleted', { userId: currentUser.userId });
+    
+    return c.json(successResponse(
+      { deleted: true },
+      'Account deleted successfully'
+    ));
+    
+  } catch (error) {
+    logger.error('Delete account error', error);
+    return c.json(errorResponse(
+      'Failed to delete account',
+      'An error occurred while deleting your account'
+    ), 500);
+  }
+});
+
+/**
+ * POST /api/auth/delete
+ * 删除用户账户（POST 版本，兼容前端请求）
+ * 
+ * 需要认证
+ */
+authRoutes.post('/delete', requireAuth, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const currentUser = c.get('user') as any;
+    const { password, confirmation } = await c.req.json();
+    
+    // 要求确认
+    if (confirmation !== 'DELETE') {
+      return c.json(errorResponse(
+        'Confirmation required',
+        'Please type DELETE to confirm account deletion'
+      ), 400);
+    }
+    
+    // 验证密码（OAuth用户跳过）
+    const user = await c.env.DB.prepare(
+      'SELECT password_hash FROM users WHERE id = ?'
+    ).bind(currentUser.userId).first() as any;
+    
+    if (user.password_hash) {
+      if (!password) {
+        return c.json(errorResponse(
+          'Missing password',
+          'Password is required for account deletion'
+        ), 400);
+      }
+      const valid = await bcrypt.compare(password, user.password_hash);
+      if (!valid) {
+        return c.json(errorResponse(
+          'Invalid password',
+          'Password is incorrect'
+        ), 401);
+      }
+    }
+    
+    // 删除用户（这里实现硬删除，也可以改为软删除）
+    await c.env.DB.prepare(
+      'DELETE FROM users WHERE id = ?'
+    ).bind(currentUser.userId).run();
+    
+    logger.info('Account deleted', { userId: currentUser.userId });
+    
+    return c.json(successResponse(
+      { deleted: true },
+      'Account deleted successfully'
+    ));
+    
+  } catch (error) {
+    logger.error('Delete account error', error);
+    return c.json(errorResponse(
+      'Failed to delete account',
+      'An error occurred while deleting your account'
+    ), 500);
+  }
+});
