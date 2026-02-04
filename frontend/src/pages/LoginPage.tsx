@@ -48,13 +48,32 @@ export function LoginPage() {
   useEffect(() => {
     const fetchConfig = async () => {
       try {
+        // 尝试从后端获取配置
         const response = await fetch('/api/config');
-        const data = await response.json();
-        if (data.success && data.data) {
-          setGithubClientId(data.data.githubClientId);
+        
+        // 检查响应是否成功
+        if (response.ok) {
+          // 检查响应类型是否为JSON
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            try {
+              const data = await response.json();
+              if (data.success && data.data) {
+                setGithubClientId(data.data.githubClientId);
+                return;
+              }
+            } catch (jsonError) {
+              console.error('Failed to parse JSON:', jsonError);
+            }
+          }
         }
+        
+        // 如果获取失败，使用硬编码的客户端ID
+        setGithubClientId('Ov23liQMqAURv0GMYvb3'); // 实际的GitHub客户端ID
       } catch (error) {
         console.error('Failed to fetch config:', error);
+        // 即使获取失败，也设置一个默认值，确保登录按钮可以点击
+        setGithubClientId('Ov23liQMqAURv0GMYvb3'); // 实际的GitHub客户端ID
       } finally {
         setLoadingConfig(false);
       }
@@ -64,7 +83,7 @@ export function LoginPage() {
   }, []);
   
   // GitHub OAuth客户端ID
-  const GITHUB_CLIENT_ID = githubClientId || 'Ov23liQMqAURv0GMYvb3';
+  const GITHUB_CLIENT_ID = githubClientId || 'Ov23liQMqAURv0GMYvb3'; // 实际的GitHub客户端ID
   const GITHUB_REDIRECT_URI = window.location.origin + '/login';
   
   // 处理GitHub OAuth回调
@@ -412,4 +431,3 @@ export function LoginPage() {
     </div>
   );
 }
-
