@@ -351,6 +351,7 @@ authRoutes.post('/github', async (c) => {
     logger.info('Exchanging code for access token', { codeLength: code.length });
     let tokenData: any;
     let githubUser: any;
+    let githubEmail: string | undefined;
     
     try {
       const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
@@ -424,7 +425,7 @@ authRoutes.post('/github', async (c) => {
       
       // ===== 3. 获取GitHub用户邮箱 =====
       logger.info('Fetching GitHub user emails');
-      let githubEmail = githubUser.email;
+      githubEmail = githubUser.email;
       
       try {
         const emailResponse = await fetch('https://api.github.com/user/emails', {
