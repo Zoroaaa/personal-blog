@@ -341,7 +341,7 @@ export function AdminPage() {
         return (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">文章管理</h2>
+              <h2 className="text-2xl font-bold text-foreground">文章管理</h2>
               <button
                 onClick={() => {
                   setShowCreateForm(true);
@@ -362,7 +362,7 @@ export function AdminPage() {
             
             {showCreateForm ? (
               <div className="space-y-6">
-                <h3 className="text-xl font-semibold mb-4">{title ? '编辑文章' : '创建文章'}</h3>
+                <h3 className="text-xl font-semibold mb-4 text-foreground">{title ? '编辑文章' : '创建文章'}</h3>
                 
                 {error && (
                   <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
@@ -384,32 +384,32 @@ export function AdminPage() {
                   }
                 }} className="space-y-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       标题
                     </label>
                     <input
                       type="text"
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
-                      className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-border bg-card rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
                       required
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       摘要
                     </label>
                     <textarea
                       value={summary}
                       onChange={(e) => setSummary(e.target.value)}
-                      className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-border bg-card rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
                       rows={2}
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       封面图片
                     </label>
                     <div className="flex space-x-4">
@@ -434,19 +434,19 @@ export function AdminPage() {
                             }
                           }
                         }}
-                        className="border rounded-lg px-3 py-2"
+                        className="border border-border bg-card rounded-lg px-3 py-2"
                       />
                     </div>
                     {coverImage && (
                       <div className="mt-2">
-                        <p className="text-sm text-gray-600 mb-1">当前封面图片:</p>
+                        <p className="text-sm text-muted-foreground mb-1">当前封面图片:</p>
                         <img src={coverImage} alt="当前封面" className="max-w-xs h-auto rounded" />
                       </div>
                     )}
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       内容 (支持Markdown)
                     </label>
                     <textarea
@@ -478,20 +478,20 @@ export function AdminPage() {
                           }
                         }
                       }}
-                      className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 font-mono"
+                      className="w-full border border-border bg-card rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 font-mono"
                       rows={20}
                       required
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       状态
                     </label>
                     <select
                       value={postStatus}
                       onChange={(e) => setPostStatus(e.target.value as 'draft' | 'published')}
-                      className="border rounded-lg px-3 py-2"
+                      className="border border-border bg-card rounded-lg px-3 py-2"
                     >
                       <option value="draft">草稿</option>
                       <option value="published">发布</option>
@@ -509,7 +509,7 @@ export function AdminPage() {
                     <button
                       type="button"
                       onClick={() => setShowCreateForm(false)}
-                      className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                      className="px-6 py-2 border border-border text-foreground rounded-lg hover:bg-muted"
                     >
                       取消
                     </button>
@@ -525,27 +525,27 @@ export function AdminPage() {
                 )}
                 
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                  <table className="min-w-full divide-y divide-border">
+                    <thead className="bg-muted">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                           标题
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                           作者
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                           状态
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                           发布时间
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                           操作
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-card divide-y divide-border">
                       {postsLoading ? (
                         <tr>
                           <td colSpan={5} className="px-6 py-4 text-center">
@@ -561,18 +561,18 @@ export function AdminPage() {
                       ) : (
                         posts.map((post) => (
                           <tr key={post.id}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                               {post.title}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                               {post.author_name || post.author_username || '未知'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`px-2 py-1 rounded text-xs ${post.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                              <span className={`px-2 py-1 rounded text-xs ${post.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-muted text-foreground'}`}>
                                 {post.status === 'published' ? '已发布' : '草稿'}
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                               {post.published_at || '未发布'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -985,12 +985,12 @@ export function AdminPage() {
       <div className="flex flex-col space-y-8">
         {/* 页面标题 */}
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">管理后台</h1>
-          <p className="text-gray-600 mt-2">欢迎回来，{user.displayName || user.username}</p>
+          <h1 className="text-3xl font-bold text-foreground">管理后台</h1>
+          <p className="text-muted-foreground mt-2">欢迎回来，{user.displayName || user.username}</p>
         </div>
         
         {/* 导航标签页 */}
-        <div className="border-b border-gray-200">
+        <div className="border-b border-border">
           <nav className="flex space-x-8">
             {[
               { id: 'posts' as AdminTab, label: '文章管理' },
@@ -1004,7 +1004,7 @@ export function AdminPage() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
                   ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                   }`}
               >
                 {tab.label}
@@ -1014,7 +1014,7 @@ export function AdminPage() {
         </div>
         
         {/* 标签页内容 */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="bg-card rounded-lg shadow-sm p-6">
           {renderTabContent()}
         </div>
         
@@ -1022,7 +1022,7 @@ export function AdminPage() {
         <div className="flex justify-end">
           <button
             onClick={() => navigate('/')}
-            className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-6 py-2 border border-border rounded-lg hover:bg-muted"
           >
             返回首页
           </button>
