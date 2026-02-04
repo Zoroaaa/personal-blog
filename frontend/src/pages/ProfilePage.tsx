@@ -69,7 +69,8 @@ export function ProfilePage() {
     user: true,
     comments: false,
     likes: false,
-    update: false
+    update: false,
+    delete: false
   });
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -287,14 +288,26 @@ export function ProfilePage() {
     }
     
     try {
-      // 这里需要后端提供删除账号的API
-      // 暂时使用模拟成功
-      alert('账号删除成功');
-      logout();
-      navigate('/');
+      // 弹出密码输入框
+      const password = prompt('请输入您的密码以确认删除账号：');
+      if (!password) {
+        return;
+      }
+      
+      setLoading(prev => ({ ...prev, delete: true }));
+      setError(null);
+      
+      const response = await api.deleteAccount(password);
+      if (response.success) {
+        alert('账号删除成功');
+        logout();
+        navigate('/');
+      }
     } catch (error) {
       console.error('Failed to delete account:', error);
-      setError('删除账号失败');
+      setError('删除账号失败，请检查密码是否正确');
+    } finally {
+      setLoading(prev => ({ ...prev, delete: false }));
     }
   };
   
@@ -596,9 +609,10 @@ export function ProfilePage() {
               </p>
               <button
                 onClick={handleDeleteAccount}
-                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                disabled={loading.delete}
+                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                删除账号
+                {loading.delete ? '删除中...' : '删除账号'}
               </button>
             </div>
           </div>
