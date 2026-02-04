@@ -337,7 +337,7 @@ export function ProfilePage() {
                 />
               </label>
             </div>
-            <h2 className="text-2xl font-bold text-foreground">{userInfo?.displayName}</h2>
+            <h2 className="text-2xl font-bold text-foreground">{formData.displayName || userInfo?.displayName}</h2>
             <p className="text-muted-foreground">@{userInfo?.username}</p>
             <p className="text-muted-foreground text-sm mt-1">{userInfo?.email}</p>
           </div>
@@ -371,6 +371,7 @@ export function ProfilePage() {
                   className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="介绍一下自己..."
                 />
+                <p className="text-xs text-muted-foreground mt-1">个人简介会显示在您的公开资料页面，让其他用户了解您</p>
               </div>
               
               <div>
@@ -443,14 +444,14 @@ export function ProfilePage() {
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-foreground mb-2">{comment.content}</p>
-                <div className="flex items-center text-sm text-muted-foreground space-x-4">
+                <div className="flex flex-col sm:flex-row sm:items-center text-sm space-y-2 sm:space-y-0 sm:space-x-4">
                   <Link 
-                    to={`/posts/${comment.postId}`} 
+                    to={`/posts/${comment.post?.slug || comment.postId}`} 
                     className="text-blue-600 hover:underline"
                   >
-                    查看文章
+                    {comment.post?.title || '查看文章'}
                   </Link>
-                  <span>{formatDate(comment.createdAt)}</span>
+                  <span className="text-muted-foreground">{formatDate(comment.createdAt)}</span>
                 </div>
               </div>
               <button
