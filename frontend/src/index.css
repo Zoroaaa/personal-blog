@@ -2,83 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  --primary-color: #3B82F6;
-  --font-size: 1rem;
-  --bg-color: #ffffff;
-  --text-color: #1f2937;
-  --text-secondary: #6b7280;
-  --border-color: #e5e7eb;
-  --card-bg: #ffffff;
-  --hover-bg: #f3f4f6;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --bg-color: #111827;
-    --text-color: #f3f4f6;
-    --text-secondary: #9ca3af;
-    --border-color: #374151;
-    --card-bg: #1f2937;
-    --hover-bg: #374151;
+    /* 亮色主题 */
+    --color-background: 255 255 255;
+    --color-foreground: 15 23 42;
+    --color-card: 255 255 255;
+    --color-border: 226 232 240;
+    --color-muted: 241 245 249;
+  }
+
+  .dark {
+    /* 暗色主题 */
+    --color-background: 15 23 42;
+    --color-foreground: 248 250 252;
+    --color-card: 30 41 59;
+    --color-border: 51 65 85;
+    --color-muted: 30 41 59;
+  }
+
+  body {
+    @apply bg-background text-foreground transition-colors duration-200;
+    margin: 0;
+    min-height: 100vh;
+    font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  /* 自定义滚动条 - 暗色模式 */
+  .dark ::-webkit-scrollbar-track {
+    background: rgba(51, 65, 85, 0.5);
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.8);
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: rgba(96, 165, 250, 0.8);
   }
 }
 
-.dark {
-  --bg-color: #111827;
-  --text-color: #f3f4f6;
-  --text-secondary: #9ca3af;
-  --border-color: #374151;
-  --card-bg: #1f2937;
-  --hover-bg: #374151;
-}
-
-.light {
-  --bg-color: #ffffff;
-  --text-color: #1f2937;
-  --text-secondary: #6b7280;
-  --border-color: #e5e7eb;
-  --card-bg: #ffffff;
-  --hover-bg: #f3f4f6;
-}
-
-body {
-  margin: 0;
-  min-height: 100vh;
-  background-color: var(--bg-color);
-  color: var(--text-color);
-  font-size: var(--font-size);
-}
-
-#root {
-  min-height: 100vh;
+/* 平滑动画 */
+@layer utilities {
+  .transition-theme {
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+  }
 }
 
 /* 自定义滚动条 */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--hover-bg);
+  @apply bg-muted;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--text-secondary);
-  border-radius: 4px;
+  @apply bg-border rounded-md;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--primary-color);
-}
-
-/* 平滑过渡 */
-* {
-  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
+  @apply bg-primary-500;
 }
