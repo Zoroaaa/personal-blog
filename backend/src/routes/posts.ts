@@ -633,6 +633,130 @@ postRoutes.get('/search', async (c) => {
   }
 });
 
+// ============= 获取用户点赞文章 =============
+
+/**
+ * GET /api/posts/likes
+ * 获取当前用户点赞的文章列表（需要认证）
+ * 
+ * 查询参数：
+ * - page: 页码（默认1）
+ * - limit: 每页数量（默认10，最大50）
+ */
+postRoutes.get('/likes', requireAuth, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const user = c.get('user') as any;
+    const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
+    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
+    const offset = (page - 1) * limit;
+    
+    // 获取用户点赞的文章
+    const { results } = await c.env.DB.prepare(`
+      SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
+             p.view_count, p.like_count, p.comment_count, p.reading_time,
+             p.published_at, p.created_at,
+             u.username as author_name, u.display_name as author_display_name, 
+             u.avatar_url as author_avatar,
+             c.name as category_name, c.slug as category_slug, c.color as category_color
+      FROM posts p
+      JOIN likes l ON p.id = l.post_id
+      LEFT JOIN users u ON p.author_id = u.id
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE l.user_id = ? AND p.status = 'published' AND p.visibility = 'public'
+      ORDER BY l.created_at DESC
+      LIMIT ? OFFSET ?
+    `).bind(user.userId, limit, offset).all();
+    
+    // 转换为 camelCase 格式
+    const formattedResults = (results as any[]).map(post => ({
+      id: post.id,
+      title: post.title,
+      slug: post.slug,
+      summary: post.summary,
+      coverImage: post.cover_image,
+      viewCount: post.view_count,
+      likeCount: post.like_count,
+      commentCount: post.comment_count,
+      readingTime: post.reading_time,
+      publishedAt: post.published_at,
+      createdAt: post.created_at,
+      authorName: post.author_name,
+      authorDisplayName: post.author_display_name,
+      authorAvatar: post.author_avatar,
+      categoryName: post.category_name,
+      categorySlug: post.category_slug,
+      categoryColor: post.category_color
+    }));
+    
+    // 获取总数
+    const countResult = await c.env.DB.prepare(`
+      SELECT COUNT(*) as total FROM posts p
+      JOIN likes l ON p.id = l.post_id
+      WHERE l.user_id = ? AND p.status = 'published' AND p.visibility = 'public'
+    `).bind(user.userId).first() as any;
+    
+    const total = countResult?.total || 0;
+    
+    // 为每篇文章获取标签
+    const postIds = formattedResults.map((p: any) => p.id);
+    let postsWithTags = formattedResults;
+    
+    if (postIds.length > 0) {
+      const tagsQuery = `
+        SELECT pt.post_id, t.id, t.name, t.slug
+        FROM post_tags pt
+        JOIN tags t ON pt.tag_id = t.id
+        WHERE pt.post_id IN (${postIds.map(() => '?').join(',')})
+      `;
+      const { results: tagResults } = await c.env.DB.prepare(tagsQuery).bind(...postIds).all();
+      
+      // 组织标签数据
+      const tagsByPost = new Map();
+      (tagResults as any[]).forEach(tag => {
+        if (!tagsByPost.has(tag.post_id)) {
+          tagsByPost.set(tag.post_id, []);
+        }
+        tagsByPost.get(tag.post_id).push({
+          id: tag.id,
+          name: tag.name,
+          slug: tag.slug
+        });
+      });
+      
+      // 添加标签到文章
+      postsWithTags = formattedResults.map((post: any) => ({
+        ...post,
+        tags: tagsByPost.get(post.id) || []
+      }));
+    }
+    
+    logger.info('User liked posts fetched successfully', { 
+      userId: user.userId,
+      count: postsWithTags.length,
+      total 
+    });
+    
+    return c.json(successResponse({
+      posts: postsWithTags,
+      total,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    }));
+    
+  } catch (error) {
+    logger.error('Get liked posts error', error);
+    return c.json(errorResponse(
+      'Failed to fetch liked posts',
+      'An error occurred while fetching liked posts'
+    ), 500);
+  }
+});
 
 // ============= 文章详情 =============
 
@@ -1101,130 +1225,7 @@ postRoutes.post('/:id/like', requireAuth, async (c) => {
   }
 });
 
-// ============= 获取用户点赞文章 =============
 
-/**
- * GET /api/posts/likes
- * 获取当前用户点赞的文章列表（需要认证）
- * 
- * 查询参数：
- * - page: 页码（默认1）
- * - limit: 每页数量（默认10，最大50）
- */
-postRoutes.get('/likes', requireAuth, async (c) => {
-  const logger = createLogger(c);
-  
-  try {
-    const user = c.get('user') as any;
-    const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
-    const offset = (page - 1) * limit;
-    
-    // 获取用户点赞的文章
-    const { results } = await c.env.DB.prepare(`
-      SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
-             p.view_count, p.like_count, p.comment_count, p.reading_time,
-             p.published_at, p.created_at,
-             u.username as author_name, u.display_name as author_display_name, 
-             u.avatar_url as author_avatar,
-             c.name as category_name, c.slug as category_slug, c.color as category_color
-      FROM posts p
-      JOIN likes l ON p.id = l.post_id
-      LEFT JOIN users u ON p.author_id = u.id
-      LEFT JOIN categories c ON p.category_id = c.id
-      WHERE l.user_id = ? AND p.status = 'published' AND p.visibility = 'public'
-      ORDER BY l.created_at DESC
-      LIMIT ? OFFSET ?
-    `).bind(user.userId, limit, offset).all();
-    
-    // 转换为 camelCase 格式
-    const formattedResults = (results as any[]).map(post => ({
-      id: post.id,
-      title: post.title,
-      slug: post.slug,
-      summary: post.summary,
-      coverImage: post.cover_image,
-      viewCount: post.view_count,
-      likeCount: post.like_count,
-      commentCount: post.comment_count,
-      readingTime: post.reading_time,
-      publishedAt: post.published_at,
-      createdAt: post.created_at,
-      authorName: post.author_name,
-      authorDisplayName: post.author_display_name,
-      authorAvatar: post.author_avatar,
-      categoryName: post.category_name,
-      categorySlug: post.category_slug,
-      categoryColor: post.category_color
-    }));
-    
-    // 获取总数
-    const countResult = await c.env.DB.prepare(`
-      SELECT COUNT(*) as total FROM posts p
-      JOIN likes l ON p.id = l.post_id
-      WHERE l.user_id = ? AND p.status = 'published' AND p.visibility = 'public'
-    `).bind(user.userId).first() as any;
-    
-    const total = countResult?.total || 0;
-    
-    // 为每篇文章获取标签
-    const postIds = formattedResults.map((p: any) => p.id);
-    let postsWithTags = formattedResults;
-    
-    if (postIds.length > 0) {
-      const tagsQuery = `
-        SELECT pt.post_id, t.id, t.name, t.slug
-        FROM post_tags pt
-        JOIN tags t ON pt.tag_id = t.id
-        WHERE pt.post_id IN (${postIds.map(() => '?').join(',')})
-      `;
-      const { results: tagResults } = await c.env.DB.prepare(tagsQuery).bind(...postIds).all();
-      
-      // 组织标签数据
-      const tagsByPost = new Map();
-      (tagResults as any[]).forEach(tag => {
-        if (!tagsByPost.has(tag.post_id)) {
-          tagsByPost.set(tag.post_id, []);
-        }
-        tagsByPost.get(tag.post_id).push({
-          id: tag.id,
-          name: tag.name,
-          slug: tag.slug
-        });
-      });
-      
-      // 添加标签到文章
-      postsWithTags = formattedResults.map((post: any) => ({
-        ...post,
-        tags: tagsByPost.get(post.id) || []
-      }));
-    }
-    
-    logger.info('User liked posts fetched successfully', { 
-      userId: user.userId,
-      count: postsWithTags.length,
-      total 
-    });
-    
-    return c.json(successResponse({
-      posts: postsWithTags,
-      total,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
-      }
-    }));
-    
-  } catch (error) {
-    logger.error('Get liked posts error', error);
-    return c.json(errorResponse(
-      'Failed to fetch liked posts',
-      'An error occurred while fetching liked posts'
-    ), 500);
-  }
-});
 
 
 
