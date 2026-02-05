@@ -209,11 +209,8 @@ export function useSiteConfig() {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
-      // 并行获取基本配置和存储配置
-      const [configResponse, storageResponse] = await Promise.all([
-        api.getConfig(),
-        api.getStorageConfig().catch(() => ({ success: false, data: null }))
-      ]);
+      // 获取基本配置
+      const configResponse = await api.getConfig();
       
       let config = { ...DEFAULT_CONFIG };
       
@@ -227,14 +224,6 @@ export function useSiteConfig() {
         }
         
         config = { ...config, ...apiConfig };
-      }
-      
-      // 合并存储配置
-      if (storageResponse.success && storageResponse.data) {
-        config = {
-          ...config,
-          storage_public_url: storageResponse.data.storagePublicUrl
-        };
       }
       
       setCachedConfig(config);
