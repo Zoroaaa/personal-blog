@@ -6,7 +6,7 @@ export function Footer() {
   // 获取配置值，使用默认值作为后备
   const brandName = config.footer_brand_name || config.site_name || '我的博客';
   const footerDescription = config.footer_description || '分享技术,记录生活';
-  const quickLinks = config.footer_quick_links || { '首页': '/', '关于': '/about' };
+  const quickLinks = config.footer_links || { '首页': '/', '关于': '/about' };
   const techStack = config.footer_tech_stack || ['React + TypeScript', 'Cloudflare Workers', 'Tailwind CSS'];
   const footerText = config.footer_text || `© ${new Date().getFullYear()} ${brandName}`;
   
