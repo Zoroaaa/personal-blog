@@ -284,10 +284,11 @@ export function sanitizeSearchQuery(query: string): string {
     return '';
   }
   
-  // 直接返回清理后的字符串，保留所有字符包括中文
   return query
-    // 只移除控制字符
-    .replace(/[\x00-\x1F\x7F]/g, '')
+    // 移除SQL通配符（如果直接用于SQL LIKE）
+    .replace(/[%_]/g, '')
+    // 移除特殊字符
+    .replace(/[^\w\s\u4e00-\u9fa5-]/g, '')
     .trim()
     .substring(0, 100); // 限制长度
 }
