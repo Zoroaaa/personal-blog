@@ -7,6 +7,7 @@
  * - 支持登录/注册按钮和用户信息显示
  * - 集成主题切换功能
  * - 支持网站名称和Logo的可配置化
+ * - 集成搜索功能
  * 
  * 优化内容：
  * 1. 集成配置系统 - 网站名称、Logo可配置
@@ -15,7 +16,7 @@
  * 4. 拆分子组件减少重渲染
  * 
  * @author 优化版本
- * @version 2.1.0
+ * @version 2.2.0
  */
 
 import React, { useState, useCallback } from 'react';
@@ -117,6 +118,45 @@ const UserInfo = React.memo(({ user, storagePublicUrl }: { user: any; storagePub
 UserInfo.displayName = 'UserInfo';
 
 /**
+ * 搜索框组件
+ */
+const SearchBar = React.memo(() => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
+  
+  const handleSearch = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery('');
+    }
+  }, [searchQuery, navigate]);
+  
+  return (
+    <form onSubmit={handleSearch} className="relative">
+      <input
+        type="text"
+        placeholder="搜索文章..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="pl-10 pr-4 py-2 w-64 bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+      />
+      <button
+        type="submit"
+        className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-primary-600 transition-colors"
+        aria-label="搜索"
+      >
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </button>
+    </form>
+  );
+});
+
+SearchBar.displayName = 'SearchBar';
+
+/**
  * 导航链接组件
  */
 const NavLinks = React.memo(({ 
@@ -135,6 +175,8 @@ const NavLinks = React.memo(({
       <Link to="/" className="text-foreground/70 hover:text-foreground transition-colors">
         首页
       </Link>
+      
+      <SearchBar />
       
       {isAuthenticated && user && (
         <>
@@ -182,6 +224,45 @@ const NavLinks = React.memo(({
 NavLinks.displayName = 'NavLinks';
 
 /**
+ * 移动端搜索框组件
+ */
+const MobileSearchBar = React.memo(() => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
+  
+  const handleSearch = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery('');
+    }
+  }, [searchQuery, navigate]);
+  
+  return (
+    <form onSubmit={handleSearch} className="relative px-3 py-2">
+      <input
+        type="text"
+        placeholder="搜索文章..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="pl-10 pr-4 py-2 w-full bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+      />
+      <button
+        type="submit"
+        className="absolute left-6 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-primary-600 transition-colors"
+        aria-label="搜索"
+      >
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </button>
+    </form>
+  );
+});
+
+MobileSearchBar.displayName = 'MobileSearchBar';
+
+/**
  * 移动端菜单组件
  */
 const MobileMenu = React.memo(({ 
@@ -215,6 +296,8 @@ const MobileMenu = React.memo(({
       >
         首页
       </Link>
+      
+      <MobileSearchBar />
       
       {isAuthenticated && user ? (
         <>
