@@ -69,6 +69,8 @@ export function SearchPage() {
       setLoading(pageNum === 1 ? true : false);
       setError(null);
       
+      console.log('Search parameters:', { q: query, category, tag });
+      
       const response = await api.searchPosts({
         q: query,
         category,
