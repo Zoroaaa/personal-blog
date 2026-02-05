@@ -41,6 +41,8 @@ export function AdminPage() {
   const [postsLoading, setPostsLoading] = useState(false);
   const [postsError, setPostsError] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  // 控制是否使用旧版表单（用于保留图片上传功能）
+  const [useOldEditor, setUseOldEditor] = useState(false);
   
   // 评论管理状态
   const [comments, setComments] = useState<any[]>([]);
@@ -106,7 +108,6 @@ export function AdminPage() {
         setTitle(response.data.title);
         setContent(response.data.content);
         setSummary(response.data.summary || '');
-        // 尝试从多个可能的字段中获取封面图片
         setCoverImage(response.data.coverImage || response.data.cover_image || '');
         setPostStatus(response.data.status as 'draft' | 'published');
         setEditingPostId(postId);
@@ -142,13 +143,10 @@ export function AdminPage() {
     
     try {
       setLoading(true);
-      // 先从本地状态中移除该文章，立即更新UI
       setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
-      // 然后发送删除请求
       await api.deletePost(postId);
       alert('文章删除成功');
     } catch (err: any) {
-      // 如果删除失败，重新加载列表以恢复正确的状态
       await loadPosts();
       setError(err.message || '删除失败');
     } finally {
@@ -177,19 +175,12 @@ export function AdminPage() {
     }
   }, [activeTab]);
   
-  // 监听配置变化，确保localConfig与服务器配置保持同步
+  // 监听配置变化
   useEffect(() => {
     if (config) {
       setLocalConfig(config);
     }
   }, [config]);
-  
-  // 当切换到设置标签页时，确保配置已加载
-  useEffect(() => {
-    if (activeTab === 'settings' && !config) {
-      // 配置会通过useSiteConfig自动加载
-    }
-  }, [activeTab, config]);
   
   // 加载评论
   const loadComments = async () => {
@@ -210,7 +201,7 @@ export function AdminPage() {
     setUsersLoading(true);
     setUsersError('');
     try {
-      const response = await api.getUsers({ page: '1', limit: '100' });
+      const response = await api.getAdminUsers({ page: '1', limit: '100' });
       setUsers(response.data.users || []);
     } catch (err: any) {
       setUsersError(err.message || '加载用户失败');
@@ -264,9 +255,7 @@ export function AdminPage() {
       setUsersError(err.message || '更新用户角色失败');
     }
   };
-  
 
-  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -275,7 +264,6 @@ export function AdminPage() {
     
     try {
       if (editingPostId) {
-        // 编辑模式
         await api.updatePost(editingPostId, {
           title,
           content,
@@ -288,17 +276,14 @@ export function AdminPage() {
           setSuccess(false);
           setShowCreateForm(false);
           setEditingPostId(null);
-          // 重置表单
           setTitle('');
           setContent('');
           setSummary('');
           setCoverImage('');
           setPostStatus('draft');
-          // 重新加载文章列表，确保状态更新
           loadPosts();
         }, 1000);
       } else {
-        // 创建模式
         await api.createPost({
           title,
           content,
@@ -309,15 +294,12 @@ export function AdminPage() {
         setSuccess(true);
         setTimeout(() => {
           setSuccess(false);
-          // 重置表单
           setTitle('');
           setContent('');
           setSummary('');
           setCoverImage('');
           setPostStatus('draft');
-          // 关闭创建表单，返回文章列表
           setShowCreateForm(false);
-          // 重新加载文章列表，确保新文章显示
           loadPosts();
         }, 1000);
       }
@@ -336,39 +318,227 @@ export function AdminPage() {
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-foreground">文章管理</h2>
-              <button
-                onClick={() => {
-                  setShowCreateForm(true);
-                  setEditingPostId(null);
-                  // 重置表单
-                  setTitle('');
-                  setContent('');
-                  setSummary('');
-                  setCoverImage('');
-                  setPostStatus('draft');
-                  setError('');
-                  setSuccess(false);
-                }}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                新建文章
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setShowCreateForm(true);
+                    setUseOldEditor(true);
+                    setEditingPostId(null);
+                    setTitle('');
+                    setContent('');
+                    setSummary('');
+                    setCoverImage('');
+                    setPostStatus('draft');
+                    setError('');
+                    setSuccess(false);
+                  }}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm"
+                >
+                  传统编辑器(支持上传)
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCreateForm(true);
+                    setUseOldEditor(false);
+                    setEditingPostId(null);
+                    setError('');
+                    setSuccess(false);
+                  }}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  新建文章
+                </button>
+              </div>
             </div>
             
             {showCreateForm ? (
-              // 使用新的PostEditor组件
-              <PostEditor
-                postId={editingPostId || undefined}
-                onSave={() => {
-                  setShowCreateForm(false);
-                  setEditingPostId(null);
-                  loadPosts();
-                }}
-                onCancel={() => {
-                  setShowCreateForm(false);
-                  setEditingPostId(null);
-                }}
-              />
+              useOldEditor ? (
+                // 原有的表单编辑器（支持图片上传）
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xl font-semibold text-foreground">
+                      {editingPostId ? '编辑文章' : '创建文章'}（传统编辑器）
+                    </h3>
+                    <button
+                      onClick={() => {
+                        setShowCreateForm(false);
+                        setEditingPostId(null);
+                      }}
+                      className="text-gray-500 hover:text-gray-700"
+                    >
+                      ✕ 关闭
+                    </button>
+                  </div>
+                  
+                  {error && (
+                    <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded">
+                      {error}
+                    </div>
+                  )}
+                  
+                  {success && (
+                    <div className="p-3 bg-green-50 border border-green-200 text-green-800 rounded">
+                      操作成功！
+                    </div>
+                  )}
+                  
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">标题</label>
+                      <input
+                        type="text"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        className="w-full border border-border bg-card rounded-lg px-3 py-2"
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">摘要</label>
+                      <textarea
+                        value={summary}
+                        onChange={(e) => setSummary(e.target.value)}
+                        className="w-full border border-border bg-card rounded-lg px-3 py-2"
+                        rows={3}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        封面图片
+                      </label>
+                      <div className="flex space-x-4">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              try {
+                                setLoading(true);
+                                const response = await api.uploadImage(file);
+                                if (response.success && response.data) {
+                                  setCoverImage(response.data.url);
+                                  alert('图片上传成功: ' + response.data.url);
+                                }
+                              } catch (error) {
+                                setError('上传失败: ' + (error instanceof Error ? error.message : '未知错误'));
+                              } finally {
+                                setLoading(false);
+                              }
+                            }
+                          }}
+                          className="border border-border bg-card rounded-lg px-3 py-2"
+                        />
+                      </div>
+                      {coverImage && (
+                        <div className="mt-2">
+                          <p className="text-sm text-muted-foreground mb-1">当前封面图片:</p>
+                          <img src={coverImage} alt="当前封面" className="max-w-xs h-auto rounded" />
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        内容 (支持Markdown)
+                      </label>
+                      <textarea
+                        value={content}
+                        onChange={(e) => setContent(e.target.value)}
+                        onPaste={async (e) => {
+                          const items = e.clipboardData.items;
+                          for (let i = 0; i < items.length; i++) {
+                            if (items[i].type.indexOf('image') === 0) {
+                              e.preventDefault();
+                              const file = items[i].getAsFile();
+                              if (file) {
+                                try {
+                                  setLoading(true);
+                                  const response = await api.uploadImage(file);
+                                  if (response.success && response.data) {
+                                    const imageUrl = response.data.url;
+                                    const markdownImage = `![图片](${imageUrl})`;
+                                    setContent(prev => prev + markdownImage);
+                                    alert('图片粘贴成功');
+                                  }
+                                } catch (error) {
+                                  setError('图片粘贴失败: ' + (error instanceof Error ? error.message : '未知错误'));
+                                } finally {
+                                  setLoading(false);
+                                }
+                              }
+                            }
+                          }
+                        }}
+                        className="w-full border border-border bg-card rounded-lg px-3 py-2 font-mono"
+                        rows={20}
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">状态</label>
+                      <select
+                        value={postStatus}
+                        onChange={(e) => setPostStatus(e.target.value as 'draft' | 'published')}
+                        className="w-full border border-border bg-card rounded-lg px-3 py-2"
+                      >
+                        <option value="draft">草稿</option>
+                        <option value="published">发布</option>
+                      </select>
+                    </div>
+                    
+                    <div className="flex gap-3">
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        {loading ? '提交中...' : (editingPostId ? '更新' : '创建')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCreateForm(false);
+                          setEditingPostId(null);
+                        }}
+                        className="px-6 py-2 border border-border rounded-lg hover:bg-muted"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              ) : (
+                // 新的PostEditor组件（带分类和标签选择）
+                <div>
+                  <div className="flex justify-end mb-4">
+                    <button
+                      onClick={() => {
+                        setShowCreateForm(false);
+                        setEditingPostId(null);
+                      }}
+                      className="text-gray-500 hover:text-gray-700"
+                    >
+                      ✕ 关闭
+                    </button>
+                  </div>
+                  <PostEditor
+                    postId={editingPostId || undefined}
+                    onSave={() => {
+                      setShowCreateForm(false);
+                      setEditingPostId(null);
+                      loadPosts();
+                    }}
+                    onCancel={() => {
+                      setShowCreateForm(false);
+                      setEditingPostId(null);
+                    }}
+                  />
+                </div>
+              )
             ) : (
               // 文章列表
               <div>
@@ -455,11 +625,9 @@ export function AdminPage() {
         );
       
       case 'categories':
-        // 使用新的CategoryManager组件
         return <CategoryManager />;
       
       case 'tags':
-        // 使用新的TagManager组件
         return <TagManager />;
       
       case 'comments':
@@ -662,99 +830,317 @@ export function AdminPage() {
                 <p className="mt-2 text-muted-foreground">加载配置中...</p>
               </div>
             ) : (
-              <div className="space-y-8">
+              <div className="space-y-6">
                 {/* 基本设置 */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-foreground border-b border-border pb-2">基本设置</h3>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">网站名称</label>
-                    <input
-                      type="text"
-                      value={localConfig.site_name || ''}
-                      onChange={(e) => setLocalConfig({...localConfig, site_name: e.target.value})}
-                      className="w-full px-3 py-2 border border-border rounded-lg bg-card text-foreground"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">网站副标题</label>
-                    <input
-                      type="text"
-                      value={localConfig.site_subtitle || ''}
-                      onChange={(e) => setLocalConfig({...localConfig, site_subtitle: e.target.value})}
-                      className="w-full px-3 py-2 border border-border rounded-lg bg-card text-foreground"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">网站描述</label>
-                    <textarea
-                      value={localConfig.site_description || ''}
-                      onChange={(e) => setLocalConfig({...localConfig, site_description: e.target.value})}
-                      className="w-full px-3 py-2 border border-border rounded-lg bg-card text-foreground"
-                      rows={3}
-                    />
+                <div className="border border-border rounded-lg p-6">
+                  <h3 className="text-xl font-semibold mb-4 text-foreground">基本设置</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">网站名称</label>
+                      <input
+                        type="text"
+                        value={localConfig.site_name || ''}
+                        onChange={(e) => setLocalConfig({...localConfig, site_name: e.target.value})}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-card text-foreground"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">网站副标题</label>
+                      <input
+                        type="text"
+                        value={localConfig.site_subtitle || ''}
+                        onChange={(e) => setLocalConfig({...localConfig, site_subtitle: e.target.value})}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-card text-foreground"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">网站Logo</label>
+                      <input
+                        type="text"
+                        value={localConfig.site_logo || ''}
+                        onChange={(e) => setLocalConfig({...localConfig, site_logo: e.target.value})}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-card text-foreground"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">网站描述</label>
+                      <textarea
+                        value={localConfig.site_description || ''}
+                        onChange={(e) => setLocalConfig({...localConfig, site_description: e.target.value})}
+                        rows={3}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-card text-foreground"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">网站关键词</label>
+                      <input
+                        type="text"
+                        value={localConfig.site_keywords || ''}
+                        onChange={(e) => setLocalConfig({...localConfig, site_keywords: e.target.value})}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-card text-foreground"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">每页文章数量</label>
+                      <input
+                        type="number"
+                        value={localConfig.posts_per_page || 10}
+                        onChange={(e) => setLocalConfig({...localConfig, posts_per_page: parseInt(e.target.value) || 0})}
+                        min="1"
+                        max="50"
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-card text-foreground"
+                      />
+                    </div>
                   </div>
                 </div>
                 
                 {/* 作者信息 */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-foreground border-b border-border pb-2">作者信息</h3>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">作者名称</label>
-                    <input
-                      type="text"
-                      value={localConfig.author_name || ''}
-                      onChange={(e) => setLocalConfig({...localConfig, author_name: e.target.value})}
-                      className="w-full px-3 py-2 border border-border rounded-lg bg-card text-foreground"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">作者简介</label>
-                    <textarea
-                      value={localConfig.author_bio || ''}
-                      onChange={(e) => setLocalConfig({...localConfig, author_bio: e.target.value})}
-                      className="w-full px-3 py-2 border border-border rounded-lg bg-card text-foreground"
-                      rows={3}
-                    />
+                <div className="border border-border rounded-lg p-6">
+                  <h3 className="text-xl font-semibold mb-4 text-foreground">作者信息</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">作者名称</label>
+                      <input
+                        type="text"
+                        value={localConfig.author_name || ''}
+                        onChange={(e) => setLocalConfig({...localConfig, author_name: e.target.value})}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-card text-foreground"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">作者头像</label>
+                      <input
+                        type="text"
+                        value={localConfig.author_avatar || ''}
+                        onChange={(e) => setLocalConfig({...localConfig, author_avatar: e.target.value})}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-card text-foreground"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">作者简介</label>
+                      <textarea
+                        value={localConfig.author_bio || ''}
+                        onChange={(e) => setLocalConfig({...localConfig, author_bio: e.target.value})}
+                        rows={3}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-card text-foreground"
+                      />
+                    </div>
                   </div>
                 </div>
                 
-                {/* 功能开关 */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-foreground border-b border-border pb-2">功能开关</h3>
-                  
-                  <div className="flex items-center justify-between py-2">
-                    <span className="text-sm font-medium text-foreground">启用评论</span>
-                    <input
-                      type="checkbox"
-                      checked={localConfig.feature_comments === 'true' || localConfig.feature_comments === true}
-                      onChange={(e) => setLocalConfig({...localConfig, feature_comments: e.target.checked.toString()})}
-                      className="w-4 h-4"
-                    />
+                {/* 主题配置 */}
+                <div className="border border-border rounded-lg p-6">
+                  <h3 className="text-xl font-semibold mb-4 text-foreground">主题配置</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">主色调</label>
+                      <div className="flex items-center space-x-4">
+                        <input
+                          type="color"
+                          value={localConfig.theme_primary_color || '#3B82F6'}
+                          onChange={(e) => setLocalConfig({...localConfig, theme_primary_color: e.target.value})}
+                          className="h-10 w-16 rounded border border-border cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={localConfig.theme_primary_color || '#3B82F6'}
+                          onChange={(e) => setLocalConfig({...localConfig, theme_primary_color: e.target.value})}
+                          className="flex-1 px-4 py-2 border border-border rounded-lg bg-card text-foreground"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">默认主题模式</label>
+                      <select
+                        value={localConfig.theme_default_mode || 'system'}
+                        onChange={(e) => setLocalConfig({...localConfig, theme_default_mode: e.target.value})}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-card text-foreground"
+                      >
+                        <option value="light">浅色</option>
+                        <option value="dark">深色</option>
+                        <option value="system">跟随系统</option>
+                      </select>
+                    </div>
                   </div>
-                  
-                  <div className="flex items-center justify-between py-2">
-                    <span className="text-sm font-medium text-foreground">启用搜索</span>
-                    <input
-                      type="checkbox"
-                      checked={localConfig.feature_search === 'true' || localConfig.feature_search === true}
-                      onChange={(e) => setLocalConfig({...localConfig, feature_search: e.target.checked.toString()})}
-                      className="w-4 h-4"
-                    />
+                </div>
+                
+                {/* 功能设置 */}
+                <div className="border border-border rounded-lg p-6">
+                  <h3 className="text-xl font-semibold mb-4 text-foreground">功能设置</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-foreground">启用评论</label>
+                      <input
+                        type="checkbox"
+                        checked={localConfig.feature_comments !== false}
+                        onChange={(e) => setLocalConfig({...localConfig, feature_comments: e.target.checked})}
+                        className="h-4 w-4 rounded border-gray-300 text-primary"
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-foreground">启用搜索</label>
+                      <input
+                        type="checkbox"
+                        checked={localConfig.feature_search !== false}
+                        onChange={(e) => setLocalConfig({...localConfig, feature_search: e.target.checked})}
+                        className="h-4 w-4 rounded border-gray-300 text-primary"
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-foreground">启用点赞</label>
+                      <input
+                        type="checkbox"
+                        checked={localConfig.feature_like !== false}
+                        onChange={(e) => setLocalConfig({...localConfig, feature_like: e.target.checked})}
+                        className="h-4 w-4 rounded border-gray-300 text-primary"
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-foreground">启用分享</label>
+                      <input
+                        type="checkbox"
+                        checked={localConfig.feature_share !== false}
+                        onChange={(e) => setLocalConfig({...localConfig, feature_share: e.target.checked})}
+                        className="h-4 w-4 rounded border-gray-300 text-primary"
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-foreground">启用RSS</label>
+                      <input
+                        type="checkbox"
+                        checked={localConfig.feature_rss !== false}
+                        onChange={(e) => setLocalConfig({...localConfig, feature_rss: e.target.checked})}
+                        className="h-4 w-4 rounded border-gray-300 text-primary"
+                      />
+                    </div>
                   </div>
-                  
-                  <div className="flex items-center justify-between py-2">
-                    <span className="text-sm font-medium text-foreground">启用点赞</span>
-                    <input
-                      type="checkbox"
-                      checked={localConfig.feature_like === 'true' || localConfig.feature_like === true}
-                      onChange={(e) => setLocalConfig({...localConfig, feature_like: e.target.checked.toString()})}
-                      className="w-4 h-4"
-                    />
+                </div>
+                
+                {/* 社交媒体 */}
+                <div className="border border-border rounded-lg p-6">
+                  <h3 className="text-xl font-semibold mb-4 text-foreground">社交媒体</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">GitHub</label>
+                      <input
+                        type="text"
+                        value={localConfig.social_github || ''}
+                        onChange={(e) => setLocalConfig({...localConfig, social_github: e.target.value})}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-card text-foreground"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">Twitter</label>
+                      <input
+                        type="text"
+                        value={localConfig.social_twitter || ''}
+                        onChange={(e) => setLocalConfig({...localConfig, social_twitter: e.target.value})}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-card text-foreground"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">邮箱</label>
+                      <input
+                        type="text"
+                        value={localConfig.social_email || ''}
+                        onChange={(e) => setLocalConfig({...localConfig, social_email: e.target.value})}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-card text-foreground"
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                {/* 页脚设置 */}
+                <div className="border border-border rounded-lg p-6">
+                  <h3 className="text-xl font-semibold mb-4 text-foreground">页脚设置</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">品牌名称</label>
+                      <input
+                        type="text"
+                        value={localConfig.footer_brand_name || ''}
+                        onChange={(e) => setLocalConfig({...localConfig, footer_brand_name: e.target.value})}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-card text-foreground"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">页脚描述</label>
+                      <input
+                        type="text"
+                        value={localConfig.footer_description || ''}
+                        onChange={(e) => setLocalConfig({...localConfig, footer_description: e.target.value})}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-card text-foreground"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">页脚文本</label>
+                      <input
+                        type="text"
+                        value={localConfig.footer_text || ''}
+                        onChange={(e) => setLocalConfig({...localConfig, footer_text: e.target.value})}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-card text-foreground"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">快速链接 (JSON格式)</label>
+                      <textarea
+                        value={JSON.stringify(localConfig.footer_links || {"首页": "/", "关于": "/about"}, null, 2)}
+                        onChange={(e) => {
+                          try {
+                            const value = JSON.parse(e.target.value);
+                            setLocalConfig({...localConfig, footer_links: value});
+                          } catch (error) {
+                            // 忽略无效JSON
+                          }
+                        }}
+                        rows={4}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-card text-foreground font-mono text-sm"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">技术栈 (JSON格式)</label>
+                      <textarea
+                        value={JSON.stringify(localConfig.footer_tech_stack || ["React + TypeScript", "Cloudflare Workers", "Tailwind CSS"], null, 2)}
+                        onChange={(e) => {
+                          try {
+                            const value = JSON.parse(e.target.value);
+                            setLocalConfig({...localConfig, footer_tech_stack: value});
+                          } catch (error) {
+                            // 忽略无效JSON
+                          }
+                        }}
+                        rows={4}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-card text-foreground font-mono text-sm"
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-foreground">显示技术支持</label>
+                      <input
+                        type="checkbox"
+                        checked={localConfig.footer_show_powered_by !== false}
+                        onChange={(e) => setLocalConfig({...localConfig, footer_show_powered_by: e.target.checked})}
+                        className="h-4 w-4 rounded border-gray-300 text-primary"
+                      />
+                    </div>
                   </div>
                 </div>
                 
@@ -764,21 +1150,14 @@ export function AdminPage() {
                     onClick={async () => {
                       try {
                         setUpdating('all');
-                        
-                        // 批量更新所有更改的配置项
                         const promises = Object.entries(localConfig).map(async ([key, value]) => {
                           if (value !== config[key]) {
                             await updateConfig(key, value);
                           }
                         });
-                        
                         await Promise.all(promises);
                         setSettingsSuccess('所有配置已成功更新');
-                        
-                        // 3秒后清除成功消息
-                        setTimeout(() => {
-                          setSettingsSuccess(null);
-                        }, 3000);
+                        setTimeout(() => setSettingsSuccess(null), 3000);
                       } catch (error) {
                         console.error('更新配置失败:', error);
                         alert('更新配置失败，请重试');
@@ -805,48 +1184,42 @@ export function AdminPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-12">
       <div className="flex flex-col space-y-8">
-        {/* 页面标题 */}
         <div>
           <h1 className="text-3xl font-bold text-foreground">管理后台</h1>
           <p className="text-muted-foreground mt-2">欢迎回来，{user.displayName || user.username}</p>
         </div>
         
-        {/* 导航标签页 */}
         <div className="border-b border-border overflow-x-auto">
           <nav className="flex space-x-6 min-w-max">
-            {
-              [
-                { id: 'posts' as AdminTab, label: '文章管理', icon: '📝' },
-                { id: 'categories' as AdminTab, label: '分类管理', icon: '🏷️' },
-                { id: 'tags' as AdminTab, label: '标签管理', icon: '#️⃣' },
-                { id: 'comments' as AdminTab, label: '评论管理', icon: '💬' },
-                { id: 'users' as AdminTab, label: '用户管理', icon: '👥' },
-                { id: 'analytics' as AdminTab, label: '数据分析', icon: '📊' },
-                { id: 'settings' as AdminTab, label: '统一设置', icon: '⚙️' }
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap flex items-center gap-2 ${
-                    activeTab === tab.id
-                      ? 'border-blue-600 text-blue-600'
-                      : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-                  }`}
-                >
-                  <span>{tab.icon}</span>
-                  <span>{tab.label}</span>
-                </button>
-              ))
-            }
+            {[
+              { id: 'posts' as AdminTab, label: '文章管理', icon: '📝' },
+              { id: 'categories' as AdminTab, label: '分类管理', icon: '🏷️' },
+              { id: 'tags' as AdminTab, label: '标签管理', icon: '#️⃣' },
+              { id: 'comments' as AdminTab, label: '评论管理', icon: '💬' },
+              { id: 'users' as AdminTab, label: '用户管理', icon: '👥' },
+              { id: 'analytics' as AdminTab, label: '数据分析', icon: '📊' },
+              { id: 'settings' as AdminTab, label: '统一设置', icon: '⚙️' }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap flex items-center gap-2 ${
+                  activeTab === tab.id
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                }`}
+              >
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
+              </button>
+            ))}
           </nav>
         </div>
         
-        {/* 标签页内容 */}
         <div className="bg-card rounded-lg shadow-sm p-6">
           {renderTabContent()}
         </div>
         
-        {/* 底部操作 */}
         <div className="flex justify-end">
           <button
             onClick={() => navigate('/')}
