@@ -7,6 +7,7 @@ import { LoginPage } from './pages/LoginPage';
 import { AdminPage } from './pages/AdminPage';
 import { SearchPage } from './pages/SearchPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { ConfigPage } from './pages/ConfigPage';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
             <Route path="/posts/:slug" element={<PostPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/admin/config" element={<ConfigPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/profile" element={<ProfilePage />} />
           </Routes>

@@ -20,7 +20,9 @@
  */
 
 import { Hono } from 'hono';
-import { Env, successResponse, errorResponse, safeGetCache, safePutCache, safeDeleteCache } from '../index';
+import type { Env } from '../types';
+import { successResponse, errorResponse } from '../utils/response';
+import { safeGetCache, safePutCache, safeDeleteCache } from '../utils/cache';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import {
@@ -42,11 +44,27 @@ const MAX_TITLE_LENGTH = 200;
 const MIN_CONTENT_LENGTH = 10;
 const MAX_CONTENT_LENGTH = 100000;
 const READING_SPEED = 250; // 每分钟阅读字数
+
+// ============= KV缓存策略优化 =============
+
+/**
+ * 新的缓存策略:
+ * - 只缓存浏览量>1000的热门文章详情
+ * - 缓存时间: 5分钟
+ * - 其他内容直接从D1读取
+ */
 const CACHE_TTL = {
-  POST_DETAIL: 300,      // 5分钟
-  POST_LIST: 180,        // 3分钟
-  HOT_POSTS: 600         // 10分钟
+  HOT_POST_DETAIL: 300  // 5分钟 - 只缓存热门文章
 };
+
+const HIGH_VIEW_THRESHOLD = 1000; // 浏览量阈值
+
+/**
+ * 判断文章是否应该缓存
+ */
+function shouldCachePost(viewCount: number): boolean {
+  return viewCount >= HIGH_VIEW_THRESHOLD;
+}
 
 // ============= 文章列表 =============
 
@@ -71,10 +89,14 @@ postRoutes.get('/', async (c) => {
     // ===== 1. 解析和验证查询参数 =====
     const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
     const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
-    const category = c.req.query('category');
-    const tag = c.req.query('tag');
+    let category = c.req.query('category');
+    let tag = c.req.query('tag');
     const author = c.req.query('author');
     const search = c.req.query('search');
+    
+    // 将字符串 "null" 转为真正的 null
+    category = (category === 'null' || !category) ? null : category;
+    tag = (tag === 'null' || !tag) ? null : tag;
     const sortBy = c.req.query('sortBy') || 'published_at';
     const order = c.req.query('order') === 'asc' ? 'ASC' : 'DESC';
     const offset = (page - 1) * limit;
@@ -83,19 +105,9 @@ postRoutes.get('/', async (c) => {
     const allowedSortFields = ['published_at', 'view_count', 'like_count', 'comment_count', 'created_at'];
     const finalSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'published_at';
     
-    // ===== 2. 尝试从缓存获取（只缓存首页） =====
-    const shouldCache = page === 1 && !category && !tag && !author && !search;
-    let cached = null;
-    
-    if (shouldCache) {
-      const cacheKey = `posts:homepage:${limit}:${finalSortBy}:${order}`;
-      cached = await safeGetCache(c.env, cacheKey);
-      
-      if (cached) {
-        logger.info('Homepage posts served from cache');
-        return c.json(JSON.parse(cached));
-      }
-    }
+    // ===== 2. 直接从D1读取 - 不使用缓存 =====
+    // 理由: D1查询足够快,无需KV缓存
+    logger.info('Fetching posts from D1', { page, limit, category, tag, author, search });
     
     // ===== 3. 构建查询 =====
     let query = `
@@ -228,13 +240,8 @@ postRoutes.get('/', async (c) => {
       }
     });
     
-    // ===== 8. 缓存结果（只缓存首页） =====
-    if (shouldCache) {
-      const cacheKey = `posts:homepage:${limit}:${finalSortBy}:${order}`;
-      await safePutCache(c.env, cacheKey, JSON.stringify(response), {
-        expirationTtl: CACHE_TTL.POST_LIST
-      });
-    }
+    // ===== 8. 直接返回响应 - 不使用缓存 =====
+    // 理由: D1查询足够快,无需KV缓存
     
     logger.info('Posts list fetched successfully', { 
       count: postsWithTags.length, 
@@ -455,8 +462,12 @@ postRoutes.get('/search', async (c) => {
   try {
     // ===== 1. 解析和验证查询参数 =====
     const q = c.req.query('q');
-    const category = c.req.query('category');
-    const tag = c.req.query('tag');
+    let category = c.req.query('category');
+    let tag = c.req.query('tag');
+    
+    // 将字符串 "null" 转为真正的 null
+    category = (category === 'null' || !category) ? null : category;
+    tag = (tag === 'null' || !tag) ? null : tag;
     const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
     const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
     const sort = c.req.query('sort') || 'published_at';
@@ -467,14 +478,9 @@ postRoutes.get('/search', async (c) => {
     const allowedSortFields = ['published_at', 'view_count', 'like_count', 'comment_count', 'relevance'];
     const finalSortBy = allowedSortFields.includes(sort) ? sort : 'published_at';
     
-    // ===== 2. 尝试从缓存获取 =====
-    const cacheKey = `posts:search:${q || ''}:${category || ''}:${tag || ''}:${page}:${limit}:${finalSortBy}:${order}`;
-    const cached = await c.env.CACHE.get(cacheKey);
-    
-    if (cached) {
-      logger.info('Search results served from cache');
-      return c.json(JSON.parse(cached));
-    }
+    // ===== 2. 直接从数据库读取 - 不使用缓存 =====
+    // 理由: D1查询足够快,无需KV缓存
+    logger.info('Searching posts from D1', { query: q, category, tag, page, limit });
     
     // ===== 3. 构建查询 =====
     let query = `
@@ -607,11 +613,6 @@ postRoutes.get('/search', async (c) => {
         total,
         totalPages: Math.ceil(total / limit)
       }
-    });
-    
-    // ===== 8. 缓存结果 =====
-    await c.env.CACHE.put(cacheKey, JSON.stringify(response), {
-      expirationTtl: CACHE_TTL.POST_LIST
     });
     
     logger.info('Search completed successfully', { 
@@ -774,20 +775,7 @@ postRoutes.get('/:slug', async (c) => {
       return c.json(errorResponse('Invalid slug'), 400);
     }
     
-    // ===== 1. 从缓存获取 =====
-    const cacheKey = `post:${slug}`;
-    const cached = await safeGetCache(c.env, cacheKey);
-    
-    if (cached) {
-      // 异步增加浏览量
-      c.executionCtx.waitUntil(
-        incrementViewCount(c, slug)
-      );
-      logger.info('Post served from cache', { slug });
-      return c.json(JSON.parse(cached));
-    }
-    
-    // ===== 2. 从数据库获取 =====
+    // ===== 1. 先查询文章基本信息(包括浏览量) =====
     const post = await c.env.DB.prepare(`
       SELECT p.*, 
              u.username as author_username,
@@ -810,6 +798,25 @@ postRoutes.get('/:slug', async (c) => {
         'Post not found',
         'The requested post does not exist or is not published'
       ), 404);
+    }
+    
+    // ===== 2. 判断是否应该使用缓存 =====
+    const cacheKey = `post:${slug}`;
+    const useCache = shouldCachePost(post.view_count);
+    
+    if (useCache) {
+      // 尝试从缓存获取
+      const cached = await safeGetCache(c.env, cacheKey);
+      if (cached) {
+        // 异步增加浏览量
+        c.executionCtx.waitUntil(
+          incrementViewCount(c, slug, post.id)
+        );
+        logger.info('Hot post served from cache', { slug, viewCount: post.view_count });
+        return c.json(JSON.parse(cached));
+      }
+    } else {
+      logger.info('Post not cached (low views)', { slug, viewCount: post.view_count });
     }
     
     // ===== 3. 获取标签 =====
@@ -852,10 +859,13 @@ postRoutes.get('/:slug', async (c) => {
     
     const response = successResponse(result);
     
-    // ===== 6. 缓存结果 =====
-    await safePutCache(c.env, cacheKey, JSON.stringify(response), {
-      expirationTtl: CACHE_TTL.POST_DETAIL
-    });
+    // ===== 6. 只缓存热门文章 =====
+    if (useCache) {
+      await safePutCache(c.env, cacheKey, JSON.stringify(response), {
+        expirationTtl: CACHE_TTL.HOT_POST_DETAIL
+      });
+      logger.info('Hot post cached', { slug, viewCount: post.view_count });
+    }
     
     // ===== 7. 异步增加浏览量 =====
     c.executionCtx.waitUntil(
@@ -1232,21 +1242,21 @@ postRoutes.post('/:id/like', requireAuth, async (c) => {
 // ============= 辅助函数 =============
 
 /**
- * 清除文章列表缓存
+ * 清除文章缓存 - 优化版
+ * 只清除热门文章缓存
+ */
+async function clearPostCache(c: any, slug: string, viewCount: number): Promise<void> {
+  if (shouldCachePost(viewCount)) {
+    await safeDeleteCache(c.env, `post:${slug}`);
+  }
+  // 不再需要清除列表缓存
+}
+
+/**
+ * 清除文章列表缓存（已废弃）
+ * 由于不再缓存列表，此函数保留仅用于兼容性
  */
 async function clearPostListCache(c: any): Promise<void> {
-  try {
-    // 清除首页缓存（现在只缓存首页）
-    const sortOptions = ['published_at', 'view_count', 'like_count'];
-    const orders = ['DESC', 'ASC'];
-    
-    for (const sortBy of sortOptions) {
-      for (const order of orders) {
-        await safeDeleteCache(c.env, `posts:homepage:${DEFAULT_PAGE_SIZE}:${sortBy}:${order}`);
-        await safeDeleteCache(c.env, `posts:homepage:${MAX_PAGE_SIZE}:${sortBy}:${order}`);
-      }
-    }
-  } catch (error) {
-    console.error('Failed to clear post list cache:', error);
-  }
+  // 由于不再缓存列表，此函数为空
+  console.log('Post list cache clearing is no longer needed');
 }

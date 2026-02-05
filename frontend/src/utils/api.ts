@@ -237,7 +237,37 @@ export const api = {
    * 获取配置信息
    */
   getConfig: () =>
-    apiRequest<{ githubClientId: string; frontendUrl: string }>('/config'),
+    apiRequest<Record<string, any>>('/config'),
+  
+  /**
+   * 更新配置项
+   */
+  updateConfig: (key: string, value: any) =>
+    apiRequest<{ key: string; value: any }>(`/config/${key}`, {
+      method: 'PUT',
+      body: JSON.stringify({ value }),
+    }),
+  
+  /**
+   * 批量更新配置
+   */
+  batchUpdateConfig: (configs: Record<string, any>) =>
+    apiRequest<{ updated: number; failed: number }>('/config', {
+      method: 'PUT',
+      body: JSON.stringify({ configs }),
+    }),
+  
+  /**
+   * 获取所有配置(管理员)
+   */
+  getAdminConfig: () =>
+    apiRequest<{ config: Record<string, any[]>; total: number }>('/config/admin'),
+  
+  /**
+   * 获取存储配置信息
+   */
+  getStorageConfig: () =>
+    apiRequest<{ storagePublicUrl: string }>('/config/storage'),
   
   // ============= 文章相关 =============
   
@@ -384,19 +414,103 @@ export const api = {
       method: 'POST',
     }),
   
-  // ============= 分类和标签 =============
-  
+  // ============= 分类相关 =============
+
   /**
-   * 获取所有分类
+   * 获取分类列表
    */
-  getCategories: () => 
-    apiRequest<{ categories: Category[] }>('/categories'),
-  
+  getCategories: (params?: { page?: string; limit?: string }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return apiRequest<{ 
+      categories: Category[]; 
+      total: number;
+      pagination: { page: number; limit: number; total: number; totalPages: number }
+    }>(`/categories${query}`);
+  },
+
   /**
-   * 获取所有标签
+   * 创建分类
    */
-  getTags: () => 
-    apiRequest<{ tags: Tag[] }>('/categories/tags'),
+  createCategory: (data: {
+    name: string;
+    slug?: string;
+    description?: string;
+    icon?: string;
+    color?: string;
+    displayOrder?: number;
+  }) => apiRequest<{ category: Category }>('/categories', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  /**
+   * 更新分类
+   */
+  updateCategory: (id: number, data: {
+    name?: string;
+    description?: string;
+    icon?: string;
+    color?: string;
+    displayOrder?: number;
+  }) => apiRequest<{ category: Category }>(`/categories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+
+  /**
+   * 删除分类
+   */
+  deleteCategory: (id: number) => 
+    apiRequest<{ deleted: boolean }>(`/categories/${id}`, {
+      method: 'DELETE',
+    }),
+
+  // ============= 标签相关 =============
+
+  /**
+   * 获取标签列表
+   */
+  getTags: (params?: { page?: string; limit?: string }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return apiRequest<{ 
+      tags: Tag[]; 
+      total: number;
+      pagination: { page: number; limit: number; total: number; totalPages: number }
+    }>(`/categories/tags${query}`);
+  },
+
+  /**
+   * 创建标签
+   */
+  createTag: (data: {
+    name: string;
+    slug?: string;
+    description?: string;
+    color?: string;
+  }) => apiRequest<{ tag: Tag }>('/categories/tags', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  /**
+   * 更新标签
+   */
+  updateTag: (id: number, data: {
+    name?: string;
+    description?: string;
+    color?: string;
+  }) => apiRequest<{ tag: Tag }>(`/categories/tags/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+
+  /**
+   * 删除标签
+   */
+  deleteTag: (id: number) => 
+    apiRequest<{ deleted: boolean }>(`/categories/tags/${id}`, {
+      method: 'DELETE',
+    }),
   
   // ============= 文件上传 =============
   
@@ -602,4 +716,7 @@ export function getCurrentUser(): User | null {
 
 // ============= 导出 =============
 
+
 export default api;
+
+

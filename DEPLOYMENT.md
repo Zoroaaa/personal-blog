@@ -1,9 +1,9 @@
-## 📚 博客系统部署手册
+## 📚 博客系统部署手册 (v3.0.0)
 
 ### 项目架构
 
-**前端**: 1个Cloudflare Pages  
-**后端**: 1个Cloudflare Worker (整合所有API)  
+**前端**: Cloudflare Pages (React + TypeScript + Tailwind CSS)  
+**后端**: Cloudflare Workers (Hono框架)  
 **数据库**: D1 (SQLite)  
 **缓存**: KV  
 **存储**: R2
@@ -23,7 +23,7 @@
 
 ```bash
 git clone <your-repo>
-cd blog-system-v1
+cd personal-blog-beta2.0
 npm install
 ```
 
@@ -157,18 +157,25 @@ A: 在backend/src/index.ts中添加你的前端URL到允许列表
 **Q: 图片上传失败**  
 A: 确保R2存储桶已创建并正确绑定
 
+**Q: 部署后API访问失败**  
+A: 检查Worker路由配置和权限设置
+
+**Q: 前端构建失败**  
+A: 确保所有依赖已正确安装，运行 `npm install`
+
 ---
 
 ### 文件结构
 
 ```
-blog-system-v1/
+personal-blog-beta2.0/
 ├── backend/                 # 后端Worker
 │   ├── src/
 │   │   ├── index.ts        # 主入口
 │   │   ├── routes/         # 路由
 │   │   ├── middleware/     # 中间件
-│   │   └── utils/          # 工具函数
+│   │   ├── utils/          # 工具函数
+│   │   └── types/          # 类型定义
 │   ├── package.json
 │   └── wrangler.toml       # Cloudflare配置
 │
@@ -177,7 +184,9 @@ blog-system-v1/
 │   │   ├── components/     # 组件
 │   │   ├── pages/          # 页面
 │   │   ├── stores/         # 状态管理
-│   │   └── utils/          # 工具函数
+│   │   ├── hooks/          # 自定义Hooks
+│   │   ├── utils/          # 工具函数
+│   │   └── types/          # 类型定义
 │   ├── package.json
 │   └── vite.config.ts
 │
@@ -191,7 +200,7 @@ blog-system-v1/
 
 ---
 
-### API端点
+### API端点 (v3.0.0)
 
 #### 认证
 - POST /api/auth/register - 注册
@@ -199,6 +208,7 @@ blog-system-v1/
 - POST /api/auth/github - GitHub OAuth
 - POST /api/auth/logout - 登出
 - GET /api/auth/me - 获取当前用户
+- PUT /api/auth/profile - 更新用户资料
 
 #### 文章
 - GET /api/posts - 文章列表
@@ -207,9 +217,13 @@ blog-system-v1/
 - PUT /api/posts/:id - 更新文章 (需认证)
 - DELETE /api/posts/:id - 删除文章 (需管理员)
 - POST /api/posts/:id/like - 点赞文章 (需认证)
+- GET /api/posts/likes - 获取用户点赞的文章 (需认证)
+- GET /api/posts/search - 搜索文章
+- GET /api/posts/admin - 管理员获取所有文章 (需认证)
+- GET /api/posts/admin/:id - 管理员获取文章详情 (需认证)
 
 #### 评论
-- GET /api/comments?postId=xxx - 评论列表
+- GET /api/comments - 评论列表
 - POST /api/comments - 发表评论 (需认证)
 - DELETE /api/comments/:id - 删除评论 (需认证)
 - POST /api/comments/:id/like - 点赞评论 (需认证)
@@ -221,6 +235,27 @@ blog-system-v1/
 #### 上传
 - POST /api/upload - 上传图片 (需认证)
 - DELETE /api/upload/:filename - 删除文件 (需认证)
+
+#### 数据分析
+- GET /api/analytics - 获取系统统计
+- GET /api/analytics/hot-posts - 获取热门文章
+- GET /api/analytics/stats - 获取基础统计数据
+- GET /api/analytics/post/:id - 获取单篇文章的详细分析
+- GET /api/analytics/users - 获取用户统计
+- POST /api/analytics/track - 记录页面访问
+
+#### 管理后台
+- GET /api/admin/comments - 获取评论列表
+- PUT /api/admin/comments/:id/status - 更新评论状态
+- DELETE /api/admin/comments/:id - 删除评论
+- GET /api/admin/users - 获取用户列表
+- PUT /api/admin/users/:id/status - 更新用户状态
+- PUT /api/admin/users/:id/role - 更新用户角色
+- GET /api/admin/settings - 获取系统设置
+- PUT /api/admin/settings - 更新系统设置
+
+#### 配置
+- GET /api/config - 获取公开配置信息
 
 ---
 
@@ -257,7 +292,7 @@ wrangler d1 export blog-db --output backup.sql
 
 ---
 
-### 技术栈
+### 技术栈 (v3.0.0)
 
 **后端**
 - Hono - Web框架

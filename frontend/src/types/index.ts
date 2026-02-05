@@ -503,30 +503,103 @@ export interface AsyncState<T = any> {
 // ============= 配置相关类型 =============
 
 /**
- * 应用配置
+ * 网站配置
+ * 对应数据库 site_config 表的配置项
+ * 用于管理网站的内容和显示设置
+ */
+export interface SiteConfig {
+  // 基本信息
+  site_name: string;
+  site_subtitle: string;
+  site_logo: string;
+  site_favicon: string;
+  site_description: string;
+  site_keywords: string;
+  site_author: string;
+  
+  // 作者信息
+  author_name: string;
+  author_avatar: string;
+  author_bio: string;
+  author_email: string;
+  
+  // 主题配置
+  theme_primary_color: string;
+  theme_default_mode: 'light' | 'dark' | 'system';
+  theme_font_family: string;
+  theme_enable_animations: boolean;
+  
+  // 社交媒体
+  social_github?: string;
+  social_twitter?: string;
+  social_linkedin?: string;
+  social_email?: string;
+  social_weibo?: string;
+  social_wechat_qr?: string;
+  
+  // 功能开关
+  feature_comments: boolean;
+  feature_search: boolean;
+  feature_like: boolean;
+  feature_share: boolean;
+  feature_rss: boolean;
+  feature_analytics: boolean;
+  feature_newsletter: boolean;
+  comment_approval_required: boolean;
+  
+  // 页脚配置
+  footer_text: string;
+  footer_links?: Record<string, string> | string;
+  footer_show_powered_by: boolean;
+  
+  // 存储配置
+  storage_public_url?: string;
+  
+  // 系统设置
+  posts_per_page: number;
+  max_upload_size_mb: number;
+  enable_maintenance_mode: boolean;
+}
+
+/**
+ * 应用运行时配置
+ * 用于前端应用的环境和运行时配置
+ * 与 SiteConfig 分离,避免混淆
  */
 export interface AppConfig {
-  siteName: string;
-  siteDescription: string;
+  // 基础信息(从SiteConfig读取)
+  siteName: string;        // 映射自 SiteConfig.site_name
+  siteDescription: string; // 映射自 SiteConfig.site_description
+  
+  // API和URL配置
   siteUrl: string;
   apiUrl: string;
   cdnUrl?: string;
+  
+  // 默认值配置
   defaultAvatar: string;
+  
+  // 文件上传配置
   maxFileSize: number;
   allowedFileTypes: string[];
-  postsPerPage: number;
+  
+  // 分页配置
+  postsPerPage: number;    // 映射自 SiteConfig.posts_per_page
   commentsPerPage: number;
-  enableComments: boolean;
+  
+  // 功能开关
+  enableComments: boolean;      // 映射自 SiteConfig.feature_comments
   enableRegistration: boolean;
   enableGitHubOAuth: boolean;
 }
 
 /**
  * 主题配置
+ * 用于运行时主题状态管理
  */
 export interface ThemeConfig {
-  primaryColor: string;
-  mode: 'light' | 'dark';
+  primaryColor: string;  // 对应 SiteConfig.theme_primary_color
+  mode: 'light' | 'dark'; // 对应 SiteConfig.theme_default_mode
   fontSize: 'small' | 'medium' | 'large';
 }
 
