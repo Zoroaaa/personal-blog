@@ -1,13 +1,19 @@
 /**
- * 网站配置Hook (优化版)
+ * 网站配置Hook (完善版)
  * 
  * 功能:
  * - 从API获取网站配置
  * - 配置缓存管理
  * - 类型安全的配置访问
  * 
- * @author 优化版本
- * @version 2.1.0
+ * 修复内容:
+ * 1. 更新SiteConfig接口，与数据库完全对应
+ * 2. 移除数据库中不存在的字段
+ * 3. 优化默认配置值
+ * 4. 改进类型定义
+ * 
+ * @author 完善版本
+ * @version 2.2.0
  */
 
 import { useState, useEffect } from 'react';
@@ -29,10 +35,13 @@ export interface SiteConfig {
   author_name: string;
   author_avatar: string;
   author_bio: string;
+  author_email: string;
   
   // 主题配置
   theme_primary_color: string;
   theme_default_mode: 'light' | 'dark' | 'system';
+  theme_font_family: string;
+  theme_enable_animations: boolean;
   
   // 社交媒体
   social_github?: string;
@@ -40,6 +49,7 @@ export interface SiteConfig {
   social_linkedin?: string;
   social_email?: string;
   social_weibo?: string;
+  social_wechat_qr?: string;
   
   // 功能开关
   feature_comments: boolean;
@@ -47,26 +57,30 @@ export interface SiteConfig {
   feature_like: boolean;
   feature_share: boolean;
   feature_rss: boolean;
+  feature_analytics: boolean;
+  feature_newsletter: boolean;
+  
+  // 评论设置
+  comment_approval_required: boolean;
   
   // 页脚配置
   footer_text: string;
-  footer_links?: Record<string, string>;
+  footer_links?: Record<string, string> | string; // JSON字符串或对象
   footer_show_powered_by: boolean;
-  footer_description?: string;
-  footer_quick_links?: Record<string, string>;
-  footer_tech_stack?: string[];
-  footer_brand_name?: string;
   
   // 存储配置
   storage_public_url?: string;
   
-  // 其他
+  // 系统设置
   posts_per_page: number;
+  max_upload_size_mb: number;
+  enable_maintenance_mode: boolean;
 }
 
 // ============= 默认配置 =============
 
 const DEFAULT_CONFIG: SiteConfig = {
+  // 基本信息
   site_name: '我的博客',
   site_subtitle: '分享技术与生活',
   site_logo: '/logo.png',
@@ -75,38 +89,50 @@ const DEFAULT_CONFIG: SiteConfig = {
   site_keywords: 'blog,技术,编程',
   site_author: 'Admin',
   
+  // 作者信息
   author_name: 'Admin',
   author_avatar: '/default-avatar.png',
   author_bio: '热爱技术的开发者',
+  author_email: 'admin@example.com',
   
+  // 主题配置
   theme_primary_color: '#3B82F6',
   theme_default_mode: 'system',
+  theme_font_family: 'system-ui, -apple-system, sans-serif',
+  theme_enable_animations: true,
   
+  // 社交媒体
   social_github: '',
   social_twitter: '',
   social_linkedin: '',
   social_email: '',
   social_weibo: '',
+  social_wechat_qr: '',
   
+  // 功能开关
   feature_comments: true,
   feature_search: true,
   feature_like: true,
   feature_share: true,
   feature_rss: true,
+  feature_analytics: true,
+  feature_newsletter: false,
   
+  // 评论设置
+  comment_approval_required: false,
+  
+  // 页脚配置
   footer_text: '© 2024 All rights reserved',
   footer_show_powered_by: true,
-  footer_description: '分享技术,记录生活',
-  footer_quick_links: {
-    '首页': '/',
-    '关于': '/about'
-  },
-  footer_tech_stack: ['React + TypeScript', 'Cloudflare Workers', 'Tailwind CSS'],
-  footer_brand_name: '我的博客',
+  footer_links: '{}',
   
+  // 存储配置
   storage_public_url: 'https://storage.blog.neutronx.uk',
   
-  posts_per_page: 10
+  // 系统设置
+  posts_per_page: 10,
+  max_upload_size_mb: 5,
+  enable_maintenance_mode: false
 };
 
 // ============= 配置状态管理 =============
@@ -166,6 +192,18 @@ export function useSiteConfig() {
     }
   };
   
+  // 处理footer_links的JSON格式
+  const processFooterLinks = (value: any): Record<string, string> | string => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return value;
+      }
+    }
+    return value || '{}';
+  };
+  
   // 获取配置
   const fetchConfig = async () => {
     try {
@@ -177,11 +215,18 @@ export function useSiteConfig() {
         api.getStorageConfig().catch(() => ({ success: false, data: null }))
       ]);
       
-      let config = DEFAULT_CONFIG;
+      let config = { ...DEFAULT_CONFIG };
       
       // 合并基本配置
       if (configResponse.success && configResponse.data) {
-        config = { ...config, ...configResponse.data };
+        const apiConfig = configResponse.data;
+        
+        // 处理特殊字段
+        if (apiConfig.footer_links) {
+          apiConfig.footer_links = processFooterLinks(apiConfig.footer_links);
+        }
+        
+        config = { ...config, ...apiConfig };
       }
       
       // 合并存储配置
@@ -226,12 +271,21 @@ export function useSiteConfig() {
   // 更新配置 (管理员使用)
   const updateConfig = async (key: string, value: any) => {
     try {
-      const response = await api.updateConfig(key, value);
+      // 处理footer_links的JSON格式
+      let processedValue = value;
+      if (key === 'footer_links' && typeof value === 'object') {
+        processedValue = JSON.stringify(value);
+      }
+      
+      const response = await api.updateConfig(key, processedValue);
       
       if (response.success) {
         // 更新本地配置
         setState(prev => {
-          const newConfig = { ...(prev.config || DEFAULT_CONFIG), [key]: value };
+          const newConfig = { 
+            ...(prev.config || DEFAULT_CONFIG), 
+            [key]: key === 'footer_links' ? processFooterLinks(processedValue) : value 
+          };
           setCachedConfig(newConfig);
           return {
             ...prev,
@@ -250,6 +304,11 @@ export function useSiteConfig() {
   
   // 强制刷新配置
   const refreshConfig = async () => {
+    // 清除缓存
+    localStorage.removeItem('site-config');
+    localStorage.removeItem('site-config-timestamp');
+    
+    // 重新获取
     await fetchConfig();
   };
   
@@ -264,6 +323,9 @@ export function useSiteConfig() {
         error: null,
         lastFetch: Date.now()
       });
+      
+      // 后台刷新配置
+      fetchConfig();
     } else {
       // 缓存无效，从API获取
       fetchConfig();
@@ -303,7 +365,9 @@ export function getConfigValue<K extends keyof SiteConfig>(
 /**
  * 检查功能是否启用
  */
-export function isFeatureEnabled(feature: 'comments' | 'search' | 'like' | 'share' | 'rss'): boolean {
+export function isFeatureEnabled(
+  feature: 'comments' | 'search' | 'like' | 'share' | 'rss' | 'analytics' | 'newsletter'
+): boolean {
   const key = `feature_${feature}` as keyof SiteConfig;
   return getConfigValue(key) as boolean;
 }
@@ -311,7 +375,24 @@ export function isFeatureEnabled(feature: 'comments' | 'search' | 'like' | 'shar
 /**
  * 获取社交媒体链接
  */
-export function getSocialLink(platform: 'github' | 'twitter' | 'linkedin' | 'email' | 'weibo'): string {
+export function getSocialLink(
+  platform: 'github' | 'twitter' | 'linkedin' | 'email' | 'weibo' | 'wechat_qr'
+): string {
   const key = `social_${platform}` as keyof SiteConfig;
   return getConfigValue(key) as string || '';
+}
+
+/**
+ * 获取页脚链接
+ */
+export function getFooterLinks(): Record<string, string> {
+  const links = getConfigValue('footer_links');
+  if (typeof links === 'string') {
+    try {
+      return JSON.parse(links);
+    } catch {
+      return {};
+    }
+  }
+  return links || {};
 }
