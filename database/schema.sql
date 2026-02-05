@@ -249,7 +249,40 @@ CREATE INDEX IF NOT EXISTS idx_view_history_post_id ON view_history(post_id);
 CREATE INDEX IF NOT EXISTS idx_view_history_user_id ON view_history(user_id);
 CREATE INDEX IF NOT EXISTS idx_view_history_created_at ON view_history(created_at DESC);
 
+-- ============= 网站配置表 =============
+
+CREATE TABLE IF NOT EXISTS site_config (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    
+    -- 配置键值
+    key TEXT NOT NULL UNIQUE,
+    value TEXT,
+    
+    -- 配置元数据
+    type TEXT NOT NULL DEFAULT 'string' CHECK(type IN ('string', 'number', 'boolean', 'json')),
+    category TEXT NOT NULL DEFAULT 'general' CHECK(category IN ('general', 'theme', 'social', 'seo', 'features')),
+    description TEXT,
+    
+    -- 审计字段
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 配置表索引
+CREATE INDEX IF NOT EXISTS idx_site_config_key ON site_config(key);
+CREATE INDEX IF NOT EXISTS idx_site_config_category ON site_config(category);
+
 -- ============= 数据库触发器 =============
+
+-- 触发器：site_config表自动更新updated_at字段
+CREATE TRIGGER IF NOT EXISTS update_site_config_timestamp
+AFTER UPDATE ON site_config
+FOR EACH ROW
+BEGIN
+    UPDATE site_config 
+    SET updated_at = CURRENT_TIMESTAMP 
+    WHERE id = NEW.id;
+END;
 
 -- 触发器：文章发布时更新分类文章数
 CREATE TRIGGER IF NOT EXISTS trg_posts_insert_update_category
@@ -383,7 +416,45 @@ INSERT OR IGNORE INTO tags (name, slug) VALUES
 INSERT OR IGNORE INTO users (username, email, password_hash, display_name, role, status) VALUES
 ('admin', 'admin@example.com', '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqRWNXb6tO', 'Administrator', 'admin', 'active');
 
--- ============= 视图（便于查询） =============
+-- 插入网站配置初始数据
+INSERT OR IGNORE INTO site_config (key, value, type, category, description) VALUES
+  ('site_name', '我的博客', 'string', 'general', '网站名称'),
+  ('site_subtitle', '分享技术与生活', 'string', 'general', '网站副标题'),
+  ('site_logo', '/logo.png', 'string', 'general', '网站Logo URL'),
+  ('site_favicon', '/favicon.ico', 'string', 'general', '网站Favicon URL'),
+  ('site_description', '一个分享技术和生活的个人博客', 'string', 'seo', '网站描述(SEO)'),
+  ('site_keywords', 'blog,技术,编程,生活', 'string', 'seo', '网站关键词(SEO)'),
+  ('site_author', 'Admin', 'string', 'general', '网站作者'),
+  ('author_name', 'Admin', 'string', 'general', '作者名称'),
+  ('author_avatar', '/default-avatar.png', 'string', 'general', '作者头像URL'),
+  ('author_bio', '热爱技术的开发者', 'string', 'general', '作者简介'),
+  ('author_email', 'admin@example.com', 'string', 'general', '作者邮箱'),
+  ('theme_primary_color', '#3B82F6', 'string', 'theme', '主题主色调'),
+  ('theme_default_mode', 'system', 'string', 'theme', '默认主题模式 (light/dark/system)'),
+  ('theme_font_family', 'system-ui', 'string', 'theme', '字体族'),
+  ('theme_enable_animations', 'true', 'boolean', 'theme', '启用动画效果'),
+  ('social_github', '', 'string', 'social', 'GitHub链接'),
+  ('social_twitter', '', 'string', 'social', 'Twitter链接'),
+  ('social_linkedin', '', 'string', 'social', 'LinkedIn链接'),
+  ('social_email', '', 'string', 'social', '联系邮箱'),
+  ('social_wechat_qr', '', 'string', 'social', '微信二维码URL'),
+  ('social_weibo', '', 'string', 'social', '微博链接'),
+  ('feature_comments', 'true', 'boolean', 'features', '启用评论功能'),
+  ('feature_search', 'true', 'boolean', 'features', '启用搜索功能'),
+  ('feature_like', 'true', 'boolean', 'features', '启用点赞功能'),
+  ('feature_share', 'true', 'boolean', 'features', '启用分享功能'),
+  ('feature_analytics', 'true', 'boolean', 'features', '启用访问统计'),
+  ('feature_rss', 'true', 'boolean', 'features', '启用RSS订阅'),
+  ('feature_newsletter', 'false', 'boolean', 'features', '启用邮件订阅'),
+  ('footer_text', '© 2024 我的博客. All rights reserved.', 'string', 'general', '页脚版权文字'),
+  ('footer_links', '{"友情链接": "https://example.com"}', 'json', 'general', '页脚链接(JSON格式)'),
+  ('footer_show_powered_by', 'true', 'boolean', 'general', '显示"Powered by"'),
+  ('posts_per_page', '10', 'number', 'general', '每页文章数'),
+  ('comment_approval_required', 'false', 'boolean', 'features', '评论需要审核'),
+  ('max_upload_size_mb', '5', 'number', 'general', '最大上传文件大小(MB)'),
+  ('enable_maintenance_mode', 'false', 'boolean', 'general', '维护模式');
+
+-- ============= 视图（便于查询） =
 
 -- 文章详情视图（包含作者和分类信息）
 CREATE VIEW IF NOT EXISTS vw_posts_detailed AS
