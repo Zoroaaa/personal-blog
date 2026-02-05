@@ -52,7 +52,7 @@ export function SearchPage() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   
-  const query = searchParams.get('search') || '';
+  const query = searchParams.get('q') || '';
   const category = searchParams.get('category');
   const tag = searchParams.get('tag');
   
@@ -70,7 +70,7 @@ export function SearchPage() {
       setError(null);
       
       const response = await api.searchPosts({
-        search: query,
+        q: query,
         category,
         tag,
         page: pageNum.toString(),
