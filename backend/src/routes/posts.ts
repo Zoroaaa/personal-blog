@@ -474,7 +474,7 @@ postRoutes.get('/search', async (c) => {
     
     // ===== 2. 直接从数据库读取 - 不使用缓存 =====
     // 理由: D1查询足够快,无需KV缓存
-    logger.info('Searching posts from D1', { query: q, category, tag, page, limit });
+    logger.info('Searching posts from D1', { query: q, rawQuery: rawQ, category, tag, page, limit });
     
     // ===== 3. 构建查询 =====
     let query = `
@@ -493,7 +493,7 @@ postRoutes.get('/search', async (c) => {
     const params: any[] = [];
     
     // 搜索关键词
-    if (q) {
+    if (q && q.length > 0) {
       const searchTerm = `%${q}%`;
       query += ` AND (p.title LIKE ? OR p.summary LIKE ? OR p.content LIKE ?)`;
       params.push(searchTerm, searchTerm, searchTerm);
@@ -516,7 +516,7 @@ postRoutes.get('/search', async (c) => {
     }
     
     // 排序
-    if (finalSortBy === 'relevance' && q) {
+    if (finalSortBy === 'relevance' && q && q.length > 0) {
       // 相关性排序（基于标题匹配权重更高）
       query += ` ORDER BY 
         CASE 
@@ -541,7 +541,7 @@ postRoutes.get('/search', async (c) => {
                       WHERE p.status = 'published' AND p.visibility = 'public'`;
     const countParams: any[] = [];
     
-    if (q) {
+    if (q && q.length > 0) {
       const searchTerm = `%${q}%`;
       countQuery += ' AND (p.title LIKE ? OR p.summary LIKE ? OR p.content LIKE ?)';
       countParams.push(searchTerm, searchTerm, searchTerm);
