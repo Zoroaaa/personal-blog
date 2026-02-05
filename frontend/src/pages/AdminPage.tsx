@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../stores/authStore';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { api } from '../utils/api';
 
 // 定义管理后台的标签页类型
@@ -992,24 +992,33 @@ export function AdminPage() {
         {/* 导航标签页 */}
         <div className="border-b border-border">
           <nav className="flex space-x-8">
-            {[
-              { id: 'posts' as AdminTab, label: '文章管理' },
-              { id: 'comments' as AdminTab, label: '评论管理' },
-              { id: 'users' as AdminTab, label: '用户管理' },
-              { id: 'analytics' as AdminTab, label: '数据分析' },
-              { id: 'settings' as AdminTab, label: '系统设置' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+            {
+              [
+                { id: 'posts' as AdminTab, label: '文章管理' },
+                { id: 'comments' as AdminTab, label: '评论管理' },
+                { id: 'users' as AdminTab, label: '用户管理' },
+                { id: 'analytics' as AdminTab, label: '数据分析' },
+                { id: 'settings' as AdminTab, label: '系统设置' }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    activeTab === tab.id
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                   }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+                >
+                  {tab.label}
+                </button>
+              ))
+            }
+            <Link
+              to="/admin/config"
+              className="py-4 px-1 border-b-2 font-medium text-sm transition-colors border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+            >
+              网页配置
+            </Link>
           </nav>
         </div>
         
