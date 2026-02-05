@@ -1,6 +1,6 @@
-# 🚀 个人博客系统 V2
+# 🚀 个人博客系统 V3
 
-基于Cloudflare Workers和Pages构建的现代化博客系统，已升级至版本2.0。
+基于Cloudflare Workers和Pages构建的现代化博客系统，已升级至版本3.0。
 
 ## ✨ 特性
 
@@ -16,6 +16,14 @@
 - ✅ 完整的管理后台
 - ✅ 速率限制和安全保护
 - ✅ 完全免费 (Cloudflare免费额度)
+- ✅ 高级搜索功能
+- ✅ 热门文章分析
+- ✅ 用户行为统计
+- ✅ 评论审核系统
+- ✅ 用户角色管理
+- ✅ 系统设置管理
+- ✅ 页面访问跟踪
+- ✅ 来源分析
 
 ## 🏗️ 架构
 
@@ -31,7 +39,7 @@
 
 ```bash
 git clone <your-repo>
-cd blog-system-v1
+cd personal-blog-beta2.0
 npm install
 ```
 
@@ -57,7 +65,7 @@ cd ../frontend && npm run build && npm run deploy
 ## 📁 项目结构
 
 ```
-blog-system-v1/
+personal-blog-beta2.0/
 ├── backend/          # 后端Worker (单个Worker)
 ├── frontend/         # 前端Pages
 ├── database/         # 数据库Schema
@@ -79,8 +87,8 @@ npm run dev
 
 ## 📖 文档
 
-- [部署手册](./DEPLOYMENT.md) - 完整部署指南
-- [API文档](./API.md) - 详细API接口说明 (v2.0.0)
+- [部署手册](./DEPLOYMENT.md) - 完整部署指南 (v3.0.0)
+- [API文档](./API.md) - 详细API接口说明 (v3.0.0)
 
 ## 🎯 功能列表
 
@@ -102,6 +110,14 @@ npm run dev
 - 速率限制和安全保护
 - 统一的API响应格式
 - 详细的错误处理和日志记录
+- 高级搜索功能 (相关性排序)
+- 热门文章分析
+- 用户行为统计
+- 评论审核系统
+- 用户角色管理
+- 系统设置管理
+- 页面访问跟踪
+- 来源分析
 
 ### 计划中 📋
 - RSS订阅
