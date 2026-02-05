@@ -427,6 +427,125 @@ export const api = {
    */
   getTags: () => 
     apiRequest<{ tags: Tag[] }>('/categories/tags'),
+
+  /**
+ * API工具函数扩展
+ * 需要添加到现有的 api.ts 文件中
+ */
+
+// 在现有的 api 对象中添加以下方法:
+
+// ============= 分类相关 =============
+
+async getCategories(params?: { page?: string; limit?: string }): Promise<ApiResponse> {
+  return this.get('/api/categories', params);
+},
+
+async createCategory(data: {
+  name: string;
+  slug?: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  displayOrder?: number;
+}): Promise<ApiResponse> {
+  return this.post('/api/categories', data);
+},
+
+async updateCategory(id: number, data: {
+  name?: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  displayOrder?: number;
+}): Promise<ApiResponse> {
+  return this.put(`/api/categories/${id}`, data);
+},
+
+async deleteCategory(id: number): Promise<ApiResponse> {
+  return this.delete(`/api/categories/${id}`);
+},
+
+// ============= 标签相关 =============
+
+async getTags(params?: { page?: string; limit?: string }): Promise<ApiResponse> {
+  return this.get('/api/categories/tags', params);
+},
+
+async createTag(data: {
+  name: string;
+  slug?: string;
+  description?: string;
+  color?: string;
+}): Promise<ApiResponse> {
+  return this.post('/api/categories/tags', data);
+},
+
+async updateTag(id: number, data: {
+  name?: string;
+  description?: string;
+  color?: string;
+}): Promise<ApiResponse> {
+  return this.put(`/api/categories/tags/${id}`, data);
+},
+
+async deleteTag(id: number): Promise<ApiResponse> {
+  return this.delete(`/api/categories/tags/${id}`);
+}
+
+// ============= 使用示例 =============
+
+/*
+// 获取分类列表
+const categoriesResponse = await api.getCategories();
+if (categoriesResponse.success) {
+  const categories = categoriesResponse.data.categories;
+  // 使用分类数据
+}
+
+// 创建新分类
+const newCategory = await api.createCategory({
+  name: '技术',
+  slug: 'tech',
+  description: '技术相关文章',
+  icon: '💻',
+  color: '#3B82F6',
+  displayOrder: 1
+});
+
+// 更新分类
+const updateResult = await api.updateCategory(1, {
+  name: '前端技术',
+  color: '#06B6D4'
+});
+
+// 删除分类
+const deleteResult = await api.deleteCategory(1);
+
+// 获取标签列表
+const tagsResponse = await api.getTags();
+if (tagsResponse.success) {
+  const tags = tagsResponse.data.tags;
+  // 使用标签数据
+}
+
+// 创建新标签
+const newTag = await api.createTag({
+  name: 'React',
+  slug: 'react',
+  description: 'React框架相关',
+  color: '#61DAFB'
+});
+
+// 更新标签
+const updateTagResult = await api.updateTag(1, {
+  name: 'React.js',
+  color: '#61DAFB'
+});
+
+// 删除标签
+const deleteTagResult = await api.deleteTag(1);
+*/
   
   // ============= 文件上传 =============
   
@@ -631,5 +750,6 @@ export function getCurrentUser(): User | null {
 }
 
 // ============= 导出 =============
+
 
 export default api;
