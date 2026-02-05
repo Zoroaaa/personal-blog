@@ -1152,11 +1152,11 @@ export function AdminPage() {
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1">快速链接 (JSON格式)</label>
                     <textarea
-                      value={JSON.stringify(localConfig.footer_quick_links || { "首页": "/", "关于": "/about" }, null, 2)}
+                      value={JSON.stringify(localConfig.footer_links || { "首页": "/", "关于": "/about" }, null, 2)}
                       onChange={(e) => {
                         try {
                           const value = JSON.parse(e.target.value);
-                          setLocalConfig({ ...localConfig, footer_quick_links: value });
+                          setLocalConfig({ ...localConfig, footer_links: value });
                         } catch (error) {
                           // 忽略无效的JSON
                         }
