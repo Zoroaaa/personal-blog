@@ -52,7 +52,7 @@ export function SearchPage() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   
-  const query = searchParams.get('q') || '';
+  const query = searchParams.get('search') || '';
   const category = searchParams.get('category');
   const tag = searchParams.get('tag');
   
@@ -69,10 +69,8 @@ export function SearchPage() {
       setLoading(pageNum === 1 ? true : false);
       setError(null);
       
-      console.log('Search parameters:', { q: query, category, tag });
-      
       const response = await api.searchPosts({
-        q: query,
+        search: query,
         category,
         tag,
         page: pageNum.toString(),
