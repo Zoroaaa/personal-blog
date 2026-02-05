@@ -237,7 +237,37 @@ export const api = {
    * 获取配置信息
    */
   getConfig: () =>
-    apiRequest<{ githubClientId: string; frontendUrl: string }>('/config'),
+    apiRequest<Record<string, any>>('/config'),
+  
+  /**
+   * 更新配置项
+   */
+  updateConfig: (key: string, value: any) =>
+    apiRequest<{ key: string; value: any }>(`/config/${key}`, {
+      method: 'PUT',
+      body: JSON.stringify({ value }),
+    }),
+  
+  /**
+   * 批量更新配置
+   */
+  batchUpdateConfig: (configs: Record<string, any>) =>
+    apiRequest<{ updated: number; failed: number }>('/config', {
+      method: 'PUT',
+      body: JSON.stringify({ configs }),
+    }),
+  
+  /**
+   * 获取所有配置(管理员)
+   */
+  getAdminConfig: () =>
+    apiRequest<{ config: Record<string, any[]>; total: number }>('/config/admin'),
+  
+  /**
+   * 获取存储配置信息
+   */
+  getStorageConfig: () =>
+    apiRequest<{ storagePublicUrl: string }>('/config/storage'),
   
   // ============= 文章相关 =============
   

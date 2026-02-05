@@ -1,4 +1,4 @@
-# 📡 API 文档 v2.0.0
+# 📡 API 文档 v3.0.0
 
 ## 基础信息
 
@@ -29,7 +29,7 @@
   "success": true,
   "data": {
     "status": "healthy",
-    "version": "2.0.0",
+    "version": "3.0.0",
     "timestamp": "2024-01-01T00:00:00Z"
   }
 }
@@ -487,6 +487,220 @@
 }
 ```
 
+## 数据分析
+
+### 获取系统统计
+
+**GET /analytics**
+
+需要认证: ✅
+需要角色: admin
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "totalPosts": 100,
+    "totalComments": 500,
+    "totalUsers": 10,
+    "totalViews": 10000,
+    "recentPosts": [
+      {
+        "id": 1,
+        "title": "Test Post",
+        "slug": "test-post",
+        "createdAt": "2024-01-01T00:00:00Z"
+      }
+    ],
+    "recentComments": [
+      {
+        "id": 1,
+        "content": "Test comment",
+        "createdAt": "2024-01-01T00:00:00Z",
+        "user_username": "testuser"
+      }
+    ],
+    "viewTrend": [
+      {
+        "date": "2024-01-01",
+        "views": 100
+      }
+    ]
+  }
+}
+```
+
+### 获取热门文章
+
+**GET /analytics/hot-posts**
+
+查询参数:
+- `limit`: 数量限制 (默认 10, 最大 50)
+- `days`: 时间范围 (默认 7天)
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "hotPosts": [
+      {
+        "id": 1,
+        "title": "Hot Post",
+        "slug": "hot-post",
+        "viewCount": 1000,
+        "likeCount": 100,
+        "commentCount": 50,
+        "publishedAt": "2024-01-01T00:00:00Z",
+        "coverImage": "https://example.com/image.jpg",
+        "author_name": "testuser",
+        "author_display_name": "Test User"
+      }
+    ],
+    "limit": 10,
+    "days": 7
+  }
+}
+```
+
+### 获取基础统计数据
+
+**GET /analytics/stats**
+
+需要认证: ✅
+需要角色: admin
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "overview": {
+      "totalPosts": 100,
+      "totalUsers": 10,
+      "totalComments": 500,
+      "totalViews": 10000,
+      "todayViews": 100
+    },
+    "viewTrend": [
+      {
+        "date": "2024-01-01",
+        "views": 100
+      }
+    ],
+    "categoryStats": [
+      {
+        "name": "General",
+        "slug": "general",
+        "post_count": 50
+      }
+    ],
+    "tagStats": [
+      {
+        "name": "test",
+        "slug": "test",
+        "post_count": 20
+      }
+    ]
+  }
+}
+```
+
+### 获取单篇文章的详细分析
+
+**GET /analytics/post/{id}**
+
+需要认证: ✅
+需要角色: admin
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "post": {
+      "id": 1,
+      "title": "Test Post",
+      "slug": "test-post"
+    },
+    "stats": {
+      "view_count": 1000,
+      "like_count": 100,
+      "comment_count": 50,
+      "unique_visitors": 500
+    },
+    "viewTrend": [
+      {
+        "date": "2024-01-01",
+        "views": 100
+      }
+    ],
+    "referrerStats": [
+      {
+        "source": "Google",
+        "count": 500
+      }
+    ]
+  }
+}
+```
+
+### 获取用户统计
+
+**GET /analytics/users**
+
+需要认证: ✅
+需要角色: admin
+
+查询参数:
+- `limit`: 数量限制 (默认 10, 最大 50)
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "users": [
+      {
+        "id": 1,
+        "username": "testuser",
+        "display_name": "Test User",
+        "email": "test@example.com",
+        "avatar_url": "https://example.com/avatar.jpg",
+        "post_count": 10,
+        "comment_count": 20,
+        "created_at": "2024-01-01T00:00:00Z",
+        "last_login_at": "2024-01-01T00:00:00Z"
+      }
+    ],
+    "limit": 10
+  }
+}
+```
+
+### 记录页面访问
+
+**POST /analytics/track**
+
+请求体:
+```json
+{
+  "postId": 1,
+  "referrer": "https://example.com"
+}
+```
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "tracked": true
+  }
+}
+```
+
 ## 评论相关
 
 ### 获取评论列表
@@ -929,6 +1143,203 @@
   "success": true,
   "data": {
     "updated": true
+  }
+}
+```
+
+### 删除用户
+
+**DELETE /admin/users/{id}**
+
+需要认证: ✅
+需要角色: admin
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "deleted": true
+  }
+}
+```
+
+### 更新评论状态
+
+**PUT /admin/comments/{id}/status**
+
+需要认证: ✅
+需要角色: admin
+
+请求体:
+```json
+{
+  "status": "approved"
+}
+```
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "updated": true
+  }
+}
+```
+
+### 删除评论
+
+**DELETE /admin/comments/{id}**
+
+需要认证: ✅
+需要角色: admin
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "deleted": true
+  }
+}
+```
+
+### 获取评论管理列表
+
+**GET /admin/comments**
+
+需要认证: ✅
+需要角色: admin
+
+查询参数:
+- `page`: 页码 (默认 1)
+- `limit`: 每页数量 (默认 20, 最大 100)
+- `status`: 状态筛选 (all, approved, pending, rejected, deleted)
+- `postId`: 文章ID筛选
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "comments": [
+      {
+        "id": 1,
+        "content": "Test comment",
+        "status": "approved",
+        "created_at": "2024-01-01T00:00:00Z",
+        "user": {
+          "id": 1,
+          "username": "testuser",
+          "display_name": "Test User",
+          "avatar_url": "https://example.com/avatar.jpg"
+        },
+        "post": {
+          "id": 1,
+          "title": "Test Post",
+          "slug": "test-post"
+        }
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 1,
+      "totalPages": 1
+    }
+  }
+}
+```
+
+### 获取用户管理列表
+
+**GET /admin/users**
+
+需要认证: ✅
+需要角色: admin
+
+查询参数:
+- `page`: 页码 (默认 1)
+- `limit`: 每页数量 (默认 20, 最大 100)
+- `role`: 角色筛选 (all, admin, user, moderator)
+- `status`: 状态筛选 (all, active, suspended, deleted)
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "users": [
+      {
+        "id": 1,
+        "username": "testuser",
+        "display_name": "Test User",
+        "email": "test@example.com",
+        "avatar_url": "https://example.com/avatar.jpg",
+        "role": "user",
+        "status": "active",
+        "created_at": "2024-01-01T00:00:00Z",
+        "last_login_at": "2024-01-01T00:00:00Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 1,
+      "totalPages": 1
+    }
+  }
+}
+```
+
+### 更新用户状态
+
+**PUT /admin/users/{id}/status**
+
+需要认证: ✅
+需要角色: admin
+
+请求体:
+```json
+{
+  "status": "active"
+}
+```
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "updated": true
+  }
+}
+```
+
+### 获取系统设置
+
+**GET /admin/settings**
+
+需要认证: ✅
+需要角色: admin
+
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "settings": {
+      "siteName": "Personal Blog",
+      "environment": "production",
+      "apiVersion": "3.0.0",
+      "features": {
+        "analytics": true,
+        "comments": true,
+        "search": true,
+        "media": true
+      }
+    }
   }
 }
 ```
