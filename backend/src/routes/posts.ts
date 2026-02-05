@@ -194,36 +194,48 @@ postRoutes.get('/', async (c) => {
     const total = countResult?.total || 0;
     
     // ===== 6. 为每篇文章获取标签（优化：批量查询） =====
-    const postIds = results.map((p: any) => p.id);
     let postsWithTags = results;
     
-    if (postIds.length > 0) {
+    if (results.length > 0) {
+      const postIds = results.map((p: any) => p.id);
+      logger.info('Fetching tags for posts', { postIds: postIds.length });
+      
       const tagsQuery = `
         SELECT pt.post_id, t.id, t.name, t.slug
         FROM post_tags pt
         JOIN tags t ON pt.tag_id = t.id
         WHERE pt.post_id IN (${postIds.map(() => '?').join(',')})
       `;
-      const { results: tagResults } = await c.env.DB.prepare(tagsQuery).bind(...postIds).all();
       
-      // 组织标签数据
-      const tagsByPost = new Map();
-      (tagResults as any[]).forEach(tag => {
-        if (!tagsByPost.has(tag.post_id)) {
-          tagsByPost.set(tag.post_id, []);
-        }
-        tagsByPost.get(tag.post_id).push({
-          id: tag.id,
-          name: tag.name,
-          slug: tag.slug
+      try {
+        const { results: tagResults } = await c.env.DB.prepare(tagsQuery).bind(...postIds).all();
+        
+        // 组织标签数据
+        const tagsByPost = new Map();
+        (tagResults as any[]).forEach(tag => {
+          if (!tagsByPost.has(tag.post_id)) {
+            tagsByPost.set(tag.post_id, []);
+          }
+          tagsByPost.get(tag.post_id).push({
+            id: tag.id,
+            name: tag.name,
+            slug: tag.slug
+          });
         });
-      });
-      
-      // 添加标签到文章
-      postsWithTags = results.map((post: any) => ({
-        ...post,
-        tags: tagsByPost.get(post.id) || []
-      }));
+        
+        // 添加标签到文章
+        postsWithTags = results.map((post: any) => ({
+          ...post,
+          tags: tagsByPost.get(post.id) || []
+        }));
+      } catch (tagError) {
+        logger.error('Error fetching tags', tagError);
+        // 即使标签获取失败，也继续返回文章数据
+        postsWithTags = results.map((post: any) => ({
+          ...post,
+          tags: []
+        }));
+      }
     }
     
     // ===== 7. 构建响应 =====
@@ -517,22 +529,16 @@ postRoutes.get('/search', async (c) => {
     
     // 排序
     if (finalSortBy === 'relevance' && q && q.length > 0) {
-      // 相关性排序（基于标题匹配权重更高）
-      query += ` ORDER BY 
-        CASE 
-          WHEN p.title LIKE ? THEN 0
-          WHEN p.summary LIKE ? THEN 1
-          WHEN p.content LIKE ? THEN 2
-          ELSE 3
-        END, p.published_at DESC LIMIT ? OFFSET ?`;
-      const searchTerm = `%${q}%`;
-      params.push(searchTerm, searchTerm, searchTerm, limit, offset);
+      // 简化的相关性排序 - 使用发布时间作为默认排序
+      query += ` ORDER BY p.published_at DESC LIMIT ? OFFSET ?`;
+      params.push(limit, offset);
     } else {
       query += ` ORDER BY p.${finalSortBy === 'relevance' ? 'published_at' : finalSortBy} ${order} LIMIT ? OFFSET ?`;
       params.push(limit, offset);
     }
     
     // ===== 4. 执行查询 =====
+    logger.info('Executing search query', { query, params: params.length });
     const { results } = await c.env.DB.prepare(query).bind(...params).all();
     
     // ===== 5. 获取总数 =====
@@ -561,40 +567,53 @@ postRoutes.get('/search', async (c) => {
       countParams.push(tag);
     }
     
+    logger.info('Executing count query', { countQuery, countParams: countParams.length });
     const countResult = await c.env.DB.prepare(countQuery).bind(...countParams).first() as any;
     const total = countResult?.total || 0;
     
     // ===== 6. 为每篇文章获取标签（优化：批量查询） =====
-    const postIds = results.map((p: any) => p.id);
     let postsWithTags = results;
     
-    if (postIds.length > 0) {
+    if (results.length > 0) {
+      const postIds = results.map((p: any) => p.id);
+      logger.info('Fetching tags for search results', { postIds: postIds.length });
+      
       const tagsQuery = `
         SELECT pt.post_id, t.id, t.name, t.slug
         FROM post_tags pt
         JOIN tags t ON pt.tag_id = t.id
         WHERE pt.post_id IN (${postIds.map(() => '?').join(',')})
       `;
-      const { results: tagResults } = await c.env.DB.prepare(tagsQuery).bind(...postIds).all();
       
-      // 组织标签数据
-      const tagsByPost = new Map();
-      (tagResults as any[]).forEach(tag => {
-        if (!tagsByPost.has(tag.post_id)) {
-          tagsByPost.set(tag.post_id, []);
-        }
-        tagsByPost.get(tag.post_id).push({
-          id: tag.id,
-          name: tag.name,
-          slug: tag.slug
+      try {
+        const { results: tagResults } = await c.env.DB.prepare(tagsQuery).bind(...postIds).all();
+        
+        // 组织标签数据
+        const tagsByPost = new Map();
+        (tagResults as any[]).forEach(tag => {
+          if (!tagsByPost.has(tag.post_id)) {
+            tagsByPost.set(tag.post_id, []);
+          }
+          tagsByPost.get(tag.post_id).push({
+            id: tag.id,
+            name: tag.name,
+            slug: tag.slug
+          });
         });
-      });
-      
-      // 添加标签到文章
-      postsWithTags = results.map((post: any) => ({
-        ...post,
-        tags: tagsByPost.get(post.id) || []
-      }));
+        
+        // 添加标签到文章
+        postsWithTags = results.map((post: any) => ({
+          ...post,
+          tags: tagsByPost.get(post.id) || []
+        }));
+      } catch (tagError) {
+        logger.error('Error fetching tags for search results', tagError);
+        // 即使标签获取失败，也继续返回搜索结果
+        postsWithTags = results.map((post: any) => ({
+          ...post,
+          tags: []
+        }));
+      }
     }
     
     // ===== 7. 构建响应 =====
