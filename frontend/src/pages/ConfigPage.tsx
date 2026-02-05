@@ -506,15 +506,10 @@ export function ConfigPage() {
 
     try {
       setUpdating('batch');
-      // 这里需要调用批量更新API
-      // await api.batchUpdateConfig(changedConfigs);
+      // 调用批量更新API
+      const response = await api.batchUpdateConfig(changedConfigs);
       
-      // 临时方案：逐个更新
-      for (const [key, value] of Object.entries(changedConfigs)) {
-        await updateConfig(key, value);
-      }
-      
-      setSuccessMessage(`成功更新 ${Object.keys(changedConfigs).length} 项配置`);
+      setSuccessMessage(`成功更新 ${response.data?.updated || 0} 项配置`);
       setHasChanges(false);
       
       // 刷新配置
@@ -609,7 +604,7 @@ export function ConfigPage() {
                         <button
                           onClick={() => handleSave(item.key, localConfig[item.key])}
                           className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors disabled:opacity-50"
-                          disabled={updating !== null || !localConfig[item.key] && !config[item.key]}
+                          disabled={updating !== null}
                         >
                           保存
                         </button>
@@ -635,7 +630,7 @@ export function ConfigPage() {
                       
                       {item.type === 'json' && (
                         <textarea
-                          value={localConfig[item.key] || ''}
+                          value={typeof localConfig[item.key] === 'object' ? JSON.stringify(localConfig[item.key], null, 2) : localConfig[item.key] || ''}
                           onChange={(e) => handleInputChange(item.key, e.target.value)}
                           placeholder={item.placeholder}
                           rows={4}
