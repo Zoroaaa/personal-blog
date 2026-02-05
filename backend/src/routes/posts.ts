@@ -29,6 +29,7 @@ import {
   validateLength,
   sanitizeInput,
   sanitizeMarkdown,
+  sanitizeSearchQuery,
   generateSlug,
   safeParseInt
 } from '../utils/validation';
@@ -457,7 +458,8 @@ postRoutes.get('/search', async (c) => {
   
   try {
     // ===== 1. 解析和验证查询参数 =====
-    const q = c.req.query('q');
+    const rawQ = c.req.query('q');
+    const q = rawQ ? sanitizeSearchQuery(rawQ) : null;
     const category = c.req.query('category');
     const tag = c.req.query('tag');
     const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
