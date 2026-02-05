@@ -417,6 +417,7 @@ INSERT OR IGNORE INTO users (username, email, password_hash, display_name, role,
 ('admin', 'admin@example.com', '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqRWNXb6tO', 'Administrator', 'admin', 'active');
 
 -- 插入网站配置初始数据
+-- 基本设置组
 INSERT OR IGNORE INTO site_config (key, value, type, category, description) VALUES
   ('site_name', '我的博客', 'string', 'general', '网站名称'),
   ('site_subtitle', '分享技术与生活', 'string', 'general', '网站副标题'),
@@ -424,33 +425,51 @@ INSERT OR IGNORE INTO site_config (key, value, type, category, description) VALU
   ('site_favicon', '/favicon.ico', 'string', 'general', '网站Favicon URL'),
   ('site_description', '一个分享技术和生活的个人博客', 'string', 'seo', '网站描述(SEO)'),
   ('site_keywords', 'blog,技术,编程,生活', 'string', 'seo', '网站关键词(SEO)'),
-  ('site_author', 'Admin', 'string', 'general', '网站作者'),
+  ('site_author', 'Admin', 'string', 'general', '网站作者');
+
+-- 作者信息组
+INSERT OR IGNORE INTO site_config (key, value, type, category, description) VALUES
   ('author_name', 'Admin', 'string', 'general', '作者名称'),
   ('author_avatar', '/default-avatar.png', 'string', 'general', '作者头像URL'),
   ('author_bio', '热爱技术的开发者', 'string', 'general', '作者简介'),
-  ('author_email', 'admin@example.com', 'string', 'general', '作者邮箱'),
+  ('author_email', 'admin@example.com', 'string', 'general', '作者邮箱');
+
+-- 主题配置组
+INSERT OR IGNORE INTO site_config (key, value, type, category, description) VALUES
   ('theme_primary_color', '#3B82F6', 'string', 'theme', '主题主色调'),
   ('theme_default_mode', 'system', 'string', 'theme', '默认主题模式 (light/dark/system)'),
-  ('theme_font_family', 'system-ui', 'string', 'theme', '字体族'),
-  ('theme_enable_animations', 'true', 'boolean', 'theme', '启用动画效果'),
+  ('theme_font_family', 'system-ui, -apple-system, sans-serif', 'string', 'theme', '字体族'),
+  ('theme_enable_animations', 'true', 'boolean', 'theme', '启用动画效果');
+
+-- 社交媒体组
+INSERT OR IGNORE INTO site_config (key, value, type, category, description) VALUES
   ('social_github', '', 'string', 'social', 'GitHub链接'),
   ('social_twitter', '', 'string', 'social', 'Twitter链接'),
   ('social_linkedin', '', 'string', 'social', 'LinkedIn链接'),
   ('social_email', '', 'string', 'social', '联系邮箱'),
-  ('social_wechat_qr', '', 'string', 'social', '微信二维码URL'),
   ('social_weibo', '', 'string', 'social', '微博链接'),
+  ('social_wechat_qr', '', 'string', 'social', '微信二维码URL');
+
+-- 功能设置组
+INSERT OR IGNORE INTO site_config (key, value, type, category, description) VALUES
   ('feature_comments', 'true', 'boolean', 'features', '启用评论功能'),
   ('feature_search', 'true', 'boolean', 'features', '启用搜索功能'),
   ('feature_like', 'true', 'boolean', 'features', '启用点赞功能'),
   ('feature_share', 'true', 'boolean', 'features', '启用分享功能'),
-  ('feature_analytics', 'true', 'boolean', 'features', '启用访问统计'),
   ('feature_rss', 'true', 'boolean', 'features', '启用RSS订阅'),
+  ('feature_analytics', 'true', 'boolean', 'features', '启用访问统计'),
   ('feature_newsletter', 'false', 'boolean', 'features', '启用邮件订阅'),
+  ('comment_approval_required', 'false', 'boolean', 'features', '评论需要审核');
+
+-- 页脚配置组
+INSERT OR IGNORE INTO site_config (key, value, type, category, description) VALUES
   ('footer_text', '© 2024 我的博客. All rights reserved.', 'string', 'general', '页脚版权文字'),
   ('footer_links', '{"友情链接": "https://example.com"}', 'json', 'general', '页脚链接(JSON格式)'),
-  ('footer_show_powered_by', 'true', 'boolean', 'general', '显示"Powered by"'),
+  ('footer_show_powered_by', 'true', 'boolean', 'general', '显示"Powered by"');
+
+-- 系统设置组
+INSERT OR IGNORE INTO site_config (key, value, type, category, description) VALUES
   ('posts_per_page', '10', 'number', 'general', '每页文章数'),
-  ('comment_approval_required', 'false', 'boolean', 'features', '评论需要审核'),
   ('max_upload_size_mb', '5', 'number', 'general', '最大上传文件大小(MB)'),
   ('enable_maintenance_mode', 'false', 'boolean', 'general', '维护模式');
 
