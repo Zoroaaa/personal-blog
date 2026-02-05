@@ -263,6 +263,12 @@ export const api = {
   getAdminConfig: () =>
     apiRequest<{ config: Record<string, any[]>; total: number }>('/config/admin'),
   
+  /**
+   * 获取存储配置信息
+   */
+  getStorageConfig: () =>
+    apiRequest<{ storagePublicUrl: string }>('/config/storage'),
+  
   // ============= 文章相关 =============
   
   /**

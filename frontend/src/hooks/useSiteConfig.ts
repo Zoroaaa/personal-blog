@@ -52,6 +52,13 @@ export interface SiteConfig {
   footer_text: string;
   footer_links?: Record<string, string>;
   footer_show_powered_by: boolean;
+  footer_description?: string;
+  footer_quick_links?: Record<string, string>;
+  footer_tech_stack?: string[];
+  footer_brand_name?: string;
+  
+  // 存储配置
+  storage_public_url?: string;
   
   // 其他
   posts_per_page: number;
@@ -89,6 +96,15 @@ const DEFAULT_CONFIG: SiteConfig = {
   
   footer_text: '© 2024 All rights reserved',
   footer_show_powered_by: true,
+  footer_description: '分享技术,记录生活',
+  footer_quick_links: {
+    '首页': '/',
+    '关于': '/about'
+  },
+  footer_tech_stack: ['React + TypeScript', 'Cloudflare Workers', 'Tailwind CSS'],
+  footer_brand_name: '我的博客',
+  
+  storage_public_url: 'https://storage.blog.neutronx.uk',
   
   posts_per_page: 10
 };
@@ -155,20 +171,34 @@ export function useSiteConfig() {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
-      const response = await api.getConfig();
+      // 并行获取基本配置和存储配置
+      const [configResponse, storageResponse] = await Promise.all([
+        api.getConfig(),
+        api.getStorageConfig().catch(() => ({ success: false, data: null }))
+      ]);
       
-      if (response.success && response.data) {
-        const config = { ...DEFAULT_CONFIG, ...response.data };
-        setCachedConfig(config);
-        setState({
-          config,
-          loading: false,
-          error: null,
-          lastFetch: Date.now()
-        });
-      } else {
-        throw new Error(response.error || 'Failed to fetch config');
+      let config = DEFAULT_CONFIG;
+      
+      // 合并基本配置
+      if (configResponse.success && configResponse.data) {
+        config = { ...config, ...configResponse.data };
       }
+      
+      // 合并存储配置
+      if (storageResponse.success && storageResponse.data) {
+        config = {
+          ...config,
+          storage_public_url: storageResponse.data.storagePublicUrl
+        };
+      }
+      
+      setCachedConfig(config);
+      setState({
+        config,
+        loading: false,
+        error: null,
+        lastFetch: Date.now()
+      });
     } catch (error) {
       console.error('Failed to fetch config:', error);
       

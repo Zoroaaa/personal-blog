@@ -30,12 +30,28 @@ import { api } from '../utils/api';
 /**
  * Logo组件 - 独立渲染
  */
-const Logo = React.memo(({ name, logo }: { name: string; logo?: string }) => {
+const Logo = React.memo(({ name, logo, storagePublicUrl }: { name: string; logo?: string; storagePublicUrl?: string }) => {
+  // 构建完整的logo URL
+  const getLogoUrl = () => {
+    if (!logo) return '';
+    
+    // 如果是完整URL，直接返回
+    if (logo.startsWith('http://') || logo.startsWith('https://')) {
+      return logo;
+    }
+    
+    // 如果是相对路径，使用存储公共URL作为基础
+    const baseUrl = storagePublicUrl || 'https://storage.blog.neutronx.uk';
+    return `${baseUrl}${logo.startsWith('/') ? '' : '/'}${logo}`;
+  };
+  
+  const logoUrl = getLogoUrl();
+  
   return (
     <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
-      {logo && (
+      {logoUrl && (
         <img 
-          src={logo} 
+          src={logoUrl} 
           alt={name}
           className="h-8 w-8 object-contain"
           loading="lazy"
@@ -53,12 +69,29 @@ Logo.displayName = 'Logo';
 /**
  * 用户信息组件 - 独立渲染
  */
-const UserInfo = React.memo(({ user }: { user: any }) => {
+const UserInfo = React.memo(({ user, storagePublicUrl }: { user: any; storagePublicUrl?: string }) => {
+  // 构建完整的头像URL
+  const getAvatarUrl = () => {
+    const avatarUrl = user.avatarUrl || user.avatar_url;
+    if (!avatarUrl) return '';
+    
+    // 如果是完整URL，直接返回
+    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) {
+      return avatarUrl;
+    }
+    
+    // 如果是相对路径，使用存储公共URL作为基础
+    const baseUrl = storagePublicUrl || 'https://storage.blog.neutronx.uk';
+    return `${baseUrl}${avatarUrl.startsWith('/') ? '' : '/'}${avatarUrl}`;
+  };
+  
+  const avatarUrl = getAvatarUrl();
+  
   return (
     <div className="flex items-center space-x-2 px-3 py-2">
-      {user.avatarUrl ? (
+      {avatarUrl ? (
         <img 
-          src={user.avatarUrl} 
+          src={avatarUrl} 
           alt={user.displayName} 
           className="w-8 h-8 rounded-full border-2 border-border"
           loading="lazy"
@@ -89,11 +122,13 @@ UserInfo.displayName = 'UserInfo';
 const NavLinks = React.memo(({ 
   isAuthenticated, 
   user, 
-  onLogout 
+  onLogout,
+  storagePublicUrl 
 }: { 
   isAuthenticated: boolean; 
   user: any;
   onLogout: () => void;
+  storagePublicUrl?: string;
 }) => {
   return (
     <div className="hidden md:flex items-center space-x-6">
@@ -103,7 +138,7 @@ const NavLinks = React.memo(({
       
       {isAuthenticated && user && (
         <>
-          <UserInfo user={user} />
+          <UserInfo user={user} storagePublicUrl={storagePublicUrl} />
           
           <Link
             to="/profile"
@@ -154,13 +189,15 @@ const MobileMenu = React.memo(({
   isAuthenticated, 
   user, 
   onClose,
-  onLogout 
+  onLogout,
+  storagePublicUrl 
 }: { 
   isOpen: boolean;
   isAuthenticated: boolean; 
   user: any;
   onClose: () => void;
   onLogout: () => void;
+  storagePublicUrl?: string;
 }) => {
   if (!isOpen) return null;
   
@@ -266,6 +303,7 @@ export const Header = React.memo(() => {
           <Logo 
             name={config.site_name} 
             logo={config.site_logo}
+            storagePublicUrl={config.storage_public_url}
           />
 
           {/* Desktop Nav */}
@@ -273,6 +311,7 @@ export const Header = React.memo(() => {
             isAuthenticated={isAuthenticated}
             user={user}
             onLogout={handleLogout}
+            storagePublicUrl={config.storage_public_url}
           />
 
           {/* Mobile Menu Button */}
@@ -299,6 +338,7 @@ export const Header = React.memo(() => {
           user={user}
           onClose={closeMobileMenu}
           onLogout={handleLogout}
+          storagePublicUrl={config.storage_public_url}
         />
       </nav>
     </header>
