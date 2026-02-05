@@ -29,7 +29,6 @@ import {
   validateLength,
   sanitizeInput,
   sanitizeMarkdown,
-  sanitizeSearchQuery,
   generateSlug,
   safeParseInt
 } from '../utils/validation';
@@ -90,10 +89,14 @@ postRoutes.get('/', async (c) => {
     // ===== 1. 解析和验证查询参数 =====
     const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
     const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
-    const category = c.req.query('category');
-    const tag = c.req.query('tag');
+    let category = c.req.query('category');
+    let tag = c.req.query('tag');
     const author = c.req.query('author');
     const search = c.req.query('search');
+    
+    // 将字符串 "null" 转为真正的 null
+    category = (category === 'null' || !category) ? null : category;
+    tag = (tag === 'null' || !tag) ? null : tag;
     const sortBy = c.req.query('sortBy') || 'published_at';
     const order = c.req.query('order') === 'asc' ? 'ASC' : 'DESC';
     const offset = (page - 1) * limit;
@@ -194,48 +197,36 @@ postRoutes.get('/', async (c) => {
     const total = countResult?.total || 0;
     
     // ===== 6. 为每篇文章获取标签（优化：批量查询） =====
+    const postIds = results.map((p: any) => p.id);
     let postsWithTags = results;
     
-    if (results.length > 0) {
-      const postIds = results.map((p: any) => p.id);
-      logger.info('Fetching tags for posts', { postIds: postIds.length });
-      
+    if (postIds.length > 0) {
       const tagsQuery = `
         SELECT pt.post_id, t.id, t.name, t.slug
         FROM post_tags pt
         JOIN tags t ON pt.tag_id = t.id
         WHERE pt.post_id IN (${postIds.map(() => '?').join(',')})
       `;
+      const { results: tagResults } = await c.env.DB.prepare(tagsQuery).bind(...postIds).all();
       
-      try {
-        const { results: tagResults } = await c.env.DB.prepare(tagsQuery).bind(...postIds).all();
-        
-        // 组织标签数据
-        const tagsByPost = new Map();
-        (tagResults as any[]).forEach(tag => {
-          if (!tagsByPost.has(tag.post_id)) {
-            tagsByPost.set(tag.post_id, []);
-          }
-          tagsByPost.get(tag.post_id).push({
-            id: tag.id,
-            name: tag.name,
-            slug: tag.slug
-          });
+      // 组织标签数据
+      const tagsByPost = new Map();
+      (tagResults as any[]).forEach(tag => {
+        if (!tagsByPost.has(tag.post_id)) {
+          tagsByPost.set(tag.post_id, []);
+        }
+        tagsByPost.get(tag.post_id).push({
+          id: tag.id,
+          name: tag.name,
+          slug: tag.slug
         });
-        
-        // 添加标签到文章
-        postsWithTags = results.map((post: any) => ({
-          ...post,
-          tags: tagsByPost.get(post.id) || []
-        }));
-      } catch (tagError) {
-        logger.error('Error fetching tags', tagError);
-        // 即使标签获取失败，也继续返回文章数据
-        postsWithTags = results.map((post: any) => ({
-          ...post,
-          tags: []
-        }));
-      }
+      });
+      
+      // 添加标签到文章
+      postsWithTags = results.map((post: any) => ({
+        ...post,
+        tags: tagsByPost.get(post.id) || []
+      }));
     }
     
     // ===== 7. 构建响应 =====
@@ -470,10 +461,13 @@ postRoutes.get('/search', async (c) => {
   
   try {
     // ===== 1. 解析和验证查询参数 =====
-    const rawQ = c.req.query('q');
-    const q = rawQ ? sanitizeSearchQuery(rawQ) : null;
-    const category = c.req.query('category');
-    const tag = c.req.query('tag');
+    const q = c.req.query('q');
+    let category = c.req.query('category');
+    let tag = c.req.query('tag');
+    
+    // 将字符串 "null" 转为真正的 null
+    category = (category === 'null' || !category) ? null : category;
+    tag = (tag === 'null' || !tag) ? null : tag;
     const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
     const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
     const sort = c.req.query('sort') || 'published_at';
@@ -486,7 +480,7 @@ postRoutes.get('/search', async (c) => {
     
     // ===== 2. 直接从数据库读取 - 不使用缓存 =====
     // 理由: D1查询足够快,无需KV缓存
-    logger.info('Searching posts from D1', { query: q, rawQuery: rawQ, category, tag, page, limit });
+    logger.info('Searching posts from D1', { query: q, category, tag, page, limit });
     
     // ===== 3. 构建查询 =====
     let query = `
@@ -505,7 +499,7 @@ postRoutes.get('/search', async (c) => {
     const params: any[] = [];
     
     // 搜索关键词
-    if (q && q.length > 0) {
+    if (q) {
       const searchTerm = `%${q}%`;
       query += ` AND (p.title LIKE ? OR p.summary LIKE ? OR p.content LIKE ?)`;
       params.push(searchTerm, searchTerm, searchTerm);
@@ -528,17 +522,23 @@ postRoutes.get('/search', async (c) => {
     }
     
     // 排序
-    if (finalSortBy === 'relevance' && q && q.length > 0) {
-      // 简化的相关性排序 - 使用发布时间作为默认排序
-      query += ` ORDER BY p.published_at DESC LIMIT ? OFFSET ?`;
-      params.push(limit, offset);
+    if (finalSortBy === 'relevance' && q) {
+      // 相关性排序（基于标题匹配权重更高）
+      query += ` ORDER BY 
+        CASE 
+          WHEN p.title LIKE ? THEN 0
+          WHEN p.summary LIKE ? THEN 1
+          WHEN p.content LIKE ? THEN 2
+          ELSE 3
+        END, p.published_at DESC LIMIT ? OFFSET ?`;
+      const searchTerm = `%${q}%`;
+      params.push(searchTerm, searchTerm, searchTerm, limit, offset);
     } else {
       query += ` ORDER BY p.${finalSortBy === 'relevance' ? 'published_at' : finalSortBy} ${order} LIMIT ? OFFSET ?`;
       params.push(limit, offset);
     }
     
     // ===== 4. 执行查询 =====
-    logger.info('Executing search query', { query, params: params.length });
     const { results } = await c.env.DB.prepare(query).bind(...params).all();
     
     // ===== 5. 获取总数 =====
@@ -547,7 +547,7 @@ postRoutes.get('/search', async (c) => {
                       WHERE p.status = 'published' AND p.visibility = 'public'`;
     const countParams: any[] = [];
     
-    if (q && q.length > 0) {
+    if (q) {
       const searchTerm = `%${q}%`;
       countQuery += ' AND (p.title LIKE ? OR p.summary LIKE ? OR p.content LIKE ?)';
       countParams.push(searchTerm, searchTerm, searchTerm);
@@ -567,53 +567,40 @@ postRoutes.get('/search', async (c) => {
       countParams.push(tag);
     }
     
-    logger.info('Executing count query', { countQuery, countParams: countParams.length });
     const countResult = await c.env.DB.prepare(countQuery).bind(...countParams).first() as any;
     const total = countResult?.total || 0;
     
     // ===== 6. 为每篇文章获取标签（优化：批量查询） =====
+    const postIds = results.map((p: any) => p.id);
     let postsWithTags = results;
     
-    if (results.length > 0) {
-      const postIds = results.map((p: any) => p.id);
-      logger.info('Fetching tags for search results', { postIds: postIds.length });
-      
+    if (postIds.length > 0) {
       const tagsQuery = `
         SELECT pt.post_id, t.id, t.name, t.slug
         FROM post_tags pt
         JOIN tags t ON pt.tag_id = t.id
         WHERE pt.post_id IN (${postIds.map(() => '?').join(',')})
       `;
+      const { results: tagResults } = await c.env.DB.prepare(tagsQuery).bind(...postIds).all();
       
-      try {
-        const { results: tagResults } = await c.env.DB.prepare(tagsQuery).bind(...postIds).all();
-        
-        // 组织标签数据
-        const tagsByPost = new Map();
-        (tagResults as any[]).forEach(tag => {
-          if (!tagsByPost.has(tag.post_id)) {
-            tagsByPost.set(tag.post_id, []);
-          }
-          tagsByPost.get(tag.post_id).push({
-            id: tag.id,
-            name: tag.name,
-            slug: tag.slug
-          });
+      // 组织标签数据
+      const tagsByPost = new Map();
+      (tagResults as any[]).forEach(tag => {
+        if (!tagsByPost.has(tag.post_id)) {
+          tagsByPost.set(tag.post_id, []);
+        }
+        tagsByPost.get(tag.post_id).push({
+          id: tag.id,
+          name: tag.name,
+          slug: tag.slug
         });
-        
-        // 添加标签到文章
-        postsWithTags = results.map((post: any) => ({
-          ...post,
-          tags: tagsByPost.get(post.id) || []
-        }));
-      } catch (tagError) {
-        logger.error('Error fetching tags for search results', tagError);
-        // 即使标签获取失败，也继续返回搜索结果
-        postsWithTags = results.map((post: any) => ({
-          ...post,
-          tags: []
-        }));
-      }
+      });
+      
+      // 添加标签到文章
+      postsWithTags = results.map((post: any) => ({
+        ...post,
+        tags: tagsByPost.get(post.id) || []
+      }));
     }
     
     // ===== 7. 构建响应 =====
