@@ -414,63 +414,103 @@ export const api = {
       method: 'POST',
     }),
   
-// ============= 分类相关 =============
+  // ============= 分类相关 =============
 
-async getCategories(params?: { page?: string; limit?: string }): Promise<ApiResponse> {
-  return this.get('/api/categories', params);
-},
+  /**
+   * 获取分类列表
+   */
+  getCategories: (params?: { page?: string; limit?: string }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return apiRequest<{ 
+      categories: Category[]; 
+      total: number;
+      pagination: { page: number; limit: number; total: number; totalPages: number }
+    }>(`/categories${query}`);
+  },
 
-async createCategory(data: {
-  name: string;
-  slug?: string;
-  description?: string;
-  icon?: string;
-  color?: string;
-  displayOrder?: number;
-}): Promise<ApiResponse> {
-  return this.post('/api/categories', data);
-},
+  /**
+   * 创建分类
+   */
+  createCategory: (data: {
+    name: string;
+    slug?: string;
+    description?: string;
+    icon?: string;
+    color?: string;
+    displayOrder?: number;
+  }) => apiRequest<{ category: Category }>('/categories', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
 
-async updateCategory(id: number, data: {
-  name?: string;
-  description?: string;
-  icon?: string;
-  color?: string;
-  displayOrder?: number;
-}): Promise<ApiResponse> {
-  return this.put(`/api/categories/${id}`, data);
-},
+  /**
+   * 更新分类
+   */
+  updateCategory: (id: number, data: {
+    name?: string;
+    description?: string;
+    icon?: string;
+    color?: string;
+    displayOrder?: number;
+  }) => apiRequest<{ category: Category }>(`/categories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
 
-async deleteCategory(id: number): Promise<ApiResponse> {
-  return this.delete(`/api/categories/${id}`);
-},
+  /**
+   * 删除分类
+   */
+  deleteCategory: (id: number) => 
+    apiRequest<{ deleted: boolean }>(`/categories/${id}`, {
+      method: 'DELETE',
+    }),
 
-// ============= 标签相关 =============
+  // ============= 标签相关 =============
 
-async getTags(params?: { page?: string; limit?: string }): Promise<ApiResponse> {
-  return this.get('/api/categories/tags', params);
-},
+  /**
+   * 获取标签列表
+   */
+  getTags: (params?: { page?: string; limit?: string }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return apiRequest<{ 
+      tags: Tag[]; 
+      total: number;
+      pagination: { page: number; limit: number; total: number; totalPages: number }
+    }>(`/categories/tags${query}`);
+  },
 
-async createTag(data: {
-  name: string;
-  slug?: string;
-  description?: string;
-  color?: string;
-}): Promise<ApiResponse> {
-  return this.post('/api/categories/tags', data);
-},
+  /**
+   * 创建标签
+   */
+  createTag: (data: {
+    name: string;
+    slug?: string;
+    description?: string;
+    color?: string;
+  }) => apiRequest<{ tag: Tag }>('/categories/tags', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
 
-async updateTag(id: number, data: {
-  name?: string;
-  description?: string;
-  color?: string;
-}): Promise<ApiResponse> {
-  return this.put(`/api/categories/tags/${id}`, data);
-},
+  /**
+   * 更新标签
+   */
+  updateTag: (id: number, data: {
+    name?: string;
+    description?: string;
+    color?: string;
+  }) => apiRequest<{ tag: Tag }>(`/categories/tags/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
 
-async deleteTag(id: number): Promise<ApiResponse> {
-  return this.delete(`/api/categories/tags/${id}`);
-}
+  /**
+   * 删除标签
+   */
+  deleteTag: (id: number) => 
+    apiRequest<{ deleted: boolean }>(`/categories/tags/${id}`, {
+      method: 'DELETE',
+    }),
   
   // ============= 文件上传 =============
   
@@ -678,4 +718,5 @@ export function getCurrentUser(): User | null {
 
 
 export default api;
+
 
