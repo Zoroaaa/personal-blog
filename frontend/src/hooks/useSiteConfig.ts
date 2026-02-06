@@ -83,15 +83,15 @@ const DEFAULT_CONFIG: SiteConfig = {
   // 基本信息
   site_name: '我的博客',
   site_subtitle: '分享技术与生活',
-  site_logo: '/logo.png',
-  site_favicon: '/favicon.ico',
+  site_logo: 'https://storage.blog.neutronx.uk/system/logo.png',
+  site_favicon: 'https://storage.blog.neutronx.uk/system/favicon.ico',
   site_description: '一个分享技术和生活的个人博客',
   site_keywords: 'blog,技术,编程',
   site_author: 'Admin',
   
   // 作者信息
   author_name: 'Admin',
-  author_avatar: '/default-avatar.png',
+  author_avatar: 'https://storage.blog.neutronx.uk/system/20221002010007_46b40.jpg',
   author_bio: '热爱技术的开发者',
   author_email: 'admin@example.com',
   
