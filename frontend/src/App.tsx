@@ -9,6 +9,7 @@ import { AdminPage } from './pages/AdminPage';
 import { SearchPage } from './pages/SearchPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { ConfigPage } from './pages/ConfigPage';
+import { AboutPage } from './pages/AboutPage';
 import { useSiteConfig } from './hooks/useSiteConfig';
 
 function App() {
@@ -55,12 +56,13 @@ function App() {
         <main className="flex-1">
           <Routes>
             <Route path="/" element={<HomePage />} />
-            <Route path="/posts/:slug" element={<PostPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/admin" element={<AdminPage />} />
-            <Route path="/admin/config" element={<ConfigPage />} />
-            <Route path="/search" element={<SearchPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/posts/:slug" element={<PostPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin/config" element={<ConfigPage />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
           </Routes>
         </main>
         <Footer />
