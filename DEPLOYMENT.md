@@ -1,4 +1,4 @@
-## 📚 博客系统部署手册 (v3.0.0)
+## 📚 博客系统部署手册 (v3.0.1)
 
 ### 项目架构
 
@@ -23,7 +23,7 @@
 
 ```bash
 git clone <your-repo>
-cd personal-blog-beta2.0
+cd personal-blog-beta3.0
 npm install
 ```
 
@@ -168,7 +168,7 @@ A: 确保所有依赖已正确安装，运行 `npm install`
 ### 文件结构
 
 ```
-personal-blog-beta2.0/
+personal-blog-beta3.0/
 ├── backend/                 # 后端Worker
 │   ├── src/
 │   │   ├── index.ts        # 主入口
@@ -200,7 +200,7 @@ personal-blog-beta2.0/
 
 ---
 
-### API端点 (v3.0.0)
+### API端点 (v3.0.1)
 
 #### 认证
 - POST /api/auth/register - 注册
@@ -292,7 +292,7 @@ wrangler d1 export blog-db --output backup.sql
 
 ---
 
-### 技术栈 (v3.0.0)
+### 技术栈 (v3.0.1)
 
 **后端**
 - Hono - Web框架
