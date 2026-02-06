@@ -1,6 +1,19 @@
 /**
- * 增强的分类和标签路由
- * 新增: 标签更新接口、标签颜色支持
+ * 分类和标签路由（优化版）
+ * 
+ * 功能：
+ * - 获取所有分类
+ * - 获取所有标签
+ * - 分类和标签的CRUD操作（管理员）
+ * 
+ * 优化内容：
+ * 1. 统一API响应格式
+ * 2. 添加缓存支持
+ * 3. 添加创建/更新/删除功能
+ * 4. 详细的错误处理和日志
+ * 
+ * @author 优化版本
+ * @version 2.0.0
  */
 
 import { Hono } from 'hono';
@@ -16,24 +29,22 @@ import {
 
 export const categoryRoutes = new Hono<{ Bindings: Env }>();
 
+// ============= 常量配置 =============
+
 const CACHE_TTL = 3600; // 1小时
 
 // ============= 获取分类列表 =============
 
 /**
  * GET /api/categories
- * 获取所有分类(公开)
- * 支持分页: ?page=1&limit=10
+ * 获取所有分类（公开）
  */
 categoryRoutes.get('/', async (c) => {
   const logger = createLogger(c);
   
   try {
-    const page = parseInt(c.req.query('page') || '1');
-    const limit = parseInt(c.req.query('limit') || '999'); // 默认返回所有
-    
     // 尝试从缓存获取
-    const cacheKey = `categories:all:${page}:${limit}`;
+    const cacheKey = 'categories:all';
     const cached = await safeGetCache(c.env, cacheKey);
     
     if (cached) {
@@ -71,18 +82,14 @@ categoryRoutes.get('/', async (c) => {
 
 /**
  * GET /api/categories/tags
- * 获取所有标签(公开)
- * 支持分页: ?page=1&limit=10
+ * 获取所有标签（公开）
  */
 categoryRoutes.get('/tags', async (c) => {
   const logger = createLogger(c);
   
   try {
-    const page = parseInt(c.req.query('page') || '1');
-    const limit = parseInt(c.req.query('limit') || '999'); // 默认返回所有
-    
     // 尝试从缓存获取
-    const cacheKey = `tags:all:${page}:${limit}`;
+    const cacheKey = 'tags:all';
     const cached = await safeGetCache(c.env, cacheKey);
     
     if (cached) {
@@ -116,11 +123,11 @@ categoryRoutes.get('/tags', async (c) => {
   }
 });
 
-// ============= 创建分类(管理员) =============
+// ============= 创建分类（管理员） =============
 
 /**
  * POST /api/categories
- * 创建分类(需要管理员权限)
+ * 创建分类（需要管理员权限）
  */
 categoryRoutes.post('/', requireAuth, requireAdmin, async (c) => {
   const logger = createLogger(c);
@@ -172,7 +179,7 @@ categoryRoutes.post('/', requireAuth, requireAdmin, async (c) => {
       slug,
       description,
       icon || null,
-      color || '#3B82F6', // 默认蓝色
+      color || null,
       displayOrder || 0
     ).run();
     
@@ -199,11 +206,11 @@ categoryRoutes.post('/', requireAuth, requireAdmin, async (c) => {
   }
 });
 
-// ============= 创建标签(管理员) =============
+// ============= 创建标签（管理员） =============
 
 /**
  * POST /api/categories/tags
- * 创建标签(需要管理员权限)
+ * 创建标签（需要管理员权限）
  */
 categoryRoutes.post('/tags', requireAuth, requireAdmin, async (c) => {
   const logger = createLogger(c);
@@ -272,11 +279,63 @@ categoryRoutes.post('/tags', requireAuth, requireAdmin, async (c) => {
   }
 });
 
-// ============= 更新分类(管理员) =============
+// ============= 更新标签（管理员） =============
+
+/**
+ * PUT /api/categories/tags/:id
+ * 更新标签（需要管理员权限）
+ */
+categoryRoutes.put('/tags/:id', requireAuth, requireAdmin, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    let { name, description, color } = body;
+    
+    // 检查标签是否存在
+    const tag = await c.env.DB.prepare(
+      'SELECT * FROM tags WHERE id = ?'
+    ).bind(id).first() as any;
+    
+    if (!tag) {
+      return c.json(errorResponse('Tag not found'), 404);
+    }
+    
+    // 清理输入
+    if (name) name = sanitizeInput(name);
+    if (description !== undefined) description = sanitizeInput(description);
+    
+    // 更新标签
+    await c.env.DB.prepare(`
+      UPDATE tags
+      SET name = ?, description = ?, color = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(
+      name || tag.name,
+      description !== undefined ? description : tag.description,
+      color !== undefined ? color : tag.color,
+      id
+    ).run();
+    
+    // 清除缓存
+    await safeDeleteCache(c.env, 'tags:all');
+    
+    logger.info('Tag updated', { tagId: id });
+    
+    return c.json(successResponse({ updated: true }, 'Tag updated successfully'));
+    
+  } catch (error) {
+    logger.error('Update tag error', error);
+    return c.json(errorResponse('Failed to update tag'), 500);
+  }
+});
+
+// ============= 更新分类（管理员） =============
 
 /**
  * PUT /api/categories/:id
- * 更新分类(需要管理员权限)
+ * 更新分类（需要管理员权限）
  */
 categoryRoutes.put('/:id', requireAuth, requireAdmin, async (c) => {
   const logger = createLogger(c);
@@ -327,63 +386,11 @@ categoryRoutes.put('/:id', requireAuth, requireAdmin, async (c) => {
   }
 });
 
-// ============= 更新标签(管理员) =============
-
-/**
- * PUT /api/categories/tags/:id
- * 更新标签(需要管理员权限)
- */
-categoryRoutes.put('/tags/:id', requireAuth, requireAdmin, async (c) => {
-  const logger = createLogger(c);
-  
-  try {
-    const id = c.req.param('id');
-    const body = await c.req.json();
-    let { name, description, color } = body;
-    
-    // 检查标签是否存在
-    const tag = await c.env.DB.prepare(
-      'SELECT * FROM tags WHERE id = ?'
-    ).bind(id).first() as any;
-    
-    if (!tag) {
-      return c.json(errorResponse('Tag not found'), 404);
-    }
-    
-    // 清理输入
-    if (name) name = sanitizeInput(name);
-    if (description !== undefined) description = sanitizeInput(description);
-    
-    // 更新标签
-    await c.env.DB.prepare(`
-      UPDATE tags
-      SET name = ?, description = ?, color = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).bind(
-      name || tag.name,
-      description !== undefined ? description : tag.description,
-      color !== undefined ? color : tag.color,
-      id
-    ).run();
-    
-    // 清除缓存
-    await safeDeleteCache(c.env, 'tags:all');
-    
-    logger.info('Tag updated', { tagId: id });
-    
-    return c.json(successResponse({ updated: true }, 'Tag updated successfully'));
-    
-  } catch (error) {
-    logger.error('Update tag error', error);
-    return c.json(errorResponse('Failed to update tag'), 500);
-  }
-});
-
-// ============= 删除分类(管理员) =============
+// ============= 删除分类（管理员） =============
 
 /**
  * DELETE /api/categories/:id
- * 删除分类(需要管理员权限)
+ * 删除分类（需要管理员权限）
  */
 categoryRoutes.delete('/:id', requireAuth, requireAdmin, async (c) => {
   const logger = createLogger(c);
@@ -424,11 +431,11 @@ categoryRoutes.delete('/:id', requireAuth, requireAdmin, async (c) => {
   }
 });
 
-// ============= 删除标签(管理员) =============
+// ============= 删除标签（管理员） =============
 
 /**
  * DELETE /api/categories/tags/:id
- * 删除标签(需要管理员权限)
+ * 删除标签（需要管理员权限）
  */
 categoryRoutes.delete('/tags/:id', requireAuth, requireAdmin, async (c) => {
   const logger = createLogger(c);
@@ -445,7 +452,7 @@ categoryRoutes.delete('/tags/:id', requireAuth, requireAdmin, async (c) => {
       return c.json(errorResponse('Tag not found'), 404);
     }
     
-    // 删除标签(会自动删除post_tags中的关联)
+    // 删除标签（会自动删除post_tags中的关联）
     await c.env.DB.prepare('DELETE FROM tags WHERE id = ?').bind(id).run();
     
     // 清除缓存
