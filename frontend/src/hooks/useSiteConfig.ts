@@ -1,5 +1,5 @@
 /**
- * 网站配置Hook (增强版)
+ * 网站配置Hook (修复缓存版)
  * 
  * 功能:
  * - 从API获取网站配置
@@ -7,12 +7,12 @@
  * - 类型安全的配置访问
  * - 主题配置自动同步
  * 
- * 新增功能:
- * 1. 与themeStore自动联动
- * 2. 配置变更时自动更新主题
- * 3. 优化缓存策略
+ * 修复内容:
+ * 1. 修复 updateConfig 后缓存不同步问题
+ * 2. 确保 refreshConfig 真正从服务器获取最新数据
+ * 3. 优化缓存更新策略
  * 
- * @version 3.0.0
+ * @version 3.1.0
  */
 
 import { useState, useEffect } from 'react';
@@ -219,7 +219,15 @@ export function useSiteConfig() {
   };
   
   // 获取配置
-  const fetchConfig = async () => {
+  const fetchConfig = async (forceRefresh: boolean = false) => {
+    // 如果强制刷新，清除所有请求状态
+    if (forceRefresh) {
+      isFetching = false;
+      fetchPromise = null;
+      localStorage.removeItem(CACHE_KEY);
+      localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+    }
+    
     // 如果已经有请求在进行中，等待其完成
     if (isFetching && fetchPromise) {
       await fetchPromise;
@@ -302,7 +310,7 @@ export function useSiteConfig() {
     await fetchPromise;
   };
   
-  // 更新配置
+  // 更新配置（修复版）
   const updateConfig = async (key: string, value: any) => {
     try {
       // 处理特殊字段
@@ -314,13 +322,14 @@ export function useSiteConfig() {
       const response = await api.updateConfig(key, processedValue);
       
       if (response.success) {
-        // 更新本地配置
+        // 立即更新本地状态
         setState(prev => {
           const newConfig = { 
             ...(prev.config || DEFAULT_CONFIG), 
             [key]: key === 'footer_links' ? processFooterLinks(processedValue) : processedValue 
           };
           
+          // 更新缓存
           setCachedConfig(newConfig);
           
           // 如果更新的是主题配置,同步到主题Store
@@ -334,6 +343,8 @@ export function useSiteConfig() {
             lastFetch: Date.now()
           };
         });
+        
+        return response;
       } else {
         throw new Error(response.error || 'Failed to update config');
       }
@@ -343,11 +354,18 @@ export function useSiteConfig() {
     }
   };
   
-  // 强制刷新配置
+  // 强制刷新配置（修复版）
   const refreshConfig = async () => {
+    console.log('🔄 Refreshing config from server...');
+    
+    // 清除本地缓存
     localStorage.removeItem(CACHE_KEY);
     localStorage.removeItem(CACHE_TIMESTAMP_KEY);
-    await fetchConfig();
+    
+    // 强制重新获取
+    await fetchConfig(true);
+    
+    console.log('✅ Config refreshed successfully');
   };
   
   // 组件挂载时自动获取配置
