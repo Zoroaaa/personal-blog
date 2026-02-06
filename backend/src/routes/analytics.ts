@@ -12,7 +12,7 @@
  */
 
 import { Hono } from 'hono';
-import { Env, successResponse, errorResponse, safeGetCache, safePutCache } from '../index';
+import { Env, successResponse, errorResponse } from '../index';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { safeParseInt } from '../utils/validation';
@@ -132,10 +132,6 @@ analyticsRoutes.get('/', requireAdmin, async (c) => {
 
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 50;
-const CACHE_TTL = {
-  HOT_POSTS: 300,      // 5分钟
-  STATS: 600           // 10分钟
-};
 
 // ============= 热门文章 =============
 
@@ -154,20 +150,11 @@ analyticsRoutes.get('/hot-posts', async (c) => {
     const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
     const days = Math.max(1, safeParseInt(c.req.query('days'), 7));
     
-    // 尝试从缓存获取
-    const cacheKey = `analytics:hot-posts:${limit}:${days}`;
-    const cached = await safeGetCache(c.env, cacheKey);
-    
-    if (cached) {
-      logger.info('Hot posts served from cache');
-      return c.json(JSON.parse(cached));
-    }
-    
     // 计算时间范围
     const timeRange = new Date();
     timeRange.setDate(timeRange.getDate() - days);
     
-    // 查询热门文章（按浏览量排序）
+    // 查询热门文章（按浏览量排序）- 直接从数据库读取，不使用缓存
     const { results } = await c.env.DB.prepare(`
       SELECT p.id, p.title, p.slug, p.view_count, p.like_count, p.comment_count,
              p.published_at, p.cover_image,
@@ -184,11 +171,6 @@ analyticsRoutes.get('/hot-posts', async (c) => {
       hotPosts: results,
       limit,
       days
-    });
-    
-    // 缓存结果
-    await safePutCache(c.env, cacheKey, JSON.stringify(response), {
-      expirationTtl: CACHE_TTL.HOT_POSTS
     });
     
     logger.info('Hot posts fetched successfully', { count: results.length, days });
