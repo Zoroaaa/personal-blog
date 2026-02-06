@@ -189,17 +189,20 @@ export const useThemeStore = create<ThemeState>()(
       // 与网站配置同步
       syncWithSiteConfig: (primaryColor?: string, defaultMode?: ThemeMode) => {
         const updates: Partial<ThemeConfig> = {};
+        const currentState = get();
         
-        if (primaryColor && primaryColor !== get().primaryColor) {
+        // 只有当用户未设置自定义主色调时，才使用网站配置的主色调
+        if (primaryColor && currentState.primaryColor === defaultTheme.primaryColor) {
           updates.primaryColor = primaryColor;
         }
         
-        if (defaultMode && defaultMode !== get().mode) {
+        // 只有当用户未设置自定义主题模式时，才使用网站配置的默认模式
+        if (defaultMode && currentState.mode === defaultTheme.mode) {
           updates.mode = defaultMode;
         }
         
         if (Object.keys(updates).length > 0) {
-          const newConfig = { ...get(), ...updates };
+          const newConfig = { ...currentState, ...updates };
           const actualMode = getActualMode(newConfig.mode);
           set({ ...updates, actualMode });
           applyThemeToDOM(actualMode, newConfig);
