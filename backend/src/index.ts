@@ -204,8 +204,13 @@ app.get('/health', async (c) => {
 
   // 检查数据库连接
   try {
-    await c.env.DB.prepare('SELECT 1').first();
-    services.database = 'healthy';
+    if (c.env.DB) {
+      await c.env.DB.prepare('SELECT 1').first();
+      services.database = 'healthy';
+    } else {
+      services.database = 'unhealthy';
+      console.error('Database not configured');
+    }
   } catch (error) {
     services.database = 'unhealthy';
     console.error('Database health check failed:', error);
@@ -226,8 +231,13 @@ app.get('/health', async (c) => {
 
   // 检查R2存储
   try {
-    await c.env.STORAGE.head('health-check');
-    services.storage = 'healthy';
+    if (c.env.STORAGE) {
+      await c.env.STORAGE.head('health-check');
+      services.storage = 'healthy';
+    } else {
+      services.storage = 'unhealthy';
+      console.error('Storage not configured');
+    }
   } catch (error) {
     // R2的head对不存在的对象会返回null，这是正常的
     services.storage = 'healthy';
