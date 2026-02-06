@@ -149,6 +149,10 @@ const CACHE_KEY = 'site-config';
 const CACHE_TIMESTAMP_KEY = 'site-config-timestamp';
 const CACHE_TTL = 5 * 60 * 1000; // 5分钟
 
+// 全局请求状态，防止重复请求
+let isFetching = false;
+let fetchPromise: Promise<void> | null = null;
+
 // ============= React Hook =============
 
 /**
@@ -216,37 +220,10 @@ export function useSiteConfig() {
   
   // 获取配置
   const fetchConfig = async () => {
-    try {
-      setState(prev => ({ ...prev, loading: true, error: null }));
-      
-      const configResponse = await api.getConfig();
-      
-      let config = { ...DEFAULT_CONFIG };
-      
-      if (configResponse.success && configResponse.data) {
-        const apiConfig = configResponse.data;
-        
-        // 处理特殊字段
-        if (apiConfig.footer_links) {
-          apiConfig.footer_links = processFooterLinks(apiConfig.footer_links);
-        }
-        
-        config = { ...config, ...apiConfig };
-      }
-      
-      setCachedConfig(config);
-      syncThemeConfig(config); // 同步主题配置
-      
-      setState({
-        config,
-        loading: false,
-        error: null,
-        lastFetch: Date.now()
-      });
-    } catch (error) {
-      console.error('Failed to fetch config:', error);
-      
-      // 尝试使用缓存
+    // 如果已经有请求在进行中，等待其完成
+    if (isFetching && fetchPromise) {
+      await fetchPromise;
+      // 当其他请求完成后，更新当前组件的状态
       const cachedConfig = getCachedConfig();
       if (cachedConfig) {
         syncThemeConfig(cachedConfig);
@@ -256,16 +233,73 @@ export function useSiteConfig() {
           error: null,
           lastFetch: Date.now()
         });
-      } else {
-        // 使用默认配置
-        setState({
-          config: DEFAULT_CONFIG,
-          loading: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-          lastFetch: null
-        });
       }
+      return;
     }
+
+    // 标记请求开始
+    isFetching = true;
+    
+    // 创建并缓存Promise，供其他组件等待
+    fetchPromise = (async () => {
+      try {
+        setState(prev => ({ ...prev, loading: true, error: null }));
+        
+        const configResponse = await api.getConfig();
+        
+        let config = { ...DEFAULT_CONFIG };
+        
+        if (configResponse.success && configResponse.data) {
+          const apiConfig = configResponse.data;
+          
+          // 处理特殊字段
+          if (apiConfig.footer_links) {
+            apiConfig.footer_links = processFooterLinks(apiConfig.footer_links);
+          }
+          
+          config = { ...config, ...apiConfig };
+        }
+        
+        setCachedConfig(config);
+        syncThemeConfig(config); // 同步主题配置
+        
+        setState({
+          config,
+          loading: false,
+          error: null,
+          lastFetch: Date.now()
+        });
+      } catch (error) {
+        console.error('Failed to fetch config:', error);
+        
+        // 尝试使用缓存
+        const cachedConfig = getCachedConfig();
+        if (cachedConfig) {
+          syncThemeConfig(cachedConfig);
+          setState({
+            config: cachedConfig,
+            loading: false,
+            error: null,
+            lastFetch: Date.now()
+          });
+        } else {
+          // 使用默认配置
+          setState({
+            config: DEFAULT_CONFIG,
+            loading: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            lastFetch: null
+          });
+        }
+      } finally {
+        // 标记请求完成
+        isFetching = false;
+        fetchPromise = null;
+      }
+    })();
+
+    // 等待请求完成
+    await fetchPromise;
   };
   
   // 更新配置
