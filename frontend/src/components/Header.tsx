@@ -150,12 +150,12 @@ export function Header() {
                   className="flex items-center space-x-2 px-3 py-2 rounded-md hover:bg-accent transition-colors"
                 >
                   <img 
-                    src={user.avatar_url || '/default-avatar.png'} 
-                    alt={user.display_name}
+                    src={avatarPreview || userInfo?.avatarUrl || getRandomAvatar(userInfo?.username || '')}
+                    alt={user.displayName}
                     className="w-8 h-8 rounded-full border-2 border-primary"
                   />
                   <span className="hidden sm:block text-sm font-medium text-foreground">
-                    {user.display_name}
+                    {user.displayName}
                   </span>
                   <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
