@@ -21,8 +21,20 @@ function App() {
         return;
       }
 
-      // 移除现有的favicon
+      // 检查是否已经有相同的favicon
       const existingFavicons = document.querySelectorAll('link[rel*="icon"]');
+      let hasSameFavicon = false;
+      existingFavicons.forEach(favicon => {
+        if (favicon.getAttribute('href') === faviconUrl) {
+          hasSameFavicon = true;
+        }
+      });
+
+      if (hasSameFavicon) {
+        return;
+      }
+
+      // 移除现有的favicon
       existingFavicons.forEach(favicon => {
         favicon.remove();
       });
