@@ -1,23 +1,23 @@
 /**
- * 网站配置Hook (完善版)
+ * 网站配置Hook (增强版)
  * 
  * 功能:
  * - 从API获取网站配置
  * - 配置缓存管理
  * - 类型安全的配置访问
+ * - 主题配置自动同步
  * 
- * 修复内容:
- * 1. 更新SiteConfig接口，与数据库完全对应
- * 2. 移除数据库中不存在的字段
- * 3. 优化默认配置值
- * 4. 改进类型定义
+ * 新增功能:
+ * 1. 与themeStore自动联动
+ * 2. 配置变更时自动更新主题
+ * 3. 优化缓存策略
  * 
- * @author 完善版本
- * @version 2.2.0
+ * @version 3.0.0
  */
 
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
+import { useThemeStore } from '../stores/themeStore';
 
 // ============= 类型定义 =============
 
@@ -65,7 +65,7 @@ export interface SiteConfig {
   
   // 页脚配置
   footer_text: string;
-  footer_links?: Record<string, string> | string; // JSON字符串或对象
+  footer_links?: Record<string, string> | string;
   footer_show_powered_by: boolean;
   
   // 存储配置
@@ -127,7 +127,7 @@ const DEFAULT_CONFIG: SiteConfig = {
   footer_links: '{}',
   
   // 存储配置
-  storage_public_url: 'https://storage.blog.neutronx.uk',
+  storage_public_url: '',
   
   // 系统设置
   posts_per_page: 10,
@@ -144,13 +144,15 @@ interface ConfigState {
   lastFetch: number | null;
 }
 
+// 缓存键
+const CACHE_KEY = 'site-config';
+const CACHE_TIMESTAMP_KEY = 'site-config-timestamp';
+const CACHE_TTL = 5 * 60 * 1000; // 5分钟
+
 // ============= React Hook =============
 
 /**
  * 使用网站配置的Hook
- * 
- * 自动在组件挂载时获取配置
- * 如果缓存有效则使用缓存
  */
 export function useSiteConfig() {
   const [state, setState] = useState<ConfigState>({
@@ -160,19 +162,20 @@ export function useSiteConfig() {
     lastFetch: null
   });
   
+  const syncWithTheme = useThemeStore(state => state.syncWithSiteConfig);
+  
   // 从localStorage获取缓存
   const getCachedConfig = (): SiteConfig | null => {
     try {
-      const cached = localStorage.getItem('site-config');
-      const timestamp = localStorage.getItem('site-config-timestamp');
+      const cached = localStorage.getItem(CACHE_KEY);
+      const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
       
       if (cached && timestamp) {
         const parsed = JSON.parse(cached);
         const time = parseInt(timestamp, 10);
         const now = Date.now();
         
-        // 缓存有效期5分钟
-        if (now - time < 5 * 60 * 1000) {
+        if (now - time < CACHE_TTL) {
           return parsed;
         }
       }
@@ -185,8 +188,8 @@ export function useSiteConfig() {
   // 缓存配置到localStorage
   const setCachedConfig = (config: SiteConfig) => {
     try {
-      localStorage.setItem('site-config', JSON.stringify(config));
-      localStorage.setItem('site-config-timestamp', Date.now().toString());
+      localStorage.setItem(CACHE_KEY, JSON.stringify(config));
+      localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
     } catch (error) {
       console.error('Failed to cache config:', error);
     }
@@ -204,17 +207,22 @@ export function useSiteConfig() {
     return value || '{}';
   };
   
+  // 同步主题配置
+  const syncThemeConfig = (config: SiteConfig) => {
+    if (config.theme_primary_color || config.theme_default_mode) {
+      syncWithTheme(config.theme_primary_color, config.theme_default_mode);
+    }
+  };
+  
   // 获取配置
   const fetchConfig = async () => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
-      // 获取基本配置
       const configResponse = await api.getConfig();
       
       let config = { ...DEFAULT_CONFIG };
       
-      // 合并基本配置
       if (configResponse.success && configResponse.data) {
         const apiConfig = configResponse.data;
         
@@ -227,6 +235,8 @@ export function useSiteConfig() {
       }
       
       setCachedConfig(config);
+      syncThemeConfig(config); // 同步主题配置
+      
       setState({
         config,
         loading: false,
@@ -239,6 +249,7 @@ export function useSiteConfig() {
       // 尝试使用缓存
       const cachedConfig = getCachedConfig();
       if (cachedConfig) {
+        syncThemeConfig(cachedConfig);
         setState({
           config: cachedConfig,
           loading: false,
@@ -257,10 +268,10 @@ export function useSiteConfig() {
     }
   };
   
-  // 更新配置 (管理员使用)
+  // 更新配置
   const updateConfig = async (key: string, value: any) => {
     try {
-      // 处理footer_links的JSON格式
+      // 处理特殊字段
       let processedValue = value;
       if (key === 'footer_links' && typeof value === 'object') {
         processedValue = JSON.stringify(value);
@@ -275,7 +286,14 @@ export function useSiteConfig() {
             ...(prev.config || DEFAULT_CONFIG), 
             [key]: key === 'footer_links' ? processFooterLinks(processedValue) : value 
           };
+          
           setCachedConfig(newConfig);
+          
+          // 如果更新的是主题配置,同步到主题Store
+          if (key === 'theme_primary_color' || key === 'theme_default_mode') {
+            syncThemeConfig(newConfig);
+          }
+          
           return {
             ...prev,
             config: newConfig,
@@ -293,19 +311,16 @@ export function useSiteConfig() {
   
   // 强制刷新配置
   const refreshConfig = async () => {
-    // 清除缓存
-    localStorage.removeItem('site-config');
-    localStorage.removeItem('site-config-timestamp');
-    
-    // 重新获取
+    localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem(CACHE_TIMESTAMP_KEY);
     await fetchConfig();
   };
   
   // 组件挂载时自动获取配置
   useEffect(() => {
-    // 先尝试使用缓存
     const cachedConfig = getCachedConfig();
     if (cachedConfig) {
+      syncThemeConfig(cachedConfig);
       setState({
         config: cachedConfig,
         loading: false,
@@ -316,13 +331,12 @@ export function useSiteConfig() {
       // 后台刷新配置
       fetchConfig();
     } else {
-      // 缓存无效，从API获取
       fetchConfig();
     }
   }, []);
   
   return {
-    config: state.config || DEFAULT_CONFIG, // 始终返回有效配置
+    config: state.config || DEFAULT_CONFIG,
     loading: state.loading,
     error: state.error,
     updateConfig,
@@ -340,7 +354,7 @@ export function getConfigValue<K extends keyof SiteConfig>(
   key: K
 ): SiteConfig[K] {
   try {
-    const cached = localStorage.getItem('site-config');
+    const cached = localStorage.getItem(CACHE_KEY);
     if (cached) {
       const config = JSON.parse(cached);
       return config[key] || DEFAULT_CONFIG[key];
