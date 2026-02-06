@@ -414,20 +414,16 @@ export const api = {
       method: 'POST',
     }),
   
-  // ============= 分类相关 =============
-
+  // ============= 分类和标签 =============
+  
   /**
-   * 获取分类列表
+   * 获取所有分类
    */
   getCategories: (params?: { page?: string; limit?: string }) => {
     const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
-    return apiRequest<{ 
-      categories: Category[]; 
-      total: number;
-      pagination: { page: number; limit: number; total: number; totalPages: number }
-    }>(`/categories${query}`);
+    return apiRequest<{ categories: Category[] }>(`/categories${query}`);
   },
-
+  
   /**
    * 创建分类
    */
@@ -438,11 +434,12 @@ export const api = {
     icon?: string;
     color?: string;
     displayOrder?: number;
-  }) => apiRequest<{ category: Category }>('/categories', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-
+  }) => 
+    apiRequest<{ id: number; slug: string }>('/categories', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
   /**
    * 更新分类
    */
@@ -452,11 +449,12 @@ export const api = {
     icon?: string;
     color?: string;
     displayOrder?: number;
-  }) => apiRequest<{ category: Category }>(`/categories/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  }),
-
+  }) => 
+    apiRequest<{ updated: boolean }>(`/categories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  
   /**
    * 删除分类
    */
@@ -464,21 +462,15 @@ export const api = {
     apiRequest<{ deleted: boolean }>(`/categories/${id}`, {
       method: 'DELETE',
     }),
-
-  // ============= 标签相关 =============
-
+  
   /**
-   * 获取标签列表
+   * 获取所有标签
    */
   getTags: (params?: { page?: string; limit?: string }) => {
     const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
-    return apiRequest<{ 
-      tags: Tag[]; 
-      total: number;
-      pagination: { page: number; limit: number; total: number; totalPages: number }
-    }>(`/categories/tags${query}`);
+    return apiRequest<{ tags: Tag[] }>(`/categories/tags${query}`);
   },
-
+  
   /**
    * 创建标签
    */
@@ -487,11 +479,12 @@ export const api = {
     slug?: string;
     description?: string;
     color?: string;
-  }) => apiRequest<{ tag: Tag }>('/categories/tags', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-
+  }) => 
+    apiRequest<{ id: number; slug: string }>('/categories/tags', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
   /**
    * 更新标签
    */
@@ -499,11 +492,12 @@ export const api = {
     name?: string;
     description?: string;
     color?: string;
-  }) => apiRequest<{ tag: Tag }>(`/categories/tags/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  }),
-
+  }) => 
+    apiRequest<{ updated: boolean }>(`/categories/tags/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  
   /**
    * 删除标签
    */
@@ -716,7 +710,4 @@ export function getCurrentUser(): User | null {
 
 // ============= 导出 =============
 
-
 export default api;
-
-

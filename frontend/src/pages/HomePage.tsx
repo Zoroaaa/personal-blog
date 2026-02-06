@@ -648,7 +648,7 @@ export function HomePage() {
         </div>
       </div>
       
-            {/* 添加必要的CSS动画 */}
+      {/* 添加必要的CSS动画 */}
       <style>{`
         @keyframes fade-in {
           from {

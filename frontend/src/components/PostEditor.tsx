@@ -1,10 +1,14 @@
 /**
  * 增强的文章编辑组件
- * 新增功能:
+ * 功能:
  * - 分类选择(单选)
  * - 标签选择(多选,带颜色显示)
  * - 标签搜索和快速创建
  * - 标签颜色预览
+ * - 封面图片上传
+ * - 内容区域粘贴图片自动上传
+ * - Markdown编辑器
+ * - 图片上传成功提示
  */
 
 import { useState, useEffect } from 'react';
@@ -55,6 +59,7 @@ export function PostEditor({ postId, onSave, onCancel }: PostEditorProps) {
   const [error, setError] = useState('');
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [tagsLoading, setTagsLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   
   // 加载分类和标签
   useEffect(() => {
@@ -162,6 +167,53 @@ export function PostEditor({ postId, onSave, onCancel }: PostEditorProps) {
       setError(err.message || '操作失败');
     } finally {
       setLoading(false);
+    }
+  };
+  
+  // 处理封面图片上传
+  const handleCoverImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        setUploading(true);
+        const response = await api.uploadImage(file);
+        if (response.success && response.data) {
+          setCoverImage(response.data.url);
+          alert('图片上传成功: ' + response.data.url);
+        }
+      } catch (error) {
+        setError('上传失败: ' + (error instanceof Error ? error.message : '未知错误'));
+      } finally {
+        setUploading(false);
+      }
+    }
+  };
+  
+  // 处理内容区域粘贴图片
+  const handleContentPaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') === 0) {
+        e.preventDefault();
+        const file = items[i].getAsFile();
+        if (file) {
+          try {
+            setUploading(true);
+            const response = await api.uploadImage(file);
+            if (response.success && response.data) {
+              // 将图片URL插入到内容中
+              const imageUrl = response.data.url;
+              const markdownImage = `![图片](${imageUrl})`;
+              setContent(prev => prev + markdownImage);
+              alert('图片粘贴成功');
+            }
+          } catch (error) {
+            setError('图片粘贴失败: ' + (error instanceof Error ? error.message : '未知错误'));
+          } finally {
+            setUploading(false);
+          }
+        }
+      }
     }
   };
   
@@ -363,22 +415,21 @@ export function PostEditor({ postId, onSave, onCancel }: PostEditorProps) {
         {/* 封面图片 */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            封面图片 URL
+            封面图片
           </label>
-          <input
-            type="url"
-            value={coverImage}
-            onChange={(e) => setCoverImage(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-            placeholder="https://example.com/image.jpg"
-          />
+          <div className="flex space-x-4">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleCoverImageUpload}
+              disabled={uploading}
+              className="border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg px-3 py-2"
+            />
+          </div>
           {coverImage && (
             <div className="mt-3">
-              <img
-                src={coverImage}
-                alt="Cover preview"
-                className="w-full max-w-md h-48 object-cover rounded-lg border border-gray-300 dark:border-slate-600"
-              />
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">当前封面图片:</p>
+              <img src={coverImage} alt="当前封面" className="max-w-xs h-auto rounded" />
             </div>
           )}
         </div>
@@ -386,14 +437,14 @@ export function PostEditor({ postId, onSave, onCancel }: PostEditorProps) {
         {/* 文章内容 */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            文章内容 * (支持 Markdown)
+            内容 (支持Markdown) *
           </label>
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white font-mono text-sm"
+            onPaste={handleContentPaste}
+            className="w-full px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono dark:bg-slate-700 dark:text-white"
             rows={20}
-            placeholder="在这里写下你的文章内容..."
             required
           />
         </div>
@@ -431,15 +482,16 @@ export function PostEditor({ postId, onSave, onCancel }: PostEditorProps) {
         <div className="flex gap-4 pt-6 border-t border-gray-200 dark:border-slate-700">
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || uploading}
             className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition-colors font-medium text-lg"
           >
-            {loading ? '提交中...' : postId ? '更新文章' : '发布文章'}
+            {loading ? '提交中...' : uploading ? '上传中...' : postId ? '更新文章' : '发布文章'}
           </button>
           {onCancel && (
             <button
               type="button"
               onClick={onCancel}
+              disabled={loading || uploading}
               className="px-6 py-3 bg-gray-200 hover:bg-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors font-medium text-lg"
             >
               取消
