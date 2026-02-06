@@ -388,7 +388,7 @@ const configGroups: ConfigGroup[] = [
   }
 ];
 
-function ConfigPage() {
+export function ConfigPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { config, loading: configLoading, updateConfig, refreshConfig } = useSiteConfig();
@@ -803,4 +803,4 @@ function ConfigPage() {
   );
 }
 
-export default ConfigPage;
+
