@@ -481,6 +481,10 @@ export function ConfigPage() {
     try {
       setUpdating(key);
       await updateConfig(key, value);
+      
+      // 保存后强制刷新缓存
+      await refreshConfig();
+      
       setSuccessMessage(`成功更新 ${configItem.label}`);
       setHasChanges(false);
       
