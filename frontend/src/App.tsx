@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { HomePage } from './pages/HomePage';
@@ -8,8 +9,41 @@ import { AdminPage } from './pages/AdminPage';
 import { SearchPage } from './pages/SearchPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { ConfigPage } from './pages/ConfigPage';
+import { useSiteConfig } from './hooks/useSiteConfig';
 
 function App() {
+  const { config } = useSiteConfig();
+
+  // 动态更新favicon
+  useEffect(() => {
+    const updateFavicon = (faviconUrl: string) => {
+      if (!faviconUrl) {
+        return;
+      }
+
+      // 移除现有的favicon
+      const existingFavicons = document.querySelectorAll('link[rel*="icon"]');
+      existingFavicons.forEach(favicon => {
+        favicon.remove();
+      });
+
+      // 添加新的favicon
+      const link = document.createElement('link');
+      link.rel = 'icon';
+      link.href = faviconUrl;
+      link.type = 'image/x-icon';
+      document.head.appendChild(link);
+
+      // 添加apple-touch-icon
+      const appleLink = document.createElement('link');
+      appleLink.rel = 'apple-touch-icon';
+      appleLink.href = faviconUrl;
+      document.head.appendChild(appleLink);
+    };
+
+    updateFavicon(config.site_favicon);
+  }, [config.site_favicon]);
+
   return (
     <BrowserRouter>
       <div className="min-h-screen flex flex-col">
