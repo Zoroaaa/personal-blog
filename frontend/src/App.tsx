@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { HomePage } from './pages/HomePage';
@@ -13,28 +13,17 @@ import { useSiteConfig } from './hooks/useSiteConfig';
 
 function App() {
   const { config } = useSiteConfig();
+  const [currentFavicon, setCurrentFavicon] = useState<string>('');
 
   // 动态更新favicon
   useEffect(() => {
     const updateFavicon = (faviconUrl: string) => {
-      if (!faviconUrl) {
-        return;
-      }
-
-      // 检查是否已经有相同的favicon
-      const existingFavicons = document.querySelectorAll('link[rel*="icon"]');
-      let hasSameFavicon = false;
-      existingFavicons.forEach(favicon => {
-        if (favicon.getAttribute('href') === faviconUrl) {
-          hasSameFavicon = true;
-        }
-      });
-
-      if (hasSameFavicon) {
+      if (!faviconUrl || faviconUrl === currentFavicon) {
         return;
       }
 
       // 移除现有的favicon
+      const existingFavicons = document.querySelectorAll('link[rel*="icon"]');
       existingFavicons.forEach(favicon => {
         favicon.remove();
       });
@@ -51,10 +40,13 @@ function App() {
       appleLink.rel = 'apple-touch-icon';
       appleLink.href = faviconUrl;
       document.head.appendChild(appleLink);
+
+      // 更新当前favicon状态
+      setCurrentFavicon(faviconUrl);
     };
 
     updateFavicon(config.site_favicon);
-  }, [config.site_favicon]);
+  }, [config.site_favicon, currentFavicon]);
 
   return (
     <BrowserRouter>
