@@ -363,7 +363,11 @@ export function useSiteConfig() {
       });
       
       // 后台刷新配置
-      fetchConfig();
+      // 只有在缓存过期或没有缓存时才刷新，避免重复请求
+      const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+      if (!timestamp || Date.now() - parseInt(timestamp, 10) >= CACHE_TTL) {
+        fetchConfig();
+      }
     } else {
       fetchConfig();
     }
