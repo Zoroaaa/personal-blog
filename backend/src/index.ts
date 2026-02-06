@@ -6,15 +6,24 @@
  * - CORS配置
  * - 全局中间件（日志、速率限制、错误处理）
  * - 健康检查端点
+ * - 完整的用户认证系统
+ * - 文章管理和搜索
+ * - 评论系统
+ * - 文件上传和管理
+ * - 数据分析
+ * - 管理后台
  * 
  * 优化内容：
  * 1. 添加速率限制中间件防止滥用
  * 2. 增强错误处理和日志记录
  * 3. 添加配置验证
  * 4. 统一响应格式
+ * 5. 完善的缓存策略
+ * 6. 增强的输入验证和清理
+ * 7. 详细的API文档注释
  * 
  * @author 优化版本
- * @version 2.0.0
+ * @version 3.0.0
  */
 
 import { Hono } from 'hono';
@@ -42,7 +51,7 @@ import type { Env, ApiResponse } from './types';
 
 // ============= 常量配置 =============
 
-const API_VERSION = '2.0.0';
+const API_VERSION = '3.0.0';
 const DEFAULT_RATE_LIMIT = 100; // 每分钟最多100次请求
 const STRICT_RATE_LIMIT = 10;   // 敏感操作每分钟最多10次
 
@@ -286,12 +295,20 @@ app.get('/api/health', (c) => {
  * - POST /api/auth/github - GitHub OAuth
  * - GET /api/auth/me - 获取当前用户信息
  * - PUT /api/auth/profile - 更新用户资料
+ * - PUT /api/auth/password - 修改密码
+ * - DELETE /api/auth/account - 删除用户账户
+ * - DELETE /api/auth/delete - 删除用户账户（别名路由）
+ * - POST /api/auth/delete - 删除用户账户（POST版本）
  */
 app.route('/api/auth', authRoutes);
 
 /**
  * 文章相关路由
  * - GET /api/posts - 获取文章列表
+ * - GET /api/posts/admin - 管理员获取文章列表
+ * - GET /api/posts/admin/:id - 管理员获取文章详情
+ * - GET /api/posts/search - 搜索文章
+ * - GET /api/posts/likes - 获取用户点赞的文章
  * - GET /api/posts/:slug - 获取文章详情
  * - POST /api/posts - 创建文章
  * - PUT /api/posts/:id - 更新文章
@@ -312,7 +329,13 @@ app.route('/api/comments', commentRoutes);
 /**
  * 分类和标签路由
  * - GET /api/categories - 获取所有分类
+ * - POST /api/categories - 创建分类（管理员）
+ * - PUT /api/categories/:id - 更新分类（管理员）
+ * - DELETE /api/categories/:id - 删除分类（管理员）
  * - GET /api/categories/tags - 获取所有标签
+ * - POST /api/categories/tags - 创建标签（管理员）
+ * - PUT /api/categories/tags/:id - 更新标签（管理员）
+ * - DELETE /api/categories/tags/:id - 删除标签（管理员）
  */
 app.route('/api/categories', categoryRoutes);
 
@@ -320,15 +343,17 @@ app.route('/api/categories', categoryRoutes);
  * 文件上传路由
  * - POST /api/upload - 上传图片
  * - DELETE /api/upload/:filename - 删除文件
+ * - GET /api/upload/:filename - 获取文件元数据
  */
 app.route('/api/upload', uploadRoutes);
 
 /**
  * 数据分析路由
+ * - GET /api/analytics - 获取系统统计数据（兼容前端，管理员）
+ * - GET /api/analytics/stats - 获取基础统计数据（管理员）
  * - GET /api/analytics/hot-posts - 获取热门文章
- * - GET /api/analytics/stats - 获取基础统计数据
- * - GET /api/analytics/post/:id - 获取单篇文章的详细分析
- * - GET /api/analytics/users - 获取用户统计
+ * - GET /api/analytics/post/:id - 获取单篇文章的详细分析（管理员）
+ * - GET /api/analytics/users - 获取用户统计（管理员）
  * - POST /api/analytics/track - 记录页面访问
  */
 app.route('/api/analytics', analyticsRoutes);
@@ -341,6 +366,7 @@ app.route('/api/analytics', analyticsRoutes);
  * - GET /api/admin/users - 获取用户列表
  * - PUT /api/admin/users/:id/status - 更新用户状态
  * - PUT /api/admin/users/:id/role - 更新用户角色
+ * - DELETE /api/admin/users/:id - 删除用户
  * - GET /api/admin/settings - 获取系统设置
  */
 app.route('/api/admin', adminRoutes);
