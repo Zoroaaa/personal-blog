@@ -150,7 +150,7 @@ export function Header() {
                   className="flex items-center space-x-2 px-3 py-2 rounded-md hover:bg-accent transition-colors"
                 >
                   <img 
-                    src={avatarPreview || userInfo?.avatarUrl || getRandomAvatar(userInfo?.username || '')}
+                    src={user.avatarUrl || '/default-avatar.png'}
                     alt={user.displayName}
                     className="w-8 h-8 rounded-full border-2 border-primary"
                   />
