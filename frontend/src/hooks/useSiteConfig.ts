@@ -318,7 +318,7 @@ export function useSiteConfig() {
         setState(prev => {
           const newConfig = { 
             ...(prev.config || DEFAULT_CONFIG), 
-            [key]: key === 'footer_links' ? processFooterLinks(processedValue) : value 
+            [key]: key === 'footer_links' ? processFooterLinks(processedValue) : processedValue 
           };
           
           setCachedConfig(newConfig);
