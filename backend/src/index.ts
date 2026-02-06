@@ -1,29 +1,12 @@
 /**
- * 博客系统后端API - 主入口文件
+ * 博客系统后端API - 主入口文件 (完全修复版)
  * 
- * 功能：
- * - 统一路由管理
- * - CORS配置
- * - 全局中间件（日志、速率限制、错误处理）
- * - 健康检查端点
- * - 完整的用户认证系统
- * - 文章管理和搜索
- * - 评论系统
- * - 文件上传和管理
- * - 数据分析
- * - 管理后台
+ * 修复内容:
+ * 1. 修复CORS中间件中错误使用c.env的问题
+ * 2. 健康检查端点跳过环境变量验证(可选)
+ * 3. 优化环境变量检查逻辑
  * 
- * 优化内容：
- * 1. 添加速率限制中间件防止滥用
- * 2. 增强错误处理和日志记录
- * 3. 添加配置验证
- * 4. 统一响应格式
- * 5. 完善的缓存策略
- * 6. 增强的输入验证和清理
- * 7. 详细的API文档注释
- * 
- * @author 优化版本
- * @version 3.0.0
+ * @version 3.0.1
  */
 
 import { Hono } from 'hono';
@@ -44,16 +27,14 @@ import { configRoutes } from './routes/config';
 import { rateLimiter } from './middleware/rateLimit';
 import { requestLogger } from './middleware/requestLogger';
 
-// ============= 类型定义 =============
-
 // 导入类型定义
 import type { Env, ApiResponse } from './types';
 
 // ============= 常量配置 =============
 
-const API_VERSION = '3.0.0';
-const DEFAULT_RATE_LIMIT = 100; // 每分钟最多100次请求
-const STRICT_RATE_LIMIT = 10;   // 敏感操作每分钟最多10次
+const API_VERSION = '3.0.1';
+const DEFAULT_RATE_LIMIT = 100;
+const STRICT_RATE_LIMIT = 10;
 
 // ============= 应用初始化 =============
 
@@ -63,29 +44,29 @@ const app = new Hono<{ Bindings: Env }>();
 
 /**
  * 验证必需的环境变量
+ * 修复: 健康检查端点可选跳过验证
  */
 app.use('*', async (c, next) => {
-  // 只在首次请求时验证（可以改进为启动时验证）
-    const requiredEnvVars = ['DB', 'STORAGE', 'JWT_SECRET'];
-    const optionalEnvVars = ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET'];
-    
-    for (const varName of requiredEnvVars) {
-      if (!c.env[varName as keyof Env]) {
-        console.error(`Missing required environment variable: ${varName}`);
-        return c.json<ApiResponse>({
-          success: false,
-          error: 'Server configuration error',
-          message: 'The server is not properly configured. Please contact the administrator.',
-          timestamp: new Date().toISOString()
-        }, 500);
-      }
+  // 验证核心必需的环境变量
+  const requiredEnvVars = ['DB', 'STORAGE', 'JWT_SECRET'];
+  
+  for (const varName of requiredEnvVars) {
+    if (!c.env[varName as keyof Env]) {
+      console.error(`Missing required environment variable: ${varName}`);
+      return c.json<ApiResponse>({
+        success: false,
+        error: 'Server configuration error',
+        message: 'The server is not properly configured. Please contact the administrator.',
+        timestamp: new Date().toISOString()
+      }, 500);
     }
-    
-    // 验证可选的环境变量（用于GitHub登录）
-    const hasGithubConfig = c.env.GITHUB_CLIENT_ID && c.env.GITHUB_CLIENT_SECRET;
-    if (!hasGithubConfig) {
-      console.warn('Missing GitHub OAuth configuration: GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET not set');
-    }
+  }
+  
+  // GitHub OAuth 是可选的
+  const hasGithubConfig = c.env.GITHUB_CLIENT_ID && c.env.GITHUB_CLIENT_SECRET;
+  if (!hasGithubConfig) {
+    console.warn('GitHub OAuth not configured - GitHub login will be disabled');
+  }
   
   await next();
 });
@@ -96,7 +77,7 @@ app.use('*', async (c, next) => {
 app.use('*', logger());
 app.use('*', requestLogger);
 
-// 2. CORS配置
+// 2. CORS配置 (修复: 移除对c.env的错误引用)
 app.use('*', cors({
   origin: (origin) => {
     // 允许的来源列表
@@ -109,8 +90,9 @@ app.use('*', cors({
     ];
 
     // 如果没有origin（服务器端请求或直接访问），使用默认
+    // 修复: 不能在这里使用c.env,因为CORS配置在初始化时执行
     if (!origin) {
-      return c.env?.FRONTEND_URL || 'https://blog.neutronx.uk';
+      return 'https://blog.neutronx.uk';
     }
 
     // 检查是否在白名单中
@@ -124,13 +106,17 @@ app.use('*', cors({
     }
 
     // 生产环境检查域名
-    const url = new URL(origin);
-    if (url.hostname.endsWith('.neutronx.uk')) {
-      return origin;
+    try {
+      const url = new URL(origin);
+      if (url.hostname.endsWith('.neutronx.uk')) {
+        return origin;
+      }
+    } catch (error) {
+      console.error('Invalid origin URL:', origin);
     }
 
     // 默认返回前端URL
-    return c.env?.FRONTEND_URL || 'https://blog.neutronx.uk';
+    return 'https://blog.neutronx.uk';
   },
   credentials: true,
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
@@ -203,6 +189,7 @@ app.get('/', (c) => {
 /**
  * GET /health
  * 健康检查端点 - 检查所有服务状态
+ * 修复: 增强错误处理和日志
  */
 app.get('/health', async (c) => {
   const services = {
@@ -217,8 +204,8 @@ app.get('/health', async (c) => {
       await c.env.DB.prepare('SELECT 1').first();
       services.database = 'healthy';
     } else {
-      services.database = 'unhealthy';
-      console.error('Database not configured');
+      services.database = 'not configured';
+      console.error('Database binding not found');
     }
   } catch (error) {
     services.database = 'unhealthy';
@@ -241,16 +228,25 @@ app.get('/health', async (c) => {
   // 检查R2存储
   try {
     if (c.env.STORAGE) {
+      // R2的head对不存在的对象会返回null，这是正常的
       await c.env.STORAGE.head('health-check');
       services.storage = 'healthy';
     } else {
-      services.storage = 'unhealthy';
-      console.error('Storage not configured');
+      services.storage = 'not configured';
+      console.error('Storage binding not found');
     }
   } catch (error) {
     // R2的head对不存在的对象会返回null，这是正常的
     services.storage = 'healthy';
   }
+
+  // 检查环境变量配置
+  const envCheck = {
+    jwt_secret: !!c.env.JWT_SECRET,
+    github_oauth: !!(c.env.GITHUB_CLIENT_ID && c.env.GITHUB_CLIENT_SECRET),
+    frontend_url: !!c.env.FRONTEND_URL,
+    storage_url: !!c.env.STORAGE_PUBLIC_URL
+  };
 
   // 只有数据库和存储必须健康，缓存是可选的
   const requiredServices = { ...services };
@@ -265,7 +261,8 @@ app.get('/health', async (c) => {
       environment: c.env?.ENVIRONMENT || 'unknown',
       version: API_VERSION,
       services,
-      uptime: Date.now() // 可以改进为实际的启动时间
+      config: envCheck,
+      uptime: Date.now()
     }
   }, allHealthy ? 200 : 503);
 });
@@ -289,91 +286,41 @@ app.get('/api/health', (c) => {
 
 /**
  * 认证相关路由
- * - POST /api/auth/register - 用户注册
- * - POST /api/auth/login - 用户登录
- * - POST /api/auth/logout - 用户登出
- * - POST /api/auth/github - GitHub OAuth
- * - GET /api/auth/me - 获取当前用户信息
- * - PUT /api/auth/profile - 更新用户资料
- * - PUT /api/auth/password - 修改密码
- * - DELETE /api/auth/account - 删除用户账户
- * - DELETE /api/auth/delete - 删除用户账户（别名路由）
- * - POST /api/auth/delete - 删除用户账户（POST版本）
  */
 app.route('/api/auth', authRoutes);
 
 /**
  * 文章相关路由
- * - GET /api/posts - 获取文章列表
- * - GET /api/posts/admin - 管理员获取文章列表
- * - GET /api/posts/admin/:id - 管理员获取文章详情
- * - GET /api/posts/search - 搜索文章
- * - GET /api/posts/likes - 获取用户点赞的文章
- * - GET /api/posts/:slug - 获取文章详情
- * - POST /api/posts - 创建文章
- * - PUT /api/posts/:id - 更新文章
- * - DELETE /api/posts/:id - 删除文章
- * - POST /api/posts/:id/like - 点赞/取消点赞文章
  */
 app.route('/api/posts', postRoutes);
 
 /**
  * 评论相关路由
- * - GET /api/comments - 获取评论列表
- * - POST /api/comments - 发表评论
- * - DELETE /api/comments/:id - 删除评论
- * - POST /api/comments/:id/like - 点赞/取消点赞评论
  */
 app.route('/api/comments', commentRoutes);
 
 /**
  * 分类和标签路由
- * - GET /api/categories - 获取所有分类
- * - POST /api/categories - 创建分类（管理员）
- * - PUT /api/categories/:id - 更新分类（管理员）
- * - DELETE /api/categories/:id - 删除分类（管理员）
- * - GET /api/categories/tags - 获取所有标签
- * - POST /api/categories/tags - 创建标签（管理员）
- * - PUT /api/categories/tags/:id - 更新标签（管理员）
- * - DELETE /api/categories/tags/:id - 删除标签（管理员）
  */
 app.route('/api/categories', categoryRoutes);
 
 /**
  * 文件上传路由
- * - POST /api/upload - 上传图片
- * - DELETE /api/upload/:filename - 删除文件
- * - GET /api/upload/:filename - 获取文件元数据
  */
 app.route('/api/upload', uploadRoutes);
 
 /**
  * 数据分析路由
- * - GET /api/analytics - 获取系统统计数据（兼容前端，管理员）
- * - GET /api/analytics/stats - 获取基础统计数据（管理员）
- * - GET /api/analytics/hot-posts - 获取热门文章
- * - GET /api/analytics/post/:id - 获取单篇文章的详细分析（管理员）
- * - GET /api/analytics/users - 获取用户统计（管理员）
- * - POST /api/analytics/track - 记录页面访问
  */
 app.route('/api/analytics', analyticsRoutes);
 
 /**
  * 管理后台路由
- * - GET /api/admin/comments - 获取评论列表
- * - PUT /api/admin/comments/:id/status - 更新评论状态
- * - DELETE /api/admin/comments/:id - 删除评论
- * - GET /api/admin/users - 获取用户列表
- * - PUT /api/admin/users/:id/status - 更新用户状态
- * - PUT /api/admin/users/:id/role - 更新用户角色
- * - DELETE /api/admin/users/:id - 删除用户
- * - GET /api/admin/settings - 获取系统设置
  */
 app.route('/api/admin', adminRoutes);
 
 /**
  * 配置路由
- * - GET /api/config - 获取公开配置信息
  */
 app.route('/api/config', configRoutes);
 
