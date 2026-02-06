@@ -217,7 +217,7 @@ categoryRoutes.post('/tags', requireAuth, requireAdmin, async (c) => {
   
   try {
     const body = await c.req.json();
-    let { name, slug, description } = body;
+    let { name, slug, description, color } = body;
     
     // 验证必填字段
     if (!name) {
@@ -252,9 +252,9 @@ categoryRoutes.post('/tags', requireAuth, requireAdmin, async (c) => {
     
     // 插入标签
     const result = await c.env.DB.prepare(`
-      INSERT INTO tags (name, slug, description, created_at, updated_at)
-      VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    `).bind(name, slug, description).run();
+      INSERT INTO tags (name, slug, description, color, created_at, updated_at)
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `).bind(name, slug, description, color || null).run();
     
     if (!result.success) {
       throw new Error('Failed to create tag');
@@ -276,6 +276,58 @@ categoryRoutes.post('/tags', requireAuth, requireAdmin, async (c) => {
   } catch (error) {
     logger.error('Create tag error', error);
     return c.json(errorResponse('Failed to create tag'), 500);
+  }
+});
+
+// ============= 更新标签（管理员） =============
+
+/**
+ * PUT /api/categories/tags/:id
+ * 更新标签（需要管理员权限）
+ */
+categoryRoutes.put('/tags/:id', requireAuth, requireAdmin, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    let { name, description, color } = body;
+    
+    // 检查标签是否存在
+    const tag = await c.env.DB.prepare(
+      'SELECT * FROM tags WHERE id = ?'
+    ).bind(id).first() as any;
+    
+    if (!tag) {
+      return c.json(errorResponse('Tag not found'), 404);
+    }
+    
+    // 清理输入
+    if (name) name = sanitizeInput(name);
+    if (description !== undefined) description = sanitizeInput(description);
+    
+    // 更新标签
+    await c.env.DB.prepare(`
+      UPDATE tags
+      SET name = ?, description = ?, color = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(
+      name || tag.name,
+      description !== undefined ? description : tag.description,
+      color !== undefined ? color : tag.color,
+      id
+    ).run();
+    
+    // 清除缓存
+    await safeDeleteCache(c.env, 'tags:all');
+    
+    logger.info('Tag updated', { tagId: id });
+    
+    return c.json(successResponse({ updated: true }, 'Tag updated successfully'));
+    
+  } catch (error) {
+    logger.error('Update tag error', error);
+    return c.json(errorResponse('Failed to update tag'), 500);
   }
 });
 

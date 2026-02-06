@@ -419,14 +419,92 @@ export const api = {
   /**
    * 获取所有分类
    */
-  getCategories: () => 
-    apiRequest<{ categories: Category[] }>('/categories'),
+  getCategories: (params?: { page?: string; limit?: string }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return apiRequest<{ categories: Category[] }>(`/categories${query}`);
+  },
+  
+  /**
+   * 创建分类
+   */
+  createCategory: (data: {
+    name: string;
+    slug?: string;
+    description?: string;
+    icon?: string;
+    color?: string;
+    displayOrder?: number;
+  }) => 
+    apiRequest<{ id: number; slug: string }>('/categories', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  /**
+   * 更新分类
+   */
+  updateCategory: (id: number, data: {
+    name?: string;
+    description?: string;
+    icon?: string;
+    color?: string;
+    displayOrder?: number;
+  }) => 
+    apiRequest<{ updated: boolean }>(`/categories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  
+  /**
+   * 删除分类
+   */
+  deleteCategory: (id: number) => 
+    apiRequest<{ deleted: boolean }>(`/categories/${id}`, {
+      method: 'DELETE',
+    }),
   
   /**
    * 获取所有标签
    */
-  getTags: () => 
-    apiRequest<{ tags: Tag[] }>('/categories/tags'),
+  getTags: (params?: { page?: string; limit?: string }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return apiRequest<{ tags: Tag[] }>(`/categories/tags${query}`);
+  },
+  
+  /**
+   * 创建标签
+   */
+  createTag: (data: {
+    name: string;
+    slug?: string;
+    description?: string;
+    color?: string;
+  }) => 
+    apiRequest<{ id: number; slug: string }>('/categories/tags', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  /**
+   * 更新标签
+   */
+  updateTag: (id: number, data: {
+    name?: string;
+    description?: string;
+    color?: string;
+  }) => 
+    apiRequest<{ updated: boolean }>(`/categories/tags/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  
+  /**
+   * 删除标签
+   */
+  deleteTag: (id: number) => 
+    apiRequest<{ deleted: boolean }>(`/categories/tags/${id}`, {
+      method: 'DELETE',
+    }),
   
   // ============= 文件上传 =============
   

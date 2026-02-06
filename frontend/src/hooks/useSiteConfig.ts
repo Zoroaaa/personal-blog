@@ -1,23 +1,23 @@
 /**
- * 网站配置Hook (完善版)
+ * 网站配置Hook (增强版)
  * 
  * 功能:
  * - 从API获取网站配置
  * - 配置缓存管理
  * - 类型安全的配置访问
+ * - 主题配置自动同步
  * 
- * 修复内容:
- * 1. 更新SiteConfig接口，与数据库完全对应
- * 2. 移除数据库中不存在的字段
- * 3. 优化默认配置值
- * 4. 改进类型定义
+ * 新增功能:
+ * 1. 与themeStore自动联动
+ * 2. 配置变更时自动更新主题
+ * 3. 优化缓存策略
  * 
- * @author 完善版本
- * @version 2.2.0
+ * @version 3.0.0
  */
 
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
+import { useThemeStore } from '../stores/themeStore';
 
 // ============= 类型定义 =============
 
@@ -65,7 +65,7 @@ export interface SiteConfig {
   
   // 页脚配置
   footer_text: string;
-  footer_links?: Record<string, string> | string; // JSON字符串或对象
+  footer_links?: Record<string, string> | string;
   footer_show_powered_by: boolean;
   
   // 存储配置
@@ -83,15 +83,15 @@ const DEFAULT_CONFIG: SiteConfig = {
   // 基本信息
   site_name: '我的博客',
   site_subtitle: '分享技术与生活',
-  site_logo: '/logo.png',
-  site_favicon: '/favicon.ico',
+  site_logo: '',
+  site_favicon: '',
   site_description: '一个分享技术和生活的个人博客',
   site_keywords: 'blog,技术,编程',
   site_author: 'Admin',
   
   // 作者信息
   author_name: 'Admin',
-  author_avatar: '/default-avatar.png',
+  author_avatar: '',
   author_bio: '热爱技术的开发者',
   author_email: 'admin@example.com',
   
@@ -127,7 +127,7 @@ const DEFAULT_CONFIG: SiteConfig = {
   footer_links: '{}',
   
   // 存储配置
-  storage_public_url: 'https://storage.blog.neutronx.uk',
+  storage_public_url: '',
   
   // 系统设置
   posts_per_page: 10,
@@ -144,13 +144,19 @@ interface ConfigState {
   lastFetch: number | null;
 }
 
+// 缓存键
+const CACHE_KEY = 'site-config';
+const CACHE_TIMESTAMP_KEY = 'site-config-timestamp';
+const CACHE_TTL = 5 * 60 * 1000; // 5分钟
+
+// 全局请求状态，防止重复请求
+let isFetching = false;
+let fetchPromise: Promise<void> | null = null;
+
 // ============= React Hook =============
 
 /**
  * 使用网站配置的Hook
- * 
- * 自动在组件挂载时获取配置
- * 如果缓存有效则使用缓存
  */
 export function useSiteConfig() {
   const [state, setState] = useState<ConfigState>({
@@ -160,19 +166,20 @@ export function useSiteConfig() {
     lastFetch: null
   });
   
+  const syncWithTheme = useThemeStore(state => state.syncWithSiteConfig);
+  
   // 从localStorage获取缓存
   const getCachedConfig = (): SiteConfig | null => {
     try {
-      const cached = localStorage.getItem('site-config');
-      const timestamp = localStorage.getItem('site-config-timestamp');
+      const cached = localStorage.getItem(CACHE_KEY);
+      const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
       
       if (cached && timestamp) {
         const parsed = JSON.parse(cached);
         const time = parseInt(timestamp, 10);
         const now = Date.now();
         
-        // 缓存有效期5分钟
-        if (now - time < 5 * 60 * 1000) {
+        if (now - time < CACHE_TTL) {
           return parsed;
         }
       }
@@ -185,8 +192,8 @@ export function useSiteConfig() {
   // 缓存配置到localStorage
   const setCachedConfig = (config: SiteConfig) => {
     try {
-      localStorage.setItem('site-config', JSON.stringify(config));
-      localStorage.setItem('site-config-timestamp', Date.now().toString());
+      localStorage.setItem(CACHE_KEY, JSON.stringify(config));
+      localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
     } catch (error) {
       console.error('Failed to cache config:', error);
     }
@@ -204,63 +211,101 @@ export function useSiteConfig() {
     return value || '{}';
   };
   
+  // 同步主题配置
+  const syncThemeConfig = (config: SiteConfig) => {
+    if (config.theme_primary_color || config.theme_default_mode) {
+      syncWithTheme(config.theme_primary_color, config.theme_default_mode);
+    }
+  };
+  
   // 获取配置
   const fetchConfig = async () => {
-    try {
-      setState(prev => ({ ...prev, loading: true, error: null }));
-      
-      // 获取基本配置
-      const configResponse = await api.getConfig();
-      
-      let config = { ...DEFAULT_CONFIG };
-      
-      // 合并基本配置
-      if (configResponse.success && configResponse.data) {
-        const apiConfig = configResponse.data;
-        
-        // 处理特殊字段
-        if (apiConfig.footer_links) {
-          apiConfig.footer_links = processFooterLinks(apiConfig.footer_links);
-        }
-        
-        config = { ...config, ...apiConfig };
-      }
-      
-      setCachedConfig(config);
-      setState({
-        config,
-        loading: false,
-        error: null,
-        lastFetch: Date.now()
-      });
-    } catch (error) {
-      console.error('Failed to fetch config:', error);
-      
-      // 尝试使用缓存
+    // 如果已经有请求在进行中，等待其完成
+    if (isFetching && fetchPromise) {
+      await fetchPromise;
+      // 当其他请求完成后，更新当前组件的状态
       const cachedConfig = getCachedConfig();
       if (cachedConfig) {
+        syncThemeConfig(cachedConfig);
         setState({
           config: cachedConfig,
           loading: false,
           error: null,
           lastFetch: Date.now()
         });
-      } else {
-        // 使用默认配置
-        setState({
-          config: DEFAULT_CONFIG,
-          loading: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-          lastFetch: null
-        });
       }
+      return;
     }
+
+    // 标记请求开始
+    isFetching = true;
+    
+    // 创建并缓存Promise，供其他组件等待
+    fetchPromise = (async () => {
+      try {
+        setState(prev => ({ ...prev, loading: true, error: null }));
+        
+        const configResponse = await api.getConfig();
+        
+        let config = { ...DEFAULT_CONFIG };
+        
+        if (configResponse.success && configResponse.data) {
+          const apiConfig = configResponse.data;
+          
+          // 处理特殊字段
+          if (apiConfig.footer_links) {
+            apiConfig.footer_links = processFooterLinks(apiConfig.footer_links);
+          }
+          
+          config = { ...config, ...apiConfig };
+        }
+        
+        setCachedConfig(config);
+        syncThemeConfig(config); // 同步主题配置
+        
+        setState({
+          config,
+          loading: false,
+          error: null,
+          lastFetch: Date.now()
+        });
+      } catch (error) {
+        console.error('Failed to fetch config:', error);
+        
+        // 尝试使用缓存
+        const cachedConfig = getCachedConfig();
+        if (cachedConfig) {
+          syncThemeConfig(cachedConfig);
+          setState({
+            config: cachedConfig,
+            loading: false,
+            error: null,
+            lastFetch: Date.now()
+          });
+        } else {
+          // 使用默认配置
+          setState({
+            config: DEFAULT_CONFIG,
+            loading: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            lastFetch: null
+          });
+        }
+      } finally {
+        // 标记请求完成
+        isFetching = false;
+        fetchPromise = null;
+      }
+    })();
+
+    // 等待请求完成
+    await fetchPromise;
   };
   
-  // 更新配置 (管理员使用)
+  // 更新配置
   const updateConfig = async (key: string, value: any) => {
     try {
-      // 处理footer_links的JSON格式
+      // 处理特殊字段
       let processedValue = value;
       if (key === 'footer_links' && typeof value === 'object') {
         processedValue = JSON.stringify(value);
@@ -275,7 +320,14 @@ export function useSiteConfig() {
             ...(prev.config || DEFAULT_CONFIG), 
             [key]: key === 'footer_links' ? processFooterLinks(processedValue) : value 
           };
+          
           setCachedConfig(newConfig);
+          
+          // 如果更新的是主题配置,同步到主题Store
+          if (key === 'theme_primary_color' || key === 'theme_default_mode') {
+            syncThemeConfig(newConfig);
+          }
+          
           return {
             ...prev,
             config: newConfig,
@@ -293,19 +345,16 @@ export function useSiteConfig() {
   
   // 强制刷新配置
   const refreshConfig = async () => {
-    // 清除缓存
-    localStorage.removeItem('site-config');
-    localStorage.removeItem('site-config-timestamp');
-    
-    // 重新获取
+    localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem(CACHE_TIMESTAMP_KEY);
     await fetchConfig();
   };
   
   // 组件挂载时自动获取配置
   useEffect(() => {
-    // 先尝试使用缓存
     const cachedConfig = getCachedConfig();
     if (cachedConfig) {
+      syncThemeConfig(cachedConfig);
       setState({
         config: cachedConfig,
         loading: false,
@@ -314,15 +363,18 @@ export function useSiteConfig() {
       });
       
       // 后台刷新配置
-      fetchConfig();
+      // 只有在缓存过期或没有缓存时才刷新，避免重复请求
+      const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+      if (!timestamp || Date.now() - parseInt(timestamp, 10) >= CACHE_TTL) {
+        fetchConfig();
+      }
     } else {
-      // 缓存无效，从API获取
       fetchConfig();
     }
   }, []);
   
   return {
-    config: state.config || DEFAULT_CONFIG, // 始终返回有效配置
+    config: state.config || DEFAULT_CONFIG,
     loading: state.loading,
     error: state.error,
     updateConfig,
@@ -340,7 +392,7 @@ export function getConfigValue<K extends keyof SiteConfig>(
   key: K
 ): SiteConfig[K] {
   try {
-    const cached = localStorage.getItem('site-config');
+    const cached = localStorage.getItem(CACHE_KEY);
     if (cached) {
       const config = JSON.parse(cached);
       return config[key] || DEFAULT_CONFIG[key];

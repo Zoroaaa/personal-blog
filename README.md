@@ -1,6 +1,6 @@
-# 🚀 个人博客系统 V3
+# 🚀 个人博客系统 V3.0 优化版
 
-基于Cloudflare Workers和Pages构建的现代化博客系统，已升级至版本3.0。
+基于Cloudflare Workers和Pages构建的现代化博客系统，已升级至版本3.0.1优化版。
 
 ## ✨ 特性
 
@@ -39,7 +39,7 @@
 
 ```bash
 git clone <your-repo>
-cd personal-blog-beta2.0
+cd personal-blog-beta3.0
 npm install
 ```
 
@@ -65,7 +65,7 @@ cd ../frontend && npm run build && npm run deploy
 ## 📁 项目结构
 
 ```
-personal-blog-beta2.0/
+personal-blog-beta3.0/
 ├── backend/          # 后端Worker (单个Worker)
 ├── frontend/         # 前端Pages
 ├── database/         # 数据库Schema
@@ -87,8 +87,8 @@ npm run dev
 
 ## 📖 文档
 
-- [部署手册](./DEPLOYMENT.md) - 完整部署指南 (v3.0.0)
-- [API文档](./API.md) - 详细API接口说明 (v3.0.0)
+- [部署手册](./DEPLOYMENT.md) - 完整部署指南 (v3.0.1)
+- [API文档](./API.md) - 详细API接口说明 (v3.0.1)
 
 ## 🎯 功能列表
 

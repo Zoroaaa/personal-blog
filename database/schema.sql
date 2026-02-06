@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS tags (
     name TEXT NOT NULL UNIQUE,
     slug TEXT NOT NULL UNIQUE,
     description TEXT,
+	color TEXT,
     post_count INTEGER DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -399,17 +400,17 @@ INSERT OR IGNORE INTO categories (name, slug, description, icon, color, display_
 ('教程', 'tutorial', '教程和指南', '📚', '#F59E0B', 4);
 
 -- 插入默认标签
-INSERT OR IGNORE INTO tags (name, slug) VALUES
-('JavaScript', 'javascript'),
-('TypeScript', 'typescript'),
-('React', 'react'),
-('Vue', 'vue'),
-('Node.js', 'nodejs'),
-('Cloudflare', 'cloudflare'),
-('数据库', 'database'),
-('算法', 'algorithm'),
-('设计模式', 'design-patterns'),
-('性能优化', 'performance');
+INSERT OR IGNORE INTO tags (name, slug,color) VALUES
+('JavaScript', 'javascript', '#3B82F6'),
+('TypeScript', 'typescript', '#2563EB'),
+('React', 'react', '#06B6D4'),
+('Vue', 'vue', '#10B981'),
+('Node.js', 'nodejs', '#8B5CF6'),
+('Cloudflare', 'cloudflare', '#F97316'),
+('数据库', 'database', '#EF4444'),
+('算法', 'algorithm', '#F59E0B'),
+('设计模式', 'design-patterns', '#EC4899'),
+('性能优化', 'performance', '#14B8A6');
 
 -- 插入默认管理员账户（密码：Admin123!，请在生产环境中修改）
 -- 注意：这个密码哈希是 'Admin123!' 的bcrypt哈希值
