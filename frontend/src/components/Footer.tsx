@@ -1,5 +1,6 @@
 import { useSiteConfig } from '../hooks/useSiteConfig';
 
+
 export function Footer() {
   const { config } = useSiteConfig();
   
