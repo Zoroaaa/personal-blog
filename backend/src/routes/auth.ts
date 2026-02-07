@@ -47,6 +47,8 @@ const MAX_LOGIN_ATTEMPTS = 5; // 最大登录失败次数
 const LOGIN_BLOCK_DURATION = 15 * 60; // 登录封锁时间（15分钟，秒）
 const VERIFICATION_CODE_TTL = 600; // 验证码有效期 10 分钟（秒）
 const VERIFICATION_CODE_LENGTH = 6;
+const EMAIL_VERIFY_RATE_WINDOW = 3600; // 单用户邮箱验证限制：1 小时（秒）
+const EMAIL_VERIFY_RATE_MAX = 10;      // 1 小时内最多 10 次
 
 /** 从 KV 读取并校验验证码，校验成功后删除 */
 async function verifyAndConsumeCode(env: Env, type: VerificationEmailType, email: string, code: string): Promise<boolean> {
@@ -86,19 +88,34 @@ authRoutes.post('/send-verification-code', optionalAuth, async (c) => {
     const body = await c.req.json();
     const { email: bodyEmail, type } = body;
     const rawType = (type || 'register') as VerificationEmailType;
-    if (!['register', 'password', 'delete'].includes(rawType)) {
-      return c.json(errorResponse('Invalid type', 'type 必须为 register / password / delete'), 400);
+    if (!['register', 'password', 'delete', 'forgot_password'].includes(rawType)) {
+      return c.json(errorResponse('Invalid type', 'type 必须为 register / password / delete / forgot_password'), 400);
     }
     
     let email: string;
-    if (rawType === 'register') {
+    if (rawType === 'register' || rawType === 'forgot_password') {
       if (!bodyEmail) {
-        return c.json(errorResponse('Missing email', '注册验证需要提供邮箱'), 400);
+        return c.json(errorResponse('Missing email', rawType === 'register' ? '注册验证需要提供邮箱' : '请输入邮箱以重置密码'), 400);
       }
       email = sanitizeInput(String(bodyEmail).toLowerCase());
       const err = validateMainstreamEmail(email);
       if (err) {
         return c.json(errorResponse('Invalid email', err), 400);
+      }
+      if (rawType === 'register') {
+        const existingUser = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
+        if (existingUser) {
+          return c.json(errorResponse('Email already registered', '该邮箱已被注册，请直接登录或使用其他邮箱'), 409);
+        }
+      }
+      if (rawType === 'forgot_password') {
+        const userRow = await c.env.DB.prepare('SELECT id, oauth_provider FROM users WHERE email = ?').bind(email).first() as any;
+        if (!userRow) {
+          return c.json(successResponse({ sent: true }, '如该邮箱已注册，验证码将发送至您的邮箱'));
+        }
+        if (userRow.oauth_provider) {
+          return c.json(errorResponse('OAuth account', '该账号使用第三方登录，无法通过邮箱重置密码'), 400);
+        }
       }
     } else {
       // password / delete：需要登录，使用当前用户邮箱
@@ -119,23 +136,25 @@ authRoutes.post('/send-verification-code', optionalAuth, async (c) => {
     }
     
     const rateKey = `email_verify_rate:${rawType}:${email}`;
-    const rate = await safeGetCache(c.env, rateKey);
-    if (rate) {
+    const rateVal = await safeGetCache(c.env, rateKey);
+    const rateCount = rateVal ? parseInt(rateVal, 10) : 0;
+    if (rateCount >= EMAIL_VERIFY_RATE_MAX) {
       return c.json(errorResponse(
         'Too many requests',
-        '验证码发送过于频繁，请 1 分钟后再试'
+        `1 小时内最多发送 ${EMAIL_VERIFY_RATE_MAX} 次验证码，请稍后再试`
       ), 429);
     }
     
     const code = generateVerificationCode();
     const kvKey = `email_verify:${rawType}:${email}`;
     await safePutCache(c.env, kvKey, code, { expirationTtl: VERIFICATION_CODE_TTL });
-    await safePutCache(c.env, rateKey, '1', { expirationTtl: 60 });
+    await safePutCache(c.env, rateKey, String(rateCount + 1), { expirationTtl: EMAIL_VERIFY_RATE_WINDOW });
     
     await sendVerificationEmail(c.env, email, code, rawType);
     logger.info('Verification code sent', { type: rawType, email: email.replace(/(.{2}).*(@.*)/, '$1***$2') });
     
-    return c.json(successResponse({ sent: true }, '验证码已发送，请查收邮件'));
+    const msg = rawType === 'forgot_password' ? '如该邮箱已注册，验证码将发送至您的邮箱' : '验证码已发送，请查收邮件';
+    return c.json(successResponse({ sent: true }, msg));
   } catch (e: any) {
     logger.error('Send verification code error', e);
     return c.json(errorResponse(
@@ -414,6 +433,83 @@ authRoutes.post('/login', async (c) => {
     return c.json(errorResponse(
       'Login failed',
       'An error occurred during login. Please try again.'
+    ), 500);
+  }
+});
+
+// ============= 忘记密码 / 重置密码 =============
+
+/**
+ * POST /api/auth/reset-password
+ * 通过邮箱验证码重置密码（无需登录）
+ * 请求体: { email, verificationCode, newPassword }
+ */
+authRoutes.post('/reset-password', async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    if (!c.env.RESEND_API_KEY) {
+      return c.json(errorResponse('Email not configured', '邮件服务未配置，无法重置密码'), 503);
+    }
+    
+    const body = await c.req.json();
+    const { email: bodyEmail, verificationCode, newPassword } = body;
+    
+    if (!bodyEmail || !verificationCode || !newPassword) {
+      return c.json(errorResponse(
+        'Missing required fields',
+        '请提供邮箱、验证码和新密码'
+      ), 400);
+    }
+    
+    const email = sanitizeInput(String(bodyEmail).toLowerCase());
+    const code = String(verificationCode).trim();
+    
+    if (code.length !== 6) {
+      return c.json(errorResponse('Invalid verification code', '请输入 6 位验证码'), 400);
+    }
+    
+    const user = await c.env.DB.prepare(
+      'SELECT id, oauth_provider, password_hash FROM users WHERE email = ?'
+    ).bind(email).first() as any;
+    
+    if (!user) {
+      return c.json(errorResponse('Invalid request', '验证码错误或已过期，请重新获取'), 400);
+    }
+    
+    if (user.oauth_provider) {
+      return c.json(errorResponse(
+        'OAuth account',
+        '该账号使用第三方登录，无法重置密码'
+      ), 400);
+    }
+    
+    const codeValid = await verifyAndConsumeCode(c.env, 'forgot_password', email, code);
+    if (!codeValid) {
+      return c.json(errorResponse(
+        'Invalid verification code',
+        '验证码错误或已过期，请重新获取'
+      ), 400);
+    }
+    
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) {
+      return c.json(errorResponse('Weak password', passwordError), 400);
+    }
+    
+    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await c.env.DB.prepare(
+      'UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+    ).bind(passwordHash, user.id).run();
+    
+    logger.info('Password reset successfully', { userId: user.id, email: email.replace(/(.{2}).*(@.*)/, '$1***$2') });
+    
+    return c.json(successResponse({ reset: true }, '密码重置成功，请使用新密码登录'));
+  } catch (e: any) {
+    logger.error('Reset password error', e);
+    return c.json(errorResponse(
+      'Reset failed',
+      e.message || '重置密码失败，请稍后重试'
     ), 500);
   }
 });

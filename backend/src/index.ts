@@ -33,8 +33,8 @@ import type { Env, ApiResponse } from './types';
 // ============= 常量配置 =============
 
 const API_VERSION = '3.0.1';
-const DEFAULT_RATE_LIMIT = 100;
-const STRICT_RATE_LIMIT = 10;
+const DEFAULT_RATE_LIMIT = 500;
+const STRICT_RATE_LIMIT = 50;
 
 // ============= 应用初始化 =============
 
@@ -128,14 +128,14 @@ app.use('*', cors({
 // 3. 速率限制（全局）
 app.use('/api/*', rateLimiter({ 
   windowMs: 60 * 1000,        // 1分钟
-  max: DEFAULT_RATE_LIMIT,    // 最多100次请求
+  max: DEFAULT_RATE_LIMIT,    // 最多500次请求
   message: 'Too many requests, please try again later.'
 }));
 
 // 敏感操作的严格速率限制
 app.use('/api/auth/register', rateLimiter({ 
   windowMs: 60 * 1000, 
-  max: 5,  // 注册每分钟最多5次
+  max: 20,  // 注册每分钟最多20次
   message: 'Too many registration attempts, please try again later.'
 }));
 
@@ -146,9 +146,15 @@ app.use('/api/auth/login', rateLimiter({
 }));
 
 app.use('/api/auth/send-verification-code', rateLimiter({ 
+  windowMs: 60 * 60 * 1000,  // 1 小时
+  max: 30, 
+  message: '验证码请求过于频繁，请 1 小时后再试'
+}));
+
+app.use('/api/auth/reset-password', rateLimiter({ 
   windowMs: 60 * 1000, 
   max: 5, 
-  message: 'Too many verification code requests, please try again later.'
+  message: '重置密码请求过于频繁，请稍后再试'
 }));
 
 app.use('/api/upload/*', rateLimiter({ 

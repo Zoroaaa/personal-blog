@@ -8,7 +8,7 @@ import type { Env } from '../types';
 const RESEND_API = 'https://api.resend.com/emails';
 
 /** 验证码邮件类型 */
-export type VerificationEmailType = 'register' | 'password' | 'delete';
+export type VerificationEmailType = 'register' | 'password' | 'delete' | 'forgot_password';
 
 /**
  * 生成验证码邮件 HTML 模板（美观、响应式）
@@ -17,7 +17,8 @@ function getVerificationEmailHtml(code: string, type: string): string {
   const titles: Record<string, string> = {
     register: '邮箱验证 - 注册',
     password: '邮箱验证 - 修改密码',
-    delete: '邮箱验证 - 删除账号'
+    delete: '邮箱验证 - 删除账号',
+    forgot_password: '邮箱验证 - 重置密码'
   };
   const title = titles[type] || '邮箱验证';
   return `
@@ -81,7 +82,13 @@ export async function sendVerificationEmail(
   }
 
   const from = (env as any).RESEND_FROM_EMAIL || 'onboarding@resend.dev';
-  const subject = type === 'register' ? '【注册】邮箱验证码' : type === 'password' ? '【修改密码】邮箱验证码' : '【删除账号】邮箱验证码';
+  const subjects: Record<string, string> = {
+    register: '【注册】邮箱验证码',
+    password: '【修改密码】邮箱验证码',
+    delete: '【删除账号】邮箱验证码',
+    forgot_password: '【重置密码】邮箱验证码'
+  };
+  const subject = subjects[type] || '【邮箱验证】验证码';
   const html = getVerificationEmailHtml(code, type);
 
   const res = await fetch(RESEND_API, {
