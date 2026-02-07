@@ -18,6 +18,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import { useThemeStore } from '../stores/themeStore';
+import { useAuthStore } from '../stores/authStore';
 
 // ============= 类型定义 =============
 
@@ -167,6 +168,8 @@ export function useSiteConfig() {
   });
   
   const syncWithTheme = useThemeStore(state => state.syncWithSiteConfig);
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin';
   
   // 从localStorage获取缓存
   const getCachedConfig = (): SiteConfig | null => {
@@ -253,13 +256,37 @@ export function useSiteConfig() {
       try {
         setState(prev => ({ ...prev, loading: true, error: null }));
         
-        const configResponse = await api.getConfig();
+        let configResponse;
+        let apiConfig;
+        
+        // 根据是否是管理员选择不同的API接口
+        if (isAdmin) {
+          // 管理员使用管理员接口获取所有配置
+          const adminResponse = await api.getAdminConfig();
+          if (adminResponse.success && adminResponse.data?.config) {
+            // 转换配置格式，从数组转换为对象
+            apiConfig = {};
+            for (const item of Object.values(adminResponse.data.config)) {
+              if (Array.isArray(item)) {
+                for (const configItem of item) {
+                  if (configItem.key && configItem.value !== undefined) {
+                    apiConfig[configItem.key] = configItem.value;
+                  }
+                }
+              }
+            }
+          }
+        } else {
+          // 非管理员使用公开接口
+          configResponse = await api.getConfig();
+          if (configResponse.success && configResponse.data) {
+            apiConfig = configResponse.data;
+          }
+        }
         
         let config = { ...DEFAULT_CONFIG };
         
-        if (configResponse.success && configResponse.data) {
-          const apiConfig = configResponse.data;
-          
+        if (apiConfig) {
           // 处理特殊字段
           if (apiConfig.footer_links) {
             apiConfig.footer_links = processFooterLinks(apiConfig.footer_links);
@@ -368,7 +395,7 @@ export function useSiteConfig() {
     console.log('✅ Config refreshed successfully');
   };
   
-  // 组件挂载时自动获取配置
+  // 组件挂载时自动获取配置，或当用户角色变化时重新获取
   useEffect(() => {
     const cachedConfig = getCachedConfig();
     if (cachedConfig) {
@@ -389,7 +416,7 @@ export function useSiteConfig() {
     } else {
       fetchConfig();
     }
-  }, []);
+  }, [isAdmin]); // 当用户角色变化时重新获取配置
   
   return {
     config: state.config || DEFAULT_CONFIG,
