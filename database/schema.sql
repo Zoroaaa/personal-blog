@@ -1,13 +1,13 @@
 -- =============================================
--- Personal Blog System - 优化版数据库Schema
+-- Personal Blog System - 数据库Schema
 -- =============================================
--- 版本: 2.0.0
--- 优化内容:
--- 1. 添加数据库触发器自动更新计数器
--- 2. 添加更多索引优化查询性能
--- 3. 添加软删除支持
--- 4. 添加审计字段
--- 5. 改进数据完整性约束
+-- 版本: 2.1.0
+-- 功能说明:
+-- 1. 完整的博客系统数据表结构
+-- 2. 优化的索引设计
+-- 3. 自动更新的触发器
+-- 4. 完整的初始数据
+-- 5. 便捷的视图查询
 -- =============================================
 
 -- ============= 用户表 =============
@@ -33,11 +33,16 @@ CREATE TABLE IF NOT EXISTS users (
     -- 统计信息
     post_count INTEGER DEFAULT 0,
     comment_count INTEGER DEFAULT 0,
+    favorite_count INTEGER DEFAULT 0,
+    reading_history_count INTEGER DEFAULT 0,
     
     -- 审计字段
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_login_at DATETIME,
+    
+    -- 邮箱验证状态
+    email_verified INTEGER DEFAULT 0, -- 0: 未验证, 1: 已验证
     
     -- 唯一约束
     UNIQUE(oauth_provider, oauth_id)
@@ -76,7 +81,7 @@ CREATE TABLE IF NOT EXISTS tags (
     name TEXT NOT NULL UNIQUE,
     slug TEXT NOT NULL UNIQUE,
     description TEXT,
-	color TEXT,
+    color TEXT,
     post_count INTEGER DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -109,6 +114,7 @@ CREATE TABLE IF NOT EXISTS posts (
     view_count INTEGER DEFAULT 0,
     like_count INTEGER DEFAULT 0,
     comment_count INTEGER DEFAULT 0,
+    favorite_count INTEGER DEFAULT 0,
     reading_time INTEGER,  -- 预计阅读时间（分钟）
     
     -- SEO信息
@@ -143,9 +149,6 @@ CREATE INDEX IF NOT EXISTS idx_posts_status_published ON posts(status, published
 
 -- 复合索引：状态和可见性
 CREATE INDEX IF NOT EXISTS idx_posts_status_visibility ON posts(status, visibility);
-
--- 全文搜索索引（如果D1支持FTS5）
--- CREATE VIRTUAL TABLE IF NOT EXISTS posts_fts USING fts5(title, content, content=posts, content_rowid=id);
 
 -- ============= 文章标签关联表 =============
 
@@ -233,7 +236,7 @@ CREATE INDEX IF NOT EXISTS idx_likes_post_id ON likes(post_id);
 CREATE INDEX IF NOT EXISTS idx_likes_comment_id ON likes(comment_id);
 CREATE INDEX IF NOT EXISTS idx_likes_user_id ON likes(user_id);
 
--- ============= 浏览历史表（新增） =============
+-- ============= 浏览历史表 =============
 
 CREATE TABLE IF NOT EXISTS view_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -249,6 +252,88 @@ CREATE TABLE IF NOT EXISTS view_history (
 CREATE INDEX IF NOT EXISTS idx_view_history_post_id ON view_history(post_id);
 CREATE INDEX IF NOT EXISTS idx_view_history_user_id ON view_history(user_id);
 CREATE INDEX IF NOT EXISTS idx_view_history_created_at ON view_history(created_at DESC);
+
+-- ============= 阅读历史表 =============
+
+CREATE TABLE IF NOT EXISTS reading_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    post_id INTEGER NOT NULL,
+    
+    -- 阅读进度
+    reading_progress INTEGER DEFAULT 0 CHECK(reading_progress >= 0 AND reading_progress <= 100), -- 阅读百分比 0-100
+    reading_time INTEGER DEFAULT 0, -- 阅读时长(秒)
+    scroll_position INTEGER DEFAULT 0, -- 滚动位置
+    
+    -- 时间信息
+    first_read_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- 首次阅读时间
+    last_read_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- 最后阅读时间
+    
+    -- 外键约束
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+    
+    -- 唯一约束：一个用户对一篇文章只有一条阅读历史
+    UNIQUE(user_id, post_id)
+);
+
+-- 阅读历史表索引
+CREATE INDEX IF NOT EXISTS idx_reading_history_user_id ON reading_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_reading_history_post_id ON reading_history(post_id);
+CREATE INDEX IF NOT EXISTS idx_reading_history_last_read ON reading_history(user_id, last_read_at DESC);
+
+-- ============= 收藏表 =============
+
+CREATE TABLE IF NOT EXISTS favorites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    post_id INTEGER NOT NULL,
+    
+    -- 收藏备注(可选)
+    notes TEXT,
+    
+    -- 时间信息
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    
+    -- 外键约束
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+    
+    -- 唯一约束：防止重复收藏
+    UNIQUE(user_id, post_id)
+);
+
+-- 收藏表索引
+CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id);
+CREATE INDEX IF NOT EXISTS idx_favorites_post_id ON favorites(post_id);
+CREATE INDEX IF NOT EXISTS idx_favorites_created_at ON favorites(user_id, created_at DESC);
+
+-- ============= 邮箱验证码表 =============
+
+CREATE TABLE IF NOT EXISTS email_verification_codes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL COLLATE NOCASE,
+    code TEXT NOT NULL, -- 6位验证码
+    type TEXT NOT NULL CHECK(type IN ('register', 'reset_password', 'delete_account', 'change_email')),
+    
+    -- 状态
+    used INTEGER DEFAULT 0, -- 0: 未使用, 1: 已使用
+    ip_address TEXT, -- 请求IP
+    
+    -- 时间信息
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL, -- 过期时间(通常5-10分钟后)
+    used_at DATETIME -- 使用时间
+);
+
+-- 邮箱验证码表索引
+CREATE INDEX IF NOT EXISTS idx_email_codes_email ON email_verification_codes(email);
+CREATE INDEX IF NOT EXISTS idx_email_codes_type ON email_verification_codes(type);
+CREATE INDEX IF NOT EXISTS idx_email_codes_created ON email_verification_codes(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_email_codes_expires ON email_verification_codes(expires_at);
+
+-- 复合索引用于验证码查询
+CREATE INDEX IF NOT EXISTS idx_email_codes_verify ON email_verification_codes(email, code, type, used, expires_at);
 
 -- ============= 网站配置表 =============
 
@@ -275,7 +360,7 @@ CREATE INDEX IF NOT EXISTS idx_site_config_category ON site_config(category);
 
 -- ============= 数据库触发器 =============
 
--- 触发器：site_config表自动更新updated_at字段
+-- 触发器：自动更新updated_at字段
 CREATE TRIGGER IF NOT EXISTS update_site_config_timestamp
 AFTER UPDATE ON site_config
 FOR EACH ROW
@@ -283,6 +368,27 @@ BEGIN
     UPDATE site_config 
     SET updated_at = CURRENT_TIMESTAMP 
     WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_users_update_timestamp
+AFTER UPDATE ON users
+FOR EACH ROW
+BEGIN
+    UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_posts_update_timestamp
+AFTER UPDATE ON posts
+FOR EACH ROW
+BEGIN
+    UPDATE posts SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_comments_update_timestamp
+AFTER UPDATE ON comments
+FOR EACH ROW
+BEGIN
+    UPDATE comments SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
 -- 触发器：文章发布时更新分类文章数
@@ -368,27 +474,121 @@ BEGIN
     WHERE id = OLD.parent_id;
 END;
 
--- 触发器：自动更新updated_at字段
-CREATE TRIGGER IF NOT EXISTS trg_users_update_timestamp
-AFTER UPDATE ON users
-FOR EACH ROW
+-- 触发器：添加收藏时更新文章收藏数
+CREATE TRIGGER IF NOT EXISTS trg_favorites_insert
+AFTER INSERT ON favorites
 BEGIN
-    UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+    UPDATE posts 
+    SET favorite_count = (
+        SELECT COUNT(*) FROM favorites WHERE post_id = NEW.post_id
+    )
+    WHERE id = NEW.post_id;
+    
+    UPDATE users
+    SET favorite_count = (
+        SELECT COUNT(*) FROM favorites WHERE user_id = NEW.user_id
+    )
+    WHERE id = NEW.user_id;
 END;
 
-CREATE TRIGGER IF NOT EXISTS trg_posts_update_timestamp
-AFTER UPDATE ON posts
-FOR EACH ROW
+-- 触发器：删除收藏时更新文章收藏数
+CREATE TRIGGER IF NOT EXISTS trg_favorites_delete
+AFTER DELETE ON favorites
 BEGIN
-    UPDATE posts SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+    UPDATE posts 
+    SET favorite_count = (
+        SELECT COUNT(*) FROM favorites WHERE post_id = OLD.post_id
+    )
+    WHERE id = OLD.post_id;
+    
+    UPDATE users
+    SET favorite_count = (
+        SELECT COUNT(*) FROM favorites WHERE user_id = OLD.user_id
+    )
+    WHERE id = OLD.user_id;
 END;
 
-CREATE TRIGGER IF NOT EXISTS trg_comments_update_timestamp
-AFTER UPDATE ON comments
+-- 触发器：更新阅读历史时自动更新 last_read_at
+CREATE TRIGGER IF NOT EXISTS trg_reading_history_update
+AFTER UPDATE ON reading_history
 FOR EACH ROW
 BEGIN
-    UPDATE comments SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+    UPDATE reading_history 
+    SET last_read_at = CURRENT_TIMESTAMP 
+    WHERE id = NEW.id;
 END;
+
+-- ============= 视图（便于查询） =============
+
+-- 文章详情视图（包含作者和分类信息）
+CREATE VIEW IF NOT EXISTS vw_posts_detailed AS
+SELECT 
+    p.*,
+    u.username as author_username,
+    u.display_name as author_name,
+    u.avatar_url as author_avatar,
+    c.name as category_name,
+    c.slug as category_slug,
+    c.color as category_color
+FROM posts p
+LEFT JOIN users u ON p.author_id = u.id
+LEFT JOIN categories c ON p.category_id = c.id;
+
+-- 评论详情视图（包含用户信息）
+CREATE VIEW IF NOT EXISTS vw_comments_detailed AS
+SELECT 
+    c.*,
+    u.username,
+    u.display_name,
+    u.avatar_url
+FROM comments c
+JOIN users u ON c.user_id = u.id;
+
+-- 阅读历史详情视图
+CREATE VIEW IF NOT EXISTS vw_reading_history_detailed AS
+SELECT 
+    rh.*,
+    p.title as post_title,
+    p.slug as post_slug,
+    p.cover_image as post_cover,
+    p.summary as post_summary,
+    p.reading_time as post_reading_time,
+    p.author_id,
+    u.username as author_username,
+    u.display_name as author_name,
+    u.avatar_url as author_avatar,
+    c.name as category_name,
+    c.slug as category_slug,
+    c.color as category_color
+FROM reading_history rh
+JOIN posts p ON rh.post_id = p.id
+LEFT JOIN users u ON p.author_id = u.id
+LEFT JOIN categories c ON p.category_id = c.id;
+
+-- 收藏详情视图
+CREATE VIEW IF NOT EXISTS vw_favorites_detailed AS
+SELECT 
+    f.*,
+    p.title as post_title,
+    p.slug as post_slug,
+    p.cover_image as post_cover,
+    p.summary as post_summary,
+    p.reading_time as post_reading_time,
+    p.view_count,
+    p.like_count,
+    p.comment_count,
+    p.published_at,
+    p.author_id,
+    u.username as author_username,
+    u.display_name as author_name,
+    u.avatar_url as author_avatar,
+    c.name as category_name,
+    c.slug as category_slug,
+    c.color as category_color
+FROM favorites f
+JOIN posts p ON f.post_id = p.id
+LEFT JOIN users u ON p.author_id = u.id
+LEFT JOIN categories c ON p.category_id = c.id;
 
 -- ============= 初始数据 =============
 
@@ -400,7 +600,7 @@ INSERT OR IGNORE INTO categories (name, slug, description, icon, color, display_
 ('教程', 'tutorial', '教程和指南', '📚', '#F59E0B', 4);
 
 -- 插入默认标签
-INSERT OR IGNORE INTO tags (name, slug,color) VALUES
+INSERT OR IGNORE INTO tags (name, slug, color) VALUES
 ('JavaScript', 'javascript', '#3B82F6'),
 ('TypeScript', 'typescript', '#2563EB'),
 ('React', 'react', '#06B6D4'),
@@ -414,8 +614,8 @@ INSERT OR IGNORE INTO tags (name, slug,color) VALUES
 
 -- 插入默认管理员账户（密码：Admin123!，请在生产环境中修改）
 -- 注意：这个密码哈希是 'Admin123!' 的bcrypt哈希值
-INSERT OR IGNORE INTO users (username, email, password_hash, display_name, role, status) VALUES
-('admin', 'admin@example.com', '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqRWNXb6tO', 'Administrator', 'admin', 'active');
+INSERT OR IGNORE INTO users (username, email, password_hash, display_name, role, status, email_verified) VALUES
+('admin', 'admin@example.com', '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqRWNXb6tO', 'Administrator', 'admin', 'active', 1);
 
 -- 插入网站配置初始数据
 -- 基本设置组
@@ -474,53 +674,6 @@ INSERT OR IGNORE INTO site_config (key, value, type, category, description) VALU
   ('max_upload_size_mb', '5', 'number', 'general', '最大上传文件大小(MB)'),
   ('enable_maintenance_mode', 'false', 'boolean', 'general', '维护模式');
 
--- ============= 视图（便于查询） =
-
--- 文章详情视图（包含作者和分类信息）
-CREATE VIEW IF NOT EXISTS vw_posts_detailed AS
-SELECT 
-    p.*,
-    u.username as author_username,
-    u.display_name as author_name,
-    u.avatar_url as author_avatar,
-    c.name as category_name,
-    c.slug as category_slug,
-    c.color as category_color
-FROM posts p
-LEFT JOIN users u ON p.author_id = u.id
-LEFT JOIN categories c ON p.category_id = c.id;
-
--- 评论详情视图（包含用户信息）
-CREATE VIEW IF NOT EXISTS vw_comments_detailed AS
-SELECT 
-    c.*,
-    u.username,
-    u.display_name,
-    u.avatar_url
-FROM comments c
-JOIN users u ON c.user_id = u.id;
-
--- ============= 实用查询函数 =============
-
--- 注意：D1不支持存储过程，这些是示例SQL查询
-
--- 获取热门文章（按浏览量）
--- SELECT * FROM posts WHERE status = 'published' ORDER BY view_count DESC LIMIT 10;
-
--- 获取最新文章
--- SELECT * FROM vw_posts_detailed WHERE status = 'published' ORDER BY published_at DESC LIMIT 10;
-
--- 获取用户统计
--- SELECT 
---     COUNT(*) as total_posts,
---     SUM(view_count) as total_views,
---     SUM(like_count) as total_likes,
---     SUM(comment_count) as total_comments
--- FROM posts WHERE author_id = ? AND status = 'published';
-
--- 获取标签云（按使用频率）
--- SELECT * FROM tags WHERE post_count > 0 ORDER BY post_count DESC LIMIT 20;
-
 -- ============= 数据库版本信息 =============
 
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -530,8 +683,9 @@ CREATE TABLE IF NOT EXISTS schema_version (
 );
 
 INSERT OR REPLACE INTO schema_version (version, description) VALUES
-('2.0.0', 'Optimized schema with triggers, indexes, and audit fields');
+('2.1.0', 'Complete blog system with reading history, favorites, and email verification');
 
 -- =============================================
 -- Schema 创建完成
 -- =============================================
+

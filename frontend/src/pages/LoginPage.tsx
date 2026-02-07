@@ -23,15 +23,29 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../utils/api';
+import { VerificationCodeInput } from '../components/VerificationCodeInput';
+
 
 export function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
+  const [isPasswordReset, setIsPasswordReset] = useState(false);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // 验证码相关状态
+  const [verificationCode, setVerificationCode] = useState('');
+  const [showVerificationCode, setShowVerificationCode] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  
+  // 密码重置相关状态
+  const [resetEmail, setResetEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -69,6 +83,21 @@ export function LoginPage() {
     
     fetchConfig();
   }, []);
+  
+  // 倒计时功能
+  useEffect(() => {
+    let interval: number;
+    if (countdown > 0) {
+      interval = window.setInterval(() => {
+        setCountdown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [countdown]);
   
   // GitHub OAuth客户端ID和重定向URI
   const GITHUB_REDIRECT_URI = window.location.origin + '/login';
@@ -131,6 +160,115 @@ export function LoginPage() {
     window.location.href = githubAuthUrl;
   };
   
+  // 发送验证码
+  const handleSendVerificationCode = async () => {
+    if (!email || !isValidEmail(email)) {
+      setError('请输入有效的邮箱地址');
+      return;
+    }
+    
+    setSendingCode(true);
+    setError('');
+    
+    try {
+      const response = await api.sendVerificationCode({
+        email,
+        type: 'register',
+        username
+      });
+      
+      if (response.success) {
+        setCountdown(60); // 60秒倒计时
+        setShowVerificationCode(true);
+        setError('');
+      } else {
+        throw new Error(response.error || '发送验证码失败');
+      }
+    } catch (err: any) {
+      setError(err.message || '发送验证码失败');
+    } finally {
+      setSendingCode(false);
+    }
+  };
+  
+  // 邮箱验证函数
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+  
+  // 处理密码重置请求
+  const handleRequestPasswordReset = async () => {
+    if (!resetEmail || !isValidEmail(resetEmail)) {
+      setError('请输入有效的邮箱地址');
+      return;
+    }
+    
+    setResetLoading(true);
+    setError('');
+    
+    try {
+      const response = await api.requestPasswordReset(resetEmail);
+      
+      if (response.success) {
+        // 发送验证码
+        const codeResponse = await api.sendVerificationCode({
+          email: resetEmail,
+          type: 'reset_password'
+        });
+        
+        if (codeResponse.success) {
+          setCountdown(60);
+          setShowVerificationCode(true);
+          setError('');
+        } else {
+          throw new Error(codeResponse.error || '发送验证码失败');
+        }
+      } else {
+        throw new Error(response.error || '请求密码重置失败');
+      }
+    } catch (err: any) {
+      setError(err.message || '请求密码重置失败');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+  
+  // 处理密码重置提交
+  const handlePasswordResetSubmit = async () => {
+    if (!resetEmail || !verificationCode || !newPassword) {
+      setError('请填写所有必填字段');
+      return;
+    }
+    
+    setResetLoading(true);
+    setError('');
+    
+    try {
+      const response = await api.resetPassword({
+        email: resetEmail,
+        verificationCode,
+        newPassword
+      });
+      
+      if (response.success) {
+        setError('密码重置成功,请使用新密码登录');
+        setIsPasswordReset(false);
+        setIsLogin(true);
+        setResetEmail('');
+        setVerificationCode('');
+        setNewPassword('');
+        setShowVerificationCode(false);
+      } else {
+        throw new Error(response.error || '重置密码失败');
+      }
+    } catch (err: any) {
+      setError(err.message || '重置密码失败');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -161,13 +299,19 @@ export function LoginPage() {
         }
       } else {
         // ===== 注册 =====
-        console.log('Attempting registration...', { username, email });
+        console.log('Attempting registration...', { username, email, hasVerificationCode: !!verificationCode });
         
-        const response = await api.register({
+        // 验证验证码
+        if (!verificationCode) {
+          throw new Error('请输入验证码');
+        }
+        
+        const response = await api.registerWithVerification({
           username,
           email,
           password,
           displayName: displayName || username,
+          verificationCode,
         });
         
         console.log('Registration response:', response);
@@ -222,10 +366,11 @@ export function LoginPage() {
           {/* 标题 */}
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-900">
-              {isLogin ? '欢迎回来' : '创建账号'}
+              {isPasswordReset ? '重置密码' : isLogin ? '欢迎回来' : '创建账号'}
             </h2>
             <p className="mt-2 text-sm text-gray-600">
-              {isLogin ? '登录以继续使用' : '注册一个新账号'}
+              {isPasswordReset ? '通过邮箱验证码重置密码' : 
+               isLogin ? '登录以继续使用' : '注册一个新账号'}
             </p>
           </div>
           
@@ -244,136 +389,273 @@ export function LoginPage() {
           )}
           
           {/* 表单 */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* 用户名 */}
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
-                用户名
-              </label>
-              <input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="输入用户名"
-                required
-                autoComplete="username"
-              />
-              {!isLogin && (
-                <p className="mt-1 text-xs text-gray-500">
-                  3-20个字符,只能包含字母、数字、下划线和连字符
-                </p>
-              )}
-            </div>
-            
-            {/* 邮箱(仅注册) */}
-            {!isLogin && (
+          {isPasswordReset ? (
+            <div className="space-y-6">
+              {/* 密码重置表单 */}
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                  邮箱
+                <label htmlFor="resetEmail" className="block text-sm font-medium text-gray-700 mb-1">
+                  邮箱地址
                 </label>
                 <input
-                  id="email"
+                  id="resetEmail"
                   type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="输入邮箱地址"
+                  placeholder="输入注册时使用的邮箱"
                   required
                   autoComplete="email"
                 />
               </div>
-            )}
-            
-            {/* 显示名称(仅注册) */}
-            {!isLogin && (
-              <div>
-                <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 mb-1">
-                  显示名称 <span className="text-gray-400 text-xs">(可选)</span>
-                </label>
-                <input
-                  id="displayName"
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="输入显示名称"
-                  autoComplete="name"
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  留空则使用用户名
-                </p>
-              </div>
-            )}
-            
-            {/* 密码 */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                密码
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="输入密码"
-                required
-                autoComplete={isLogin ? 'current-password' : 'new-password'}
-              />
               
-              {/* 密码强度指示器(仅注册) */}
-              {!isLogin && password && passwordStrength && (
-                <div className="mt-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-gray-600">密码强度:</span>
-                    <span className={`text-xs font-medium ${passwordStrength.color}`}>
-                      {passwordStrength.text}
-                    </span>
-                  </div>
-                  <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full transition-all ${
-                        passwordStrength.level === 1 ? 'bg-red-500 w-1/4' :
-                        passwordStrength.level === 2 ? 'bg-orange-500 w-2/4' :
-                        passwordStrength.level === 3 ? 'bg-yellow-500 w-3/4' :
-                        'bg-green-500 w-full'
-                      }`}
+              {/* 验证码(仅在发送后显示) */}
+              {showVerificationCode && (
+                <div>
+                  <label htmlFor="verificationCode" className="block text-sm font-medium text-gray-700 mb-1">
+                    验证码
+                  </label>
+                  <div className="flex space-x-2">
+                    <VerificationCodeInput
+                      email={resetEmail}
+                      type="reset_password"
+                      value={verificationCode}
+                      onChange={(code) => setVerificationCode(code)}
+                      className="flex-1"
                     />
                   </div>
                   <p className="mt-1 text-xs text-gray-500">
-                    建议:至少8个字符,包含大小写字母和数字
+                    验证码已发送到您的邮箱，请注意查收
                   </p>
                 </div>
               )}
               
-              {isLogin && (
-                <p className="mt-1 text-xs text-gray-500">
-                  至少6个字符
-                </p>
+              {/* 新密码(仅在验证码验证后显示) */}
+              {showVerificationCode && (
+                <div>
+                  <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                    新密码
+                  </label>
+                  <input
+                    id="newPassword"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="输入新密码"
+                    required
+                    autoComplete="new-password"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    至少8个字符,包含大小写字母和数字
+                  </p>
+                </div>
+              )}
+              
+              {/* 发送验证码按钮 */}
+              {!showVerificationCode && (
+                <button
+                  onClick={handleRequestPasswordReset}
+                  disabled={resetLoading || countdown > 0}
+                  className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors flex items-center justify-center"
+                >
+                  {resetLoading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      发送中...
+                    </>
+                  ) : (
+                    '发送验证码'
+                  )}
+                </button>
+              )}
+              
+              {/* 重置密码按钮 */}
+              {showVerificationCode && (
+                <button
+                  onClick={handlePasswordResetSubmit}
+                  disabled={resetLoading}
+                  className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors flex items-center justify-center"
+                >
+                  {resetLoading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      重置中...
+                    </>
+                  ) : (
+                    '重置密码'
+                  )}
+                </button>
               )}
             </div>
-            
-            {/* 提交按钮 */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors flex items-center justify-center"
-            >
-              {loading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  处理中...
-                </>
-              ) : (
-                isLogin ? '登录' : '注册'
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* 用户名 */}
+              <div>
+                <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+                  用户名
+                </label>
+                <input
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="输入用户名"
+                  required
+                  autoComplete="username"
+                />
+                {!isLogin && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    3-20个字符,只能包含字母、数字、下划线和连字符
+                  </p>
+                )}
+              </div>
+              
+              {/* 邮箱(仅注册) */}
+              {!isLogin && (
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                    邮箱
+                  </label>
+                  <div className="flex space-x-2">
+                    <input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="输入邮箱地址"
+                      required
+                      autoComplete="email"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSendVerificationCode}
+                      disabled={sendingCode || countdown > 0}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap transition-colors"
+                    >
+                      {sendingCode ? '发送中...' : 
+                       countdown > 0 ? `${countdown}s后重发` : 
+                       '发送验证码'}
+                    </button>
+                  </div>
+                </div>
               )}
-            </button>
-          </form>
+              
+              {/* 验证码(仅注册且发送后显示) */}
+              {!isLogin && showVerificationCode && (
+                <div>
+                  <label htmlFor="verificationCode" className="block text-sm font-medium text-gray-700 mb-1">
+                    验证码
+                  </label>
+                  <VerificationCodeInput
+                    email={email}
+                    type="register"
+                    value={verificationCode}
+                    onChange={(code) => setVerificationCode(code)}
+                    className="w-full"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    验证码已发送到您的邮箱，请注意查收
+                  </p>
+                </div>
+              )}
+              
+              {/* 显示名称(仅注册) */}
+              {!isLogin && (
+                <div>
+                  <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 mb-1">
+                    显示名称 <span className="text-gray-400 text-xs">(可选)</span>
+                  </label>
+                  <input
+                    id="displayName"
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="输入显示名称"
+                    autoComplete="name"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    留空则使用用户名
+                  </p>
+                </div>
+              )}
+              
+              {/* 密码 */}
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                  密码
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="输入密码"
+                  required
+                  autoComplete={isLogin ? 'current-password' : 'new-password'}
+                />
+                
+                {/* 密码强度指示器(仅注册) */}
+                {!isLogin && password && passwordStrength && (
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-gray-600">密码强度:</span>
+                      <span className={`text-xs font-medium ${passwordStrength.color}`}>
+                        {passwordStrength.text}
+                      </span>
+                    </div>
+                    <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all ${
+                          passwordStrength.level === 1 ? 'bg-red-500 w-1/4' :
+                          passwordStrength.level === 2 ? 'bg-orange-500 w-2/4' :
+                          passwordStrength.level === 3 ? 'bg-yellow-500 w-3/4' :
+                          'bg-green-500 w-full'
+                        }`}
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      建议:至少8个字符,包含大小写字母和数字
+                    </p>
+                  </div>
+                )}
+                
+                {isLogin && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    至少6个字符
+                  </p>
+                )}
+              </div>
+              
+              {/* 提交按钮 */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors flex items-center justify-center"
+              >
+                {loading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    处理中...
+                  </>
+                ) : (
+                  isLogin ? '登录' : '注册'
+                )}
+              </button>
+            </form>
+          )}
           
           {/* 分割线 */}
           <div className="relative my-6">

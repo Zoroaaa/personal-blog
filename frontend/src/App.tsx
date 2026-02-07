@@ -10,6 +10,8 @@ import { SearchPage } from './pages/SearchPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { ConfigPage } from './pages/ConfigPage';
 import { AboutPage } from './pages/AboutPage';
+import { ReadingHistoryPage } from './pages/ReadingHistoryPage';
+import { FavoritesPage } from './pages/FavoritesPage';
 import { useSiteConfig } from './hooks/useSiteConfig';
 
 function App() {
@@ -63,6 +65,8 @@ function App() {
           <Route path="/admin/config" element={<ConfigPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/reading-history" element={<ReadingHistoryPage />} />
+          <Route path="/favorites" element={<FavoritesPage />} />
           </Routes>
         </main>
         <Footer />

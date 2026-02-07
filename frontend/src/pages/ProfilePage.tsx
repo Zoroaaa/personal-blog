@@ -86,6 +86,16 @@ export function ProfilePage() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>('');
   
+  // 邮箱验证相关状态
+  const [verificationCode, setVerificationCode] = useState('');
+  const [showVerificationCode, setShowVerificationCode] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  
+  // 更改邮箱相关状态
+  const [newEmail, setNewEmail] = useState('');
+  const [confirmNewEmail, setConfirmNewEmail] = useState('');
+  
   // 初始化数据
   useEffect(() => {
     if (user) {
@@ -133,7 +143,13 @@ export function ProfilePage() {
       });
       
       if (response.success && response.data) {
-        setComments(response.data.comments || []);
+        const processedComments = (response.data.comments || []).map((comment: any) => ({
+          ...comment,
+          createdAt: comment.createdAt || comment.created_at,
+          updatedAt: comment.updatedAt || comment.updated_at,
+          postId: comment.postId || comment.post_id
+        }));
+        setComments(processedComments);
       }
     } catch (error) {
       console.error('Failed to load comments:', error);
@@ -173,6 +189,21 @@ export function ProfilePage() {
       loadLikedPosts();
     }
   }, [activeTab]);
+  
+  // 倒计时功能
+  useEffect(() => {
+    let interval: number;
+    if (countdown > 0) {
+      interval = window.setInterval(() => {
+        setCountdown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [countdown]);
   
   // 处理表单输入变化
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -228,6 +259,45 @@ export function ProfilePage() {
     }
   };
   
+  // 发送验证码
+  const handleSendVerificationCode = async (type: 'reset_password' | 'delete_account' | 'change_email') => {
+    if (!userInfo?.email) {
+      setError('用户邮箱未设置，无法发送验证码');
+      return;
+    }
+    
+    setSendingCode(true);
+    setError('');
+    
+    try {
+      const emailToSend = type === 'change_email' ? newEmail : userInfo.email;
+      
+      if (type === 'change_email' && (!newEmail || newEmail === userInfo.email)) {
+        setError('请输入新的邮箱地址');
+        setSendingCode(false);
+        return;
+      }
+      
+      const response = await api.sendVerificationCode({
+        email: emailToSend,
+        type,
+        username: userInfo.username
+      });
+      
+      if (response.success) {
+        setCountdown(60); // 60秒倒计时
+        setShowVerificationCode(true);
+        setError('');
+      } else {
+        throw new Error(response.error || '发送验证码失败');
+      }
+    } catch (err: any) {
+      setError(err.message || '发送验证码失败');
+    } finally {
+      setSendingCode(false);
+    }
+  };
+  
   // 修改密码
   const handleChangePassword = async () => {
     try {
@@ -240,10 +310,16 @@ export function ProfilePage() {
         return;
       }
       
-      // 调用修改密码API
-      const response = await api.changePassword({
+      if (!showVerificationCode || !verificationCode) {
+        setError('请先获取并输入验证码');
+        return;
+      }
+      
+      // 调用修改密码API（带验证码）
+      const response = await api.changePasswordWithCode({
         currentPassword: formData.password,
-        newPassword: formData.newPassword
+        newPassword: formData.newPassword,
+        verificationCode
       });
       
       if (response.success) {
@@ -254,6 +330,8 @@ export function ProfilePage() {
           newPassword: '',
           confirmPassword: ''
         }));
+        setVerificationCode('');
+        setShowVerificationCode(false);
       }
     } catch (error) {
       console.error('Failed to change password:', error);
@@ -281,6 +359,51 @@ export function ProfilePage() {
     }
   };
   
+  // 更改邮箱
+  const handleChangeEmail = async () => {
+    try {
+      setLoading(prev => ({ ...prev, update: true }));
+      setError(null);
+      setSuccessMessage(null);
+      
+      if (newEmail !== confirmNewEmail) {
+        setError('两次输入的邮箱不一致');
+        return;
+      }
+      
+      if (!showVerificationCode || !verificationCode) {
+        setError('请先获取并输入验证码');
+        return;
+      }
+      
+      if (newEmail === userInfo?.email) {
+        setError('新邮箱与当前邮箱相同');
+        return;
+      }
+      
+      // 调用更改邮箱API（带验证码）
+      const response = await api.changeEmailWithCode({
+        newEmail,
+        verificationCode
+      });
+      
+      if (response.success) {
+        setSuccessMessage('邮箱更改成功');
+        setNewEmail('');
+        setConfirmNewEmail('');
+        setVerificationCode('');
+        setShowVerificationCode(false);
+        // 重新加载用户信息
+        await loadUserInfo();
+      }
+    } catch (error) {
+      console.error('Failed to change email:', error);
+      setError('更改邮箱失败');
+    } finally {
+      setLoading(prev => ({ ...prev, update: false }));
+    }
+  };
+  
   // 删除账号
   const handleDeleteAccount = async () => {
     if (!confirm('确定要删除您的账号吗？此操作不可恢复！')) {
@@ -294,10 +417,19 @@ export function ProfilePage() {
         return;
       }
       
+      if (!showVerificationCode || !verificationCode) {
+        setError('请先获取并输入验证码');
+        return;
+      }
+      
       setLoading(prev => ({ ...prev, delete: true }));
       setError(null);
       
-      const response = await api.deleteAccount(password);
+      // 调用删除账号API（带验证码）
+      const response = await api.deleteAccountWithCode({
+        password,
+        verificationCode
+      });
       if (response.success) {
         alert('账号删除成功');
         logout();
@@ -305,7 +437,7 @@ export function ProfilePage() {
       }
     } catch (error) {
       console.error('Failed to delete account:', error);
-      setError('删除账号失败，请检查密码是否正确');
+      setError('删除账号失败，请检查密码和验证码是否正确');
     } finally {
       setLoading(prev => ({ ...prev, delete: false }));
     }
@@ -459,12 +591,12 @@ export function ProfilePage() {
                 <p className="text-foreground mb-2">{comment.content}</p>
                 <div className="flex flex-col sm:flex-row sm:items-center text-sm space-y-2 sm:space-y-0 sm:space-x-4">
                   <Link 
-                    to={`/posts/${comment.post?.slug || comment.postId}`} 
+                    to={`/posts/${comment.postId}`} 
                     className="text-blue-600 hover:underline"
                   >
-                    {comment.post?.title || '查看文章'}
+                    查看文章
                   </Link>
-                  <span className="text-muted-foreground">{formatDate(comment.createdAt || comment.created_at)}</span>
+                  <span className="text-muted-foreground">{formatDate(comment.createdAt)}</span>
                 </div>
               </div>
               <button
@@ -585,6 +717,36 @@ export function ProfilePage() {
               />
             </div>
             
+            {/* 验证码 */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                验证码
+              </label>
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value)}
+                  className="flex-1 px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="输入验证码"
+                  disabled={!showVerificationCode}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleSendVerificationCode('reset_password')}
+                  disabled={sendingCode || countdown > 0}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap transition-colors"
+                >
+                  {sendingCode ? '发送中...' : 
+                   countdown > 0 ? `${countdown}s后重发` : 
+                   '发送验证码'}
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                验证码将发送到您的邮箱：{userInfo?.email}
+              </p>
+            </div>
+            
             <div>
               <button
                 type="button"
@@ -593,6 +755,91 @@ export function ProfilePage() {
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading.update ? '修改中...' : '修改密码'}
+              </button>
+            </div>
+          </form>
+        </div>
+        
+        {/* 更改邮箱 */}
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6">
+          <h3 className="text-xl font-semibold text-foreground mb-4">更改邮箱</h3>
+          <form className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                当前邮箱
+              </label>
+              <input
+                type="email"
+                value={userInfo?.email || ''}
+                disabled
+                className="w-full px-4 py-2 border border-border rounded-lg bg-muted focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                新邮箱
+              </label>
+              <input
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="输入新的邮箱地址"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                确认新邮箱
+              </label>
+              <input
+                type="email"
+                value={confirmNewEmail}
+                onChange={(e) => setConfirmNewEmail(e.target.value)}
+                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="再次输入新的邮箱地址"
+              />
+            </div>
+            
+            {/* 验证码 */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                验证码
+              </label>
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value)}
+                  className="flex-1 px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="输入验证码"
+                  disabled={!showVerificationCode}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleSendVerificationCode('change_email')}
+                  disabled={sendingCode || countdown > 0}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap transition-colors"
+                >
+                  {sendingCode ? '发送中...' : 
+                   countdown > 0 ? `${countdown}s后重发` : 
+                   '发送验证码'}
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                验证码将发送到您的新邮箱：{newEmail}
+              </p>
+            </div>
+            
+            <div>
+              <button
+                type="button"
+                onClick={handleChangeEmail}
+                disabled={loading.update}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {loading.update ? '修改中...' : '更改邮箱'}
               </button>
             </div>
           </form>
@@ -607,6 +854,37 @@ export function ProfilePage() {
               <p className="text-red-700 mb-4">
                 一旦删除账号，所有数据将被永久删除，无法恢复。
               </p>
+              
+              {/* 验证码 */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-red-800 mb-1">
+                  验证码
+                </label>
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value)}
+                    className="flex-1 px-4 py-2 border border-red-300 rounded-lg bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    placeholder="输入验证码"
+                    disabled={!showVerificationCode}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleSendVerificationCode('delete_account')}
+                    disabled={sendingCode || countdown > 0}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap transition-colors"
+                  >
+                    {sendingCode ? '发送中...' : 
+                     countdown > 0 ? `${countdown}s后重发` : 
+                     '发送验证码'}
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-red-600">
+                  验证码将发送到您的邮箱：{userInfo?.email}
+                </p>
+              </div>
+              
               <button
                 onClick={handleDeleteAccount}
                 disabled={loading.delete}
