@@ -688,3 +688,4 @@ INSERT OR REPLACE INTO schema_version (version, description) VALUES
 -- =============================================
 -- Schema 创建完成
 -- =============================================
+
