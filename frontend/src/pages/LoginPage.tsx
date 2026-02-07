@@ -33,6 +33,12 @@ export function LoginPage() {
   const [emailVerificationCode, setEmailVerificationCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
   const [codeSending, setCodeSending] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+  const [resetCodeSent, setResetCodeSent] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
@@ -208,6 +214,142 @@ export function LoginPage() {
   
   const passwordStrength = !isLogin ? getPasswordStrength(password) : null;
   
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (resetPassword !== resetConfirmPassword) {
+      setError('两次输入的密码不一致');
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await api.resetPassword({
+        email: resetEmail.trim(),
+        verificationCode: resetCode.trim(),
+        newPassword: resetPassword,
+      });
+      if (response.success) {
+        alert('密码重置成功，请使用新密码登录');
+        setShowForgotPassword(false);
+        setResetEmail('');
+        setResetCode('');
+        setResetPassword('');
+        setResetConfirmPassword('');
+        setResetCodeSent(false);
+      } else {
+        throw new Error(response.error || response.message || '重置失败');
+      }
+    } catch (err: any) {
+      setError(err.message || '重置密码失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  if (showForgotPassword) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 bg-gray-50">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-lg p-8">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold text-gray-900">重置密码</h2>
+              <p className="mt-2 text-sm text-gray-600">通过邮箱验证码重置您的密码</p>
+            </div>
+            {error && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
+            <form onSubmit={handleResetPassword} className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">邮箱</label>
+                <input
+                  type="email"
+                  value={resetEmail}
+                  onChange={(e) => { setResetEmail(e.target.value); setResetCodeSent(false); }}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                  placeholder="请输入注册时使用的邮箱"
+                  required
+                />
+              </div>
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">邮箱验证码</label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={resetCode}
+                    onChange={(e) => setResetCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="6 位验证码"
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!resetEmail.trim()) { setError('请先填写邮箱'); return; }
+                    setCodeSending(true); setError('');
+                    try {
+                      const res = await api.sendVerificationCode({ email: resetEmail.trim(), type: 'forgot_password' });
+                      if (res.success) { setResetCodeSent(true); setError(''); }
+                      else setError(res.message || res.error || '发送失败');
+                    } catch (e: any) {
+                      setError(e.message || '发送验证码失败');
+                    } finally {
+                      setCodeSending(false);
+                    }
+                  }}
+                  disabled={codeSending}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap text-sm"
+                >
+                  {codeSending ? '发送中...' : resetCodeSent ? '已发送' : '获取验证码'}
+                </button>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">新密码</label>
+                <input
+                  type="password"
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                  placeholder="至少8位，含大小写字母和数字"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">确认新密码</label>
+                <input
+                  type="password"
+                  value={resetConfirmPassword}
+                  onChange={(e) => setResetConfirmPassword(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                  placeholder="再次输入新密码"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+              >
+                {loading ? '提交中...' : '重置密码'}
+              </button>
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => { setShowForgotPassword(false); setError(''); }}
+                  className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+                >
+                  返回登录
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 bg-gray-50">
       <div className="max-w-md w-full">
@@ -380,9 +522,16 @@ export function LoginPage() {
               )}
               
               {isLogin && (
-                <p className="mt-1 text-xs text-gray-500">
-                  至少6个字符
-                </p>
+                <div className="mt-1 flex items-center justify-between">
+                  <p className="text-xs text-gray-500">至少6个字符</p>
+                  <button
+                    type="button"
+                    onClick={() => { setShowForgotPassword(true); setError(''); }}
+                    className="text-xs text-blue-600 hover:text-blue-700"
+                  >
+                    忘记密码?
+                  </button>
+                </div>
               )}
             </div>
             

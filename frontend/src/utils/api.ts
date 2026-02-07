@@ -226,6 +226,15 @@ export const api = {
     }),
   
   /**
+   * 通过邮箱验证码重置密码（忘记密码）
+   */
+  resetPassword: (data: { email: string; verificationCode: string; newPassword: string }) =>
+    apiRequest<{ reset: boolean }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /**
    * GitHub OAuth登录
    */
   githubLogin: (code: string) =>
@@ -384,9 +393,9 @@ export const api = {
   },
   
   /**
-   * 发送邮箱验证码（注册传 email+type=register；改密/删号需登录传 type=password 或 delete）
+   * 发送邮箱验证码（注册/忘记密码传 email+type；改密/删号需登录传 type=password 或 delete）
    */
-  sendVerificationCode: (data: { email?: string; type: 'register' | 'password' | 'delete' }) =>
+  sendVerificationCode: (data: { email?: string; type: 'register' | 'password' | 'delete' | 'forgot_password' }) =>
     apiRequest<{ sent: boolean }>('/auth/send-verification-code', {
       method: 'POST',
       body: JSON.stringify(data),
