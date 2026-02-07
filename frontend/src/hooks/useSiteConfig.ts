@@ -24,116 +24,116 @@ import { useAuthStore } from '../stores/authStore';
 
 export interface SiteConfig {
   // 基本信息
-  site_name: string;
-  site_subtitle: string;
-  site_logo: string;
-  site_favicon: string;
-  site_description: string;
-  site_keywords: string;
-  site_author: string;
+  siteName: string;
+  siteSubtitle: string;
+  siteLogo: string;
+  siteFavicon: string;
+  siteDescription: string;
+  siteKeywords: string;
+  siteAuthor: string;
   
   // 作者信息
-  author_name: string;
-  author_avatar: string;
-  author_bio: string;
-  author_email: string;
+  authorName: string;
+  authorAvatar: string;
+  authorBio: string;
+  authorEmail: string;
   
   // 主题配置
-  theme_primary_color: string;
-  theme_default_mode: 'light' | 'dark' | 'system';
-  theme_font_family: string;
-  theme_enable_animations: boolean;
+  themePrimaryColor: string;
+  themeDefaultMode: 'light' | 'dark' | 'system';
+  themeFontFamily: string;
+  themeEnableAnimations: boolean;
   
   // 社交媒体
-  social_github?: string;
-  social_twitter?: string;
-  social_linkedin?: string;
-  social_email?: string;
-  social_weibo?: string;
-  social_wechat_qr?: string;
+  socialGithub?: string;
+  socialTwitter?: string;
+  socialLinkedin?: string;
+  socialEmail?: string;
+  socialWeibo?: string;
+  socialWechatQr?: string;
   
   // 功能开关
-  feature_comments: boolean;
-  feature_search: boolean;
-  feature_like: boolean;
-  feature_share: boolean;
-  feature_rss: boolean;
-  feature_analytics: boolean;
-  feature_newsletter: boolean;
+  featureComments: boolean;
+  featureSearch: boolean;
+  featureLike: boolean;
+  featureShare: boolean;
+  featureRss: boolean;
+  featureAnalytics: boolean;
+  featureNewsletter: boolean;
   
   // 评论设置
-  comment_approval_required: boolean;
+  commentApprovalRequired: boolean;
   
   // 页脚配置
-  footer_text: string;
-  footer_links?: Record<string, string> | string;
-  footer_show_powered_by: boolean;
+  footerText: string;
+  footerLinks?: Record<string, string> | string;
+  footerShowPoweredBy: boolean;
   
   // 存储配置
-  storage_public_url?: string;
+  storagePublicUrl?: string;
   
   // 系统设置
-  posts_per_page: number;
-  max_upload_size_mb: number;
-  enable_maintenance_mode: boolean;
+  postsPerPage: number;
+  maxUploadSizeMb: number;
+  enableMaintenanceMode: boolean;
 }
 
 // ============= 默认配置 =============
 
 const DEFAULT_CONFIG: SiteConfig = {
   // 基本信息
-  site_name: '我的博客',
-  site_subtitle: '分享技术与生活',
-  site_logo: '',
-  site_favicon: '',
-  site_description: '一个分享技术和生活的个人博客',
-  site_keywords: 'blog,技术,编程',
-  site_author: 'Admin',
+  siteName: '我的博客',
+  siteSubtitle: '分享技术与生活',
+  siteLogo: '',
+  siteFavicon: '',
+  siteDescription: '一个分享技术和生活的个人博客',
+  siteKeywords: 'blog,技术,编程',
+  siteAuthor: 'Admin',
   
   // 作者信息
-  author_name: 'Admin',
-  author_avatar: '',
-  author_bio: '热爱技术的开发者',
-  author_email: 'admin@example.com',
+  authorName: 'Admin',
+  authorAvatar: '',
+  authorBio: '热爱技术的开发者',
+  authorEmail: 'admin@example.com',
   
   // 主题配置
-  theme_primary_color: '#3B82F6',
-  theme_default_mode: 'system',
-  theme_font_family: 'system-ui, -apple-system, sans-serif',
-  theme_enable_animations: true,
+  themePrimaryColor: '#3B82F6',
+  themeDefaultMode: 'system',
+  themeFontFamily: 'system-ui, -apple-system, sans-serif',
+  themeEnableAnimations: true,
   
   // 社交媒体
-  social_github: '',
-  social_twitter: '',
-  social_linkedin: '',
-  social_email: '',
-  social_weibo: '',
-  social_wechat_qr: '',
+  socialGithub: '',
+  socialTwitter: '',
+  socialLinkedin: '',
+  socialEmail: '',
+  socialWeibo: '',
+  socialWechatQr: '',
   
   // 功能开关
-  feature_comments: true,
-  feature_search: true,
-  feature_like: true,
-  feature_share: true,
-  feature_rss: true,
-  feature_analytics: true,
-  feature_newsletter: false,
+  featureComments: true,
+  featureSearch: true,
+  featureLike: true,
+  featureShare: true,
+  featureRss: true,
+  featureAnalytics: true,
+  featureNewsletter: false,
   
   // 评论设置
-  comment_approval_required: false,
+  commentApprovalRequired: false,
   
   // 页脚配置
-  footer_text: '© 2024 All rights reserved',
-  footer_show_powered_by: true,
-  footer_links: '{}',
+  footerText: '© 2024 All rights reserved',
+  footerShowPoweredBy: true,
+  footerLinks: '{}',
   
   // 存储配置
-  storage_public_url: '',
+  storagePublicUrl: '',
   
   // 系统设置
-  posts_per_page: 10,
-  max_upload_size_mb: 5,
-  enable_maintenance_mode: false
+  postsPerPage: 10,
+  maxUploadSizeMb: 5,
+  enableMaintenanceMode: false
 };
 
 // ============= 配置状态管理 =============
@@ -216,8 +216,8 @@ export function useSiteConfig() {
   
   // 同步主题配置
   const syncThemeConfig = (config: SiteConfig) => {
-    if (config.theme_primary_color || config.theme_default_mode) {
-      syncWithTheme(config.theme_primary_color, config.theme_default_mode);
+    if (config.themePrimaryColor || config.themeDefaultMode) {
+      syncWithTheme(config.themePrimaryColor, config.themeDefaultMode);
     }
   };
   
@@ -257,7 +257,7 @@ export function useSiteConfig() {
         setState(prev => ({ ...prev, loading: true, error: null }));
         
         let configResponse;
-        let apiConfig;
+        let apiConfig: Record<string, any> | undefined;
         
         // 根据是否是管理员选择不同的API接口
         if (isAdmin) {
@@ -342,7 +342,7 @@ export function useSiteConfig() {
     try {
       // 处理特殊字段
       let processedValue = value;
-      if (key === 'footer_links' && typeof value === 'object') {
+      if (key === 'footerLinks' && typeof value === 'object') {
         processedValue = JSON.stringify(value);
       }
       
@@ -353,14 +353,14 @@ export function useSiteConfig() {
         setState(prev => {
           const newConfig = { 
             ...(prev.config || DEFAULT_CONFIG), 
-            [key]: key === 'footer_links' ? processFooterLinks(processedValue) : processedValue 
+            [key]: key === 'footerLinks' ? processFooterLinks(processedValue) : processedValue 
           };
           
           // 更新缓存
           setCachedConfig(newConfig);
           
           // 如果更新的是主题配置,同步到主题Store
-          if (key === 'theme_primary_color' || key === 'theme_default_mode') {
+          if (key === 'themePrimaryColor' || key === 'themeDefaultMode') {
             syncThemeConfig(newConfig);
           }
           
@@ -454,7 +454,16 @@ export function getConfigValue<K extends keyof SiteConfig>(
 export function isFeatureEnabled(
   feature: 'comments' | 'search' | 'like' | 'share' | 'rss' | 'analytics' | 'newsletter'
 ): boolean {
-  const key = `feature_${feature}` as keyof SiteConfig;
+  const keyMap: Record<string, keyof SiteConfig> = {
+    comments: 'featureComments',
+    search: 'featureSearch',
+    like: 'featureLike',
+    share: 'featureShare',
+    rss: 'featureRss',
+    analytics: 'featureAnalytics',
+    newsletter: 'featureNewsletter'
+  };
+  const key = keyMap[feature];
   return getConfigValue(key) as boolean;
 }
 
@@ -464,7 +473,15 @@ export function isFeatureEnabled(
 export function getSocialLink(
   platform: 'github' | 'twitter' | 'linkedin' | 'email' | 'weibo' | 'wechat_qr'
 ): string {
-  const key = `social_${platform}` as keyof SiteConfig;
+  const keyMap: Record<string, keyof SiteConfig> = {
+    github: 'socialGithub',
+    twitter: 'socialTwitter',
+    linkedin: 'socialLinkedin',
+    email: 'socialEmail',
+    weibo: 'socialWeibo',
+    wechat_qr: 'socialWechatQr'
+  };
+  const key = keyMap[platform];
   return getConfigValue(key) as string || '';
 }
 
@@ -472,7 +489,7 @@ export function getSocialLink(
  * 获取页脚链接
  */
 export function getFooterLinks(): Record<string, string> {
-  const links = getConfigValue('footer_links');
+  const links = getConfigValue('footerLinks');
   if (typeof links === 'string') {
     try {
       return JSON.parse(links);

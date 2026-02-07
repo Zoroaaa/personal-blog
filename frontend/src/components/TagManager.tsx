@@ -5,15 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
-
-interface Tag {
-  id: number;
-  name: string;
-  slug: string;
-  description: string;
-  color: string;
-  post_count: number;
-}
+import { Tag } from '../types';
 
 // 预设颜色选项 - 更丰富的配色方案
 const PRESET_COLORS = [
@@ -163,7 +155,7 @@ export function TagManager() {
     )
     .sort((a, b) => {
       if (sortBy === 'count') {
-        return b.post_count - a.post_count;
+        return b.postCount - a.postCount;
       }
       return a.name.localeCompare(b.name);
     });
@@ -220,13 +212,13 @@ export function TagManager() {
         <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
           <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">使用中</div>
           <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-            {tags.filter(t => t.post_count > 0).length}
+            {tags.filter(t => t.postCount > 0).length}
           </div>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
           <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">未使用</div>
           <div className="text-2xl font-bold text-gray-400">
-            {tags.filter(t => t.post_count === 0).length}
+            {tags.filter(t => t.postCount === 0).length}
           </div>
         </div>
       </div>
@@ -484,11 +476,11 @@ export function TagManager() {
                     </td>
                     <td className="px-6 py-4 text-center">
                       <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
-                        tag.post_count > 0
+                        tag.postCount > 0
                           ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
                           : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-400'
                       }`}>
-                        {tag.post_count} 篇
+                        {tag.postCount} 篇
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">

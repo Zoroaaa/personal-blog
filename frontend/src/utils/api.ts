@@ -657,6 +657,204 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ password, confirmation: 'DELETE' }),
     }),
+  
+  // ============= 邮箱验证相关 =============
+  
+  /**
+   * 发送邮箱验证码
+   */
+  sendVerificationCode: (data: {
+    email: string;
+    type: 'register' | 'reset_password' | 'delete_account' | 'change_email';
+    username?: string;
+  }) =>
+    apiRequest<{ sent: boolean; expiresIn: number }>('/email/send-code', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  /**
+   * 带验证码的注册
+   */
+  registerWithVerification: (data: {
+    username: string;
+    email: string;
+    password: string;
+    displayName?: string;
+    verificationCode: string;
+  }) =>
+    apiRequest<{ user: User; token: string }>('/auth/register-with-verification', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  /**
+   * 请求密码重置(第一步)
+   */
+  requestPasswordReset: (email: string) =>
+    apiRequest<{ requested: boolean }>('/auth/request-password-reset', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+  
+  /**
+   * 重置密码(第二步,需要验证码)
+   */
+  resetPassword: (data: {
+    email: string;
+    verificationCode: string;
+    newPassword: string;
+  }) =>
+    apiRequest<{ reset: boolean }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  /**
+   * 修改密码(需要验证码)
+   */
+  changePasswordWithCode: (data: {
+    currentPassword: string;
+    newPassword: string;
+    verificationCode: string;
+  }) =>
+    apiRequest<{ changed: boolean }>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  /**
+   * 删除账号(需要验证码)
+   */
+  deleteAccountWithCode: (data: {
+    password?: string;
+    verificationCode: string;
+  }) =>
+    apiRequest<{ deleted: boolean }>('/auth/delete-account', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  /**
+   * 更改邮箱(需要验证码)
+   */
+  changeEmailWithCode: (data: {
+    newEmail: string;
+    verificationCode: string;
+  }) =>
+    apiRequest<{ changed: boolean }>('/auth/change-email', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  // ============= 阅读历史相关 =============
+  
+  /**
+   * 记录/更新阅读历史
+   */
+  recordReadingHistory: (data: {
+    postId: number;
+    readingProgress: number;
+    readingTime: number;
+    scrollPosition?: number;
+  }) =>
+    apiRequest<{ recorded: boolean }>('/user/reading-history', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  /**
+   * 获取阅读历史列表
+   */
+  getReadingHistory: (page: number = 1, limit: number = 20) =>
+    apiRequest<{
+      history: any[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+    }>(`/user/reading-history?page=${page}&limit=${limit}`),
+  
+  /**
+   * 删除单条阅读历史
+   */
+  deleteReadingHistory: (historyId: number) =>
+    apiRequest<{ deleted: boolean }>(`/user/reading-history/${historyId}`, {
+      method: 'DELETE',
+    }),
+  
+  /**
+   * 清空所有阅读历史
+   */
+  clearReadingHistory: () =>
+    apiRequest<{ deleted: number }>('/user/reading-history', {
+      method: 'DELETE',
+    }),
+  
+  // ============= 收藏相关 =============
+  
+  /**
+   * 收藏文章
+   */
+  favoritePost: (postId: number, notes?: string) =>
+    apiRequest<{ favorited: boolean }>(`/user/favorites/${postId}`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    }),
+  
+  /**
+   * 取消收藏文章
+   */
+  unfavoritePost: (postId: number) =>
+    apiRequest<{ favorited: boolean }>(`/user/favorites/${postId}`, {
+      method: 'DELETE',
+    }),
+  
+  /**
+   * 获取收藏列表
+   */
+  getFavorites: (page: number = 1, limit: number = 20) =>
+    apiRequest<{
+      favorites: any[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+    }>(`/user/favorites?page=${page}&limit=${limit}`),
+  
+  /**
+   * 检查文章是否已收藏
+   */
+  checkFavoriteStatus: (postId: number) =>
+    apiRequest<{ isFavorited: boolean }>(`/user/favorites/check/${postId}`),
+  
+  // ============= 优化的点赞API =============
+  
+  /**
+   * 点赞/取消点赞文章(优化版,返回最新点赞数)
+   */
+  togglePostLike: (postId: number) =>
+    apiRequest<{ liked: boolean; likeCount: number }>(`/posts/${postId}/like`, {
+      method: 'POST',
+    }),
+  
+  /**
+   * 获取文章点赞状态和点赞数
+   */
+  getPostLikeStatus: (postId: number) =>
+    apiRequest<{ likeCount: number; isLiked: boolean }>(`/posts/${postId}/like-status`),
+  
+  /**
+   * 点赞/取消点赞评论(优化版)
+   */
+  toggleCommentLike: (commentId: number) =>
+    apiRequest<{ liked: boolean; likeCount: number }>(`/posts/comments/${commentId}/like`, {
+      method: 'POST',
+    }),
 };
 
 // ============= 辅助函数 =============

@@ -19,7 +19,7 @@
  * @version 3.0.0
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSiteConfig } from '../hooks/useSiteConfig';
 import { useAuthStore } from '../stores/authStore';
 import { useTheme } from '../stores/themeStore';
@@ -392,7 +392,7 @@ export function ConfigPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { config, loading: configLoading, updateConfig, refreshConfig } = useSiteConfig();
-  const { setPrimaryColor, setThemeMode, config: themeConfig } = useTheme();
+  const { setPrimaryColor, setThemeMode } = useTheme();
   
   const [localConfig, setLocalConfig] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -408,9 +408,29 @@ export function ConfigPage() {
     }
   }, [user, navigate]);
 
+  // 蛇形命名转驼峰命名
+  const snakeToCamel = (str: string): string => {
+    return str.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+  };
+
+  // 驼峰命名转蛇形命名
+  const camelToSnake = (str: string): string => {
+    return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+  };
+
   // 初始化本地配置
   useEffect(() => {
-    setLocalConfig(config);
+    // 处理配置键的命名转换
+    const processedConfig: Record<string, any> = {};
+    configGroups.forEach(group => {
+      group.items.forEach(item => {
+        const camelKey = snakeToCamel(item.key);
+        if (config[camelKey] !== undefined) {
+          processedConfig[item.key] = config[camelKey];
+        }
+      });
+    });
+    setLocalConfig(processedConfig);
   }, [config]);
 
   // 处理输入变化
@@ -480,7 +500,9 @@ export function ConfigPage() {
 
     try {
       setUpdating(key);
-      await updateConfig(key, value);
+      // 将蛇形命名的key转换为驼峰命名
+      const camelKey = snakeToCamel(key);
+      await updateConfig(camelKey, value);
       
       // 保存后强制刷新缓存
       await refreshConfig();
@@ -504,7 +526,7 @@ export function ConfigPage() {
     
     for (const group of configGroups) {
       for (const item of group.items) {
-        if (localConfig[item.key] !== config[item.key]) {
+        if (localConfig[item.key] !== (config as Record<string, any>)[item.key]) {
           const error = validateConfigItem(item, localConfig[item.key]);
           if (error) {
             validationErrors[item.key] = error;
@@ -522,8 +544,9 @@ export function ConfigPage() {
     // 准备要更新的配置
     const changedConfigs: Record<string, any> = {};
     for (const key in localConfig) {
-      if (localConfig[key] !== config[key]) {
-        changedConfigs[key] = localConfig[key];
+      const camelKey = snakeToCamel(key);
+      if (localConfig[key] !== config[camelKey]) {
+        changedConfigs[camelKey] = localConfig[key];
       }
     }
 
@@ -558,11 +581,12 @@ export function ConfigPage() {
       setErrors({});
       
       // 重置主题预览
-      if (config.theme_primary_color) {
-        setPrimaryColor(config.theme_primary_color);
+      const configObj = config as Record<string, any>;
+      if (configObj.theme_primary_color) {
+        setPrimaryColor(configObj.theme_primary_color);
       }
-      if (config.theme_default_mode) {
-        setThemeMode(config.theme_default_mode);
+      if (configObj.theme_default_mode) {
+        setThemeMode(configObj.theme_default_mode);
       }
     }
   };

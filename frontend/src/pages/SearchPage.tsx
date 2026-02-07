@@ -15,7 +15,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { api } from '../utils/api';
 import { format } from 'date-fns';
-import type { Post } from '../types';
+import type { PostListItem } from '../types';
 
 // ============= 辅助函数 =============
 
@@ -45,7 +45,7 @@ function formatDate(date: any, formatStr: string = 'yyyy-MM-dd HH:mm'): string {
 
 export function SearchPage() {
   const [searchParams] = useSearchParams();
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [posts, setPosts] = useState<PostListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
@@ -53,8 +53,8 @@ export function SearchPage() {
   const [hasMore, setHasMore] = useState(true);
   
   const query = searchParams.get('q') || '';
-  const category = searchParams.get('category');
-  const tag = searchParams.get('tag');
+  const category = searchParams.get('category') || undefined;
+  const tag = searchParams.get('tag') || undefined;
   
   useEffect(() => {
     if (query || category || tag) {
@@ -81,7 +81,7 @@ export function SearchPage() {
         if (pageNum === 1) {
           setPosts(response.data.posts || []);
         } else {
-          setPosts(prev => [...prev, ...(response.data.posts || [])]);
+          setPosts(prev => [...prev, ...(response.data?.posts || [])]);
         }
         setTotal(response.data.total || 0);
         setHasMore((pageNum * 10) < (response.data.total || 0));
@@ -173,21 +173,21 @@ export function SearchPage() {
                     </h2>
                     <div className="flex items-center text-sm text-gray-500 space-x-4">
                       <span className="flex items-center">
-                        {post.authorAvatar || post.author_avatar ? (
+                        {post.authorAvatar ? (
                           <img 
-                            src={post.authorAvatar || post.author_avatar} 
-                            alt={post.authorName || post.author_name} 
+                            src={post.authorAvatar} 
+                            alt={post.authorName || 'Unknown'} 
                             className="w-5 h-5 rounded-full mr-1" 
                           />
                         ) : (
                           <div className="w-5 h-5 rounded-full bg-gray-300 mr-1"></div>
                         )}
-                        {post.authorName || post.author_name || 'Unknown'}
+                        {post.authorName || 'Unknown'}
                       </span>
-                      <span>{formatDate(post.publishedAt || post.published_at)}</span>
-                      <span>{post.viewCount || post.view_count || 0} 次阅读</span>
-                      {(post.readingTime || post.reading_time) && (
-                        <span>{post.readingTime || post.reading_time} 分钟</span>
+                      <span>{formatDate(post.publishedAt)}</span>
+                      <span>{post.viewCount || 0} 次阅读</span>
+                      {post.readingTime && (
+                        <span>{post.readingTime} 分钟</span>
                       )}
                     </div>
                   </div>
@@ -214,12 +214,12 @@ export function SearchPage() {
                   )}
                   
                   {/* 分类 */}
-                  {post.category && (
+                  {post.categoryName && (
                     <Link
-                      to={`/search?category=${post.category.slug}`}
+                      to={`/search?category=${post.categoryName}`}
                       className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs hover:bg-blue-200 transition-colors"
                     >
-                      {post.category.name}
+                      {post.categoryName}
                     </Link>
                   )}
                 </div>

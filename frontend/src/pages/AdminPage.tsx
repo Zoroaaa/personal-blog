@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../stores/authStore';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../utils/api';
-import { useSiteConfig } from '../hooks/useSiteConfig';
 // 导入新增的组件
 import { CategoryManager } from '../components/CategoryManager';
 import { TagManager } from '../components/TagManager';
@@ -26,14 +25,6 @@ export function AdminPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>('posts');
   
   // 文章创建状态
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [summary, setSummary] = useState('');
-  const [coverImage, setCoverImage] = useState('');
-  const [postStatus, setPostStatus] = useState<'draft' | 'published'>('draft');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
   const [editingPostId, setEditingPostId] = useState<number | null>(null);
   
   // 文章列表状态
@@ -78,7 +69,8 @@ export function AdminPage() {
   useEffect(() => {
     const editPostId = searchParams.get('edit');
     if (editPostId) {
-      loadPostForEdit(parseInt(editPostId));
+      setEditingPostId(parseInt(editPostId));
+      setShowCreateForm(true);
     }
   }, [searchParams]);
   
@@ -88,30 +80,6 @@ export function AdminPage() {
       loadPosts();
     }
   }, [activeTab, showCreateForm]);
-  
-  // 加载文章详情用于编辑
-  const loadPostForEdit = async (postId: number) => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      const response = await api.getPostById(postId);
-      if (response.success && response.data) {
-        setTitle(response.data.title);
-        setContent(response.data.content);
-        setSummary(response.data.summary || '');
-        // 尝试从多个可能的字段中获取封面图片
-        setCoverImage(response.data.coverImage || response.data.cover_image || '');
-        setPostStatus(response.data.status as 'draft' | 'published');
-        setEditingPostId(postId);
-        setShowCreateForm(true);
-      }
-    } catch (err: any) {
-      setError(err.message || '加载文章失败');
-    } finally {
-      setLoading(false);
-    }
-  };
   
   // 加载文章列表
   const loadPosts = async () => {
@@ -135,7 +103,6 @@ export function AdminPage() {
     if (!confirm('确定要删除这篇文章吗？')) return;
     
     try {
-      setLoading(true);
       // 先从本地状态中移除该文章，立即更新UI
       setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
       // 然后发送删除请求
@@ -144,9 +111,6 @@ export function AdminPage() {
     } catch (err: any) {
       // 如果删除失败，重新加载列表以恢复正确的状态
       await loadPosts();
-      setError(err.message || '删除失败');
-    } finally {
-      setLoading(false);
     }
   };
   
@@ -179,7 +143,7 @@ export function AdminPage() {
     setCommentsError('');
     try {
       const response = await api.getAdminComments({ page: '1', limit: '10' });
-      setComments(response.data.comments || []);
+      setComments(response.data?.comments || []);
     } catch (err: any) {
       setCommentsError(err.message || '加载评论失败');
     } finally {
@@ -193,7 +157,7 @@ export function AdminPage() {
     setUsersError('');
     try {
       const response = await api.getAdminUsers({ page: '1', limit: '10' });
-      setUsers(response.data.users || []);
+      setUsers(response.data?.users || []);
     } catch (err: any) {
       setUsersError(err.message || '加载用户失败');
     } finally {
@@ -234,69 +198,6 @@ export function AdminPage() {
       loadUsers();
     } catch (err: any) {
       setUsersError(err.message || '更新用户角色失败');
-    }
-  };
-  
-
-  
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSuccess(false);
-    setLoading(true);
-    
-    try {
-      if (editingPostId) {
-        // 编辑模式
-        await api.updatePost(editingPostId, {
-          title,
-          content,
-          summary,
-          coverImage,
-          status: postStatus,
-        });
-        setSuccess(true);
-        setTimeout(() => {
-          setSuccess(false);
-          setShowCreateForm(false);
-          setEditingPostId(null);
-          // 重置表单
-          setTitle('');
-          setContent('');
-          setSummary('');
-          setCoverImage('');
-          setPostStatus('draft');
-          // 重新加载文章列表，确保状态更新
-          loadPosts();
-        }, 1000);
-      } else {
-        // 创建模式
-        await api.createPost({
-          title,
-          content,
-          summary,
-          coverImage,
-          status: postStatus,
-        });
-        setSuccess(true);
-        setTimeout(() => {
-          setSuccess(false);
-          // 重置表单
-          setTitle('');
-          setContent('');
-          setSummary('');
-          setCoverImage('');
-          setPostStatus('draft');
-          // 关闭创建表单，返回文章列表
-          setShowCreateForm(false);
-          // 重新加载文章列表，确保新文章显示
-          loadPosts();
-        }, 1000);
-      }
-    } catch (err: any) {
-      setError(err.message || '操作失败');
-    } finally {
-      setLoading(false);
     }
   };
   
@@ -389,15 +290,15 @@ export function AdminPage() {
                               }`}>
                                 {post.status === 'published' ? '已发布' : '草稿'}
                               </span>
-                              {post.category_name && (
+                              {(post.category_name || post.categoryName) && (
                                 <span className="flex items-center gap-1">
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                                   </svg>
-                                  {post.category_name}
+                                  {post.category_name || post.categoryName}
                                 </span>
                               )}
-                              {post.tags && post.tags.length > 0 && (
+                              {(post.tags && post.tags.length > 0) && (
                                 <span className="flex items-center gap-1">
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
@@ -405,13 +306,16 @@ export function AdminPage() {
                                   {post.tags.map((tag: any) => tag.name).join(', ')}
                                 </span>
                               )}
-                              <span>{post.view_count || 0} 次浏览</span>
-                              <span>{new Date(post.created_at).toLocaleDateString()}</span>
+                              <span>{post.view_count || post.viewCount || 0} 次浏览</span>
+                              <span>{new Date(post.created_at || post.createdAt).toLocaleDateString()}</span>
                             </div>
                           </div>
                           <div className="flex gap-2 ml-4">
                             <button
-                              onClick={() => loadPostForEdit(post.id)}
+                              onClick={() => {
+                                setEditingPostId(post.id);
+                                setShowCreateForm(true);
+                              }}
                               className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded"
                             >
                               编辑
@@ -607,7 +511,7 @@ export function AdminPage() {
                           </select>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
-                          {userItem.created_at ? new Date(userItem.created_at).toLocaleString() : userItem.createdAt ? new Date(userItem.createdAt).toLocaleString() : '未知'}
+                          {new Date(userItem.created_at || userItem.createdAt).toLocaleString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <button

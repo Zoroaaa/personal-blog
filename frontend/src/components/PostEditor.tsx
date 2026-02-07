@@ -13,22 +13,7 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
-
-interface Category {
-  id: number;
-  name: string;
-  slug: string;
-  icon: string;
-  color: string;
-}
-
-interface Tag {
-  id: number;
-  name: string;
-  slug: string;
-  color: string;
-  post_count: number;
-}
+import { Category, Tag, CreatePostRequest, UpdatePostRequest } from '../types';
 
 interface PostEditorProps {
   postId?: number;
@@ -113,7 +98,7 @@ export function PostEditor({ postId, onSave, onCancel }: PostEditorProps) {
         setSummary(post.summary || '');
         setCoverImage(post.cover_image || post.coverImage || '');
         setStatus(post.status);
-        setSelectedCategoryId(post.category_id);
+        setSelectedCategoryId(post.category_id || post.categoryId || null);
         setSelectedTagIds(post.tags?.map((t: any) => t.id) || []);
       }
     } catch (err: any) {
@@ -145,7 +130,7 @@ export function PostEditor({ postId, onSave, onCancel }: PostEditorProps) {
         content,
         summary,
         coverImage,
-        categoryId: selectedCategoryId,
+        categoryId: selectedCategoryId || undefined,
         tags: selectedTagIds,
         status
       };

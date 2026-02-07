@@ -4,10 +4,25 @@ export function Footer() {
   const { config } = useSiteConfig();
   
   // 获取配置值，使用默认值作为后备
-  const brandName = config.footer_brand_name || config.site_name || '我的博客';
-  const footerDescription = config.footer_description || '分享技术,记录生活';
-  const quickLinks = config.footer_links || { '首页': '/', '关于': '/about' };
-  const techStack = config.footer_tech_stack || ['React + TypeScript', 'Cloudflare Workers', 'Tailwind CSS'];
+  const brandName = config.site_name || '我的博客';
+  const footerDescription = config.site_description || '分享技术,记录生活';
+  
+  // 处理 footer_links 字段，确保它是一个对象
+  let quickLinks: Record<string, string> = { '首页': '/', '关于': '/about' };
+  if (config.footer_links) {
+    if (typeof config.footer_links === 'string') {
+      try {
+        quickLinks = JSON.parse(config.footer_links);
+      } catch {
+        quickLinks = { '首页': '/', '关于': '/about' };
+      }
+    } else {
+      quickLinks = config.footer_links;
+    }
+  }
+  
+  // 技术栈（使用默认值，因为配置中没有该字段）
+  const techStack = ['React + TypeScript', 'Cloudflare Workers', 'Tailwind CSS'];
   const footerText = config.footer_text || `© ${new Date().getFullYear()} ${brandName}`;
   
   return (

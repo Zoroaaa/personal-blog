@@ -15,25 +15,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../utils/api';
 import { format } from 'date-fns';
-import type { PostListItem } from '../types';
-
-interface Category {
-  id: number;
-  name: string;
-  slug: string;
-  description: string;
-  icon: string;
-  color: string;
-  post_count: number;
-}
-
-interface Tag {
-  id: number;
-  name: string;
-  slug: string;
-  color: string;
-  post_count: number;
-}
+import type { PostListItem, Category, Tag } from '../types';
 
 export function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -134,19 +116,22 @@ export function HomePage() {
       const response = await api.getPosts(params);
       
       if (response.success && response.data) {
-        const processedPosts = (response.data.posts || []).map((post: any) => ({
-          ...post,
-          authorName: post.author_name || post.author_display_name,
-          authorAvatar: post.author_avatar,
-          viewCount: post.view_count,
-          likeCount: post.like_count,
-          commentCount: post.comment_count,
-          publishedAt: post.published_at,
-          coverImage: post.cover_image,
-          categoryName: post.category_name,
-          categorySlug: post.category_slug,
-          categoryColor: post.category_color
-        }));
+        const processedPosts = (response.data.posts || [])
+          .map((post: any) => ({
+            ...post,
+            authorName: post.authorName,
+            authorAvatar: post.authorAvatar,
+            viewCount: post.viewCount,
+            likeCount: post.likeCount,
+            commentCount: post.commentCount,
+            publishedAt: post.publishedAt,
+            coverImage: post.coverImage,
+            categoryName: post.categoryName,
+            categorySlug: post.categorySlug,
+            categoryColor: post.categoryColor
+          }))
+          // 过滤掉无效的文章数据
+          .filter(post => post.id && post.title);
         
         setPosts(processedPosts);
         
@@ -270,7 +255,7 @@ export function HomePage() {
                             ? 'bg-white/20'
                             : 'bg-gray-200 dark:bg-slate-600'
                         }`}>
-                          {category.post_count}
+                          {category.postCount}
                         </span>
                       </button>
                     ))}
@@ -338,9 +323,7 @@ export function HomePage() {
                             ? tag.color || '#6B7280'
                             : selectedTag 
                               ? 'rgb(243 244 246)' 
-                              : tag.color 
-                                ? `${tag.color}20` 
-                                : 'rgb(243 244 246)',
+                              : 'rgb(243 244 246)',
                           borderWidth: '2px',
                           borderColor: selectedTag === tag.slug 
                             ? 'transparent'
@@ -349,7 +332,7 @@ export function HomePage() {
                       >
                         #{tag.name}
                         <span className="ml-2 text-xs opacity-75">
-                          {tag.post_count}
+                          {tag.postCount}
                         </span>
                       </button>
                     ))}
@@ -553,7 +536,7 @@ export function HomePage() {
                         <div className="flex flex-wrap items-center gap-2">
                           {post.categoryName && (
                             <button
-                              onClick={() => handleCategoryClick(post.categorySlug)}
+                              onClick={() => {}}
                               className="px-3 py-1.5 rounded-lg text-white text-xs font-medium hover:opacity-80 transition-opacity"
                               style={{ backgroundColor: post.categoryColor || '#3B82F6' }}
                             >
@@ -567,7 +550,7 @@ export function HomePage() {
                               onClick={() => handleTagClick(tag.slug)}
                               className="px-3 py-1.5 rounded-full text-xs font-medium border-2 hover:scale-105 transition-transform"
                               style={{
-                                backgroundColor: tag.color ? `${tag.color}15` : '#F3F4F6',
+                                backgroundColor: '#F3F4F6',
                                 borderColor: tag.color || '#E5E7EB',
                                 color: tag.color || '#6B7280'
                               }}

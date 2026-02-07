@@ -10,7 +10,7 @@
  * @version 2.0.1
  */
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -47,19 +47,7 @@ function formatDate(date: any, formatStr: string = 'yyyy-MM-dd HH:mm'): string {
   }
 }
 
-/**
- * 检查日期是否有效
- */
-function isValidDate(date: any): boolean {
-  if (!date) return false;
-  
-  try {
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
-    return !isNaN(dateObj.getTime());
-  } catch {
-    return false;
-  }
-}
+
 
 // ============= 组件 =============
 
@@ -73,6 +61,12 @@ export function PostPage() {
   const [error, setError] = useState<string | null>(null);
   const [commentLoading, setCommentLoading] = useState(false);
   const [liking, setLiking] = useState(false);
+  const [favoriting, setFavoriting] = useState(false);
+  const [readingTime, setReadingTime] = useState(0);
+  const [readingProgress, setReadingProgress] = useState(0);
+  const [hasRecordedHistory, setHasRecordedHistory] = useState(false);
+  const readingTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const articleRef = React.useRef<HTMLDivElement>(null);
   
   const { isAuthenticated, user } = useAuthStore();
   
@@ -81,6 +75,32 @@ export function PostPage() {
       loadPost();
     }
   }, [slug]);
+  
+  useEffect(() => {
+    if (post) {
+      // 开始阅读计时
+      startReadingTimer();
+      
+      // 添加滚动监听
+      window.addEventListener('scroll', handleScroll);
+      
+      // 初始计算阅读进度
+      calculateReadingProgress();
+    }
+    
+    return () => {
+      // 清理定时器和事件监听器
+      if (readingTimerRef.current) {
+        clearInterval(readingTimerRef.current);
+      }
+      window.removeEventListener('scroll', handleScroll);
+      
+      // 组件卸载时记录阅读历史
+      if (post && (readingTime > 5 || readingProgress > 10)) {
+        recordReadingHistory();
+      }
+    };
+  }, [post]);
   
   const loadPost = async () => {
     try {
@@ -111,7 +131,7 @@ export function PostPage() {
   
   const loadComments = async (postId: number) => {
     try {
-      const response = await api.getComments({ postId: postId.toString() });
+      const response = await api.getComments({ postId });
       
       console.log('Comments response:', response);
       
@@ -207,6 +227,134 @@ export function PostPage() {
     }
   };
   
+  const handleFavorite = async () => {
+    if (!isAuthenticated) {
+      navigate('/login?redirect=' + encodeURIComponent(window.location.pathname));
+      return;
+    }
+    
+    if (!post || favoriting) return;
+    
+    // 立即更新本地状态，提升用户体验
+    const newIsFavorited = !post.isFavorited;
+    
+    // 先更新UI
+    setPost({
+      ...post,
+      isFavorited: newIsFavorited
+    });
+    
+    try {
+      setFavoriting(true);
+      
+      if (newIsFavorited) {
+        // 收藏文章
+        const response = await api.favoritePost(post.id);
+        console.log('Favorite response:', response);
+        
+        if (!response.success) {
+          // 如果API请求失败，恢复原来的状态
+          setPost({
+            ...post,
+            isFavorited: !newIsFavorited
+          });
+          console.error('Favorite post failed:', response.error);
+          alert('收藏失败，请重试');
+        }
+      } else {
+        // 取消收藏
+        const response = await api.unfavoritePost(post.id);
+        console.log('Unfavorite response:', response);
+        
+        if (!response.success) {
+          // 如果API请求失败，恢复原来的状态
+          setPost({
+            ...post,
+            isFavorited: !newIsFavorited
+          });
+          console.error('Unfavorite post failed:', response.error);
+          alert('取消收藏失败，请重试');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+      // 如果网络错误，恢复原来的状态
+      setPost({
+        ...post,
+        isFavorited: !newIsFavorited
+      });
+      alert('操作失败，请重试');
+    } finally {
+      setFavoriting(false);
+    }
+  };
+  
+  // 开始阅读计时
+  const startReadingTimer = () => {
+    // 清除之前的定时器
+    if (readingTimerRef.current) {
+      clearInterval(readingTimerRef.current);
+    }
+    
+    // 每秒更新一次阅读时长
+    readingTimerRef.current = setInterval(() => {
+      setReadingTime(prevTime => prevTime + 1);
+    }, 1000);
+  };
+  
+  // 计算阅读进度
+  const calculateReadingProgress = () => {
+    if (!articleRef.current) return;
+    
+    const article = articleRef.current;
+    const rect = article.getBoundingClientRect();
+    const windowHeight = window.innerHeight;
+    const articleHeight = article.offsetHeight;
+    
+    // 计算滚动位置
+    const scrollTop = window.scrollY || document.documentElement.scrollTop;
+    const visibleTop = rect.top + scrollTop;
+    
+    // 计算阅读进度
+    const progress = Math.min(
+      Math.max((scrollTop - visibleTop + windowHeight * 0.8) / articleHeight, 0),
+      1
+    ) * 100;
+    
+    setReadingProgress(progress);
+    
+    // 检查是否需要记录阅读历史
+    if ((progress > 10 || readingTime > 5) && !hasRecordedHistory && isAuthenticated) {
+      recordReadingHistory();
+    }
+  };
+  
+  // 处理滚动事件
+  const handleScroll = () => {
+    calculateReadingProgress();
+  };
+  
+  // 记录阅读历史
+  const recordReadingHistory = async () => {
+    if (!post || !isAuthenticated || hasRecordedHistory) return;
+    
+    try {
+      const response = await api.recordReadingHistory({
+        postId: post.id,
+        readingProgress: Math.round(readingProgress),
+        readingTime: readingTime
+      });
+      
+      console.log('Reading history recorded:', response);
+      
+      if (response.success) {
+        setHasRecordedHistory(true);
+      }
+    } catch (error) {
+      console.error('Failed to record reading history:', error);
+    }
+  };
+  
   // 评论状态管理
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyContent, setReplyContent] = useState('');
@@ -227,10 +375,13 @@ export function PostPage() {
       const response = await api.likeComment(commentId);
       
       if (response.success && response.data) {
-        // 更新评论点赞状态
-        setComments(prevComments => 
-          updateCommentInList(prevComments, commentId, response.data.liked)
-        );
+        const liked = response.data.liked;
+        if (liked !== undefined) {
+          // 更新评论点赞状态
+          setComments(prevComments => 
+            updateCommentInList(prevComments, commentId, liked)
+          );
+        }
       }
     } catch (error) {
       console.error('Failed to like comment:', error);
@@ -325,7 +476,7 @@ export function PostPage() {
             </span>
             <span className="text-sm text-muted-foreground">
               {/* 使用安全的日期格式化 */}
-              {formatDate(comment.createdAt || comment.created_at)}
+              {formatDate(comment.createdAt)}
             </span>
           </div>
           <p className="text-foreground whitespace-pre-wrap">{comment.content}</p>
@@ -339,7 +490,7 @@ export function PostPage() {
               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
               </svg>
-              {comment.likeCount || comment.like_count || 0}
+              {comment.likeCount || 0}
             </button>
             
             {level < 3 && (
@@ -429,49 +580,49 @@ export function PostPage() {
         
         <div className="flex items-center text-sm text-muted-foreground space-x-4 mb-8">
           <span className="flex items-center">
-            {post.author?.avatarUrl || post.authorAvatar || post.author_avatar ? (
+            {post.author?.avatarUrl || post.authorAvatar ? (
               <img 
-                src={post.author?.avatarUrl || post.authorAvatar || post.author_avatar} 
-                alt={post.author?.displayName || post.authorName || post.author_name} 
+                src={post.author?.avatarUrl || post.authorAvatar} 
+                alt={post.author?.displayName || post.authorName} 
                 className="w-6 h-6 rounded-full mr-2" 
               />
             ) : (
               <div className="w-6 h-6 rounded-full bg-border mr-2"></div>
             )}
-            {post.author?.displayName || post.authorName || post.author_name || post.author_display_name || 'Unknown'}
+            {post.author?.displayName || post.authorName || 'Unknown'}
           </span>
           <span>•</span>
           <span>
             {/* 使用安全的日期格式化 */}
-            {formatDate(post.publishedAt || post.published_at)}
+            {formatDate(post.publishedAt)}
           </span>
           <span>•</span>
-          <span>{post.viewCount || post.view_count || 0} 次阅读</span>
-          {(post.readingTime || post.reading_time) && (
+          <span>{post.viewCount || 0} 次阅读</span>
+          {post.readingTime && (
             <>
               <span>•</span>
-              <span>{post.readingTime || post.reading_time} 分钟</span>
+              <span>{post.readingTime} 分钟</span>
             </>
           )}
         </div>
         
-        {(post.coverImage || post.cover_image) && (
+        {post.coverImage && (
           <img
-            src={post.coverImage || post.cover_image}
+            src={post.coverImage}
             alt={post.title}
             className="w-full h-96 object-cover rounded-lg mb-8"
           />
         )}
         
         {/* 文章内容 */}
-        <div className="prose prose-lg max-w-none mb-8">
+        <div className="prose prose-lg max-w-none mb-8" ref={articleRef}>
           <ReactMarkdown 
             remarkPlugins={[remarkGfm]} 
             rehypePlugins={[rehypeHighlight]}
             components={{
-              code: ({ node, inline, className, children, ...props }) => {
+              code: ({ node, className, children, ...props }) => {
                 const match = /language-(\w+)/.exec(className || '');
-                return !inline && match ? (
+                return match ? (
                   <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
                     <code className={className} {...props}>
                       {children}
@@ -528,14 +679,39 @@ export function PostPage() {
                   d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
                 />
               </svg>
-              <span>{post.likeCount || post.like_count || 0}</span>
+              <span>{post.likeCount || 0}</span>
+            </button>
+            
+            <button
+              onClick={handleFavorite}
+              disabled={favoriting}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                post.isFavorited
+                  ? 'bg-yellow-50 text-yellow-600'
+                  : 'bg-muted text-foreground hover:bg-border'
+              } disabled:opacity-50`}
+            >
+              <svg
+                className={`w-5 h-5 ${post.isFavorited ? 'fill-current' : ''}`}
+                fill={post.isFavorited ? 'currentColor' : 'none'}
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                />
+              </svg>
+              <span>{post.isFavorited ? '已收藏' : '收藏'}</span>
             </button>
             
             <div className="flex items-center space-x-2 text-muted-foreground">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
-              <span>{post.commentCount || post.comment_count || 0} 评论</span>
+              <span>{post.commentCount || 0} 评论</span>
             </div>
           </div>
           

@@ -174,6 +174,7 @@ export interface Post {
   
   // 交互状态
   isLiked?: boolean;
+  isFavorited?: boolean;
 }
 
 /**
@@ -277,6 +278,7 @@ export interface Tag {
   name: string;
   slug: string;
   description?: string;
+  color?: string;
   postCount: number;
   createdAt: string;
   updatedAt: string;
@@ -509,56 +511,56 @@ export interface AsyncState<T = any> {
  */
 export interface SiteConfig {
   // 基本信息
-  site_name: string;
-  site_subtitle: string;
-  site_logo: string;
-  site_favicon: string;
-  site_description: string;
-  site_keywords: string;
-  site_author: string;
+  siteName: string;
+  siteSubtitle: string;
+  siteLogo: string;
+  siteFavicon: string;
+  siteDescription: string;
+  siteKeywords: string;
+  siteAuthor: string;
   
   // 作者信息
-  author_name: string;
-  author_avatar: string;
-  author_bio: string;
-  author_email: string;
+  authorName: string;
+  authorAvatar: string;
+  authorBio: string;
+  authorEmail: string;
   
   // 主题配置
-  theme_primary_color: string;
-  theme_default_mode: 'light' | 'dark' | 'system';
-  theme_font_family: string;
-  theme_enable_animations: boolean;
+  themePrimaryColor: string;
+  themeDefaultMode: 'light' | 'dark' | 'system';
+  themeFontFamily: string;
+  themeEnableAnimations: boolean;
   
   // 社交媒体
-  social_github?: string;
-  social_twitter?: string;
-  social_linkedin?: string;
-  social_email?: string;
-  social_weibo?: string;
-  social_wechat_qr?: string;
+  socialGithub?: string;
+  socialTwitter?: string;
+  socialLinkedin?: string;
+  socialEmail?: string;
+  socialWeibo?: string;
+  socialWechatQr?: string;
   
   // 功能开关
-  feature_comments: boolean;
-  feature_search: boolean;
-  feature_like: boolean;
-  feature_share: boolean;
-  feature_rss: boolean;
-  feature_analytics: boolean;
-  feature_newsletter: boolean;
-  comment_approval_required: boolean;
+  featureComments: boolean;
+  featureSearch: boolean;
+  featureLike: boolean;
+  featureShare: boolean;
+  featureRss: boolean;
+  featureAnalytics: boolean;
+  featureNewsletter: boolean;
+  commentApprovalRequired: boolean;
   
   // 页脚配置
-  footer_text: string;
-  footer_links?: Record<string, string> | string;
-  footer_show_powered_by: boolean;
+  footerText: string;
+  footerLinks?: Record<string, string> | string;
+  footerShowPoweredBy: boolean;
   
   // 存储配置
-  storage_public_url?: string;
+  storagePublicUrl?: string;
   
   // 系统设置
-  posts_per_page: number;
-  max_upload_size_mb: number;
-  enable_maintenance_mode: boolean;
+  postsPerPage: number;
+  maxUploadSizeMb: number;
+  enableMaintenanceMode: boolean;
 }
 
 /**
