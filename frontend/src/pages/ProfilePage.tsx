@@ -17,6 +17,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../utils/api';
+import { useVerificationCountdown } from '../hooks/useVerificationCountdown';
 import type { User, Comment, PostListItem, ReadingHistoryItem } from '../types';
 import { format } from 'date-fns';
 
@@ -90,11 +91,14 @@ export function ProfilePage() {
   });
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>('');
-  const [codeSent, setCodeSent] = useState<'password' | 'delete' | null>(null);
   const [codeSending, setCodeSending] = useState(false);
   const [deleteVerificationCode, setDeleteVerificationCode] = useState('');
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  
+  // 验证码倒计时 hooks
+  const { countdown: passwordCountdown, isCounting: isPasswordCounting, startCountdown: startPasswordCountdown } = useVerificationCountdown('password');
+  const { countdown: deleteCountdown, isCounting: isDeleteCounting, startCountdown: startDeleteCountdown } = useVerificationCountdown('delete');
   
   // 初始化数据
   useEffect(() => {
@@ -118,7 +122,8 @@ export function ProfilePage() {
           bio: response.data.user.bio || '',
           password: '',
           newPassword: '',
-          confirmPassword: ''
+          confirmPassword: '',
+          emailVerificationCode: ''
         });
         setAvatarPreview(response.data.user.avatarUrl || getRandomAvatar(response.data.user.username));
       }
@@ -264,12 +269,27 @@ export function ProfilePage() {
   };
   
   const handleSendCode = async (type: 'password' | 'delete') => {
+    // 检查是否在倒计时中
+    if (type === 'password' && isPasswordCounting) {
+      setError(`请等待 ${passwordCountdown} 秒后重试`);
+      return;
+    }
+    if (type === 'delete' && isDeleteCounting) {
+      setError(`请等待 ${deleteCountdown} 秒后重试`);
+      return;
+    }
+    
     try {
       setCodeSending(true);
       setError(null);
       const response = await api.sendVerificationCode({ type });
       if (response.success) {
-        setCodeSent(type);
+        // 根据类型启动对应的倒计时
+        if (type === 'password') {
+          startPasswordCountdown();
+        } else {
+          startDeleteCountdown();
+        }
         setSuccessMessage('验证码已发送到您的邮箱，请查收');
       } else {
         setError(response.message || response.error || '发送失败');
@@ -308,7 +328,6 @@ export function ProfilePage() {
           confirmPassword: '',
           emailVerificationCode: ''
         }));
-        setCodeSent(null);
       }
     } catch (error: any) {
       setError(error.message || '修改密码失败');
@@ -707,10 +726,10 @@ export function ProfilePage() {
               <button
                 type="button"
                 onClick={() => handleSendCode('password')}
-                disabled={codeSending}
-                className="px-4 py-2 border border-border rounded-lg hover:bg-muted disabled:opacity-50 whitespace-nowrap"
+                disabled={codeSending || isPasswordCounting}
+                className="px-4 py-2 border border-border rounded-lg hover:bg-muted disabled:opacity-50 whitespace-nowrap min-w-[100px]"
               >
-                {codeSending ? '发送中...' : codeSent === 'password' ? '已发送' : '获取验证码'}
+                {codeSending ? '发送中...' : isPasswordCounting ? `${passwordCountdown}秒后重试` : '获取验证码'}
               </button>
             </div>
             <div>
@@ -776,10 +795,10 @@ export function ProfilePage() {
               <button
                 type="button"
                 onClick={() => handleSendCode('delete')}
-                disabled={codeSending}
-                className="px-4 py-2 border border-border rounded-lg hover:bg-muted disabled:opacity-50 whitespace-nowrap"
+                disabled={codeSending || isDeleteCounting}
+                className="px-4 py-2 border border-border rounded-lg hover:bg-muted disabled:opacity-50 whitespace-nowrap min-w-[100px]"
               >
-                {codeSending ? '发送中...' : codeSent === 'delete' ? '已发送' : '获取验证码'}
+                {codeSending ? '发送中...' : isDeleteCounting ? `${deleteCountdown}秒后重试` : '获取验证码'}
               </button>
             </div>
             <div>

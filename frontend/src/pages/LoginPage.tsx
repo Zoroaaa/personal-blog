@@ -23,6 +23,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../utils/api';
+import { useVerificationCountdown } from '../hooks/useVerificationCountdown';
 
 export function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -31,16 +32,18 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [emailVerificationCode, setEmailVerificationCode] = useState('');
-  const [codeSent, setCodeSent] = useState(false);
   const [codeSending, setCodeSending] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetCode, setResetCode] = useState('');
   const [resetPassword, setResetPassword] = useState('');
   const [resetConfirmPassword, setResetConfirmPassword] = useState('');
-  const [resetCodeSent, setResetCodeSent] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // 验证码倒计时 hooks
+  const { countdown: registerCountdown, isCounting: isRegisterCounting, startCountdown: startRegisterCountdown } = useVerificationCountdown('register', email);
+  const { countdown: forgotCountdown, isCounting: isForgotCounting, startCountdown: startForgotCountdown } = useVerificationCountdown('forgot_password', resetEmail);
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -235,7 +238,6 @@ export function LoginPage() {
         setResetCode('');
         setResetPassword('');
         setResetConfirmPassword('');
-        setResetCodeSent(false);
       } else {
         throw new Error(response.error || response.message || '重置失败');
       }
@@ -288,21 +290,26 @@ export function LoginPage() {
                   type="button"
                   onClick={async () => {
                     if (!resetEmail.trim()) { setError('请先填写邮箱'); return; }
+                    if (isForgotCounting) { setError(`请等待 ${forgotCountdown} 秒后重试`); return; }
                     setCodeSending(true); setError('');
                     try {
                       const res = await api.sendVerificationCode({ email: resetEmail.trim(), type: 'forgot_password' });
-                      if (res.success) { setResetCodeSent(true); setError(''); }
-                      else setError(res.message || res.error || '发送失败');
+                      if (res.success) {
+                        startForgotCountdown();
+                        setError('');
+                      } else {
+                        setError(res.message || res.error || '发送失败');
+                      }
                     } catch (e: any) {
                       setError(e.message || '发送验证码失败');
                     } finally {
                       setCodeSending(false);
                     }
                   }}
-                  disabled={codeSending}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap text-sm"
+                  disabled={codeSending || isForgotCounting}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap text-sm min-w-[100px]"
                 >
-                  {codeSending ? '发送中...' : resetCodeSent ? '已发送' : '获取验证码'}
+                  {codeSending ? '发送中...' : isForgotCounting ? `${forgotCountdown}秒后重试` : '获取验证码'}
                 </button>
               </div>
               <div>
@@ -439,21 +446,26 @@ export function LoginPage() {
                     type="button"
                     onClick={async () => {
                       if (!email.trim()) { setError('请先填写邮箱'); return; }
+                      if (isRegisterCounting) { setError(`请等待 ${registerCountdown} 秒后重试`); return; }
                       setCodeSending(true); setError('');
                       try {
                         const res = await api.sendVerificationCode({ email: email.trim(), type: 'register' });
-                        if (res.success) { setCodeSent(true); setError(''); }
-                        else setError(res.message || res.error || '发送失败');
+                        if (res.success) {
+                          startRegisterCountdown();
+                          setError('');
+                        } else {
+                          setError(res.message || res.error || '发送失败');
+                        }
                       } catch (e: any) {
                         setError(e.message || '发送验证码失败');
                       } finally {
                         setCodeSending(false);
                       }
                     }}
-                    disabled={codeSending}
-                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap text-sm"
+                    disabled={codeSending || isRegisterCounting}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap text-sm min-w-[100px]"
                   >
-                    {codeSending ? '发送中...' : codeSent ? '已发送' : '获取验证码'}
+                    {codeSending ? '发送中...' : isRegisterCounting ? `${registerCountdown}秒后重试` : '获取验证码'}
                   </button>
                 </div>
               </>
