@@ -16,6 +16,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../utils/api';
 import { format } from 'date-fns';
 import type { PostListItem } from '../types';
+import { transformPostList } from '../utils/apiTransformer';
 
 interface Category {
   id: number;
@@ -24,7 +25,7 @@ interface Category {
   description: string;
   icon: string;
   color: string;
-  post_count: number;
+  postCount: number;
 }
 
 interface Tag {
@@ -32,7 +33,7 @@ interface Tag {
   name: string;
   slug: string;
   color: string;
-  post_count: number;
+  postCount: number;
 }
 
 export function HomePage() {
@@ -95,7 +96,16 @@ export function HomePage() {
       setCategoriesLoading(true);
       const response = await api.getCategories();
       if (response.success && response.data) {
-        setCategories(response.data.categories || []);
+        const transformedCategories = (response.data.categories || []).map((cat: any) => ({
+          id: cat.id,
+          name: cat.name,
+          slug: cat.slug,
+          description: cat.description,
+          icon: cat.icon,
+          color: cat.color,
+          postCount: cat.post_count || 0
+        }));
+        setCategories(transformedCategories);
       }
     } catch (error) {
       console.error('Failed to load categories:', error);
@@ -109,7 +119,14 @@ export function HomePage() {
       setTagsLoading(true);
       const response = await api.getTags();
       if (response.success && response.data) {
-        setTags(response.data.tags || []);
+        const transformedTags = (response.data.tags || []).map((tag: any) => ({
+          id: tag.id,
+          name: tag.name,
+          slug: tag.slug,
+          color: tag.color,
+          postCount: tag.post_count || 0
+        }));
+        setTags(transformedTags);
       }
     } catch (error) {
       console.error('Failed to load tags:', error);
@@ -134,21 +151,8 @@ export function HomePage() {
       const response = await api.getPosts(params);
       
       if (response.success && response.data) {
-        const processedPosts = (response.data.posts || []).map((post: any) => ({
-          ...post,
-          authorName: post.author_name || post.author_display_name,
-          authorAvatar: post.author_avatar,
-          viewCount: post.view_count,
-          likeCount: post.like_count,
-          commentCount: post.comment_count,
-          publishedAt: post.published_at,
-          coverImage: post.cover_image,
-          categoryName: post.category_name,
-          categorySlug: post.category_slug,
-          categoryColor: post.category_color
-        }));
-        
-        setPosts(processedPosts);
+        const transformedPosts = transformPostList(response.data.posts || []);
+        setPosts(transformedPosts);
         
         if (response.data.pagination) {
           setTotalPages(response.data.pagination.totalPages);
@@ -270,7 +274,7 @@ export function HomePage() {
                             ? 'bg-white/20'
                             : 'bg-gray-200 dark:bg-slate-600'
                         }`}>
-                          {category.post_count}
+                          {category.postCount}
                         </span>
                       </button>
                     ))}
@@ -349,7 +353,7 @@ export function HomePage() {
                       >
                         #{tag.name}
                         <span className="ml-2 text-xs opacity-75">
-                          {tag.post_count}
+                          {tag.postCount}
                         </span>
                       </button>
                     ))}
@@ -553,7 +557,7 @@ export function HomePage() {
                         <div className="flex flex-wrap items-center gap-2">
                           {post.categoryName && (
                             <button
-                              onClick={() => handleCategoryClick(post.categorySlug)}
+                              onClick={() => post.categorySlug && handleCategoryClick(post.categorySlug)}
                               className="px-3 py-1.5 rounded-lg text-white text-xs font-medium hover:opacity-80 transition-opacity"
                               style={{ backgroundColor: post.categoryColor || '#3B82F6' }}
                             >

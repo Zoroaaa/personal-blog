@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { api } from '../utils/api';
-import { useSiteConfig } from '../hooks/useSiteConfig';
 // 导入新增的组件
 import { CategoryManager } from '../components/CategoryManager';
 import { TagManager } from '../components/TagManager';
 import { PostEditor } from '../components/PostEditor';
+import { transformPost } from '../utils/apiTransformer';
 
 // 定义管理后台的标签页类型 - 添加 categories 和 tags
 type AdminTab = 'posts' | 'comments' | 'users' | 'analytics' | 'categories' | 'tags';
@@ -25,15 +25,15 @@ export function AdminPage() {
   // 当前活动的标签页
   const [activeTab, setActiveTab] = useState<AdminTab>('posts');
   
-  // 文章创建状态
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [summary, setSummary] = useState('');
-  const [coverImage, setCoverImage] = useState('');
-  const [postStatus, setPostStatus] = useState<'draft' | 'published'>('draft');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
+  // 文章创建状态 (保留状态但使用下划线前缀表示暂时未使用)
+  const [_title, _setTitle] = useState('');
+  const [_content, _setContent] = useState('');
+  const [_summary, _setSummary] = useState('');
+  const [_coverImage, _setCoverImage] = useState('');
+  const [_postStatus, _setPostStatus] = useState<'draft' | 'published'>('draft');
+  const [_loading, setLoading] = useState(false);
+  const [_error, setError] = useState('');
+  const [_success, _setSuccess] = useState(false);
   const [editingPostId, setEditingPostId] = useState<number | null>(null);
   
   // 文章列表状态
@@ -93,16 +93,17 @@ export function AdminPage() {
   const loadPostForEdit = async (postId: number) => {
     try {
       setLoading(true);
-      setError('');
+      // setError('');
       
       const response = await api.getPostById(postId);
       if (response.success && response.data) {
-        setTitle(response.data.title);
-        setContent(response.data.content);
-        setSummary(response.data.summary || '');
-        // 尝试从多个可能的字段中获取封面图片
-        setCoverImage(response.data.coverImage || response.data.cover_image || '');
-        setPostStatus(response.data.status as 'draft' | 'published');
+        const post = transformPost(response.data);
+        // 这些状态变量暂时未使用，但保留以备将来需要
+        _setTitle(post.title);
+        _setContent(post.content);
+        _setSummary(post.summary || '');
+        _setCoverImage(post.coverImage || '');
+        _setPostStatus(post.status as 'draft' | 'published');
         setEditingPostId(postId);
         setShowCreateForm(true);
       }
@@ -121,7 +122,8 @@ export function AdminPage() {
       
       const response = await api.getAdminPosts({ limit: '100' });
       if (response.success && response.data) {
-        setPosts(response.data.posts || []);
+        const transformedPosts = (response.data.posts || []).map((post: any) => transformPost(post));
+        setPosts(transformedPosts);
       }
     } catch (err: any) {
       setPostsError(err.message || '加载文章列表失败');
@@ -179,7 +181,17 @@ export function AdminPage() {
     setCommentsError('');
     try {
       const response = await api.getAdminComments({ page: '1', limit: '10' });
-      setComments(response.data.comments || []);
+      const transformedComments = (response.data?.comments || []).map((comment: any) => ({
+        id: comment.id,
+        content: comment.content,
+        status: comment.status,
+        user: comment.user,
+        username: comment.username,
+        postTitle: comment.post_title || comment.postTitle,
+        post: comment.post,
+        createdAt: comment.created_at || comment.createdAt
+      }));
+      setComments(transformedComments);
     } catch (err: any) {
       setCommentsError(err.message || '加载评论失败');
     } finally {
@@ -193,7 +205,14 @@ export function AdminPage() {
     setUsersError('');
     try {
       const response = await api.getAdminUsers({ page: '1', limit: '10' });
-      setUsers(response.data.users || []);
+      const transformedUsers = (response.data?.users || []).map((user: any) => ({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        createdAt: user.created_at || user.createdAt
+      }));
+      setUsers(transformedUsers);
     } catch (err: any) {
       setUsersError(err.message || '加载用户失败');
     } finally {
@@ -239,67 +258,6 @@ export function AdminPage() {
   
 
   
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSuccess(false);
-    setLoading(true);
-    
-    try {
-      if (editingPostId) {
-        // 编辑模式
-        await api.updatePost(editingPostId, {
-          title,
-          content,
-          summary,
-          coverImage,
-          status: postStatus,
-        });
-        setSuccess(true);
-        setTimeout(() => {
-          setSuccess(false);
-          setShowCreateForm(false);
-          setEditingPostId(null);
-          // 重置表单
-          setTitle('');
-          setContent('');
-          setSummary('');
-          setCoverImage('');
-          setPostStatus('draft');
-          // 重新加载文章列表，确保状态更新
-          loadPosts();
-        }, 1000);
-      } else {
-        // 创建模式
-        await api.createPost({
-          title,
-          content,
-          summary,
-          coverImage,
-          status: postStatus,
-        });
-        setSuccess(true);
-        setTimeout(() => {
-          setSuccess(false);
-          // 重置表单
-          setTitle('');
-          setContent('');
-          setSummary('');
-          setCoverImage('');
-          setPostStatus('draft');
-          // 关闭创建表单，返回文章列表
-          setShowCreateForm(false);
-          // 重新加载文章列表，确保新文章显示
-          loadPosts();
-        }, 1000);
-      }
-    } catch (err: any) {
-      setError(err.message || '操作失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
   // 渲染不同的标签页内容
   const renderTabContent = () => {
     switch (activeTab) {
@@ -312,8 +270,8 @@ export function AdminPage() {
                 onClick={() => {
                   setShowCreateForm(true);
                   setEditingPostId(null);
-                  setError('');
-                  setSuccess(false);
+                  // setError('');
+                  // setSuccess(false);
                 }}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
@@ -389,12 +347,12 @@ export function AdminPage() {
                               }`}>
                                 {post.status === 'published' ? '已发布' : '草稿'}
                               </span>
-                              {post.category_name && (
+                              {post.categoryName && (
                                 <span className="flex items-center gap-1">
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                                   </svg>
-                                  {post.category_name}
+                                  {post.categoryName}
                                 </span>
                               )}
                               {post.tags && post.tags.length > 0 && (
@@ -405,8 +363,8 @@ export function AdminPage() {
                                   {post.tags.map((tag: any) => tag.name).join(', ')}
                                 </span>
                               )}
-                              <span>{post.view_count || 0} 次浏览</span>
-                              <span>{new Date(post.created_at).toLocaleDateString()}</span>
+                              <span>{post.viewCount || 0} 次浏览</span>
+                              <span>{post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '未知日期'}</span>
                             </div>
                           </div>
                           <div className="flex gap-2 ml-4">
@@ -499,7 +457,7 @@ export function AdminPage() {
                           {comment.user?.username || comment.username || '未知用户'}
                         </td>
                         <td className="px-6 py-4 text-sm text-muted-foreground">
-                          {comment.post_title || comment.post?.title || comment.postTitle || '未知文章'}
+                          {comment.postTitle || comment.post?.title || '未知文章'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <select
@@ -607,7 +565,7 @@ export function AdminPage() {
                           </select>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
-                          {userItem.created_at ? new Date(userItem.created_at).toLocaleString() : userItem.createdAt ? new Date(userItem.createdAt).toLocaleString() : '未知'}
+                          {userItem.createdAt ? new Date(userItem.createdAt).toLocaleString() : '未知'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <button
@@ -687,7 +645,7 @@ export function AdminPage() {
                     {analytics.recentPosts && analytics.recentPosts.map((post: any) => (
                       <div key={post.id} className="flex items-center justify-between p-3 bg-card rounded-lg shadow-sm border border-border">
                         <span className="text-sm font-medium text-foreground">{post.title}</span>
-                        <span className="text-xs text-muted-foreground">{new Date(post.createdAt).toLocaleDateString()}</span>
+                        <span className="text-xs text-muted-foreground">{post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '未知日期'}</span>
                       </div>
                     ))}
                   </div>
@@ -701,7 +659,7 @@ export function AdminPage() {
                       <div key={comment.id} className="p-3 bg-card rounded-lg shadow-sm border border-border">
                         <div className="flex justify-between items-start">
                           <span className="text-sm font-medium text-foreground">{comment.user?.username || '匿名用户'}</span>
-                          <span className="text-xs text-muted-foreground">{new Date(comment.createdAt).toLocaleString()}</span>
+                          <span className="text-xs text-muted-foreground">{comment.createdAt ? new Date(comment.createdAt).toLocaleString() : '未知时间'}</span>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">
                           {comment.content.substring(0, 100)}{comment.content.length > 100 ? '...' : ''}

@@ -201,6 +201,7 @@ export interface PostListItem {
   authorName: string;
   authorAvatar?: string;
   categoryName?: string;
+  categorySlug?: string;
   categoryColor?: string;
   viewCount: number;
   likeCount: number;
@@ -290,6 +291,7 @@ export interface Tag {
   name: string;
   slug: string;
   description?: string;
+  color?: string;
   postCount: number;
   createdAt: string;
   updatedAt: string;
@@ -332,6 +334,13 @@ export interface Comment {
   displayName?: string;
   avatarUrl?: string;
   replies?: Comment[];
+  
+  // 关联文章信息（在某些API响应中返回）
+  post?: {
+    id: number;
+    title: string;
+    slug: string;
+  };
 }
 
 /**
@@ -347,7 +356,7 @@ export interface CreateCommentRequest {
  * 评论查询参数
  */
 export interface CommentQueryParams {
-  postId?: number;
+  postId?: number | string;
   userId?: string;
   page?: number;
   limit?: number;
@@ -529,19 +538,19 @@ export interface SiteConfig {
   site_description: string;
   site_keywords: string;
   site_author: string;
-  
+
   // 作者信息
   author_name: string;
   author_avatar: string;
   author_bio: string;
   author_email: string;
-  
+
   // 主题配置
   theme_primary_color: string;
   theme_default_mode: 'light' | 'dark' | 'system';
   theme_font_family: string;
   theme_enable_animations: boolean;
-  
+
   // 社交媒体
   social_github?: string;
   social_twitter?: string;
@@ -549,7 +558,7 @@ export interface SiteConfig {
   social_email?: string;
   social_weibo?: string;
   social_wechat_qr?: string;
-  
+
   // 功能开关
   feature_comments: boolean;
   feature_search: boolean;
@@ -559,19 +568,22 @@ export interface SiteConfig {
   feature_analytics: boolean;
   feature_newsletter: boolean;
   comment_approval_required: boolean;
-  
+
   // 页脚配置
   footer_text: string;
   footer_links?: Record<string, string> | string;
   footer_show_powered_by: boolean;
-  
+
   // 存储配置
   storage_public_url?: string;
-  
+
   // 系统设置
   posts_per_page: number;
   max_upload_size_mb: number;
   enable_maintenance_mode: boolean;
+
+  // 索引签名，允许动态访问配置项
+  [key: string]: any;
 }
 
 /**

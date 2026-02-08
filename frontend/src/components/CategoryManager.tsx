@@ -13,8 +13,8 @@ interface Category {
   description: string;
   icon: string;
   color: string;
-  post_count: number;
-  display_order: number;
+  postCount: number;
+  displayOrder: number;
 }
 
 // 预设颜色选项
@@ -68,7 +68,17 @@ export function CategoryManager() {
       setError('');
       const response = await api.getCategories();
       if (response.success && response.data) {
-        setCategories(response.data.categories || []);
+        const transformedCategories = (response.data.categories || []).map((cat: any) => ({
+          id: cat.id,
+          name: cat.name,
+          slug: cat.slug,
+          description: cat.description,
+          icon: cat.icon,
+          color: cat.color,
+          postCount: cat.post_count || 0,
+          displayOrder: cat.display_order || 0
+        }));
+        setCategories(transformedCategories);
       }
     } catch (err: any) {
       setError(err.message || '加载分类失败');
@@ -99,7 +109,7 @@ export function CategoryManager() {
       description: category.description || '',
       icon: category.icon || '💻',
       color: category.color || '#3B82F6',
-      displayOrder: category.display_order || 0
+      displayOrder: category.displayOrder || 0
     });
     setShowForm(true);
     setFormError('');
@@ -393,7 +403,7 @@ export function CategoryManager() {
               
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-500 dark:text-gray-400">
-                  {category.post_count} 篇文章 • 序号 {category.display_order}
+                  {category.postCount} 篇文章 • 序号 {category.displayOrder}
                 </span>
                 <div className="flex gap-2">
                   <button
@@ -404,9 +414,9 @@ export function CategoryManager() {
                   </button>
                   <button
                     onClick={() => handleDelete(category.id, category.name)}
-                    disabled={category.post_count > 0}
+                    disabled={category.postCount > 0}
                     className="px-3 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title={category.post_count > 0 ? '该分类下还有文章,无法删除' : ''}
+                    title={category.postCount > 0 ? '该分类下还有文章,无法删除' : ''}
                   >
                     删除
                   </button>

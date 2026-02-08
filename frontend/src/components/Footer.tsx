@@ -45,7 +45,7 @@ export function Footer() {
           <div>
             <h4 className="text-sm font-semibold mb-3 text-foreground dark:text-foreground">技术栈</h4>
             <ul className="space-y-2 text-sm text-foreground/70 dark:text-foreground/70">
-              {techStack.map((tech, index) => (
+              {techStack.map((tech: string, index: number) => (
                 <li key={index}>{tech}</li>
               ))}
             </ul>

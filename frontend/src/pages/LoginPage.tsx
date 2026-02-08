@@ -40,6 +40,8 @@ export function LoginPage() {
   const [resetConfirmPassword, setResetConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [_codeSent, setCodeSent] = useState(false);
+  const [_resetCodeSent, setResetCodeSent] = useState(false);
   
   // 验证码倒计时 hooks
   const { countdown: registerCountdown, isCounting: isRegisterCounting, startCountdown: startRegisterCountdown } = useVerificationCountdown('register', email);

@@ -68,6 +68,9 @@ export interface SiteConfig {
   footer_text: string;
   footer_links?: Record<string, string> | string;
   footer_show_powered_by: boolean;
+  footer_brand_name?: string;
+  footer_description?: string;
+  footer_tech_stack?: string[];
   
   // 存储配置
   storage_public_url?: string;
@@ -76,6 +79,9 @@ export interface SiteConfig {
   posts_per_page: number;
   max_upload_size_mb: number;
   enable_maintenance_mode: boolean;
+  
+  // 索引签名
+  [key: string]: any;
 }
 
 // ============= 默认配置 =============
@@ -265,12 +271,12 @@ export function useSiteConfig() {
           const adminResponse = await api.getAdminConfig();
           if (adminResponse.success && adminResponse.data?.config) {
             // 转换配置格式，从数组转换为对象
-            apiConfig = {};
+            apiConfig = {} as Record<string, any>;
             for (const item of Object.values(adminResponse.data.config)) {
               if (Array.isArray(item)) {
                 for (const configItem of item) {
                   if (configItem.key && configItem.value !== undefined) {
-                    apiConfig[configItem.key] = configItem.value;
+                    (apiConfig as Record<string, any>)[configItem.key] = configItem.value;
                   }
                 }
               }

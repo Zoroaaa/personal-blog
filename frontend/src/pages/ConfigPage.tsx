@@ -19,7 +19,7 @@
  * @version 3.0.0
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSiteConfig } from '../hooks/useSiteConfig';
 import { useAuthStore } from '../stores/authStore';
 import { useTheme } from '../stores/themeStore';
@@ -392,7 +392,7 @@ export function ConfigPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { config, loading: configLoading, updateConfig, refreshConfig } = useSiteConfig();
-  const { setPrimaryColor, setThemeMode, config: themeConfig } = useTheme();
+  const { setPrimaryColor, setThemeMode } = useTheme();
   
   const [localConfig, setLocalConfig] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});

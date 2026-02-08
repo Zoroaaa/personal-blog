@@ -531,7 +531,7 @@ export function ProfilePage() {
                   >
                     {comment.post?.title || '查看文章'}
                   </Link>
-                  <span className="text-muted-foreground">{formatDate(comment.createdAt || comment.created_at)}</span>
+                  <span className="text-muted-foreground">{formatDate(comment.createdAt)}</span>
                 </div>
               </div>
               <button

@@ -1,11 +1,11 @@
 /**
  * 文章详情页面（修复日期错误版）
- * 
+ *
  * 修复内容：
  * 1. 修复日期格式错误（Invalid time value）
  * 2. 添加日期验证
  * 3. 处理null/undefined日期
- * 
+ *
  * @author 优化版本
  * @version 2.0.1
  */
@@ -19,6 +19,7 @@ import { api } from '../utils/api';
 import { format } from 'date-fns';
 import { useAuthStore } from '../stores/authStore';
 import type { Post, Comment } from '../types';
+import { transformPost, transformCommentList } from '../utils/apiTransformer';
 
 // 导入代码高亮样式
 import 'highlight.js/styles/github.css';
@@ -30,34 +31,20 @@ import 'highlight.js/styles/github.css';
  */
 function formatDate(date: any, formatStr: string = 'yyyy-MM-dd HH:mm'): string {
   if (!date) return '未知时间';
-  
+
   try {
     const dateObj = typeof date === 'string' ? new Date(date) : date;
-    
+
     // 检查日期是否有效
     if (isNaN(dateObj.getTime())) {
       console.warn('Invalid date:', date);
       return '未知时间';
     }
-    
+
     return format(dateObj, formatStr);
   } catch (error) {
     console.error('Date format error:', error, 'Date:', date);
     return '未知时间';
-  }
-}
-
-/**
- * 检查日期是否有效
- */
-function isValidDate(date: any): boolean {
-  if (!date) return false;
-  
-  try {
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
-    return !isNaN(dateObj.getTime());
-  } catch {
-    return false;
   }
 }
 
@@ -77,15 +64,15 @@ export function PostPage() {
   const readStartTime = useRef<number>(0);
   const readProgressSent = useRef<boolean>(false);
   const progressTimeoutRef = useRef<number | null>(null);
-  
+
   const { isAuthenticated, user } = useAuthStore();
-  
+
   useEffect(() => {
     if (slug) {
       loadPost();
     }
   }, [slug]);
-  
+
   // 阅读进度：进入页面开始计时，离开或滚动时上报（仅登录用户）
   const sendReadingProgress = useCallback(async (readPercentage: number) => {
     if (!post?.id || !isAuthenticated) return;
@@ -100,15 +87,15 @@ export function PostPage() {
       console.warn('Failed to send reading progress', e);
     }
   }, [post?.id, isAuthenticated]);
-  
+
   useEffect(() => {
     if (!post?.id || !isAuthenticated) return;
     readStartTime.current = Date.now();
     readProgressSent.current = false;
-    
+
     const contentEl = document.querySelector('.prose');
     if (!contentEl) return;
-    
+
     const onScroll = () => {
       if (readProgressSent.current) return;
       const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
@@ -116,7 +103,7 @@ export function PostPage() {
       if (progressTimeoutRef.current) clearTimeout(progressTimeoutRef.current);
       progressTimeoutRef.current = window.setTimeout(() => sendReadingProgress(percent), 800);
     };
-    
+
     const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
         const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
@@ -124,7 +111,7 @@ export function PostPage() {
         sendReadingProgress(percent);
       }
     };
-    
+
     window.addEventListener('scroll', onScroll, { passive: true });
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
@@ -133,22 +120,23 @@ export function PostPage() {
       if (progressTimeoutRef.current) clearTimeout(progressTimeoutRef.current);
     };
   }, [post?.id, isAuthenticated, sendReadingProgress]);
-  
+
   const loadPost = async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const response = await api.getPost(slug!);
-      
+
       console.log('Post response:', response);
-      
+
       if (response.success && response.data) {
-        setPost(response.data);
-        
+        const transformedPost = transformPost(response.data);
+        setPost(transformedPost);
+
         // 加载评论
-        if (response.data.id) {
-          loadComments(response.data.id);
+        if (transformedPost.id) {
+          loadComments(transformedPost.id);
         }
       } else {
         throw new Error(response.error || '文章不存在');
@@ -160,40 +148,40 @@ export function PostPage() {
       setLoading(false);
     }
   };
-  
+
   const loadComments = async (postId: number) => {
     try {
       const response = await api.getComments({ postId: postId.toString() });
-      
+
       console.log('Comments response:', response);
-      
+
       if (response.success && response.data) {
-        setComments(response.data.comments || []);
+        setComments(transformCommentList(response.data.comments || []));
       }
     } catch (error) {
       console.error('Failed to load comments:', error);
     }
   };
-  
+
   const handleSubmitComment = async (e: React.FormEvent, parentId?: number) => {
     e.preventDefault();
-    
+
     if (!newComment.trim() || !post) return;
-    
+
     if (!isAuthenticated) {
       navigate('/login?redirect=' + encodeURIComponent(window.location.pathname));
       return;
     }
-    
+
     try {
       setCommentLoading(true);
-      
+
       const response = await api.createComment({
         postId: post.id,
         content: newComment.trim(),
         parentId,
       });
-      
+
       if (response.success) {
         setNewComment('');
         // 重新加载评论列表
@@ -208,7 +196,7 @@ export function PostPage() {
       setCommentLoading(false);
     }
   };
-  
+
   const handleLike = async () => {
     if (!isAuthenticated) {
       navigate('/login?redirect=' + encodeURIComponent(window.location.pathname));
@@ -216,7 +204,7 @@ export function PostPage() {
     }
     if (!post || liking) return;
     const newIsLiked = !post.isLiked;
-    const prevLikeCount = post.likeCount ?? (post as any).like_count ?? 0;
+    const prevLikeCount = post.likeCount ?? 0;
     const newLikeCount = prevLikeCount + (newIsLiked ? 1 : -1);
     setPost({ ...post, isLiked: newIsLiked, likeCount: newLikeCount });
     try {
@@ -237,7 +225,7 @@ export function PostPage() {
       setLiking(false);
     }
   };
-  
+
   const handleFavorite = async () => {
     if (!isAuthenticated) {
       navigate('/login?redirect=' + encodeURIComponent(window.location.pathname));
@@ -257,30 +245,30 @@ export function PostPage() {
       setFavoriting(false);
     }
   };
-  
+
   // 评论状态管理
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyContent, setReplyContent] = useState('');
   const [commentLiking, setCommentLiking] = useState<number | null>(null);
-  
+
   // 处理评论点赞
   const handleLikeComment = async (commentId: number) => {
     if (!isAuthenticated) {
       navigate('/login?redirect=' + encodeURIComponent(window.location.pathname));
       return;
     }
-    
+
     if (commentLiking === commentId) return;
-    
+
     try {
       setCommentLiking(commentId);
-      
+
       const response = await api.likeComment(commentId);
-      
+
       if (response.success && response.data) {
         // 更新评论点赞状态
-        setComments(prevComments => 
-          updateCommentInList(prevComments, commentId, response.data.liked)
+        setComments(prevComments =>
+          updateCommentInList(prevComments, commentId, response.data!.liked)
         );
       }
     } catch (error) {
@@ -289,33 +277,33 @@ export function PostPage() {
       setCommentLiking(null);
     }
   };
-  
+
   // 处理评论回复
   const handleReply = (commentId: number) => {
     setReplyingTo(replyingTo === commentId ? null : commentId);
     setReplyContent('');
   };
-  
+
   // 处理回复提交
   const handleSubmitReply = async (e: React.FormEvent, parentId: number) => {
     e.preventDefault();
-    
+
     if (!replyContent.trim() || !post) return;
-    
+
     if (!isAuthenticated) {
       navigate('/login?redirect=' + encodeURIComponent(window.location.pathname));
       return;
     }
-    
+
     try {
       setCommentLoading(true);
-      
+
       const response = await api.createComment({
         postId: post.id,
         content: replyContent.trim(),
         parentId,
       });
-      
+
       if (response.success) {
         setReplyContent('');
         setReplyingTo(null);
@@ -331,7 +319,7 @@ export function PostPage() {
       setCommentLoading(false);
     }
   };
-  
+
   // 辅助函数：更新评论列表中的评论
   const updateCommentInList = (comments: Comment[], commentId: number, liked: boolean): Comment[] => {
     return comments.map(comment => {
@@ -350,16 +338,16 @@ export function PostPage() {
       return comment;
     });
   };
-  
+
   // 渲染评论
   const renderComment = (comment: Comment, level = 0) => (
     <div key={comment.id} className={`${level > 0 ? 'ml-8' : ''} border-l-2 border-border pl-4 mb-4`}>
       <div className="flex items-start space-x-3">
         {comment.avatarUrl || comment.user?.avatarUrl ? (
-          <img 
-            src={comment.avatarUrl || comment.user?.avatarUrl} 
-            alt={comment.displayName || comment.user?.displayName} 
-            className="w-10 h-10 rounded-full" 
+          <img
+            src={comment.avatarUrl || comment.user?.avatarUrl}
+            alt={comment.displayName || comment.user?.displayName}
+            className="w-10 h-10 rounded-full"
           />
         ) : (
           <div className="w-10 h-10 rounded-full bg-border flex items-center justify-center">
@@ -368,7 +356,7 @@ export function PostPage() {
             </span>
           </div>
         )}
-        
+
         <div className="flex-1">
           <div className="flex items-center space-x-2 mb-1">
             <span className="font-medium text-foreground">
@@ -376,11 +364,11 @@ export function PostPage() {
             </span>
             <span className="text-sm text-muted-foreground">
               {/* 使用安全的日期格式化 */}
-              {formatDate(comment.createdAt || comment.created_at)}
+              {formatDate(comment.createdAt)}
             </span>
           </div>
           <p className="text-foreground whitespace-pre-wrap">{comment.content}</p>
-          
+
           <div className="mt-2 flex items-center space-x-4 text-sm text-muted-foreground">
             <button
               onClick={() => handleLikeComment(comment.id)}
@@ -390,11 +378,11 @@ export function PostPage() {
               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
               </svg>
-              {comment.likeCount || comment.like_count || 0}
+              {comment.likeCount || 0}
             </button>
-            
+
             {level < 3 && (
-              <button 
+              <button
                 onClick={() => handleReply(comment.id)}
                 className="hover:text-blue-600"
               >
@@ -402,10 +390,10 @@ export function PostPage() {
               </button>
             )}
           </div>
-          
+
           {/* 回复表单 */}
           {replyingTo === comment.id && (
-            <form 
+            <form
               onSubmit={(e) => handleSubmitReply(e, comment.id)}
               className="mt-4 p-4 bg-muted rounded-lg"
             >
@@ -431,7 +419,7 @@ export function PostPage() {
               </div>
             </form>
           )}
-          
+
           {/* 递归渲染回复 */}
           {comment.replies && comment.replies.length > 0 && (
             <div className="mt-4">
@@ -442,7 +430,7 @@ export function PostPage() {
       </div>
     </div>
   );
-  
+
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12">
@@ -453,7 +441,7 @@ export function PostPage() {
       </div>
     );
   }
-  
+
   if (error || !post) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12">
@@ -471,56 +459,56 @@ export function PostPage() {
       </div>
     );
   }
-  
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">
       {/* 文章头部 */}
       <article>
         <h1 className="text-4xl font-bold text-foreground mb-4">{post.title}</h1>
-        
+
         <div className="flex items-center text-sm text-muted-foreground space-x-4 mb-8">
           <span className="flex items-center">
-            {post.author?.avatarUrl || post.authorAvatar || post.author_avatar ? (
-              <img 
-                src={post.author?.avatarUrl || post.authorAvatar || post.author_avatar} 
-                alt={post.author?.displayName || post.authorName || post.author_name} 
-                className="w-6 h-6 rounded-full mr-2" 
+            {post.author?.avatarUrl || post.authorAvatar ? (
+              <img
+                src={post.author?.avatarUrl || post.authorAvatar}
+                alt={post.author?.displayName || post.authorName}
+                className="w-6 h-6 rounded-full mr-2"
               />
             ) : (
               <div className="w-6 h-6 rounded-full bg-border mr-2"></div>
             )}
-            {post.author?.displayName || post.authorName || post.author_name || post.author_display_name || 'Unknown'}
+            {post.author?.displayName || post.authorName || 'Unknown'}
           </span>
           <span>•</span>
           <span>
             {/* 使用安全的日期格式化 */}
-            {formatDate(post.publishedAt || post.published_at)}
+            {formatDate(post.publishedAt)}
           </span>
           <span>•</span>
-          <span>{post.viewCount || post.view_count || 0} 次阅读</span>
-          {(post.readingTime || post.reading_time) && (
+          <span>{post.viewCount || 0} 次阅读</span>
+          {post.readingTime && (
             <>
               <span>•</span>
-              <span>{post.readingTime || post.reading_time} 分钟</span>
+              <span>{post.readingTime} 分钟</span>
             </>
           )}
         </div>
-        
-        {(post.coverImage || post.cover_image) && (
+
+        {post.coverImage && (
           <img
-            src={post.coverImage || post.cover_image}
+            src={post.coverImage}
             alt={post.title}
             className="w-full h-96 object-cover rounded-lg mb-8"
           />
         )}
-        
+
         {/* 文章内容 */}
         <div className="prose prose-lg max-w-none mb-8">
-          <ReactMarkdown 
-            remarkPlugins={[remarkGfm]} 
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeHighlight]}
             components={{
-              code: ({ node, inline, className, children, ...props }) => {
+              code: ({ node, inline, className, children, ...props }: any) => {
                 const match = /language-(\w+)/.exec(className || '');
                 return !inline && match ? (
                   <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
@@ -539,7 +527,7 @@ export function PostPage() {
             {post.content}
           </ReactMarkdown>
         </div>
-        
+
         {/* 标签 */}
         {post.tags && post.tags.length > 0 && (
           <div className="mt-8 flex flex-wrap gap-2">
@@ -553,7 +541,7 @@ export function PostPage() {
             ))}
           </div>
         )}
-        
+
         {/* 文章操作 */}
         <div className="mt-8 pt-8 border-t border-border flex items-center justify-between">
           <div className="flex items-center space-x-6">
@@ -579,9 +567,9 @@ export function PostPage() {
                   d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
                 />
               </svg>
-              <span>{post.likeCount ?? (post as any).like_count ?? 0}</span>
+              <span>{post.likeCount ?? 0}</span>
             </button>
-            
+
             <button
               onClick={handleFavorite}
               disabled={favoriting}
@@ -602,15 +590,15 @@ export function PostPage() {
               </svg>
               <span>{post.isFavorited ? '已收藏' : '收藏'}</span>
             </button>
-            
+
             <div className="flex items-center space-x-2 text-muted-foreground">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
-              <span>{post.commentCount || post.comment_count || 0} 评论</span>
+              <span>{post.commentCount || 0} 评论</span>
             </div>
           </div>
-          
+
           {user && user.role === 'admin' && (
             <button
               onClick={() => navigate(`/admin?edit=${post.id}`)}
@@ -621,11 +609,11 @@ export function PostPage() {
           )}
         </div>
       </article>
-      
+
       {/* 评论区 */}
       <div className="mt-16 border-t border-border pt-8">
         <h2 className="text-2xl font-bold text-foreground mb-6">评论 ({comments.length})</h2>
-        
+
         {/* 发表评论 */}
         {isAuthenticated ? (
           <form onSubmit={handleSubmitComment} className="mb-8">
@@ -661,7 +649,7 @@ export function PostPage() {
             </button>
           </div>
         )}
-        
+
         {/* 评论列表 */}
         {comments.length > 0 ? (
           <div className="space-y-6">

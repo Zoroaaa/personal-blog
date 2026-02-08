@@ -11,14 +11,14 @@
  * @version 3.0.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useSiteConfig } from '../hooks/useSiteConfig';
-import { api } from '../utils/api';
 
 export function AboutPage() {
   const { config } = useSiteConfig();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // 保留这些状态以备将来使用
+  const [_loading, _setLoading] = useState(false);
+  const [_error, _setError] = useState<string | null>(null);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
