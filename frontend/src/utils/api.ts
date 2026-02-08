@@ -427,7 +427,10 @@ export const api = {
     limit?: string;
     sort?: string;
   }) => {
-    const query = new URLSearchParams(params as any).toString();
+    const filteredParams = Object.fromEntries(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== '')
+    );
+    const query = new URLSearchParams(filteredParams as any).toString();
     return apiRequest<{ 
       posts: PostListItem[]; 
       total: number;
