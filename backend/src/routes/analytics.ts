@@ -74,8 +74,8 @@ analyticsRoutes.get('/', requireAdmin, async (c) => {
     
     // 6. 最近评论
     const { results: recentComments } = await c.env.DB.prepare(`
-      SELECT c.id, c.content, c.created_at as createdAt, 
-             u.username as user_username
+      SELECT c.id, c.content, c.created_at as createdAt,
+             u.username, u.display_name as displayName, u.avatar_url as avatarUrl
       FROM comments c
       LEFT JOIN users u ON c.user_id = u.id
       WHERE c.status = 'approved'
