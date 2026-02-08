@@ -1,19 +1,16 @@
 /**
- * 网站配置路由 (优化版)
- * 
+ * 网站配置路由
+ *
  * 功能:
  * - 获取公开配置信息
  * - 管理员更新配置
- * - 配置缓存管理
- * 
+ *
  * 优化内容:
- * 1. 添加配置缓存到KV (1小时TTL)
- * 2. 配置分类管理
- * 3. 类型安全的配置读取
- * 4. 批量更新配置
- * 
- * @author 优化版本
- * @version 2.1.0
+ * 1. 配置分类管理
+ * 2. 类型安全的配置读取
+ * 3. 批量更新配置
+ *
+ * @version 2.2.0
  */
 
 import { Hono } from 'hono';
@@ -21,14 +18,9 @@ import type { Env } from '../types';
 import { successResponse, errorResponse } from '../utils/response';
 import { createLogger } from '../middleware/requestLogger';
 import { requireAuth, requireAdmin } from '../middleware/auth';
-import { safeGetCache, safePutCache, safeDeleteCache } from '../utils/cache';
+
 
 export const configRoutes = new Hono<{ Bindings: Env }>();
-
-// ============= 常量配置 =============
-
-const CACHE_KEY = 'site:config';
-const CACHE_TTL = 3600; // 1小时
 
 // 公开配置白名单 (不需要管理员权限即可访问)
 const PUBLIC_CONFIG_KEYS = [
@@ -136,50 +128,36 @@ async function fetchConfigFromDB(env: Env, keysFilter?: string[]): Promise<Confi
 /**
  * GET /api/config
  * 获取公开的网站配置
- * 
+ *
  * 特性:
- * - 从KV缓存读取(1小时TTL)
  * - 只返回公开配置项
  * - 自动类型转换
  */
 configRoutes.get('/', async (c) => {
   const logger = createLogger(c);
-  
+
   try {
-    // ===== 1. 尝试从缓存获取 =====
-    const cached = await safeGetCache(c.env, CACHE_KEY);
-    if (cached) {
-      logger.info('Config served from cache');
-      return c.json(JSON.parse(cached));
-    }
-    
     // 获取环境配置
     const envConfig = {
       githubClientId: c.env.GITHUB_CLIENT_ID,
       frontendUrl: c.env.FRONTEND_URL
     };
-    
-    // ===== 2. 从数据库获取公开配置 =====
+
+    // 从数据库获取公开配置
     const dbConfig = await fetchConfigFromDB(c.env, PUBLIC_CONFIG_KEYS);
-    
+
     // 合并配置
     const config = {
       ...dbConfig,
       ...envConfig
     };
-    
-    // ===== 3. 构建响应 =====
+
     const response = successResponse(config);
-    
-    // ===== 4. 写入缓存 =====
-    await safePutCache(c.env, CACHE_KEY, JSON.stringify(response), {
-      expirationTtl: CACHE_TTL
-    });
-    
+
     logger.info('Config fetched from database', { count: Object.keys(config).length });
-    
+
     return c.json(response);
-    
+
   } catch (error) {
     logger.error('Get config error', error);
     return c.json(successResponse({
@@ -291,10 +269,7 @@ configRoutes.put('/:key', requireAuth, requireAdmin, async (c) => {
     await c.env.DB.prepare(
       'UPDATE site_config SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ?'
     ).bind(processedValue, key).run();
-    
-    // ===== 4. 清除缓存 =====
-    await safeDeleteCache(c.env, CACHE_KEY);
-    
+
     logger.info('Config updated', { key, value: processedValue });
     
     return c.json(successResponse({ 
@@ -387,13 +362,10 @@ configRoutes.put('/', requireAuth, requireAdmin, async (c) => {
         'UPDATE site_config SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ?'
       ).bind(value, key).run();
     }
-    
-    // ===== 4. 清除缓存 =====
-    await safeDeleteCache(c.env, CACHE_KEY);
-    
-    logger.info('Configs batch updated', { 
-      updated: updates.length, 
-      failed: errors.length 
+
+    logger.info('Configs batch updated', {
+      updated: updates.length,
+      failed: errors.length
     });
     
     return c.json(successResponse({
@@ -440,46 +412,4 @@ configRoutes.post('/:key/reset', requireAuth, requireAdmin, async (c) => {
   }
 });
 
-// ============= 刷新缓存 =============
 
-/**
- * POST /api/config/cache/refresh
- * 手动刷新配置缓存
- * 需要管理员权限
- */
-configRoutes.post('/cache/refresh', requireAuth, requireAdmin, async (c) => {
-  const logger = createLogger(c);
-  
-  try {
-    // 清除缓存
-    await safeDeleteCache(c.env, CACHE_KEY);
-    
-    // 重新加载配置到缓存
-    const envConfig = {
-      githubClientId: c.env.GITHUB_CLIENT_ID,
-      frontendUrl: c.env.FRONTEND_URL
-    };
-    
-    const dbConfig = await fetchConfigFromDB(c.env, PUBLIC_CONFIG_KEYS);
-    const config = {
-      ...dbConfig,
-      ...envConfig
-    };
-    
-    const response = successResponse(config);
-    await safePutCache(c.env, CACHE_KEY, JSON.stringify(response), {
-      expirationTtl: CACHE_TTL
-    });
-    
-    logger.info('Config cache refreshed');
-    
-    return c.json(successResponse(null, 'Cache refreshed successfully'));
-    
-  } catch (error) {
-    logger.error('Refresh cache error', error);
-    return c.json(errorResponse(
-      'Failed to refresh cache',
-      'An error occurred while refreshing cache'
-    ), 500);
-  }
-});

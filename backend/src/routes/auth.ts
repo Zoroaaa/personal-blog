@@ -24,7 +24,7 @@ import { Hono } from 'hono';
 import bcrypt from 'bcryptjs';
 import type { Env } from '../types';
 import { successResponse, errorResponse } from '../utils/response';
-import { safeGetCache, safePutCache, safeDeleteCache } from '../index';
+import { safeGetCache, safePutCache, safeDeleteCache } from '../utils/cache';
 import { generateToken } from '../utils/jwt';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
@@ -43,8 +43,6 @@ export const authRoutes = new Hono<{ Bindings: Env }>();
 // ============= 常量配置 =============
 
 const BCRYPT_ROUNDS = 12; // bcrypt加密轮次（增加安全性）
-const MAX_LOGIN_ATTEMPTS = 5; // 最大登录失败次数
-const LOGIN_BLOCK_DURATION = 15 * 60; // 登录封锁时间（15分钟，秒）
 const VERIFICATION_CODE_TTL = 600; // 验证码有效期 10 分钟（秒）
 const VERIFICATION_CODE_LENGTH = 6;
 const EMAIL_VERIFY_RATE_WINDOW = 3600; // 单用户邮箱验证限制：1 小时（秒）
@@ -147,12 +145,24 @@ authRoutes.post('/send-verification-code', optionalAuth, async (c) => {
     
     const code = generateVerificationCode();
     const kvKey = `email_verify:${rawType}:${email}`;
-    await safePutCache(c.env, kvKey, code, { expirationTtl: VERIFICATION_CODE_TTL });
+
+    // 先存储验证码到KV，确保存储成功后再发送邮件
+    const codeStored = await safePutCache(c.env, kvKey, code, { expirationTtl: VERIFICATION_CODE_TTL });
+    if (!codeStored) {
+      logger.error('Failed to store verification code in KV', { type: rawType, email: email.replace(/(.{2}).*(@.*)/, '$1***$2') });
+      return c.json(errorResponse(
+        'Service temporarily unavailable',
+        '验证码服务暂时不可用，请稍后重试'
+      ), 503);
+    }
+
+    // 更新频率限制计数
     await safePutCache(c.env, rateKey, String(rateCount + 1), { expirationTtl: EMAIL_VERIFY_RATE_WINDOW });
-    
+
+    // KV存储成功后发送邮件
     await sendVerificationEmail(c.env, email, code, rawType);
     logger.info('Verification code sent', { type: rawType, email: email.replace(/(.{2}).*(@.*)/, '$1***$2') });
-    
+
     const msg = rawType === 'forgot_password' ? '如该邮箱已注册，验证码将发送至您的邮箱' : '验证码已发送，请查收邮件';
     return c.json(successResponse({ sent: true }, msg));
   } catch (e: any) {
@@ -341,37 +351,22 @@ authRoutes.post('/login', async (c) => {
         'Please provide username and password'
       ), 400);
     }
-    
-    // ===== 2. 检查登录尝试次数（防暴力破解） =====
-    const loginKey = `login_attempts:${username}`;
-    const attempts = await safeGetCache(c.env, loginKey);
-    const attemptCount = attempts ? parseInt(attempts, 10) : 0;
-    
-    if (attemptCount >= MAX_LOGIN_ATTEMPTS) {
-      logger.warn('Login failed: Too many attempts', { username });
-      return c.json(errorResponse(
-        'Account temporarily locked',
-        'Too many failed login attempts. Please try again in 15 minutes.'
-      ), 429);
-    }
-    
-    // ===== 3. 查找用户 =====
+
+    // ===== 2. 查找用户 =====
     const user = await c.env.DB.prepare(
       'SELECT id, username, email, password_hash, display_name, avatar_url, bio, role FROM users WHERE username = ? OR email = ?'
     ).bind(username, username).first() as any;
-    
-    // ===== 4. 验证用户存在 =====
+
+    // ===== 3. 验证用户存在 =====
     if (!user) {
-      // 记录失败尝试
-      await recordLoginAttempt(c, loginKey, attemptCount);
       logger.warn('Login failed: User not found', { username });
       return c.json(errorResponse(
         'Invalid credentials',
         'Username or password is incorrect'
       ), 401);
     }
-    
-    // ===== 5. 验证密码 =====
+
+    // ===== 4. 验证密码 =====
     if (!user.password_hash) {
       logger.warn('Login failed: OAuth user trying password login', { username });
       return c.json(errorResponse(
@@ -379,22 +374,17 @@ authRoutes.post('/login', async (c) => {
         'This account uses OAuth login. Please sign in with GitHub.'
       ), 401);
     }
-    
+
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
-      // 记录失败尝试
-      await recordLoginAttempt(c, loginKey, attemptCount);
       logger.warn('Login failed: Invalid password', { username });
       return c.json(errorResponse(
         'Invalid credentials',
         'Username or password is incorrect'
       ), 401);
     }
-    
-    // ===== 6. 清除失败尝试记录 =====
-    await safeDeleteCache(c.env, loginKey);
-    
-    // ===== 7. 生成JWT Token =====
+
+    // ===== 5. 生成JWT Token =====
     const token = await generateToken(c.env.JWT_SECRET, {
       userId: user.id,
       username: user.username,
@@ -513,22 +503,6 @@ authRoutes.post('/reset-password', async (c) => {
     ), 500);
   }
 });
-
-/**
- * 记录登录失败尝试
- */
-async function recordLoginAttempt(
-  c: any, 
-  key: string, 
-  currentCount: number
-): Promise<void> {
-  await safePutCache(
-    c.env, 
-    key, 
-    (currentCount + 1).toString(), 
-    { expirationTtl: LOGIN_BLOCK_DURATION }
-  );
-}
 
 // ============= GitHub OAuth登录 =============
 

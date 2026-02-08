@@ -17,7 +17,8 @@
  */
 
 import { Hono } from 'hono';
-import { Env, successResponse, errorResponse, safeGetCache, safePutCache, safeDeleteCache } from '../index';
+import { Env, successResponse, errorResponse } from '../index';
+
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import {
@@ -29,10 +30,6 @@ import {
 
 export const categoryRoutes = new Hono<{ Bindings: Env }>();
 
-// ============= 常量配置 =============
-
-const CACHE_TTL = 3600; // 1小时
-
 // ============= 获取分类列表 =============
 
 /**
@@ -41,34 +38,20 @@ const CACHE_TTL = 3600; // 1小时
  */
 categoryRoutes.get('/', async (c) => {
   const logger = createLogger(c);
-  
+
   try {
-    // 尝试从缓存获取
-    const cacheKey = 'categories:all';
-    const cached = await safeGetCache(c.env, cacheKey);
-    
-    if (cached) {
-      logger.info('Categories served from cache');
-      return c.json(JSON.parse(cached));
-    }
-    
     // 从数据库获取
     const { results } = await c.env.DB.prepare(`
-      SELECT * FROM categories 
+      SELECT * FROM categories
       ORDER BY display_order ASC, name ASC
     `).all();
-    
+
     const response = successResponse({ categories: results });
-    
-    // 缓存结果
-    await safePutCache(c.env, cacheKey, JSON.stringify(response), {
-      expirationTtl: CACHE_TTL
-    });
-    
+
     logger.info('Categories fetched successfully', { count: results.length });
-    
+
     return c.json(response);
-    
+
   } catch (error) {
     logger.error('Get categories error', error);
     return c.json(errorResponse(
@@ -86,34 +69,20 @@ categoryRoutes.get('/', async (c) => {
  */
 categoryRoutes.get('/tags', async (c) => {
   const logger = createLogger(c);
-  
+
   try {
-    // 尝试从缓存获取
-    const cacheKey = 'tags:all';
-    const cached = await safeGetCache(c.env, cacheKey);
-    
-    if (cached) {
-      logger.info('Tags served from cache');
-      return c.json(JSON.parse(cached));
-    }
-    
     // 从数据库获取
     const { results } = await c.env.DB.prepare(`
-      SELECT * FROM tags 
+      SELECT * FROM tags
       ORDER BY post_count DESC, name ASC
     `).all();
-    
+
     const response = successResponse({ tags: results });
-    
-    // 缓存结果
-    await safePutCache(c.env, cacheKey, JSON.stringify(response), {
-      expirationTtl: CACHE_TTL
-    });
-    
+
     logger.info('Tags fetched successfully', { count: results.length });
-    
+
     return c.json(response);
-    
+
   } catch (error) {
     logger.error('Get tags error', error);
     return c.json(errorResponse(
@@ -186,13 +155,10 @@ categoryRoutes.post('/', requireAuth, requireAdmin, async (c) => {
     if (!result.success) {
       throw new Error('Failed to create category');
     }
-    
-    // 清除缓存
-    await safeDeleteCache(c.env, 'categories:all');
-    
-    logger.info('Category created', { 
+
+    logger.info('Category created', {
       categoryId: result.meta.last_row_id,
-      name 
+      name
     });
     
     return c.json(successResponse({
@@ -259,13 +225,10 @@ categoryRoutes.post('/tags', requireAuth, requireAdmin, async (c) => {
     if (!result.success) {
       throw new Error('Failed to create tag');
     }
-    
-    // 清除缓存
-    await safeDeleteCache(c.env, 'tags:all');
-    
-    logger.info('Tag created', { 
+
+    logger.info('Tag created', {
       tagId: result.meta.last_row_id,
-      name 
+      name
     });
     
     return c.json(successResponse({
@@ -317,10 +280,7 @@ categoryRoutes.put('/tags/:id', requireAuth, requireAdmin, async (c) => {
       color !== undefined ? color : tag.color,
       id
     ).run();
-    
-    // 清除缓存
-    await safeDeleteCache(c.env, 'tags:all');
-    
+
     logger.info('Tag updated', { tagId: id });
     
     return c.json(successResponse({ updated: true }, 'Tag updated successfully'));
@@ -372,10 +332,7 @@ categoryRoutes.put('/:id', requireAuth, requireAdmin, async (c) => {
       displayOrder !== undefined ? displayOrder : category.display_order,
       id
     ).run();
-    
-    // 清除缓存
-    await safeDeleteCache(c.env, 'categories:all');
-    
+
     logger.info('Category updated', { categoryId: id });
     
     return c.json(successResponse({ updated: true }, 'Category updated successfully'));
@@ -417,10 +374,7 @@ categoryRoutes.delete('/:id', requireAuth, requireAdmin, async (c) => {
     
     // 删除分类
     await c.env.DB.prepare('DELETE FROM categories WHERE id = ?').bind(id).run();
-    
-    // 清除缓存
-    await safeDeleteCache(c.env, 'categories:all');
-    
+
     logger.info('Category deleted', { categoryId: id });
     
     return c.json(successResponse({ deleted: true }, 'Category deleted successfully'));
@@ -454,10 +408,7 @@ categoryRoutes.delete('/tags/:id', requireAuth, requireAdmin, async (c) => {
     
     // 删除标签（会自动删除post_tags中的关联）
     await c.env.DB.prepare('DELETE FROM tags WHERE id = ?').bind(id).run();
-    
-    // 清除缓存
-    await safeDeleteCache(c.env, 'tags:all');
-    
+
     logger.info('Tag deleted', { tagId: id });
     
     return c.json(successResponse({ deleted: true }, 'Tag deleted successfully'));

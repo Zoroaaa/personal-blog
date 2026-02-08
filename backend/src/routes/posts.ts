@@ -22,7 +22,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../types';
 import { successResponse, errorResponse } from '../utils/response';
-import { safeGetCache, safePutCache, safeDeleteCache } from '../utils/cache';
+
 import { requireAuth, requireAdmin, optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import {
@@ -45,26 +45,7 @@ const MIN_CONTENT_LENGTH = 10;
 const MAX_CONTENT_LENGTH = 100000;
 const READING_SPEED = 250; // 每分钟阅读字数
 
-// ============= KV缓存策略优化 =============
-
-/**
- * 新的缓存策略:
- * - 只缓存浏览量>1000的热门文章详情
- * - 缓存时间: 5分钟
- * - 其他内容直接从D1读取
- */
-const CACHE_TTL = {
-  HOT_POST_DETAIL: 300  // 5分钟 - 只缓存热门文章
-};
-
-const HIGH_VIEW_THRESHOLD = 1000; // 浏览量阈值
-
-/**
- * 判断文章是否应该缓存
- */
-function shouldCachePost(viewCount: number): boolean {
-  return viewCount >= HIGH_VIEW_THRESHOLD;
-}
+// ============= 常量配置 =============
 
 // ============= 文章列表 =============
 
@@ -972,26 +953,7 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
       ), 404);
     }
     
-    // ===== 2. 判断是否应该使用缓存 =====
-    const cacheKey = `post:${slug}`;
-    const useCache = shouldCachePost(post.view_count);
-    
-    if (useCache) {
-      // 尝试从缓存获取
-      const cached = await safeGetCache(c.env, cacheKey);
-      if (cached) {
-        // 异步增加浏览量
-        c.executionCtx.waitUntil(
-          incrementViewCount(c, slug, post.id)
-        );
-        logger.info('Hot post served from cache', { slug, viewCount: post.view_count });
-        return c.json(JSON.parse(cached));
-      }
-    } else {
-      logger.info('Post not cached (low views)', { slug, viewCount: post.view_count });
-    }
-    
-    // ===== 3. 获取标签 =====
+    // ===== 2. 获取标签 =====
     const { results: tags } = await c.env.DB.prepare(`
       SELECT t.id, t.name, t.slug, t.post_count
       FROM tags t
@@ -999,7 +961,7 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
       WHERE pt.post_id = ?
     `).bind(post.id).all();
     
-    // ===== 4. 检查当前用户是否点赞、是否收藏 =====
+    // ===== 3. 检查当前用户是否点赞、是否收藏 =====
     const currentUser = c.get('user') as any;
     let isLiked = false;
     let isFavorited = false;
@@ -1035,15 +997,7 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
     
     const response = successResponse(result);
     
-    // ===== 6. 只缓存热门文章 =====
-    if (useCache) {
-      await safePutCache(c.env, cacheKey, JSON.stringify(response), {
-        expirationTtl: CACHE_TTL.HOT_POST_DETAIL
-      });
-      logger.info('Hot post cached', { slug, viewCount: post.view_count });
-    }
-    
-    // ===== 7. 异步增加浏览量 =====
+    // ===== 5. 异步增加浏览量 =====
     c.executionCtx.waitUntil(
       incrementViewCount(c, slug, post.id)
     );
@@ -1173,9 +1127,6 @@ postRoutes.post('/', requireAuth, async (c) => {
       }
     }
     
-    // ===== 8. 清除相关缓存 =====
-    await clearPostListCache(c);
-    
     logger.info('Post created successfully', { 
       postId, 
       slug, 
@@ -1287,10 +1238,6 @@ postRoutes.put('/:id', requireAuth, async (c) => {
       }
     }
     
-    // ===== 7. 清除缓存 =====
-    await safeDeleteCache(c.env, `post:${post.slug}`);
-    await clearPostListCache(c);
-    
     logger.info('Post updated successfully', { postId: id, userId: user.userId });
     
     return c.json(successResponse({ updated: true }, 'Post updated successfully'));
@@ -1328,12 +1275,6 @@ postRoutes.delete('/:id', requireAuth, requireAdmin, async (c) => {
     
     // 删除文章（级联删除会自动处理评论、点赞等）
     await c.env.DB.prepare('DELETE FROM posts WHERE id = ?').bind(id).run();
-    
-    // 清除缓存
-    await safeDeleteCache(c.env, `post:${post.slug}`);
-    await clearPostListCache(c);
-    // 清除数据分析缓存
-    await safeDeleteCache(c.env, 'analytics:stats');
     
     logger.info('Post deleted successfully', { postId: id });
     
@@ -1396,9 +1337,6 @@ postRoutes.post('/:id/like', requireAuth, async (c) => {
       liked = true;
       logger.info('Post liked', { postId, userId: user.userId });
     }
-    
-    // 清除文章详情缓存
-    await safeDeleteCache(c.env, `post:${post.slug}`);
     
     // 返回最新点赞数，便于前端实时更新
     const updated = await c.env.DB.prepare('SELECT like_count FROM posts WHERE id = ?').bind(postId).first() as any;
@@ -1513,22 +1451,3 @@ postRoutes.post('/:id/favorite', requireAuth, async (c) => {
 
 // ============= 辅助函数 =============
 
-/**
- * 清除文章缓存 - 优化版
- * 只清除热门文章缓存
- */
-async function clearPostCache(c: any, slug: string, viewCount: number): Promise<void> {
-  if (shouldCachePost(viewCount)) {
-    await safeDeleteCache(c.env, `post:${slug}`);
-  }
-  // 不再需要清除列表缓存
-}
-
-/**
- * 清除文章列表缓存（已废弃）
- * 由于不再缓存列表，此函数保留仅用于兼容性
- */
-async function clearPostListCache(c: any): Promise<void> {
-  // 由于不再缓存列表，此函数为空
-  console.log('Post list cache clearing is no longer needed');
-}

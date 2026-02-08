@@ -79,26 +79,14 @@ export function rateLimiter(options: RateLimitOptions = {}) {
       
       // 检查是否超出限制
       if (current >= max) {
-        // 计算重置时间
-        const resetTime = await getResetTime(c, key, windowMs);
-        const retryAfter = Math.ceil((resetTime - Date.now()) / 1000);
-
         // 设置响应头
         c.header('X-RateLimit-Limit', max.toString());
         c.header('X-RateLimit-Remaining', '0');
-        c.header('X-RateLimit-Reset', Math.floor(resetTime / 1000).toString());
-        c.header('Retry-After', retryAfter.toString());
 
         return c.json({
           success: false,
           error: 'Rate limit exceeded',
-          message,
-          data: {
-            limit: max,
-            remaining: 0,
-            resetAt: new Date(resetTime).toISOString(),
-            retryAfter
-          }
+          message
         }, 429);
       }
 
@@ -114,15 +102,7 @@ export function rateLimiter(options: RateLimitOptions = {}) {
       // 执行下一个中间件
       await next();
 
-      // 根据响应结果决定是否计数
-      const status = c.res.status;
-      if (skipSuccessfulRequests && status < 400) {
-        // 成功请求不计数，需要回滚
-        await decrementCount(c, key);
-      } else if (skipFailedRequests && status >= 400) {
-        // 失败请求不计数，需要回滚
-        await decrementCount(c, key);
-      }
+      // 简化逻辑：不再回滚计数，减少KV操作
 
     } catch (error) {
       console.error('Rate limiter error:', error);
@@ -196,42 +176,9 @@ async function incrementCount(
   await c.env.CACHE.put(key, newCount.toString(), {
     expirationTtl
   });
-
-  // 存储重置时间
-  if (current === 0) {
-    const resetTime = Date.now() + windowMs;
-    await c.env.CACHE.put(`${key}:reset`, resetTime.toString(), {
-      expirationTtl
-    });
-  }
 }
 
-/**
- * 减少计数（回滚用）
- */
-async function decrementCount(c: Context<{ Bindings: Env }>, key: string): Promise<void> {
-  const current = await getCurrentCount(c, key);
-  if (current > 0) {
-    await c.env.CACHE.put(key, (current - 1).toString(), {
-      expirationTtl: 60 // 保留1分钟
-    });
-  }
-}
 
-/**
- * 获取重置时间
- */
-async function getResetTime(
-  c: Context<{ Bindings: Env }>, 
-  key: string, 
-  windowMs: number
-): Promise<number> {
-  const resetTimeStr = await c.env.CACHE.get(`${key}:reset`);
-  if (resetTimeStr) {
-    return parseInt(resetTimeStr, 10);
-  }
-  return Date.now() + windowMs;
-}
 
 /**
  * 预定义的速率限制配置
