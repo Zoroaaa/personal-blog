@@ -24,116 +24,122 @@ import { useAuthStore } from '../stores/authStore';
 
 export interface SiteConfig {
   // 基本信息
-  siteName: string;
-  siteSubtitle: string;
-  siteLogo: string;
-  siteFavicon: string;
-  siteDescription: string;
-  siteKeywords: string;
-  siteAuthor: string;
+  site_name: string;
+  site_subtitle: string;
+  site_logo: string;
+  site_favicon: string;
+  site_description: string;
+  site_keywords: string;
+  site_author: string;
   
   // 作者信息
-  authorName: string;
-  authorAvatar: string;
-  authorBio: string;
-  authorEmail: string;
+  author_name: string;
+  author_avatar: string;
+  author_bio: string;
+  author_email: string;
   
   // 主题配置
-  themePrimaryColor: string;
-  themeDefaultMode: 'light' | 'dark' | 'system';
-  themeFontFamily: string;
-  themeEnableAnimations: boolean;
+  theme_primary_color: string;
+  theme_default_mode: 'light' | 'dark' | 'system';
+  theme_font_family: string;
+  theme_enable_animations: boolean;
   
   // 社交媒体
-  socialGithub?: string;
-  socialTwitter?: string;
-  socialLinkedin?: string;
-  socialEmail?: string;
-  socialWeibo?: string;
-  socialWechatQr?: string;
+  social_github?: string;
+  social_twitter?: string;
+  social_linkedin?: string;
+  social_email?: string;
+  social_weibo?: string;
+  social_wechat_qr?: string;
   
   // 功能开关
-  featureComments: boolean;
-  featureSearch: boolean;
-  featureLike: boolean;
-  featureShare: boolean;
-  featureRss: boolean;
-  featureAnalytics: boolean;
-  featureNewsletter: boolean;
+  feature_comments: boolean;
+  feature_search: boolean;
+  feature_like: boolean;
+  feature_share: boolean;
+  feature_rss: boolean;
+  feature_analytics: boolean;
+  feature_newsletter: boolean;
   
   // 评论设置
-  commentApprovalRequired: boolean;
+  comment_approval_required: boolean;
   
   // 页脚配置
-  footerText: string;
-  footerLinks?: Record<string, string> | string;
-  footerShowPoweredBy: boolean;
+  footer_text: string;
+  footer_links?: Record<string, string> | string;
+  footer_show_powered_by: boolean;
+  footer_brand_name?: string;
+  footer_description?: string;
+  footer_tech_stack?: string[];
   
   // 存储配置
-  storagePublicUrl?: string;
+  storage_public_url?: string;
   
   // 系统设置
-  postsPerPage: number;
-  maxUploadSizeMb: number;
-  enableMaintenanceMode: boolean;
+  posts_per_page: number;
+  max_upload_size_mb: number;
+  enable_maintenance_mode: boolean;
+  
+  // 索引签名
+  [key: string]: any;
 }
 
 // ============= 默认配置 =============
 
 const DEFAULT_CONFIG: SiteConfig = {
   // 基本信息
-  siteName: '我的博客',
-  siteSubtitle: '分享技术与生活',
-  siteLogo: '',
-  siteFavicon: '',
-  siteDescription: '一个分享技术和生活的个人博客',
-  siteKeywords: 'blog,技术,编程',
-  siteAuthor: 'Admin',
+  site_name: '我的博客',
+  site_subtitle: '分享技术与生活',
+  site_logo: '',
+  site_favicon: '',
+  site_description: '一个分享技术和生活的个人博客',
+  site_keywords: 'blog,技术,编程',
+  site_author: 'Admin',
   
   // 作者信息
-  authorName: 'Admin',
-  authorAvatar: '',
-  authorBio: '热爱技术的开发者',
-  authorEmail: 'admin@example.com',
+  author_name: 'Admin',
+  author_avatar: '',
+  author_bio: '热爱技术的开发者',
+  author_email: 'admin@example.com',
   
   // 主题配置
-  themePrimaryColor: '#3B82F6',
-  themeDefaultMode: 'system',
-  themeFontFamily: 'system-ui, -apple-system, sans-serif',
-  themeEnableAnimations: true,
+  theme_primary_color: '#3B82F6',
+  theme_default_mode: 'system',
+  theme_font_family: 'system-ui, -apple-system, sans-serif',
+  theme_enable_animations: true,
   
   // 社交媒体
-  socialGithub: '',
-  socialTwitter: '',
-  socialLinkedin: '',
-  socialEmail: '',
-  socialWeibo: '',
-  socialWechatQr: '',
+  social_github: '',
+  social_twitter: '',
+  social_linkedin: '',
+  social_email: '',
+  social_weibo: '',
+  social_wechat_qr: '',
   
   // 功能开关
-  featureComments: true,
-  featureSearch: true,
-  featureLike: true,
-  featureShare: true,
-  featureRss: true,
-  featureAnalytics: true,
-  featureNewsletter: false,
+  feature_comments: true,
+  feature_search: true,
+  feature_like: true,
+  feature_share: true,
+  feature_rss: true,
+  feature_analytics: true,
+  feature_newsletter: false,
   
   // 评论设置
-  commentApprovalRequired: false,
+  comment_approval_required: false,
   
   // 页脚配置
-  footerText: '© 2024 All rights reserved',
-  footerShowPoweredBy: true,
-  footerLinks: '{}',
+  footer_text: '© 2024 All rights reserved',
+  footer_show_powered_by: true,
+  footer_links: '{}',
   
   // 存储配置
-  storagePublicUrl: '',
+  storage_public_url: '',
   
   // 系统设置
-  postsPerPage: 10,
-  maxUploadSizeMb: 5,
-  enableMaintenanceMode: false
+  posts_per_page: 10,
+  max_upload_size_mb: 5,
+  enable_maintenance_mode: false
 };
 
 // ============= 配置状态管理 =============
@@ -216,8 +222,8 @@ export function useSiteConfig() {
   
   // 同步主题配置
   const syncThemeConfig = (config: SiteConfig) => {
-    if (config.themePrimaryColor || config.themeDefaultMode) {
-      syncWithTheme(config.themePrimaryColor, config.themeDefaultMode);
+    if (config.theme_primary_color || config.theme_default_mode) {
+      syncWithTheme(config.theme_primary_color, config.theme_default_mode);
     }
   };
   
@@ -257,7 +263,7 @@ export function useSiteConfig() {
         setState(prev => ({ ...prev, loading: true, error: null }));
         
         let configResponse;
-        let apiConfig: Record<string, any> | undefined;
+        let apiConfig;
         
         // 根据是否是管理员选择不同的API接口
         if (isAdmin) {
@@ -265,12 +271,12 @@ export function useSiteConfig() {
           const adminResponse = await api.getAdminConfig();
           if (adminResponse.success && adminResponse.data?.config) {
             // 转换配置格式，从数组转换为对象
-            apiConfig = {};
+            apiConfig = {} as Record<string, any>;
             for (const item of Object.values(adminResponse.data.config)) {
               if (Array.isArray(item)) {
                 for (const configItem of item) {
                   if (configItem.key && configItem.value !== undefined) {
-                    apiConfig[configItem.key] = configItem.value;
+                    (apiConfig as Record<string, any>)[configItem.key] = configItem.value;
                   }
                 }
               }
@@ -342,7 +348,7 @@ export function useSiteConfig() {
     try {
       // 处理特殊字段
       let processedValue = value;
-      if (key === 'footerLinks' && typeof value === 'object') {
+      if (key === 'footer_links' && typeof value === 'object') {
         processedValue = JSON.stringify(value);
       }
       
@@ -353,14 +359,14 @@ export function useSiteConfig() {
         setState(prev => {
           const newConfig = { 
             ...(prev.config || DEFAULT_CONFIG), 
-            [key]: key === 'footerLinks' ? processFooterLinks(processedValue) : processedValue 
+            [key]: key === 'footer_links' ? processFooterLinks(processedValue) : processedValue 
           };
           
           // 更新缓存
           setCachedConfig(newConfig);
           
           // 如果更新的是主题配置,同步到主题Store
-          if (key === 'themePrimaryColor' || key === 'themeDefaultMode') {
+          if (key === 'theme_primary_color' || key === 'theme_default_mode') {
             syncThemeConfig(newConfig);
           }
           
@@ -454,16 +460,7 @@ export function getConfigValue<K extends keyof SiteConfig>(
 export function isFeatureEnabled(
   feature: 'comments' | 'search' | 'like' | 'share' | 'rss' | 'analytics' | 'newsletter'
 ): boolean {
-  const keyMap: Record<string, keyof SiteConfig> = {
-    comments: 'featureComments',
-    search: 'featureSearch',
-    like: 'featureLike',
-    share: 'featureShare',
-    rss: 'featureRss',
-    analytics: 'featureAnalytics',
-    newsletter: 'featureNewsletter'
-  };
-  const key = keyMap[feature];
+  const key = `feature_${feature}` as keyof SiteConfig;
   return getConfigValue(key) as boolean;
 }
 
@@ -473,15 +470,7 @@ export function isFeatureEnabled(
 export function getSocialLink(
   platform: 'github' | 'twitter' | 'linkedin' | 'email' | 'weibo' | 'wechat_qr'
 ): string {
-  const keyMap: Record<string, keyof SiteConfig> = {
-    github: 'socialGithub',
-    twitter: 'socialTwitter',
-    linkedin: 'socialLinkedin',
-    email: 'socialEmail',
-    weibo: 'socialWeibo',
-    wechat_qr: 'socialWechatQr'
-  };
-  const key = keyMap[platform];
+  const key = `social_${platform}` as keyof SiteConfig;
   return getConfigValue(key) as string || '';
 }
 
@@ -489,7 +478,7 @@ export function getSocialLink(
  * 获取页脚链接
  */
 export function getFooterLinks(): Record<string, string> {
-  const links = getConfigValue('footerLinks');
+  const links = getConfigValue('footer_links');
   if (typeof links === 'string') {
     try {
       return JSON.parse(links);

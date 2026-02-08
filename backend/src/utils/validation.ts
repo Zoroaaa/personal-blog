@@ -18,6 +18,14 @@ const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,20}$/;
 /** 邮箱正则 */
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** 主流邮箱域名（用于注册/改密/删号验证码） */
+const MAINSTREAM_EMAIL_DOMAINS = new Set([
+  'gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com', 'live.com', 'msn.com', 'yahoo.com', 'yahoo.cn', 'yahoo.com.cn',
+  'qq.com', '163.com', '126.com', 'sina.com', 'sina.cn', 'foxmail.com', '139.com', '189.cn', 'aliyun.com', 'foxmail.com',
+  'icloud.com', 'me.com', 'mac.com', 'aol.com', 'protonmail.com', 'proton.me', 'mail.com', 'zoho.com', 'yandex.com',
+  'gmial.com', 'gmai.com', 'gmal.com'
+]);
+
 /** 强密码正则：至少8位，包含大小写字母和数字 */
 const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
@@ -85,6 +93,22 @@ export function validateEmail(email: string): string | null {
     return 'Disposable email addresses are not allowed';
   }
   
+  return null;
+}
+
+/**
+ * 校验是否为主流正规邮箱（用于发送验证码）
+ * @param email 邮箱地址
+ * @returns 错误信息，通过返回 null
+ */
+export function validateMainstreamEmail(email: string): string | null {
+  const err = validateEmail(email);
+  if (err) return err;
+  const domain = email.split('@')[1]?.toLowerCase();
+  if (!domain) return 'Invalid email format';
+  if (!MAINSTREAM_EMAIL_DOMAINS.has(domain)) {
+    return '请使用主流邮箱（如 Gmail、QQ、163、Outlook 等）以接收验证码';
+  }
   return null;
 }
 

@@ -30,11 +30,14 @@ import { requestLogger } from './middleware/requestLogger';
 // 导入类型定义
 import type { Env, ApiResponse } from './types';
 
+// 导出类型供其他模块使用
+export type { Env, ApiResponse } from './types';
+
 // ============= 常量配置 =============
 
 const API_VERSION = '3.0.1';
-const DEFAULT_RATE_LIMIT = 100;
-const STRICT_RATE_LIMIT = 10;
+const DEFAULT_RATE_LIMIT = 500;
+const STRICT_RATE_LIMIT = 50;
 
 // ============= 应用初始化 =============
 
@@ -128,14 +131,14 @@ app.use('*', cors({
 // 3. 速率限制（全局）
 app.use('/api/*', rateLimiter({ 
   windowMs: 60 * 1000,        // 1分钟
-  max: DEFAULT_RATE_LIMIT,    // 最多100次请求
+  max: DEFAULT_RATE_LIMIT,    // 最多500次请求
   message: 'Too many requests, please try again later.'
 }));
 
 // 敏感操作的严格速率限制
 app.use('/api/auth/register', rateLimiter({ 
   windowMs: 60 * 1000, 
-  max: 5,  // 注册每分钟最多5次
+  max: 20,  // 注册每分钟最多20次
   message: 'Too many registration attempts, please try again later.'
 }));
 
@@ -143,6 +146,18 @@ app.use('/api/auth/login', rateLimiter({
   windowMs: 60 * 1000, 
   max: STRICT_RATE_LIMIT, 
   message: 'Too many login attempts, please try again later.'
+}));
+
+app.use('/api/auth/send-verification-code', rateLimiter({ 
+  windowMs: 60 * 60 * 1000,  // 1 小时
+  max: 30, 
+  message: '验证码请求过于频繁，请 1 小时后再试'
+}));
+
+app.use('/api/auth/reset-password', rateLimiter({ 
+  windowMs: 60 * 1000, 
+  max: 5, 
+  message: '重置密码请求过于频繁，请稍后再试'
 }));
 
 app.use('/api/upload/*', rateLimiter({ 
@@ -249,8 +264,7 @@ app.get('/health', async (c) => {
   };
 
   // 只有数据库和存储必须健康，缓存是可选的
-  const requiredServices = { ...services };
-  delete requiredServices.cache;
+  const { cache: _, ...requiredServices } = services;
   const allHealthy = Object.values(requiredServices).every(status => status === 'healthy');
 
   return c.json<ApiResponse>({
@@ -414,64 +428,3 @@ export default app;
 // 重新导出响应工具函数，保持向后兼容
 export { successResponse, errorResponse };
 
-/**
- * 缓存辅助函数
- */
-
-/**
- * 检查缓存是否启用
- */
-export function isCacheEnabled(env: Env): boolean {
-  return env.ENABLE_CACHE !== 'false';
-}
-
-/**
- * 安全地获取缓存
- */
-export async function safeGetCache(env: Env, key: string): Promise<string | null> {
-  if (!isCacheEnabled(env) || !env.CACHE) {
-    return null;
-  }
-  
-  try {
-    return await env.CACHE.get(key);
-  } catch (error) {
-    console.error('Cache get error:', error);
-    return null;
-  }
-}
-
-/**
- * 安全地写入缓存
- */
-export async function safePutCache(
-  env: Env, 
-  key: string, 
-  value: string, 
-  options?: { expirationTtl?: number; expiration?: number }
-): Promise<void> {
-  if (!isCacheEnabled(env) || !env.CACHE) {
-    return;
-  }
-  
-  try {
-    await env.CACHE.put(key, value, options);
-  } catch (error) {
-    console.error('Cache put error:', error);
-  }
-}
-
-/**
- * 安全地删除缓存
- */
-export async function safeDeleteCache(env: Env, key: string): Promise<void> {
-  if (!isCacheEnabled(env) || !env.CACHE) {
-    return;
-  }
-  
-  try {
-    await env.CACHE.delete(key);
-  } catch (error) {
-    console.error('Cache delete error:', error);
-  }
-}

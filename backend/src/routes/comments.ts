@@ -20,7 +20,8 @@
  */
 
 import { Hono } from 'hono';
-import { Env, successResponse, errorResponse } from '../index';
+import { Env, Variables } from '../types';
+import { successResponse, errorResponse } from '../utils/response';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import {
@@ -29,7 +30,7 @@ import {
   safeParseInt
 } from '../utils/validation';
 
-export const commentRoutes = new Hono<{ Bindings: Env }>();
+export const commentRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // ============= 常量配置 =============
 
@@ -163,13 +164,25 @@ commentRoutes.get('/', optionalAuth, async (c) => {
       // 构建评论树
       comments = buildCommentTree([...comments, ...replies as any[]]);
     } else if (!postId) {
-      // 按用户ID获取的评论，添加文章信息
+      // 按用户ID获取的评论，添加文章信息（包括分类）
       for (const comment of comments) {
-        const post = await c.env.DB.prepare(
-          'SELECT id, title, slug FROM posts WHERE id = ?'
-        ).bind(comment.post_id).first() as any;
+        const post = await c.env.DB.prepare(`
+          SELECT p.id, p.title, p.slug, p.cover_image,
+                 c.name as category_name, c.slug as category_slug, c.color as category_color
+          FROM posts p
+          LEFT JOIN categories c ON p.category_id = c.id
+          WHERE p.id = ?
+        `).bind(comment.post_id).first() as any;
         if (post) {
-          comment.post = post;
+          comment.post = {
+            id: post.id,
+            title: post.title,
+            slug: post.slug,
+            coverImage: post.cover_image,
+            categoryName: post.category_name,
+            categorySlug: post.category_slug,
+            categoryColor: post.category_color
+          };
         }
       }
     }

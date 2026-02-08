@@ -23,10 +23,10 @@ export function ThemeToggle() {
     setIsOpen(!isOpen);
   };
   
-  // 关闭主题菜单
-  const closeMenu = () => {
-    setIsOpen(false);
-  };
+  // 关闭主题菜单 (保留以备将来使用)
+  // const closeMenu = () => {
+  //   setIsOpen(false);
+  // };
   
   // 切换主题模式
   const handleThemeModeChange = (mode: ThemeMode) => {

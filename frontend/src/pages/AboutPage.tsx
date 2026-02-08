@@ -11,14 +11,14 @@
  * @version 3.0.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useSiteConfig } from '../hooks/useSiteConfig';
-import { api } from '../utils/api';
 
 export function AboutPage() {
   const { config } = useSiteConfig();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // 保留这些状态以备将来使用
+  const [_loading, _setLoading] = useState(false);
+  const [_error, _setError] = useState<string | null>(null);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
@@ -53,21 +53,21 @@ export function AboutPage() {
                 <div>
                   <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">网站描述</h3>
                   <p className="text-gray-700 dark:text-gray-300">
-                    {config.siteDescription || '暂无描述'}
+                    {config.site_description || '暂无描述'}
                   </p>
                 </div>
                 
                 <div>
                   <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">网站关键词</h3>
                   <p className="text-gray-700 dark:text-gray-300">
-                    {config.siteKeywords || '暂无关键词'}
+                    {config.site_keywords || '暂无关键词'}
                   </p>
                 </div>
                 
                 <div>
                   <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">网站作者</h3>
                   <p className="text-gray-700 dark:text-gray-300">
-                    {config.siteAuthor || '暂无作者信息'}
+                    {config.site_author || '暂无作者信息'}
                   </p>
                 </div>
               </div>
@@ -84,10 +84,10 @@ export function AboutPage() {
               
               <div className="flex flex-col md:flex-row md:items-center gap-6">
                 <div className="flex-shrink-0">
-                  {config.authorAvatar ? (
+                  {config.author_avatar ? (
                     <img 
-                      src={config.authorAvatar} 
-                      alt={config.authorName || '作者头像'}
+                      src={config.author_avatar} 
+                      alt={config.author_name || '作者头像'}
                       className="w-32 h-32 rounded-full object-cover border-4 border-white dark:border-slate-700 shadow-lg"
                     />
                   ) : (
@@ -103,22 +103,22 @@ export function AboutPage() {
                   <div>
                     <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">作者名称</h3>
                     <p className="text-xl font-bold text-gray-700 dark:text-gray-300">
-                    {config.authorName || '暂无作者名称'}
-                  </p>
+                      {config.author_name || '暂无作者名称'}
+                    </p>
                   </div>
                   
                   <div>
                     <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">作者简介</h3>
                     <p className="text-gray-700 dark:text-gray-300">
-                    {config.authorBio || '暂无作者简介'}
-                  </p>
+                      {config.author_bio || '暂无作者简介'}
+                    </p>
                   </div>
                   
                   <div>
                     <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">联系邮箱</h3>
                     <p className="text-gray-700 dark:text-gray-300">
-                    {config.authorEmail || '暂无联系邮箱'}
-                  </p>
+                      {config.author_email || '暂无联系邮箱'}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -138,9 +138,9 @@ export function AboutPage() {
               </h2>
               
               <div className="space-y-4">
-                {config.socialGithub && (
+                {config.social_github && (
                   <a 
-                    href={config.socialGithub} 
+                    href={config.social_github} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors group"
@@ -156,9 +156,9 @@ export function AboutPage() {
                   </a>
                 )}
                 
-                {config.socialTwitter && (
+                {config.social_twitter && (
                   <a 
-                    href={config.socialTwitter} 
+                    href={config.social_twitter} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors group"
@@ -174,9 +174,9 @@ export function AboutPage() {
                   </a>
                 )}
                 
-                {config.socialLinkedin && (
+                {config.social_linkedin && (
                   <a 
-                    href={config.socialLinkedin} 
+                    href={config.social_linkedin} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors group"
@@ -192,9 +192,9 @@ export function AboutPage() {
                   </a>
                 )}
                 
-                {config.socialWeibo && (
+                {config.social_weibo && (
                   <a 
-                    href={config.socialWeibo} 
+                    href={config.social_weibo} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors group"
@@ -210,9 +210,9 @@ export function AboutPage() {
                   </a>
                 )}
                 
-                {config.socialEmail && (
+                {config.social_email && (
                   <a 
-                    href={`mailto:${config.socialEmail}`} 
+                    href={`mailto:${config.social_email}`} 
                     className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors group"
                   >
                     <div className="w-10 h-10 rounded-full bg-gray-800 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
@@ -226,7 +226,7 @@ export function AboutPage() {
                   </a>
                 )}
                 
-                {config.socialWechatQr && (
+                {config.social_wechat_qr && (
                   <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors group">
                     <div className="w-10 h-10 rounded-full bg-green-600 flex items-center justify-center flex-shrink-0">
                       <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -236,7 +236,7 @@ export function AboutPage() {
                     <div className="flex-1">
                       <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-2">微信二维码</h3>
                       <img 
-                        src={config.socialWechatQr} 
+                        src={config.social_wechat_qr} 
                         alt="微信二维码"
                         className="w-32 h-32 rounded-lg border border-gray-200 dark:border-gray-700"
                       />
@@ -244,7 +244,7 @@ export function AboutPage() {
                   </div>
                 )}
                 
-                {(!config.socialGithub && !config.socialTwitter && !config.socialLinkedin && !config.socialWeibo && !config.socialEmail && !config.socialWechatQr) && (
+                {(!config.social_github && !config.social_twitter && !config.social_linkedin && !config.social_weibo && !config.social_email && !config.social_wechat_qr) && (
                   <div className="text-center py-8">
                     <p className="text-gray-500 dark:text-gray-400">暂无社交媒体信息</p>
                   </div>

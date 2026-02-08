@@ -17,7 +17,9 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../utils/api';
-import type { User, Comment, PostListItem } from '../types';
+import { useVerificationCountdown } from '../hooks/useVerificationCountdown';
+import { transformCommentList } from '../utils/apiTransformer';
+import type { User, Comment, PostListItem, ReadingHistoryItem } from '../types';
 import { format } from 'date-fns';
 
 // ============= 辅助函数 =============
@@ -61,14 +63,18 @@ export function ProfilePage() {
   const navigate = useNavigate();
   
   // 状态管理
-  const [activeTab, setActiveTab] = useState<'info' | 'comments' | 'likes' | 'settings'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'comments' | 'likes' | 'history' | 'favorites' | 'settings'>('info');
   const [userInfo, setUserInfo] = useState<User | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [likedPosts, setLikedPosts] = useState<PostListItem[]>([]);
+  const [readingHistory, setReadingHistory] = useState<ReadingHistoryItem[]>([]);
+  const [favoritePosts, setFavoritePosts] = useState<PostListItem[]>([]);
   const [loading, setLoading] = useState({
     user: true,
     comments: false,
     likes: false,
+    history: false,
+    favorites: false,
     update: false,
     delete: false
   });
@@ -81,20 +87,19 @@ export function ProfilePage() {
     bio: '',
     password: '',
     newPassword: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    emailVerificationCode: ''
   });
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>('');
+  const [codeSending, setCodeSending] = useState(false);
+  const [deleteVerificationCode, setDeleteVerificationCode] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
   
-  // 邮箱验证相关状态
-  const [verificationCode, setVerificationCode] = useState('');
-  const [showVerificationCode, setShowVerificationCode] = useState(false);
-  const [sendingCode, setSendingCode] = useState(false);
-  const [countdown, setCountdown] = useState(0);
-  
-  // 更改邮箱相关状态
-  const [newEmail, setNewEmail] = useState('');
-  const [confirmNewEmail, setConfirmNewEmail] = useState('');
+  // 验证码倒计时 hooks
+  const { countdown: passwordCountdown, isCounting: isPasswordCounting, startCountdown: startPasswordCountdown } = useVerificationCountdown('password');
+  const { countdown: deleteCountdown, isCounting: isDeleteCounting, startCountdown: startDeleteCountdown } = useVerificationCountdown('delete');
   
   // 初始化数据
   useEffect(() => {
@@ -118,7 +123,8 @@ export function ProfilePage() {
           bio: response.data.user.bio || '',
           password: '',
           newPassword: '',
-          confirmPassword: ''
+          confirmPassword: '',
+          emailVerificationCode: ''
         });
         setAvatarPreview(response.data.user.avatarUrl || getRandomAvatar(response.data.user.username));
       }
@@ -143,13 +149,7 @@ export function ProfilePage() {
       });
       
       if (response.success && response.data) {
-        const processedComments = (response.data.comments || []).map((comment: any) => ({
-          ...comment,
-          createdAt: comment.createdAt || comment.created_at,
-          updatedAt: comment.updatedAt || comment.updated_at,
-          postId: comment.postId || comment.post_id
-        }));
-        setComments(processedComments);
+        setComments(transformCommentList(response.data.comments || []));
       }
     } catch (error) {
       console.error('Failed to load comments:', error);
@@ -164,12 +164,7 @@ export function ProfilePage() {
     try {
       setLoading(prev => ({ ...prev, likes: true }));
       setError(null);
-      
-      const response = await api.getLikedPosts({
-        page: '1',
-        limit: '20'
-      });
-      
+      const response = await api.getLikedPosts({ page: '1', limit: '20' });
       if (response.success && response.data) {
         setLikedPosts(response.data.posts || []);
       }
@@ -181,29 +176,44 @@ export function ProfilePage() {
     }
   };
   
-  // 切换标签时加载对应数据
-  useEffect(() => {
-    if (activeTab === 'comments') {
-      loadUserComments();
-    } else if (activeTab === 'likes') {
-      loadLikedPosts();
-    }
-  }, [activeTab]);
-  
-  // 倒计时功能
-  useEffect(() => {
-    let interval: number;
-    if (countdown > 0) {
-      interval = window.setInterval(() => {
-        setCountdown((prev) => prev - 1);
-      }, 1000);
-    }
-    return () => {
-      if (interval) {
-        clearInterval(interval);
+  const loadReadingHistory = async () => {
+    try {
+      setLoading(prev => ({ ...prev, history: true }));
+      setError(null);
+      const response = await api.getReadingHistory({ page: '1', limit: '20' });
+      if (response.success && response.data) {
+        setReadingHistory(response.data.items || []);
       }
-    };
-  }, [countdown]);
+    } catch (error) {
+      console.error('Failed to load reading history:', error);
+      setError('加载阅读历史失败');
+    } finally {
+      setLoading(prev => ({ ...prev, history: false }));
+    }
+  };
+  
+  const loadFavoritePosts = async () => {
+    try {
+      setLoading(prev => ({ ...prev, favorites: true }));
+      setError(null);
+      const response = await api.getFavorites({ page: '1', limit: '20' });
+      if (response.success && response.data) {
+        setFavoritePosts(response.data.posts || []);
+      }
+    } catch (error) {
+      console.error('Failed to load favorites:', error);
+      setError('加载收藏失败');
+    } finally {
+      setLoading(prev => ({ ...prev, favorites: false }));
+    }
+  };
+  
+  useEffect(() => {
+    if (activeTab === 'comments') loadUserComments();
+    else if (activeTab === 'likes') loadLikedPosts();
+    else if (activeTab === 'history') loadReadingHistory();
+    else if (activeTab === 'favorites') loadFavoritePosts();
+  }, [activeTab]);
   
   // 处理表单输入变化
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -259,42 +269,36 @@ export function ProfilePage() {
     }
   };
   
-  // 发送验证码
-  const handleSendVerificationCode = async (type: 'reset_password' | 'delete_account' | 'change_email') => {
-    if (!userInfo?.email) {
-      setError('用户邮箱未设置，无法发送验证码');
+  const handleSendCode = async (type: 'password' | 'delete') => {
+    // 检查是否在倒计时中
+    if (type === 'password' && isPasswordCounting) {
+      setError(`请等待 ${passwordCountdown} 秒后重试`);
+      return;
+    }
+    if (type === 'delete' && isDeleteCounting) {
+      setError(`请等待 ${deleteCountdown} 秒后重试`);
       return;
     }
     
-    setSendingCode(true);
-    setError('');
-    
     try {
-      const emailToSend = type === 'change_email' ? newEmail : userInfo.email;
-      
-      if (type === 'change_email' && (!newEmail || newEmail === userInfo.email)) {
-        setError('请输入新的邮箱地址');
-        setSendingCode(false);
-        return;
-      }
-      
-      const response = await api.sendVerificationCode({
-        email: emailToSend,
-        type,
-        username: userInfo.username
-      });
-      
+      setCodeSending(true);
+      setError(null);
+      const response = await api.sendVerificationCode({ type });
       if (response.success) {
-        setCountdown(60); // 60秒倒计时
-        setShowVerificationCode(true);
-        setError('');
+        // 根据类型启动对应的倒计时
+        if (type === 'password') {
+          startPasswordCountdown();
+        } else {
+          startDeleteCountdown();
+        }
+        setSuccessMessage('验证码已发送到您的邮箱，请查收');
       } else {
-        throw new Error(response.error || '发送验证码失败');
+        setError(response.message || response.error || '发送失败');
       }
-    } catch (err: any) {
-      setError(err.message || '发送验证码失败');
+    } catch (e: any) {
+      setError(e.message || '发送验证码失败');
     } finally {
-      setSendingCode(false);
+      setCodeSending(false);
     }
   };
   
@@ -310,16 +314,10 @@ export function ProfilePage() {
         return;
       }
       
-      if (!showVerificationCode || !verificationCode) {
-        setError('请先获取并输入验证码');
-        return;
-      }
-      
-      // 调用修改密码API（带验证码）
-      const response = await api.changePasswordWithCode({
+      const response = await api.changePassword({
         currentPassword: formData.password,
         newPassword: formData.newPassword,
-        verificationCode
+        emailVerificationCode: formData.emailVerificationCode || undefined
       });
       
       if (response.success) {
@@ -328,14 +326,12 @@ export function ProfilePage() {
           ...prev,
           password: '',
           newPassword: '',
-          confirmPassword: ''
+          confirmPassword: '',
+          emailVerificationCode: ''
         }));
-        setVerificationCode('');
-        setShowVerificationCode(false);
       }
-    } catch (error) {
-      console.error('Failed to change password:', error);
-      setError('修改密码失败');
+    } catch (error: any) {
+      setError(error.message || '修改密码失败');
     } finally {
       setLoading(prev => ({ ...prev, update: false }));
     }
@@ -359,85 +355,25 @@ export function ProfilePage() {
     }
   };
   
-  // 更改邮箱
-  const handleChangeEmail = async () => {
-    try {
-      setLoading(prev => ({ ...prev, update: true }));
-      setError(null);
-      setSuccessMessage(null);
-      
-      if (newEmail !== confirmNewEmail) {
-        setError('两次输入的邮箱不一致');
-        return;
-      }
-      
-      if (!showVerificationCode || !verificationCode) {
-        setError('请先获取并输入验证码');
-        return;
-      }
-      
-      if (newEmail === userInfo?.email) {
-        setError('新邮箱与当前邮箱相同');
-        return;
-      }
-      
-      // 调用更改邮箱API（带验证码）
-      const response = await api.changeEmailWithCode({
-        newEmail,
-        verificationCode
-      });
-      
-      if (response.success) {
-        setSuccessMessage('邮箱更改成功');
-        setNewEmail('');
-        setConfirmNewEmail('');
-        setVerificationCode('');
-        setShowVerificationCode(false);
-        // 重新加载用户信息
-        await loadUserInfo();
-      }
-    } catch (error) {
-      console.error('Failed to change email:', error);
-      setError('更改邮箱失败');
-    } finally {
-      setLoading(prev => ({ ...prev, update: false }));
-    }
-  };
-  
   // 删除账号
   const handleDeleteAccount = async () => {
-    if (!confirm('确定要删除您的账号吗？此操作不可恢复！')) {
+    if (!deleteConfirmation || deleteConfirmation !== 'DELETE') {
+      setError('请在下方输入 DELETE 确认删除');
       return;
     }
     
     try {
-      // 弹出密码输入框
-      const password = prompt('请输入您的密码以确认删除账号：');
-      if (!password) {
-        return;
-      }
-      
-      if (!showVerificationCode || !verificationCode) {
-        setError('请先获取并输入验证码');
-        return;
-      }
-      
       setLoading(prev => ({ ...prev, delete: true }));
       setError(null);
       
-      // 调用删除账号API（带验证码）
-      const response = await api.deleteAccountWithCode({
-        password,
-        verificationCode
-      });
+      const response = await api.deleteAccount(deletePassword, deleteVerificationCode);
       if (response.success) {
         alert('账号删除成功');
         logout();
         navigate('/');
       }
-    } catch (error) {
-      console.error('Failed to delete account:', error);
-      setError('删除账号失败，请检查密码和验证码是否正确');
+    } catch (error: any) {
+      setError(error.message || '删除账号失败，请检查密码和验证码');
     } finally {
       setLoading(prev => ({ ...prev, delete: false }));
     }
@@ -569,7 +505,7 @@ export function ProfilePage() {
         </div>
       );
     }
-    
+
     if (comments.length === 0) {
       return (
         <div className="text-center py-16 bg-muted rounded-lg">
@@ -581,33 +517,197 @@ export function ProfilePage() {
         </div>
       );
     }
-    
+
     return (
       <div className="space-y-4">
         {comments.map((comment) => (
           <div key={comment.id} className="border border-border rounded-lg p-4 hover:shadow-sm transition-shadow">
             <div className="flex justify-between items-start">
-              <div>
-                <p className="text-foreground mb-2">{comment.content}</p>
-                <div className="flex flex-col sm:flex-row sm:items-center text-sm space-y-2 sm:space-y-0 sm:space-x-4">
-                  <Link 
-                    to={`/posts/${comment.postId}`} 
-                    className="text-blue-600 hover:underline"
-                  >
-                    查看文章
-                  </Link>
+              <div className="flex-1 min-w-0">
+                {/* 评论内容 */}
+                <p className="text-foreground mb-3">{comment.content}</p>
+
+                {/* 文章信息卡片 */}
+                <Link
+                  to={`/posts/${comment.post?.slug || comment.postId}`}
+                  className="block bg-muted rounded-lg p-3 mb-3 hover:bg-muted/80 transition-colors group"
+                >
+                  <div className="flex items-start gap-3">
+                    {comment.post?.coverImage && (
+                      <img
+                        src={comment.post.coverImage}
+                        alt={comment.post?.title || ''}
+                        className="w-16 h-12 object-cover rounded flex-shrink-0"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-foreground text-sm line-clamp-1 group-hover:text-blue-600 transition-colors">
+                        {comment.post?.title || '未知文章'}
+                      </h4>
+                      {comment.post?.categoryName && (
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded text-xs mt-1"
+                          style={{
+                            backgroundColor: comment.post?.categoryColor ? `${comment.post.categoryColor}20` : '#e5e7eb',
+                            color: comment.post?.categoryColor || '#374151'
+                          }}
+                        >
+                          {comment.post.categoryName}
+                        </span>
+                      )}
+                    </div>
+                    <svg className="w-5 h-5 text-muted-foreground flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </Link>
+
+                {/* 评论时间和操作 */}
+                <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">{formatDate(comment.createdAt)}</span>
                 </div>
               </div>
               <button
                 onClick={() => handleDeleteComment(comment.id)}
-                className="text-red-600 hover:text-red-800"
+                className="text-red-600 hover:text-red-800 ml-4 flex-shrink-0"
+                title="删除评论"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </button>
             </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+  
+  const formatDuration = (seconds: number) => {
+    if (seconds < 60) return `${seconds} 秒`;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return s ? `${m} 分 ${s} 秒` : `${m} 分钟`;
+  };
+  
+  const renderHistoryTab = () => {
+    if (loading.history) {
+      return (
+        <div className="text-center py-12">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="mt-2 text-muted-foreground">加载中...</p>
+        </div>
+      );
+    }
+    if (readingHistory.length === 0) {
+      return (
+        <div className="text-center py-16 bg-muted rounded-lg">
+          <svg className="mx-auto h-16 w-16 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <h3 className="mt-4 text-lg font-medium text-foreground">暂无阅读历史</h3>
+          <p className="mt-2 text-muted-foreground">阅读过的文章会出现在这里</p>
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-4">
+        {readingHistory.map((item) => (
+          <Link
+            key={item.postId ?? item.id}
+            to={`/posts/${item.slug || item.id}`}
+            className="block border border-border rounded-lg p-4 hover:shadow-md transition-shadow"
+          >
+            <h3 className="font-semibold text-foreground">{item.title}</h3>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-muted-foreground">
+              <span>{formatDate(item.lastReadAt)}</span>
+              {item.readDurationSeconds != null && item.readDurationSeconds > 0 && (
+                <span>阅读时长 {formatDuration(item.readDurationSeconds)}</span>
+              )}
+              {item.readPercentage != null && (
+                <span>阅读进度 {item.readPercentage}%</span>
+              )}
+            </div>
+          </Link>
+        ))}
+      </div>
+    );
+  };
+  
+  // 取消收藏
+  const handleUnfavorite = async (postId: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!confirm('确定要取消收藏这篇文章吗？')) {
+      return;
+    }
+
+    try {
+      const response = await api.toggleFavorite(postId);
+      if (response.success) {
+        // 从列表中移除
+        setFavoritePosts(prev => prev.filter(post => post.id !== postId));
+        setSuccessMessage('已取消收藏');
+      }
+    } catch (error) {
+      console.error('Failed to unfavorite:', error);
+      setError('取消收藏失败');
+    }
+  };
+
+  const renderFavoritesTab = () => {
+    if (loading.favorites) {
+      return (
+        <div className="text-center py-12">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="mt-2 text-muted-foreground">加载中...</p>
+        </div>
+      );
+    }
+    if (favoritePosts.length === 0) {
+      return (
+        <div className="text-center py-16 bg-muted rounded-lg">
+          <svg className="mx-auto h-16 w-16 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+          </svg>
+          <h3 className="mt-4 text-lg font-medium text-foreground">暂无收藏</h3>
+          <p className="mt-2 text-muted-foreground">在文章页点击「收藏」即可收藏文章</p>
+        </div>
+      );
+    }
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {favoritePosts.map((post) => (
+          <div
+            key={post.id}
+            className="border border-border rounded-lg overflow-hidden hover:shadow-md transition-shadow group relative"
+          >
+            <Link to={`/posts/${post.slug || post.id}`}>
+              {post.coverImage && (
+                <div className="h-40 overflow-hidden">
+                  <img src={post.coverImage} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                </div>
+              )}
+              <div className="p-4">
+                <h3 className="text-lg font-semibold text-foreground group-hover:text-blue-600 transition-colors">{post.title}</h3>
+                <div className="flex items-center text-sm text-muted-foreground mt-2">
+                  <span>{formatDate(post.publishedAt)}</span>
+                  <span className="mx-2">•</span>
+                  <span>{post.viewCount} 次阅读</span>
+                </div>
+              </div>
+            </Link>
+            {/* 取消收藏按钮 */}
+            <button
+              onClick={(e) => handleUnfavorite(post.id, e)}
+              className="absolute top-2 right-2 p-2 bg-white/90 dark:bg-gray-800/90 rounded-full shadow-sm hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 transition-colors"
+              title="取消收藏"
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M5.525 3.025a.5.5 0 00-.707.707l.707.707a.5.5 0 00.707-.707l-.707-.707zM12 2.5a.5.5 0 00-.5.5v1a.5.5 0 001 0v-1a.5.5 0 00-.5-.5zM18.475 3.025l-.707.707a.5.5 0 00.707.707l.707-.707a.5.5 0 00-.707-.707zM4.5 12a.5.5 0 00-.5.5v1a.5.5 0 001 0v-1a.5.5 0 00-.5-.5zM19.5 12a.5.5 0 00-.5.5v1a.5.5 0 001 0v-1a.5.5 0 00-.5-.5zM5.525 20.975a.5.5 0 00.707-.707l-.707-.707a.5.5 0 00-.707.707l.707.707zM12 21.5a.5.5 0 00.5-.5v-1a.5.5 0 00-1 0v1a.5.5 0 00.5.5zM18.475 20.975l.707-.707a.5.5 0 00-.707-.707l-.707.707a.5.5 0 00.707.707zM12 5.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13z" />
+              </svg>
+            </button>
           </div>
         ))}
       </div>
@@ -677,11 +777,30 @@ export function ProfilePage() {
         {/* 密码修改 */}
         <div className="bg-card rounded-lg shadow-sm border border-border p-6">
           <h3 className="text-xl font-semibold text-foreground mb-4">密码修改</h3>
-          <form className="space-y-4">
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleChangePassword(); }}>
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-foreground mb-1">邮箱验证码</label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  placeholder="6 位验证码"
+                  value={formData.emailVerificationCode}
+                  onChange={(e) => setFormData(prev => ({ ...prev, emailVerificationCode: e.target.value.replace(/\D/g, '') }))}
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => handleSendCode('password')}
+                disabled={codeSending || isPasswordCounting}
+                className="px-4 py-2 border border-border rounded-lg hover:bg-muted disabled:opacity-50 whitespace-nowrap min-w-[100px]"
+              >
+                {codeSending ? '发送中...' : isPasswordCounting ? `${passwordCountdown}秒后重试` : '获取验证码'}
+              </button>
+            </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
-                当前密码
-              </label>
+              <label className="block text-sm font-medium text-foreground mb-1">当前密码</label>
               <input
                 type="password"
                 name="password"
@@ -690,11 +809,8 @@ export function ProfilePage() {
                 className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
-                新密码
-              </label>
+              <label className="block text-sm font-medium text-foreground mb-1">新密码</label>
               <input
                 type="password"
                 name="newPassword"
@@ -703,11 +819,8 @@ export function ProfilePage() {
                 className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
-                确认新密码
-              </label>
+              <label className="block text-sm font-medium text-foreground mb-1">确认新密码</label>
               <input
                 type="password"
                 name="confirmPassword"
@@ -716,183 +829,72 @@ export function ProfilePage() {
                 className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            
-            {/* 验证码 */}
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
-                验证码
-              </label>
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value)}
-                  className="flex-1 px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="输入验证码"
-                  disabled={!showVerificationCode}
-                />
-                <button
-                  type="button"
-                  onClick={() => handleSendVerificationCode('reset_password')}
-                  disabled={sendingCode || countdown > 0}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap transition-colors"
-                >
-                  {sendingCode ? '发送中...' : 
-                   countdown > 0 ? `${countdown}s后重发` : 
-                   '发送验证码'}
-                </button>
-              </div>
-              <p className="mt-1 text-xs text-gray-500">
-                验证码将发送到您的邮箱：{userInfo?.email}
-              </p>
-            </div>
-            
-            <div>
-              <button
-                type="button"
-                onClick={handleChangePassword}
-                disabled={loading.update}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {loading.update ? '修改中...' : '修改密码'}
-              </button>
-            </div>
-          </form>
-        </div>
-        
-        {/* 更改邮箱 */}
-        <div className="bg-card rounded-lg shadow-sm border border-border p-6">
-          <h3 className="text-xl font-semibold text-foreground mb-4">更改邮箱</h3>
-          <form className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
-                当前邮箱
-              </label>
-              <input
-                type="email"
-                value={userInfo?.email || ''}
-                disabled
-                className="w-full px-4 py-2 border border-border rounded-lg bg-muted focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
-                新邮箱
-              </label>
-              <input
-                type="email"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="输入新的邮箱地址"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
-                确认新邮箱
-              </label>
-              <input
-                type="email"
-                value={confirmNewEmail}
-                onChange={(e) => setConfirmNewEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="再次输入新的邮箱地址"
-              />
-            </div>
-            
-            {/* 验证码 */}
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
-                验证码
-              </label>
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value)}
-                  className="flex-1 px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="输入验证码"
-                  disabled={!showVerificationCode}
-                />
-                <button
-                  type="button"
-                  onClick={() => handleSendVerificationCode('change_email')}
-                  disabled={sendingCode || countdown > 0}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap transition-colors"
-                >
-                  {sendingCode ? '发送中...' : 
-                   countdown > 0 ? `${countdown}s后重发` : 
-                   '发送验证码'}
-                </button>
-              </div>
-              <p className="mt-1 text-xs text-gray-500">
-                验证码将发送到您的新邮箱：{newEmail}
-              </p>
-            </div>
-            
-            <div>
-              <button
-                type="button"
-                onClick={handleChangeEmail}
-                disabled={loading.update}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {loading.update ? '修改中...' : '更改邮箱'}
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={loading.update}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading.update ? '修改中...' : '修改密码'}
+            </button>
           </form>
         </div>
         
         {/* 账号删除 */}
         <div className="bg-card rounded-lg shadow-sm border border-border p-6">
           <h3 className="text-xl font-semibold text-foreground mb-4">账号管理</h3>
-          <div className="space-y-4">
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-              <h4 className="text-lg font-medium text-red-800 mb-2">删除账号</h4>
-              <p className="text-red-700 mb-4">
-                一旦删除账号，所有数据将被永久删除，无法恢复。
-              </p>
-              
-              {/* 验证码 */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-red-800 mb-1">
-                  验证码
-                </label>
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    value={verificationCode}
-                    onChange={(e) => setVerificationCode(e.target.value)}
-                    className="flex-1 px-4 py-2 border border-red-300 rounded-lg bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                    placeholder="输入验证码"
-                    disabled={!showVerificationCode}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleSendVerificationCode('delete_account')}
-                    disabled={sendingCode || countdown > 0}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap transition-colors"
-                  >
-                    {sendingCode ? '发送中...' : 
-                     countdown > 0 ? `${countdown}s后重发` : 
-                     '发送验证码'}
-                  </button>
-                </div>
-                <p className="mt-1 text-xs text-red-600">
-                  验证码将发送到您的邮箱：{userInfo?.email}
-                </p>
+          <div className="p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg space-y-4">
+            <h4 className="text-lg font-medium text-red-800 dark:text-red-200 mb-2">删除账号</h4>
+            <p className="text-red-700 dark:text-red-300 text-sm">
+              一旦删除账号，所有数据将被永久删除，无法恢复。请先获取邮箱验证码并输入密码确认。
+            </p>
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-foreground mb-1">邮箱验证码</label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  placeholder="6 位验证码"
+                  value={deleteVerificationCode}
+                  onChange={(e) => setDeleteVerificationCode(e.target.value.replace(/\D/g, ''))}
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-red-500"
+                />
               </div>
-              
               <button
-                onClick={handleDeleteAccount}
-                disabled={loading.delete}
-                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                type="button"
+                onClick={() => handleSendCode('delete')}
+                disabled={codeSending || isDeleteCounting}
+                className="px-4 py-2 border border-border rounded-lg hover:bg-muted disabled:opacity-50 whitespace-nowrap min-w-[100px]"
               >
-                {loading.delete ? '删除中...' : '删除账号'}
+                {codeSending ? '发送中...' : isDeleteCounting ? `${deleteCountdown}秒后重试` : '获取验证码'}
               </button>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">当前密码</label>
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                placeholder="请输入密码以确认身份"
+                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">确认删除（输入 DELETE）</label>
+              <input
+                type="text"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                placeholder="输入 DELETE 确认删除"
+                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+            <button
+              onClick={handleDeleteAccount}
+              disabled={loading.delete || deleteConfirmation !== 'DELETE'}
+              className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading.delete ? '删除中...' : '删除账号'}
+            </button>
           </div>
         </div>
       </div>
@@ -943,6 +945,18 @@ export function ProfilePage() {
             我的点赞
           </button>
           <button
+            onClick={() => setActiveTab('history')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'history' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
+          >
+            阅读历史
+          </button>
+          <button
+            onClick={() => setActiveTab('favorites')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'favorites' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
+          >
+            我的收藏
+          </button>
+          <button
             onClick={() => setActiveTab('settings')}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'settings' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
           >
@@ -956,6 +970,8 @@ export function ProfilePage() {
         {activeTab === 'info' && renderInfoTab()}
         {activeTab === 'comments' && renderCommentsTab()}
         {activeTab === 'likes' && renderLikesTab()}
+        {activeTab === 'history' && renderHistoryTab()}
+        {activeTab === 'favorites' && renderFavoritesTab()}
         {activeTab === 'settings' && renderSettingsTab()}
       </div>
     </div>

@@ -5,7 +5,18 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
-import { Category } from '../types';
+import { transformCategoryList } from '../utils/apiTransformer';
+
+interface Category {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  icon: string;
+  color: string;
+  postCount: number;
+  displayOrder: number;
+}
 
 // 预设颜色选项
 const PRESET_COLORS = [
@@ -58,7 +69,7 @@ export function CategoryManager() {
       setError('');
       const response = await api.getCategories();
       if (response.success && response.data) {
-        setCategories(response.data.categories || []);
+        setCategories(transformCategoryList(response.data.categories || []));
       }
     } catch (err: any) {
       setError(err.message || '加载分类失败');

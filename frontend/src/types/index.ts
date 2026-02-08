@@ -105,6 +105,18 @@ export interface RegisterRequest {
   email: string;
   password: string;
   displayName?: string;
+  emailVerificationCode?: string;
+}
+
+/**
+ * 阅读历史项（含阅读进度）
+ */
+export interface ReadingHistoryItem extends PostListItem {
+  postId?: number;
+  firstReadAt: string;
+  lastReadAt: string;
+  readDurationSeconds: number;
+  readPercentage: number;
 }
 
 /**
@@ -189,6 +201,7 @@ export interface PostListItem {
   authorName: string;
   authorAvatar?: string;
   categoryName?: string;
+  categorySlug?: string;
   categoryColor?: string;
   viewCount: number;
   likeCount: number;
@@ -321,6 +334,17 @@ export interface Comment {
   displayName?: string;
   avatarUrl?: string;
   replies?: Comment[];
+  
+  // 关联文章信息（在某些API响应中返回）
+  post?: {
+    id: number;
+    title: string;
+    slug: string;
+    coverImage?: string;
+    categoryName?: string;
+    categorySlug?: string;
+    categoryColor?: string;
+  };
 }
 
 /**
@@ -336,7 +360,7 @@ export interface CreateCommentRequest {
  * 评论查询参数
  */
 export interface CommentQueryParams {
-  postId?: number;
+  postId?: number | string;
   userId?: string;
   page?: number;
   limit?: number;
@@ -511,56 +535,59 @@ export interface AsyncState<T = any> {
  */
 export interface SiteConfig {
   // 基本信息
-  siteName: string;
-  siteSubtitle: string;
-  siteLogo: string;
-  siteFavicon: string;
-  siteDescription: string;
-  siteKeywords: string;
-  siteAuthor: string;
-  
+  site_name: string;
+  site_subtitle: string;
+  site_logo: string;
+  site_favicon: string;
+  site_description: string;
+  site_keywords: string;
+  site_author: string;
+
   // 作者信息
-  authorName: string;
-  authorAvatar: string;
-  authorBio: string;
-  authorEmail: string;
-  
+  author_name: string;
+  author_avatar: string;
+  author_bio: string;
+  author_email: string;
+
   // 主题配置
-  themePrimaryColor: string;
-  themeDefaultMode: 'light' | 'dark' | 'system';
-  themeFontFamily: string;
-  themeEnableAnimations: boolean;
-  
+  theme_primary_color: string;
+  theme_default_mode: 'light' | 'dark' | 'system';
+  theme_font_family: string;
+  theme_enable_animations: boolean;
+
   // 社交媒体
-  socialGithub?: string;
-  socialTwitter?: string;
-  socialLinkedin?: string;
-  socialEmail?: string;
-  socialWeibo?: string;
-  socialWechatQr?: string;
-  
+  social_github?: string;
+  social_twitter?: string;
+  social_linkedin?: string;
+  social_email?: string;
+  social_weibo?: string;
+  social_wechat_qr?: string;
+
   // 功能开关
-  featureComments: boolean;
-  featureSearch: boolean;
-  featureLike: boolean;
-  featureShare: boolean;
-  featureRss: boolean;
-  featureAnalytics: boolean;
-  featureNewsletter: boolean;
-  commentApprovalRequired: boolean;
-  
+  feature_comments: boolean;
+  feature_search: boolean;
+  feature_like: boolean;
+  feature_share: boolean;
+  feature_rss: boolean;
+  feature_analytics: boolean;
+  feature_newsletter: boolean;
+  comment_approval_required: boolean;
+
   // 页脚配置
-  footerText: string;
-  footerLinks?: Record<string, string> | string;
-  footerShowPoweredBy: boolean;
-  
+  footer_text: string;
+  footer_links?: Record<string, string> | string;
+  footer_show_powered_by: boolean;
+
   // 存储配置
-  storagePublicUrl?: string;
-  
+  storage_public_url?: string;
+
   // 系统设置
-  postsPerPage: number;
-  maxUploadSizeMb: number;
-  enableMaintenanceMode: boolean;
+  posts_per_page: number;
+  max_upload_size_mb: number;
+  enable_maintenance_mode: boolean;
+
+  // 索引签名，允许动态访问配置项
+  [key: string]: any;
 }
 
 /**

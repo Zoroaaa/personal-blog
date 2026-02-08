@@ -22,26 +22,157 @@
 
 import { Hono } from 'hono';
 import bcrypt from 'bcryptjs';
-import type { Env } from '../types';
+import type { Env, Variables } from '../types';
 import { successResponse, errorResponse } from '../utils/response';
-import { safeGetCache, safePutCache, safeDeleteCache } from '../index';
+import { safeGetCache, safePutCache, safeDeleteCache } from '../utils/cache';
 import { generateToken } from '../utils/jwt';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { 
   validateUsername, 
   validateEmail, 
   validatePassword,
-  sanitizeInput 
+  validateMainstreamEmail,
+  sanitizeInput
 } from '../utils/validation';
+import { sendVerificationEmail } from '../utils/resend';
+import type { VerificationEmailType } from '../utils/resend';
 
-export const authRoutes = new Hono<{ Bindings: Env }>();
+export const authRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // ============= 常量配置 =============
 
 const BCRYPT_ROUNDS = 12; // bcrypt加密轮次（增加安全性）
-const MAX_LOGIN_ATTEMPTS = 5; // 最大登录失败次数
-const LOGIN_BLOCK_DURATION = 15 * 60; // 登录封锁时间（15分钟，秒）
+const VERIFICATION_CODE_TTL = 600; // 验证码有效期 10 分钟（秒）
+const VERIFICATION_CODE_LENGTH = 6;
+const EMAIL_VERIFY_RATE_WINDOW = 3600; // 单用户邮箱验证限制：1 小时（秒）
+const EMAIL_VERIFY_RATE_MAX = 10;      // 1 小时内最多 10 次
+
+/** 从 KV 读取并校验验证码，校验成功后删除 */
+async function verifyAndConsumeCode(env: Env, type: VerificationEmailType, email: string, code: string): Promise<boolean> {
+  const key = `email_verify:${type}:${email.toLowerCase()}`;
+  const stored = await safeGetCache(env, key);
+  if (!stored || stored !== code) return false;
+  await safeDeleteCache(env, key);
+  return true;
+}
+
+/** 生成 6 位数字验证码 */
+function generateVerificationCode(): string {
+  const bytes = new Uint8Array(4);
+  crypto.getRandomValues(bytes);
+  let n = 0;
+  for (let i = 0; i < 4; i++) n = (n << 8) | bytes[i];
+  return String(Math.abs(n) % 1000000).padStart(6, '0');
+}
+
+// ============= 发送邮箱验证码 =============
+
+/**
+ * POST /api/auth/send-verification-code
+ * 发送邮箱验证码（注册时传 email+type=register；改密/删号需登录，type=password 或 delete，使用当前用户邮箱）
+ */
+authRoutes.post('/send-verification-code', optionalAuth, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    if (!c.env.RESEND_API_KEY) {
+      return c.json(errorResponse(
+        'Email not configured',
+        '邮件服务未配置，无法发送验证码'
+      ), 503);
+    }
+    
+    const body = await c.req.json();
+    const { email: bodyEmail, type } = body;
+    const rawType = (type || 'register') as VerificationEmailType;
+    if (!['register', 'password', 'delete', 'forgot_password'].includes(rawType)) {
+      return c.json(errorResponse('Invalid type', 'type 必须为 register / password / delete / forgot_password'), 400);
+    }
+    
+    let email: string;
+    if (rawType === 'register' || rawType === 'forgot_password') {
+      if (!bodyEmail) {
+        return c.json(errorResponse('Missing email', rawType === 'register' ? '注册验证需要提供邮箱' : '请输入邮箱以重置密码'), 400);
+      }
+      email = sanitizeInput(String(bodyEmail).toLowerCase());
+      const err = validateMainstreamEmail(email);
+      if (err) {
+        return c.json(errorResponse('Invalid email', err), 400);
+      }
+      if (rawType === 'register') {
+        const existingUser = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
+        if (existingUser) {
+          return c.json(errorResponse('Email already registered', '该邮箱已被注册，请直接登录或使用其他邮箱'), 409);
+        }
+      }
+      if (rawType === 'forgot_password') {
+        const userRow = await c.env.DB.prepare('SELECT id, oauth_provider FROM users WHERE email = ?').bind(email).first() as any;
+        if (!userRow) {
+          return c.json(successResponse({ sent: true }, '如该邮箱已注册，验证码将发送至您的邮箱'));
+        }
+        if (userRow.oauth_provider) {
+          return c.json(errorResponse('OAuth account', '该账号使用第三方登录，无法通过邮箱重置密码'), 400);
+        }
+      }
+    } else {
+      // password / delete：需要登录，使用当前用户邮箱
+      const user = c.get('user') as any;
+      if (!user) {
+        return c.json(errorResponse('Unauthorized', '请先登录'), 401);
+      }
+      const row = await c.env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(user.userId).first() as any;
+      if (!row?.email) {
+        return c.json(errorResponse('User email not found', '未找到绑定邮箱'), 400);
+      }
+      email = row.email.toLowerCase();
+      // OAuth 用户的邮箱可能是占位邮箱，校验主流邮箱
+      const err = validateMainstreamEmail(email);
+      if (err) {
+        return c.json(errorResponse('Email not supported', '当前账号绑定的邮箱无法接收验证码，请使用主流邮箱登录或联系管理员'), 400);
+      }
+    }
+    
+    const rateKey = `email_verify_rate:${rawType}:${email}`;
+    const rateVal = await safeGetCache(c.env, rateKey);
+    const rateCount = rateVal ? parseInt(rateVal, 10) : 0;
+    if (rateCount >= EMAIL_VERIFY_RATE_MAX) {
+      return c.json(errorResponse(
+        'Too many requests',
+        `1 小时内最多发送 ${EMAIL_VERIFY_RATE_MAX} 次验证码，请稍后再试`
+      ), 429);
+    }
+    
+    const code = generateVerificationCode();
+    const kvKey = `email_verify:${rawType}:${email}`;
+
+    // 先存储验证码到KV，确保存储成功后再发送邮件
+    const codeStored = await safePutCache(c.env, kvKey, code, { expirationTtl: VERIFICATION_CODE_TTL });
+    if (!codeStored) {
+      logger.error('Failed to store verification code in KV', { type: rawType, email: email.replace(/(.{2}).*(@.*)/, '$1***$2') });
+      return c.json(errorResponse(
+        'Service temporarily unavailable',
+        '验证码服务暂时不可用，请稍后重试'
+      ), 503);
+    }
+
+    // 更新频率限制计数
+    await safePutCache(c.env, rateKey, String(rateCount + 1), { expirationTtl: EMAIL_VERIFY_RATE_WINDOW });
+
+    // KV存储成功后发送邮件
+    await sendVerificationEmail(c.env, email, code, rawType);
+    logger.info('Verification code sent', { type: rawType, email: email.replace(/(.{2}).*(@.*)/, '$1***$2') });
+
+    const msg = rawType === 'forgot_password' ? '如该邮箱已注册，验证码将发送至您的邮箱' : '验证码已发送，请查收邮件';
+    return c.json(successResponse({ sent: true }, msg));
+  } catch (e: any) {
+    logger.error('Send verification code error', e);
+    return c.json(errorResponse(
+      'Send failed',
+      e.message || '发送验证码失败，请稍后重试'
+    ), 500);
+  }
+});
 
 // ============= 用户注册 =============
 
@@ -63,14 +194,14 @@ authRoutes.post('/register', async (c) => {
   try {
     // 解析请求体
     const body = await c.req.json();
-    let { username, email, password, displayName } = body;
+    let { username, email, password, displayName, emailVerificationCode } = body;
     
     // ===== 1. 验证必填字段 =====
     if (!username || !email || !password) {
       logger.warn('Registration failed: Missing required fields');
       return c.json(errorResponse(
         'Missing required fields',
-        'Please provide username, email, and password'
+        '请提供用户名、邮箱和密码'
       ), 400);
     }
     
@@ -79,6 +210,16 @@ authRoutes.post('/register', async (c) => {
     email = sanitizeInput(email.toLowerCase()); // 邮箱转小写
     displayName = displayName ? sanitizeInput(displayName) : username;
     
+    const emailVerificationRequired = !!c.env.RESEND_API_KEY;
+    if (emailVerificationRequired) {
+      if (!emailVerificationCode || String(emailVerificationCode).length !== 6) {
+        return c.json(errorResponse(
+          'Verification code required',
+          '请先获取并填写 6 位邮箱验证码'
+        ), 400);
+      }
+    }
+    
     // ===== 3. 验证用户名格式 =====
     const usernameError = validateUsername(username);
     if (usernameError) {
@@ -86,11 +227,21 @@ authRoutes.post('/register', async (c) => {
       return c.json(errorResponse('Invalid username', usernameError), 400);
     }
     
-    // ===== 4. 验证邮箱格式 =====
-    const emailError = validateEmail(email);
+    // ===== 4. 验证邮箱（启用邮件时要求主流邮箱 + 格式） =====
+    const emailError = emailVerificationRequired ? validateMainstreamEmail(email) : validateEmail(email);
     if (emailError) {
       logger.warn('Registration failed: Invalid email', { email });
       return c.json(errorResponse('Invalid email', emailError), 400);
+    }
+    
+    if (emailVerificationRequired) {
+      const codeValid = await verifyAndConsumeCode(c.env, 'register', email, String(emailVerificationCode).trim());
+      if (!codeValid) {
+        return c.json(errorResponse(
+          'Invalid verification code',
+          '验证码错误或已过期，请重新获取'
+        ), 400);
+      }
     }
     
     // ===== 5. 验证密码强度 =====
@@ -200,37 +351,22 @@ authRoutes.post('/login', async (c) => {
         'Please provide username and password'
       ), 400);
     }
-    
-    // ===== 2. 检查登录尝试次数（防暴力破解） =====
-    const loginKey = `login_attempts:${username}`;
-    const attempts = await safeGetCache(c.env, loginKey);
-    const attemptCount = attempts ? parseInt(attempts, 10) : 0;
-    
-    if (attemptCount >= MAX_LOGIN_ATTEMPTS) {
-      logger.warn('Login failed: Too many attempts', { username });
-      return c.json(errorResponse(
-        'Account temporarily locked',
-        'Too many failed login attempts. Please try again in 15 minutes.'
-      ), 429);
-    }
-    
-    // ===== 3. 查找用户 =====
+
+    // ===== 2. 查找用户 =====
     const user = await c.env.DB.prepare(
       'SELECT id, username, email, password_hash, display_name, avatar_url, bio, role FROM users WHERE username = ? OR email = ?'
     ).bind(username, username).first() as any;
-    
-    // ===== 4. 验证用户存在 =====
+
+    // ===== 3. 验证用户存在 =====
     if (!user) {
-      // 记录失败尝试
-      await recordLoginAttempt(c, loginKey, attemptCount);
       logger.warn('Login failed: User not found', { username });
       return c.json(errorResponse(
         'Invalid credentials',
         'Username or password is incorrect'
       ), 401);
     }
-    
-    // ===== 5. 验证密码 =====
+
+    // ===== 4. 验证密码 =====
     if (!user.password_hash) {
       logger.warn('Login failed: OAuth user trying password login', { username });
       return c.json(errorResponse(
@@ -238,22 +374,17 @@ authRoutes.post('/login', async (c) => {
         'This account uses OAuth login. Please sign in with GitHub.'
       ), 401);
     }
-    
+
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
-      // 记录失败尝试
-      await recordLoginAttempt(c, loginKey, attemptCount);
       logger.warn('Login failed: Invalid password', { username });
       return c.json(errorResponse(
         'Invalid credentials',
         'Username or password is incorrect'
       ), 401);
     }
-    
-    // ===== 6. 清除失败尝试记录 =====
-    await safeDeleteCache(c.env, loginKey);
-    
-    // ===== 7. 生成JWT Token =====
+
+    // ===== 5. 生成JWT Token =====
     const token = await generateToken(c.env.JWT_SECRET, {
       userId: user.id,
       username: user.username,
@@ -296,21 +427,82 @@ authRoutes.post('/login', async (c) => {
   }
 });
 
+// ============= 忘记密码 / 重置密码 =============
+
 /**
- * 记录登录失败尝试
+ * POST /api/auth/reset-password
+ * 通过邮箱验证码重置密码（无需登录）
+ * 请求体: { email, verificationCode, newPassword }
  */
-async function recordLoginAttempt(
-  c: any, 
-  key: string, 
-  currentCount: number
-): Promise<void> {
-  await safePutCache(
-    c.env, 
-    key, 
-    (currentCount + 1).toString(), 
-    { expirationTtl: LOGIN_BLOCK_DURATION }
-  );
-}
+authRoutes.post('/reset-password', async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    if (!c.env.RESEND_API_KEY) {
+      return c.json(errorResponse('Email not configured', '邮件服务未配置，无法重置密码'), 503);
+    }
+    
+    const body = await c.req.json();
+    const { email: bodyEmail, verificationCode, newPassword } = body;
+    
+    if (!bodyEmail || !verificationCode || !newPassword) {
+      return c.json(errorResponse(
+        'Missing required fields',
+        '请提供邮箱、验证码和新密码'
+      ), 400);
+    }
+    
+    const email = sanitizeInput(String(bodyEmail).toLowerCase());
+    const code = String(verificationCode).trim();
+    
+    if (code.length !== 6) {
+      return c.json(errorResponse('Invalid verification code', '请输入 6 位验证码'), 400);
+    }
+    
+    const user = await c.env.DB.prepare(
+      'SELECT id, oauth_provider, password_hash FROM users WHERE email = ?'
+    ).bind(email).first() as any;
+    
+    if (!user) {
+      return c.json(errorResponse('Invalid request', '验证码错误或已过期，请重新获取'), 400);
+    }
+    
+    if (user.oauth_provider) {
+      return c.json(errorResponse(
+        'OAuth account',
+        '该账号使用第三方登录，无法重置密码'
+      ), 400);
+    }
+    
+    const codeValid = await verifyAndConsumeCode(c.env, 'forgot_password', email, code);
+    if (!codeValid) {
+      return c.json(errorResponse(
+        'Invalid verification code',
+        '验证码错误或已过期，请重新获取'
+      ), 400);
+    }
+    
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) {
+      return c.json(errorResponse('Weak password', passwordError), 400);
+    }
+    
+    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await c.env.DB.prepare(
+      'UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+    ).bind(passwordHash, user.id).run();
+    
+    logger.info('Password reset successfully', { userId: user.id, email: email.replace(/(.{2}).*(@.*)/, '$1***$2') });
+    
+    return c.json(successResponse({ reset: true }, '密码重置成功，请使用新密码登录'));
+  } catch (e: any) {
+    logger.error('Reset password error', e);
+    return c.json(errorResponse(
+      'Reset failed',
+      e.message || '重置密码失败，请稍后重试'
+    ), 500);
+  }
+});
 
 // ============= GitHub OAuth登录 =============
 
@@ -370,7 +562,7 @@ authRoutes.post('/github', async (c) => {
       logger.info('Token exchange response received', { status: tokenResponse.status });
       
       if (!tokenResponse.ok) {
-        const errorData = await tokenResponse.json().catch(() => ({}));
+        const errorData = await tokenResponse.json().catch(() => ({})) as { error?: string };
         logger.error('GitHub token exchange failed', { status: tokenResponse.status, error: errorData });
         return c.json(errorResponse(
           'OAuth failed',
@@ -403,7 +595,7 @@ authRoutes.post('/github', async (c) => {
       logger.info('GitHub user info response received', { status: userResponse.status });
       
       if (!userResponse.ok) {
-        const errorData = await userResponse.json().catch(() => ({}));
+        const errorData = await userResponse.json().catch(() => ({})) as { message?: string };
         logger.error('GitHub user info fetch failed', { status: userResponse.status, error: errorData });
         return c.json(errorResponse(
           'OAuth failed',
@@ -792,24 +984,39 @@ authRoutes.put('/password', requireAuth, async (c) => {
   
   try {
     const currentUser = c.get('user') as any;
-    const { currentPassword, newPassword } = await c.req.json();
+    const { currentPassword, newPassword, emailVerificationCode } = await c.req.json();
     
     // 验证必填字段
     if (!currentPassword || !newPassword) {
       return c.json(errorResponse(
         'Missing required fields',
-        'Please provide current password and new password'
+        '请提供当前密码和新密码'
       ), 400);
     }
     
-    // 获取用户信息
     const user = await c.env.DB.prepare(
-      'SELECT password_hash FROM users WHERE id = ?'
+      'SELECT password_hash, email FROM users WHERE id = ?'
     ).bind(currentUser.userId).first() as any;
     
-    // 验证用户存在
     if (!user) {
       return c.json(errorResponse('User not found'), 404);
+    }
+    
+    const emailVerificationRequired = !!c.env.RESEND_API_KEY;
+    if (emailVerificationRequired) {
+      if (!emailVerificationCode || String(emailVerificationCode).length !== 6) {
+        return c.json(errorResponse(
+          'Verification code required',
+          '请先获取并填写 6 位邮箱验证码'
+        ), 400);
+      }
+      const codeValid = await verifyAndConsumeCode(c.env, 'password', user.email, String(emailVerificationCode).trim());
+      if (!codeValid) {
+        return c.json(errorResponse(
+          'Invalid verification code',
+          '验证码错误或已过期，请重新获取'
+        ), 400);
+      }
     }
     
     // 验证用户不是OAuth用户
@@ -871,26 +1078,47 @@ authRoutes.delete('/account', requireAuth, async (c) => {
   
   try {
     const currentUser = c.get('user') as any;
-    const { password, confirmation } = await c.req.json();
+    const { password, confirmation, emailVerificationCode } = await c.req.json();
     
     // 要求确认
     if (confirmation !== 'DELETE') {
       return c.json(errorResponse(
         'Confirmation required',
-        'Please type DELETE to confirm account deletion'
+        '请输入 DELETE 确认删除账号'
       ), 400);
     }
     
-    // 验证密码（OAuth用户跳过）
     const user = await c.env.DB.prepare(
-      'SELECT password_hash FROM users WHERE id = ?'
+      'SELECT password_hash, email FROM users WHERE id = ?'
     ).bind(currentUser.userId).first() as any;
     
+    if (!user) {
+      return c.json(errorResponse('User not found'), 404);
+    }
+    
+    const emailVerificationRequired = !!c.env.RESEND_API_KEY;
+    if (emailVerificationRequired) {
+      if (!emailVerificationCode || String(emailVerificationCode).length !== 6) {
+        return c.json(errorResponse(
+          'Verification code required',
+          '请先获取并填写 6 位邮箱验证码'
+        ), 400);
+      }
+      const codeValid = await verifyAndConsumeCode(c.env, 'delete', user.email, String(emailVerificationCode).trim());
+      if (!codeValid) {
+        return c.json(errorResponse(
+          'Invalid verification code',
+          '验证码错误或已过期，请重新获取'
+        ), 400);
+      }
+    }
+    
+    // 验证密码（OAuth用户跳过）
     if (user.password_hash) {
       if (!password) {
         return c.json(errorResponse(
           'Missing password',
-          'Password is required for account deletion'
+          '删除账号需要输入密码'
         ), 400);
       }
       const valid = await bcrypt.compare(password, user.password_hash);
@@ -934,41 +1162,43 @@ authRoutes.delete('/delete', requireAuth, async (c) => {
   
   try {
     const currentUser = c.get('user') as any;
-    const { password, confirmation } = await c.req.json();
+    const body = await c.req.json().catch(() => ({}));
+    const { password, confirmation, emailVerificationCode } = body;
     
-    // 要求确认
     if (confirmation !== 'DELETE') {
       return c.json(errorResponse(
         'Confirmation required',
-        'Please type DELETE to confirm account deletion'
+        '请输入 DELETE 确认删除账号'
       ), 400);
     }
     
-    // 验证密码（OAuth用户跳过）
     const user = await c.env.DB.prepare(
-      'SELECT password_hash FROM users WHERE id = ?'
+      'SELECT password_hash, email FROM users WHERE id = ?'
     ).bind(currentUser.userId).first() as any;
     
-    if (user.password_hash) {
-      if (!password) {
-        return c.json(errorResponse(
-          'Missing password',
-          'Password is required for account deletion'
-        ), 400);
+    if (!user) return c.json(errorResponse('User not found'), 404);
+    
+    if (c.env.RESEND_API_KEY) {
+      if (!emailVerificationCode || String(emailVerificationCode).length !== 6) {
+        return c.json(errorResponse('Verification code required', '请先获取并填写 6 位邮箱验证码'), 400);
       }
-      const valid = await bcrypt.compare(password, user.password_hash);
-      if (!valid) {
-        return c.json(errorResponse(
-          'Invalid password',
-          'Password is incorrect'
-        ), 401);
+      const codeValid = await verifyAndConsumeCode(c.env, 'delete', user.email, String(emailVerificationCode).trim());
+      if (!codeValid) {
+        return c.json(errorResponse('Invalid verification code', '验证码错误或已过期，请重新获取'), 400);
       }
     }
     
-    // 删除用户（这里实现硬删除，也可以改为软删除）
-    await c.env.DB.prepare(
-      'DELETE FROM users WHERE id = ?'
-    ).bind(currentUser.userId).run();
+    if (user.password_hash) {
+      if (!password) {
+        return c.json(errorResponse('Missing password', '删除账号需要输入密码'), 400);
+      }
+      const valid = await bcrypt.compare(password, user.password_hash);
+      if (!valid) {
+        return c.json(errorResponse('Invalid password', 'Password is incorrect'), 401);
+      }
+    }
+    
+    await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(currentUser.userId).run();
     
     logger.info('Account deleted', { userId: currentUser.userId });
     
@@ -997,41 +1227,43 @@ authRoutes.post('/delete', requireAuth, async (c) => {
   
   try {
     const currentUser = c.get('user') as any;
-    const { password, confirmation } = await c.req.json();
+    const body = await c.req.json();
+    const { password, confirmation, emailVerificationCode } = body;
     
-    // 要求确认
     if (confirmation !== 'DELETE') {
       return c.json(errorResponse(
         'Confirmation required',
-        'Please type DELETE to confirm account deletion'
+        '请输入 DELETE 确认删除账号'
       ), 400);
     }
     
-    // 验证密码（OAuth用户跳过）
     const user = await c.env.DB.prepare(
-      'SELECT password_hash FROM users WHERE id = ?'
+      'SELECT password_hash, email FROM users WHERE id = ?'
     ).bind(currentUser.userId).first() as any;
     
-    if (user.password_hash) {
-      if (!password) {
-        return c.json(errorResponse(
-          'Missing password',
-          'Password is required for account deletion'
-        ), 400);
+    if (!user) return c.json(errorResponse('User not found'), 404);
+    
+    if (c.env.RESEND_API_KEY) {
+      if (!emailVerificationCode || String(emailVerificationCode).length !== 6) {
+        return c.json(errorResponse('Verification code required', '请先获取并填写 6 位邮箱验证码'), 400);
       }
-      const valid = await bcrypt.compare(password, user.password_hash);
-      if (!valid) {
-        return c.json(errorResponse(
-          'Invalid password',
-          'Password is incorrect'
-        ), 401);
+      const codeValid = await verifyAndConsumeCode(c.env, 'delete', user.email, String(emailVerificationCode).trim());
+      if (!codeValid) {
+        return c.json(errorResponse('Invalid verification code', '验证码错误或已过期，请重新获取'), 400);
       }
     }
     
-    // 删除用户（这里实现硬删除，也可以改为软删除）
-    await c.env.DB.prepare(
-      'DELETE FROM users WHERE id = ?'
-    ).bind(currentUser.userId).run();
+    if (user.password_hash) {
+      if (!password) {
+        return c.json(errorResponse('Missing password', '删除账号需要输入密码'), 400);
+      }
+      const valid = await bcrypt.compare(password, user.password_hash);
+      if (!valid) {
+        return c.json(errorResponse('Invalid password', 'Password is incorrect'), 401);
+      }
+    }
+    
+    await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(currentUser.userId).run();
     
     logger.info('Account deleted', { userId: currentUser.userId });
     

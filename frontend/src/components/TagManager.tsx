@@ -5,7 +5,16 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
-import { Tag } from '../types';
+import { transformTagList } from '../utils/apiTransformer';
+
+interface Tag {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  color: string;
+  postCount: number;
+}
 
 // 预设颜色选项 - 更丰富的配色方案
 const PRESET_COLORS = [
@@ -58,7 +67,7 @@ export function TagManager() {
       setError('');
       const response = await api.getTags();
       if (response.success && response.data) {
-        setTags(response.data.tags || []);
+        setTags(transformTagList(response.data.tags || []));
       }
     } catch (err: any) {
       setError(err.message || '加载标签失败');

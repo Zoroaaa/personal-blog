@@ -12,12 +12,13 @@
  */
 
 import { Hono } from 'hono';
-import { Env, successResponse, errorResponse } from '../index';
+import { Env, Variables } from '../types';
+import { successResponse, errorResponse } from '../utils/response';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { safeParseInt } from '../utils/validation';
 
-export const analyticsRoutes = new Hono<{ Bindings: Env }>();
+export const analyticsRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // 为需要管理员权限的路由应用认证中间件
 analyticsRoutes.use('/', requireAuth);
@@ -73,8 +74,8 @@ analyticsRoutes.get('/', requireAdmin, async (c) => {
     
     // 6. 最近评论
     const { results: recentComments } = await c.env.DB.prepare(`
-      SELECT c.id, c.content, c.created_at as createdAt, 
-             u.username as user_username
+      SELECT c.id, c.content, c.created_at as createdAt,
+             u.username, u.display_name as displayName, u.avatar_url as avatarUrl
       FROM comments c
       LEFT JOIN users u ON c.user_id = u.id
       WHERE c.status = 'approved'

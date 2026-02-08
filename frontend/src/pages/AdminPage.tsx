@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useAuthStore } from '../stores/authStore';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuthStore } from '../stores/authStore';
 import { api } from '../utils/api';
 // 导入新增的组件
 import { CategoryManager } from '../components/CategoryManager';
 import { TagManager } from '../components/TagManager';
 import { PostEditor } from '../components/PostEditor';
+import { transformPost, transformCommentList, transformUserList } from '../utils/apiTransformer';
 
 // 定义管理后台的标签页类型 - 添加 categories 和 tags
 type AdminTab = 'posts' | 'comments' | 'users' | 'analytics' | 'categories' | 'tags';
@@ -24,7 +25,15 @@ export function AdminPage() {
   // 当前活动的标签页
   const [activeTab, setActiveTab] = useState<AdminTab>('posts');
   
-  // 文章创建状态
+  // 文章创建状态 (保留状态但使用下划线前缀表示暂时未使用)
+  const [_title, _setTitle] = useState('');
+  const [_content, _setContent] = useState('');
+  const [_summary, _setSummary] = useState('');
+  const [_coverImage, _setCoverImage] = useState('');
+  const [_postStatus, _setPostStatus] = useState<'draft' | 'published'>('draft');
+  const [_loading, setLoading] = useState(false);
+  const [_error, setError] = useState('');
+  const [_success, _setSuccess] = useState(false);
   const [editingPostId, setEditingPostId] = useState<number | null>(null);
   
   // 文章列表状态
@@ -69,8 +78,7 @@ export function AdminPage() {
   useEffect(() => {
     const editPostId = searchParams.get('edit');
     if (editPostId) {
-      setEditingPostId(parseInt(editPostId));
-      setShowCreateForm(true);
+      loadPostForEdit(parseInt(editPostId));
     }
   }, [searchParams]);
   
@@ -81,6 +89,31 @@ export function AdminPage() {
     }
   }, [activeTab, showCreateForm]);
   
+  // 加载文章详情用于编辑
+  const loadPostForEdit = async (postId: number) => {
+    try {
+      setLoading(true);
+      // setError('');
+      
+      const response = await api.getPostById(postId);
+      if (response.success && response.data) {
+        const post = transformPost(response.data);
+        // 这些状态变量暂时未使用，但保留以备将来需要
+        _setTitle(post.title);
+        _setContent(post.content);
+        _setSummary(post.summary || '');
+        _setCoverImage(post.coverImage || '');
+        _setPostStatus(post.status as 'draft' | 'published');
+        setEditingPostId(postId);
+        setShowCreateForm(true);
+      }
+    } catch (err: any) {
+      setError(err.message || '加载文章失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   // 加载文章列表
   const loadPosts = async () => {
     try {
@@ -89,7 +122,8 @@ export function AdminPage() {
       
       const response = await api.getAdminPosts({ limit: '100' });
       if (response.success && response.data) {
-        setPosts(response.data.posts || []);
+        const transformedPosts = (response.data.posts || []).map((post: any) => transformPost(post));
+        setPosts(transformedPosts);
       }
     } catch (err: any) {
       setPostsError(err.message || '加载文章列表失败');
@@ -103,6 +137,7 @@ export function AdminPage() {
     if (!confirm('确定要删除这篇文章吗？')) return;
     
     try {
+      setLoading(true);
       // 先从本地状态中移除该文章，立即更新UI
       setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
       // 然后发送删除请求
@@ -111,6 +146,9 @@ export function AdminPage() {
     } catch (err: any) {
       // 如果删除失败，重新加载列表以恢复正确的状态
       await loadPosts();
+      setError(err.message || '删除失败');
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -143,21 +181,21 @@ export function AdminPage() {
     setCommentsError('');
     try {
       const response = await api.getAdminComments({ page: '1', limit: '10' });
-      setComments(response.data?.comments || []);
+      setComments(transformCommentList(response.data?.comments || []));
     } catch (err: any) {
       setCommentsError(err.message || '加载评论失败');
     } finally {
       setCommentsLoading(false);
     }
   };
-  
+
   // 加载用户
   const loadUsers = async () => {
     setUsersLoading(true);
     setUsersError('');
     try {
       const response = await api.getAdminUsers({ page: '1', limit: '10' });
-      setUsers(response.data?.users || []);
+      setUsers(transformUserList(response.data?.users || []));
     } catch (err: any) {
       setUsersError(err.message || '加载用户失败');
     } finally {
@@ -201,6 +239,8 @@ export function AdminPage() {
     }
   };
   
+
+  
   // 渲染不同的标签页内容
   const renderTabContent = () => {
     switch (activeTab) {
@@ -213,8 +253,8 @@ export function AdminPage() {
                 onClick={() => {
                   setShowCreateForm(true);
                   setEditingPostId(null);
-                  setError('');
-                  setSuccess(false);
+                  // setError('');
+                  // setSuccess(false);
                 }}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
@@ -290,15 +330,15 @@ export function AdminPage() {
                               }`}>
                                 {post.status === 'published' ? '已发布' : '草稿'}
                               </span>
-                              {(post.category_name || post.categoryName) && (
+                              {post.categoryName && (
                                 <span className="flex items-center gap-1">
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                                   </svg>
-                                  {post.category_name || post.categoryName}
+                                  {post.categoryName}
                                 </span>
                               )}
-                              {(post.tags && post.tags.length > 0) && (
+                              {post.tags && post.tags.length > 0 && (
                                 <span className="flex items-center gap-1">
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
@@ -306,16 +346,13 @@ export function AdminPage() {
                                   {post.tags.map((tag: any) => tag.name).join(', ')}
                                 </span>
                               )}
-                              <span>{post.view_count || post.viewCount || 0} 次浏览</span>
-                              <span>{new Date(post.created_at || post.createdAt).toLocaleDateString()}</span>
+                              <span>{post.viewCount || 0} 次浏览</span>
+                              <span>{post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '未知日期'}</span>
                             </div>
                           </div>
                           <div className="flex gap-2 ml-4">
                             <button
-                              onClick={() => {
-                                setEditingPostId(post.id);
-                                setShowCreateForm(true);
-                              }}
+                              onClick={() => loadPostForEdit(post.id)}
                               className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded"
                             >
                               编辑
@@ -403,7 +440,7 @@ export function AdminPage() {
                           {comment.user?.username || comment.username || '未知用户'}
                         </td>
                         <td className="px-6 py-4 text-sm text-muted-foreground">
-                          {comment.post_title || comment.post?.title || comment.postTitle || '未知文章'}
+                          {comment.postTitle || comment.post?.title || '未知文章'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <select
@@ -511,7 +548,7 @@ export function AdminPage() {
                           </select>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
-                          {new Date(userItem.created_at || userItem.createdAt).toLocaleString()}
+                          {userItem.createdAt ? new Date(userItem.createdAt).toLocaleString() : '未知'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <button
@@ -591,7 +628,7 @@ export function AdminPage() {
                     {analytics.recentPosts && analytics.recentPosts.map((post: any) => (
                       <div key={post.id} className="flex items-center justify-between p-3 bg-card rounded-lg shadow-sm border border-border">
                         <span className="text-sm font-medium text-foreground">{post.title}</span>
-                        <span className="text-xs text-muted-foreground">{new Date(post.createdAt).toLocaleDateString()}</span>
+                        <span className="text-xs text-muted-foreground">{post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '未知日期'}</span>
                       </div>
                     ))}
                   </div>
@@ -604,8 +641,10 @@ export function AdminPage() {
                     {analytics.recentComments && analytics.recentComments.map((comment: any) => (
                       <div key={comment.id} className="p-3 bg-card rounded-lg shadow-sm border border-border">
                         <div className="flex justify-between items-start">
-                          <span className="text-sm font-medium text-foreground">{comment.user?.username || '匿名用户'}</span>
-                          <span className="text-xs text-muted-foreground">{new Date(comment.createdAt).toLocaleString()}</span>
+                          <span className="text-sm font-medium text-foreground">
+                            {comment.displayName || comment.username || '匿名用户'}
+                          </span>
+                          <span className="text-xs text-muted-foreground">{comment.createdAt ? new Date(comment.createdAt).toLocaleString() : '未知时间'}</span>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">
                           {comment.content.substring(0, 100)}{comment.content.length > 100 ? '...' : ''}

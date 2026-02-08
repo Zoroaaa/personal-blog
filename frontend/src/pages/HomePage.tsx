@@ -15,7 +15,26 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../utils/api';
 import { format } from 'date-fns';
-import type { PostListItem, Category, Tag } from '../types';
+import type { PostListItem } from '../types';
+import { transformPostList, transformCategoryList, transformTagList } from '../utils/apiTransformer';
+
+interface Category {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  icon: string;
+  color: string;
+  postCount: number;
+}
+
+interface Tag {
+  id: number;
+  name: string;
+  slug: string;
+  color: string;
+  postCount: number;
+}
 
 export function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -77,7 +96,7 @@ export function HomePage() {
       setCategoriesLoading(true);
       const response = await api.getCategories();
       if (response.success && response.data) {
-        setCategories(response.data.categories || []);
+        setCategories(transformCategoryList(response.data.categories || []));
       }
     } catch (error) {
       console.error('Failed to load categories:', error);
@@ -85,13 +104,13 @@ export function HomePage() {
       setCategoriesLoading(false);
     }
   };
-  
+
   const loadTags = async () => {
     try {
       setTagsLoading(true);
       const response = await api.getTags();
       if (response.success && response.data) {
-        setTags(response.data.tags || []);
+        setTags(transformTagList(response.data.tags || []));
       }
     } catch (error) {
       console.error('Failed to load tags:', error);
@@ -116,24 +135,8 @@ export function HomePage() {
       const response = await api.getPosts(params);
       
       if (response.success && response.data) {
-        const processedPosts = (response.data.posts || [])
-          .map((post: any) => ({
-            ...post,
-            authorName: post.authorName,
-            authorAvatar: post.authorAvatar,
-            viewCount: post.viewCount,
-            likeCount: post.likeCount,
-            commentCount: post.commentCount,
-            publishedAt: post.publishedAt,
-            coverImage: post.coverImage,
-            categoryName: post.categoryName,
-            categorySlug: post.categorySlug,
-            categoryColor: post.categoryColor
-          }))
-          // 过滤掉无效的文章数据
-          .filter(post => post.id && post.title);
-        
-        setPosts(processedPosts);
+        const transformedPosts = transformPostList(response.data.posts || []);
+        setPosts(transformedPosts);
         
         if (response.data.pagination) {
           setTotalPages(response.data.pagination.totalPages);
@@ -323,7 +326,9 @@ export function HomePage() {
                             ? tag.color || '#6B7280'
                             : selectedTag 
                               ? 'rgb(243 244 246)' 
-                              : 'rgb(243 244 246)',
+                              : tag.color 
+                                ? `${tag.color}20` 
+                                : 'rgb(243 244 246)',
                           borderWidth: '2px',
                           borderColor: selectedTag === tag.slug 
                             ? 'transparent'
@@ -536,7 +541,7 @@ export function HomePage() {
                         <div className="flex flex-wrap items-center gap-2">
                           {post.categoryName && (
                             <button
-                              onClick={() => {}}
+                              onClick={() => post.categorySlug && handleCategoryClick(post.categorySlug)}
                               className="px-3 py-1.5 rounded-lg text-white text-xs font-medium hover:opacity-80 transition-opacity"
                               style={{ backgroundColor: post.categoryColor || '#3B82F6' }}
                             >
@@ -550,7 +555,7 @@ export function HomePage() {
                               onClick={() => handleTagClick(tag.slug)}
                               className="px-3 py-1.5 rounded-full text-xs font-medium border-2 hover:scale-105 transition-transform"
                               style={{
-                                backgroundColor: '#F3F4F6',
+                                backgroundColor: tag.color ? `${tag.color}15` : '#F3F4F6',
                                 borderColor: tag.color || '#E5E7EB',
                                 color: tag.color || '#6B7280'
                               }}

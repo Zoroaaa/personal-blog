@@ -20,10 +20,10 @@
  */
 
 import { Hono } from 'hono';
-import type { Env } from '../types';
+import type { Env, Variables } from '../types';
 import { successResponse, errorResponse } from '../utils/response';
-import { safeGetCache, safePutCache, safeDeleteCache } from '../utils/cache';
-import { requireAuth, requireAdmin } from '../middleware/auth';
+
+import { requireAuth, requireAdmin, optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import {
   validateLength,
@@ -33,7 +33,8 @@ import {
   safeParseInt
 } from '../utils/validation';
 
-export const postRoutes = new Hono<{ Bindings: Env }>();
+// 定义应用路由类型
+export const postRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // ============= 常量配置 =============
 
@@ -45,26 +46,7 @@ const MIN_CONTENT_LENGTH = 10;
 const MAX_CONTENT_LENGTH = 100000;
 const READING_SPEED = 250; // 每分钟阅读字数
 
-// ============= KV缓存策略优化 =============
-
-/**
- * 新的缓存策略:
- * - 只缓存浏览量>1000的热门文章详情
- * - 缓存时间: 5分钟
- * - 其他内容直接从D1读取
- */
-const CACHE_TTL = {
-  HOT_POST_DETAIL: 300  // 5分钟 - 只缓存热门文章
-};
-
-const HIGH_VIEW_THRESHOLD = 1000; // 浏览量阈值
-
-/**
- * 判断文章是否应该缓存
- */
-function shouldCachePost(viewCount: number): boolean {
-  return viewCount >= HIGH_VIEW_THRESHOLD;
-}
+// ============= 常量配置 =============
 
 // ============= 文章列表 =============
 
@@ -95,8 +77,8 @@ postRoutes.get('/', async (c) => {
     const search = c.req.query('search');
     
     // 将字符串 "null" 转为真正的 null
-    category = (category === 'null' || !category) ? null : category;
-    tag = (tag === 'null' || !tag) ? null : tag;
+    category = (category === 'null' || !category) ? undefined : category;
+    tag = (tag === 'null' || !tag) ? undefined : tag;
     const sortBy = c.req.query('sortBy') || 'published_at';
     const order = c.req.query('order') === 'asc' ? 'ASC' : 'DESC';
     const offset = (page - 1) * limit;
@@ -465,9 +447,9 @@ postRoutes.get('/search', async (c) => {
     let category = c.req.query('category');
     let tag = c.req.query('tag');
     
-    // 将字符串 "null" 转为真正的 null
-    category = (category === 'null' || !category) ? null : category;
-    tag = (tag === 'null' || !tag) ? null : tag;
+    // 将字符串 "null" 转为真正的 undefined
+    category = (category === 'null' || !category) ? undefined : category;
+    tag = (tag === 'null' || !tag) ? undefined : tag;
     const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
     const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
     const sort = c.req.query('sort') || 'published_at';
@@ -759,13 +741,185 @@ postRoutes.get('/likes', requireAuth, async (c) => {
   }
 });
 
+// ============= 阅读历史列表 =============
+
+/**
+ * GET /api/posts/reading-history
+ * 获取当前用户阅读历史（需要认证）
+ * 返回阅读时长、阅读百分比
+ */
+postRoutes.get('/reading-history', requireAuth, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const user = c.get('user') as any;
+    const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
+    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
+    const offset = (page - 1) * limit;
+    
+    const { results } = await c.env.DB.prepare(`
+      SELECT rh.id, rh.post_id, rh.first_read_at, rh.last_read_at, rh.read_duration_seconds, rh.read_percentage,
+             p.title, p.slug, p.summary, p.cover_image, p.view_count, p.like_count, p.comment_count, p.reading_time, p.published_at,
+             u.username as author_name, u.display_name as author_display_name, u.avatar_url as author_avatar,
+             c.name as category_name, c.slug as category_slug, c.color as category_color
+      FROM reading_history rh
+      JOIN posts p ON p.id = rh.post_id
+      LEFT JOIN users u ON p.author_id = u.id
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE rh.user_id = ? AND p.status = 'published' AND p.visibility = 'public'
+      ORDER BY rh.last_read_at DESC
+      LIMIT ? OFFSET ?
+    `).bind(user.userId, limit, offset).all();
+    
+    const countResult = await c.env.DB.prepare(
+      'SELECT COUNT(*) as total FROM reading_history rh JOIN posts p ON p.id = rh.post_id WHERE rh.user_id = ? AND p.status = ? AND p.visibility = ?'
+    ).bind(user.userId, 'published', 'public').first() as any;
+    const total = countResult?.total || 0;
+    
+    const postIds = (results as any[]).map((r: any) => r.post_id);
+    let withTags = results as any[];
+    if (postIds.length > 0) {
+      const tagsQuery = `SELECT pt.post_id, t.id, t.name, t.slug FROM post_tags pt JOIN tags t ON pt.tag_id = t.id WHERE pt.post_id IN (${postIds.map(() => '?').join(',')})`;
+      const { results: tagResults } = await c.env.DB.prepare(tagsQuery).bind(...postIds).all();
+      const tagsByPost = new Map();
+      (tagResults as any[]).forEach((t: any) => {
+        if (!tagsByPost.has(t.post_id)) tagsByPost.set(t.post_id, []);
+        tagsByPost.get(t.post_id).push({ id: t.id, name: t.name, slug: t.slug });
+      });
+      withTags = (results as any[]).map((r: any) => ({
+        ...r,
+        tags: tagsByPost.get(r.post_id) || []
+      }));
+    }
+    
+    const items = withTags.map((r: any) => ({
+      id: r.id,
+      postId: r.post_id,
+      title: r.title,
+      slug: r.slug,
+      summary: r.summary,
+      coverImage: r.cover_image,
+      viewCount: r.view_count,
+      likeCount: r.like_count,
+      commentCount: r.comment_count,
+      readingTime: r.reading_time,
+      publishedAt: r.published_at,
+      authorName: r.author_name,
+      authorDisplayName: r.author_display_name,
+      authorAvatar: r.author_avatar,
+      categoryName: r.category_name,
+      categorySlug: r.category_slug,
+      categoryColor: r.category_color,
+      tags: r.tags || [],
+      firstReadAt: r.first_read_at,
+      lastReadAt: r.last_read_at,
+      readDurationSeconds: r.read_duration_seconds,
+      readPercentage: r.read_percentage
+    }));
+    
+    return c.json(successResponse({
+      items,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+    }));
+  } catch (error) {
+    logger.error('Get reading history error', error);
+    return c.json(errorResponse(
+      'Failed to fetch reading history',
+      'An error occurred while fetching reading history'
+    ), 500);
+  }
+});
+
+// ============= 收藏列表 =============
+
+/**
+ * GET /api/posts/favorites
+ * 获取当前用户收藏的文章列表（需要认证）
+ */
+postRoutes.get('/favorites', requireAuth, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const user = c.get('user') as any;
+    const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
+    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
+    const offset = (page - 1) * limit;
+    
+    const { results } = await c.env.DB.prepare(`
+      SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
+             p.view_count, p.like_count, p.comment_count, p.reading_time,
+             p.published_at, p.created_at,
+             u.username as author_name, u.display_name as author_display_name, u.avatar_url as author_avatar,
+             c.name as category_name, c.slug as category_slug, c.color as category_color
+      FROM posts p
+      JOIN favorites f ON p.id = f.post_id
+      LEFT JOIN users u ON p.author_id = u.id
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE f.user_id = ? AND p.status = 'published' AND p.visibility = 'public'
+      ORDER BY f.created_at DESC
+      LIMIT ? OFFSET ?
+    `).bind(user.userId, limit, offset).all();
+    
+    const countResult = await c.env.DB.prepare(
+      'SELECT COUNT(*) as total FROM favorites f JOIN posts p ON p.id = f.post_id WHERE f.user_id = ? AND p.status = ? AND p.visibility = ?'
+    ).bind(user.userId, 'published', 'public').first() as any;
+    const total = countResult?.total || 0;
+    
+    const postIds = (results as any[]).map((p: any) => p.id);
+    let postsWithTags = results as any[];
+    if (postIds.length > 0) {
+      const tagsQuery = `SELECT pt.post_id, t.id, t.name, t.slug FROM post_tags pt JOIN tags t ON pt.tag_id = t.id WHERE pt.post_id IN (${postIds.map(() => '?').join(',')})`;
+      const { results: tagResults } = await c.env.DB.prepare(tagsQuery).bind(...postIds).all();
+      const tagsByPost = new Map();
+      (tagResults as any[]).forEach((t: any) => {
+        if (!tagsByPost.has(t.post_id)) tagsByPost.set(t.post_id, []);
+        tagsByPost.get(t.post_id).push({ id: t.id, name: t.name, slug: t.slug });
+      });
+      postsWithTags = (results as any[]).map((p: any) => ({ ...p, tags: tagsByPost.get(p.id) || [] }));
+    }
+    
+    const formatted = postsWithTags.map((p: any) => ({
+      id: p.id,
+      title: p.title,
+      slug: p.slug,
+      summary: p.summary,
+      coverImage: p.cover_image,
+      viewCount: p.view_count,
+      likeCount: p.like_count,
+      commentCount: p.comment_count,
+      readingTime: p.reading_time,
+      publishedAt: p.published_at,
+      createdAt: p.created_at,
+      authorName: p.author_name,
+      authorDisplayName: p.author_display_name,
+      authorAvatar: p.author_avatar,
+      categoryName: p.category_name,
+      categorySlug: p.category_slug,
+      categoryColor: p.category_color,
+      tags: p.tags || []
+    }));
+    
+    return c.json(successResponse({
+      posts: formatted,
+      total,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+    }));
+  } catch (error) {
+    logger.error('Get favorites error', error);
+    return c.json(errorResponse(
+      'Failed to fetch favorites',
+      'An error occurred while fetching favorites'
+    ), 500);
+  }
+});
+
 // ============= 文章详情 =============
 
 /**
  * GET /api/posts/:slug
  * 获取文章详情（公开）
  */
-postRoutes.get('/:slug', async (c) => {
+postRoutes.get('/:slug', optionalAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
@@ -800,26 +954,7 @@ postRoutes.get('/:slug', async (c) => {
       ), 404);
     }
     
-    // ===== 2. 判断是否应该使用缓存 =====
-    const cacheKey = `post:${slug}`;
-    const useCache = shouldCachePost(post.view_count);
-    
-    if (useCache) {
-      // 尝试从缓存获取
-      const cached = await safeGetCache(c.env, cacheKey);
-      if (cached) {
-        // 异步增加浏览量
-        c.executionCtx.waitUntil(
-          incrementViewCount(c, slug, post.id)
-        );
-        logger.info('Hot post served from cache', { slug, viewCount: post.view_count });
-        return c.json(JSON.parse(cached));
-      }
-    } else {
-      logger.info('Post not cached (low views)', { slug, viewCount: post.view_count });
-    }
-    
-    // ===== 3. 获取标签 =====
+    // ===== 2. 获取标签 =====
     const { results: tags } = await c.env.DB.prepare(`
       SELECT t.id, t.name, t.slug, t.post_count
       FROM tags t
@@ -827,15 +962,18 @@ postRoutes.get('/:slug', async (c) => {
       WHERE pt.post_id = ?
     `).bind(post.id).all();
     
-    // ===== 4. 检查当前用户是否点赞 =====
+    // ===== 3. 检查当前用户是否点赞、是否收藏 =====
     const currentUser = c.get('user') as any;
     let isLiked = false;
+    let isFavorited = false;
     
     if (currentUser) {
-      const like = await c.env.DB.prepare(
-        'SELECT id FROM likes WHERE user_id = ? AND post_id = ?'
-      ).bind(currentUser.userId, post.id).first();
+      const [like, fav] = await Promise.all([
+        c.env.DB.prepare('SELECT id FROM likes WHERE user_id = ? AND post_id = ?').bind(currentUser.userId, post.id).first(),
+        c.env.DB.prepare('SELECT id FROM favorites WHERE user_id = ? AND post_id = ?').bind(currentUser.userId, post.id).first()
+      ]);
       isLiked = !!like;
+      isFavorited = !!fav;
     }
     
     // ===== 5. 构建响应 =====
@@ -843,6 +981,7 @@ postRoutes.get('/:slug', async (c) => {
       ...post,
       tags,
       isLiked,
+      isFavorited,
       author: {
         username: post.author_username,
         displayName: post.author_name,
@@ -859,15 +998,7 @@ postRoutes.get('/:slug', async (c) => {
     
     const response = successResponse(result);
     
-    // ===== 6. 只缓存热门文章 =====
-    if (useCache) {
-      await safePutCache(c.env, cacheKey, JSON.stringify(response), {
-        expirationTtl: CACHE_TTL.HOT_POST_DETAIL
-      });
-      logger.info('Hot post cached', { slug, viewCount: post.view_count });
-    }
-    
-    // ===== 7. 异步增加浏览量 =====
+    // ===== 5. 异步增加浏览量 =====
     c.executionCtx.waitUntil(
       incrementViewCount(c, slug, post.id)
     );
@@ -997,9 +1128,6 @@ postRoutes.post('/', requireAuth, async (c) => {
       }
     }
     
-    // ===== 8. 清除相关缓存 =====
-    await clearPostListCache(c);
-    
     logger.info('Post created successfully', { 
       postId, 
       slug, 
@@ -1111,10 +1239,6 @@ postRoutes.put('/:id', requireAuth, async (c) => {
       }
     }
     
-    // ===== 7. 清除缓存 =====
-    await safeDeleteCache(c.env, `post:${post.slug}`);
-    await clearPostListCache(c);
-    
     logger.info('Post updated successfully', { postId: id, userId: user.userId });
     
     return c.json(successResponse({ updated: true }, 'Post updated successfully'));
@@ -1152,12 +1276,6 @@ postRoutes.delete('/:id', requireAuth, requireAdmin, async (c) => {
     
     // 删除文章（级联删除会自动处理评论、点赞等）
     await c.env.DB.prepare('DELETE FROM posts WHERE id = ?').bind(id).run();
-    
-    // 清除缓存
-    await safeDeleteCache(c.env, `post:${post.slug}`);
-    await clearPostListCache(c);
-    // 清除数据分析缓存
-    await safeDeleteCache(c.env, 'analytics:stats');
     
     logger.info('Post deleted successfully', { postId: id });
     
@@ -1221,10 +1339,11 @@ postRoutes.post('/:id/like', requireAuth, async (c) => {
       logger.info('Post liked', { postId, userId: user.userId });
     }
     
-    // 清除文章详情缓存
-    await safeDeleteCache(c.env, `post:${post.slug}`);
+    // 返回最新点赞数，便于前端实时更新
+    const updated = await c.env.DB.prepare('SELECT like_count FROM posts WHERE id = ?').bind(postId).first() as any;
+    const likeCount = updated?.like_count ?? 0;
     
-    return c.json(successResponse({ liked }));
+    return c.json(successResponse({ liked, likeCount }));
     
   } catch (error) {
     logger.error('Like post error', error);
@@ -1235,28 +1354,101 @@ postRoutes.post('/:id/like', requireAuth, async (c) => {
   }
 });
 
+// ============= 记录阅读进度 =============
 
+/**
+ * POST /api/posts/:id/reading-progress
+ * 记录当前用户对文章的阅读进度（需要认证）
+ * 请求体: { readDurationSeconds?: number, readPercentage?: number }
+ */
+postRoutes.post('/:id/reading-progress', requireAuth, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const user = c.get('user') as any;
+    const postId = c.req.param('id');
+    const body = await c.req.json().catch(() => ({}));
+    const readDurationSeconds = Math.max(0, safeParseInt(body.readDurationSeconds, 0));
+    const readPercentage = Math.min(100, Math.max(0, safeParseInt(body.readPercentage, 0)));
+    
+    const post = await c.env.DB.prepare('SELECT id FROM posts WHERE id = ? AND status = ? AND visibility = ?')
+      .bind(postId, 'published', 'public').first() as any;
+    
+    if (!post) {
+      return c.json(errorResponse('Post not found'), 404);
+    }
+    
+    const existing = await c.env.DB.prepare(
+      'SELECT read_duration_seconds, read_percentage FROM reading_history WHERE user_id = ? AND post_id = ?'
+    ).bind(user.userId, postId).first() as any;
+    
+    if (existing) {
+      const duration = Math.max(existing.read_duration_seconds || 0, readDurationSeconds);
+      const percentage = Math.max(existing.read_percentage || 0, readPercentage);
+      await c.env.DB.prepare(`
+        UPDATE reading_history SET last_read_at = CURRENT_TIMESTAMP, read_duration_seconds = ?, read_percentage = ?
+        WHERE user_id = ? AND post_id = ?
+      `).bind(duration, percentage, user.userId, postId).run();
+    } else {
+      await c.env.DB.prepare(`
+        INSERT INTO reading_history (user_id, post_id, first_read_at, last_read_at, read_duration_seconds, read_percentage)
+        VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?)
+      `).bind(user.userId, postId, readDurationSeconds, readPercentage).run();
+    }
+    
+    logger.info('Reading progress recorded', { postId, userId: user.userId });
+    return c.json(successResponse({ updated: true }));
+  } catch (error) {
+    logger.error('Reading progress error', error);
+    return c.json(errorResponse(
+      'Failed to record reading progress',
+      'An error occurred while saving progress'
+    ), 500);
+  }
+});
 
+// ============= 收藏/取消收藏文章 =============
 
+/**
+ * POST /api/posts/:id/favorite
+ * 收藏或取消收藏文章（需要认证）
+ */
+postRoutes.post('/:id/favorite', requireAuth, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const user = c.get('user') as any;
+    const postId = c.req.param('id');
+    
+    const post = await c.env.DB.prepare('SELECT id FROM posts WHERE id = ?').bind(postId).first() as any;
+    if (!post) {
+      return c.json(errorResponse('Post not found'), 404);
+    }
+    
+    const existing = await c.env.DB.prepare(
+      'SELECT id FROM favorites WHERE user_id = ? AND post_id = ?'
+    ).bind(user.userId, postId).first();
+    
+    let favorited: boolean;
+    if (existing) {
+      await c.env.DB.prepare('DELETE FROM favorites WHERE id = ?').bind(existing.id).run();
+      favorited = false;
+      logger.info('Post unfavorited', { postId, userId: user.userId });
+    } else {
+      await c.env.DB.prepare('INSERT INTO favorites (user_id, post_id) VALUES (?, ?)').bind(user.userId, postId).run();
+      favorited = true;
+      logger.info('Post favorited', { postId, userId: user.userId });
+    }
+    
+    return c.json(successResponse({ favorited }));
+  } catch (error) {
+    logger.error('Favorite post error', error);
+    return c.json(errorResponse(
+      'Failed to update favorite',
+      'An error occurred while processing your request'
+    ), 500);
+  }
+});
 
 // ============= 辅助函数 =============
 
-/**
- * 清除文章缓存 - 优化版
- * 只清除热门文章缓存
- */
-async function clearPostCache(c: any, slug: string, viewCount: number): Promise<void> {
-  if (shouldCachePost(viewCount)) {
-    await safeDeleteCache(c.env, `post:${slug}`);
-  }
-  // 不再需要清除列表缓存
-}
-
-/**
- * 清除文章列表缓存（已废弃）
- * 由于不再缓存列表，此函数保留仅用于兼容性
- */
-async function clearPostListCache(c: any): Promise<void> {
-  // 由于不再缓存列表，此函数为空
-  console.log('Post list cache clearing is no longer needed');
-}

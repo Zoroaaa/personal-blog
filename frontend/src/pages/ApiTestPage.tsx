@@ -55,7 +55,7 @@ export default function ApiTestPage() {
     setLoading(true);
     try {
       const result = await api.getCategories();
-      alert(`成功获取 ${result.length} 个分类`);
+      alert(`成功获取 ${result.data?.categories?.length || 0} 个分类`);
     } catch (error) {
       alert(`获取分类失败: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
