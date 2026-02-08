@@ -18,6 +18,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../utils/api';
 import { useVerificationCountdown } from '../hooks/useVerificationCountdown';
+import { transformCommentList } from '../utils/apiTransformer';
 import type { User, Comment, PostListItem, ReadingHistoryItem } from '../types';
 import { format } from 'date-fns';
 
@@ -148,7 +149,7 @@ export function ProfilePage() {
       });
       
       if (response.success && response.data) {
-        setComments(response.data.comments || []);
+        setComments(transformCommentList(response.data.comments || []));
       }
     } catch (error) {
       console.error('Failed to load comments:', error);
