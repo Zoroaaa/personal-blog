@@ -641,7 +641,9 @@ export function AdminPage() {
                     {analytics.recentComments && analytics.recentComments.map((comment: any) => (
                       <div key={comment.id} className="p-3 bg-card rounded-lg shadow-sm border border-border">
                         <div className="flex justify-between items-start">
-                          <span className="text-sm font-medium text-foreground">{comment.user?.username || '匿名用户'}</span>
+                          <span className="text-sm font-medium text-foreground">
+                            {comment.displayName || comment.username || '匿名用户'}
+                          </span>
                           <span className="text-xs text-muted-foreground">{comment.createdAt ? new Date(comment.createdAt).toLocaleString() : '未知时间'}</span>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">

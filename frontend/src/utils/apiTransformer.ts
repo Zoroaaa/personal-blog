@@ -83,9 +83,9 @@ export function transformPost(post: any): Post {
     categorySlug: post.category_slug,
     categoryColor: post.category_color,
     tags: post.tags ? post.tags.map(transformTag) : undefined,
-    // 交互状态
-    isLiked: post.is_liked,
-    isFavorited: post.is_favorited
+    // 交互状态（后端可能返回 camelCase 或 snake_case）
+    isLiked: post.isLiked !== undefined ? post.isLiked : post.is_liked,
+    isFavorited: post.isFavorited !== undefined ? post.isFavorited : post.is_favorited
   };
 }
 
@@ -111,7 +111,13 @@ export function transformComment(comment: any): Comment {
     username: comment.username,
     displayName: comment.display_name,
     avatarUrl: comment.avatar_url,
-    replies: comment.replies ? comment.replies.map(transformComment) : undefined
+    replies: comment.replies ? comment.replies.map(transformComment) : undefined,
+    // 关联文章信息（来自管理后台API）
+    post: comment.post_title ? {
+      id: comment.post_id,
+      title: comment.post_title,
+      slug: comment.post_slug
+    } : comment.post
   };
 }
 

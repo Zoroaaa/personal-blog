@@ -505,7 +505,7 @@ export function ProfilePage() {
         </div>
       );
     }
-    
+
     if (comments.length === 0) {
       return (
         <div className="text-center py-16 bg-muted rounded-lg">
@@ -517,27 +517,60 @@ export function ProfilePage() {
         </div>
       );
     }
-    
+
     return (
       <div className="space-y-4">
         {comments.map((comment) => (
           <div key={comment.id} className="border border-border rounded-lg p-4 hover:shadow-sm transition-shadow">
             <div className="flex justify-between items-start">
-              <div>
-                <p className="text-foreground mb-2">{comment.content}</p>
-                <div className="flex flex-col sm:flex-row sm:items-center text-sm space-y-2 sm:space-y-0 sm:space-x-4">
-                  <Link 
-                    to={`/posts/${comment.post?.slug || comment.postId}`} 
-                    className="text-blue-600 hover:underline"
-                  >
-                    {comment.post?.title || '查看文章'}
-                  </Link>
+              <div className="flex-1 min-w-0">
+                {/* 评论内容 */}
+                <p className="text-foreground mb-3">{comment.content}</p>
+
+                {/* 文章信息卡片 */}
+                <Link
+                  to={`/posts/${comment.post?.slug || comment.postId}`}
+                  className="block bg-muted rounded-lg p-3 mb-3 hover:bg-muted/80 transition-colors group"
+                >
+                  <div className="flex items-start gap-3">
+                    {comment.post?.coverImage && (
+                      <img
+                        src={comment.post.coverImage}
+                        alt={comment.post?.title || ''}
+                        className="w-16 h-12 object-cover rounded flex-shrink-0"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-foreground text-sm line-clamp-1 group-hover:text-blue-600 transition-colors">
+                        {comment.post?.title || '未知文章'}
+                      </h4>
+                      {comment.post?.categoryName && (
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded text-xs mt-1"
+                          style={{
+                            backgroundColor: comment.post?.categoryColor ? `${comment.post.categoryColor}20` : '#e5e7eb',
+                            color: comment.post?.categoryColor || '#374151'
+                          }}
+                        >
+                          {comment.post.categoryName}
+                        </span>
+                      )}
+                    </div>
+                    <svg className="w-5 h-5 text-muted-foreground flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </Link>
+
+                {/* 评论时间和操作 */}
+                <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">{formatDate(comment.createdAt)}</span>
                 </div>
               </div>
               <button
                 onClick={() => handleDeleteComment(comment.id)}
-                className="text-red-600 hover:text-red-800"
+                className="text-red-600 hover:text-red-800 ml-4 flex-shrink-0"
+                title="删除评论"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -601,6 +634,28 @@ export function ProfilePage() {
     );
   };
   
+  // 取消收藏
+  const handleUnfavorite = async (postId: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!confirm('确定要取消收藏这篇文章吗？')) {
+      return;
+    }
+
+    try {
+      const response = await api.toggleFavorite(postId);
+      if (response.success) {
+        // 从列表中移除
+        setFavoritePosts(prev => prev.filter(post => post.id !== postId));
+        setSuccessMessage('已取消收藏');
+      }
+    } catch (error) {
+      console.error('Failed to unfavorite:', error);
+      setError('取消收藏失败');
+    }
+  };
+
   const renderFavoritesTab = () => {
     if (loading.favorites) {
       return (
@@ -624,25 +679,36 @@ export function ProfilePage() {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {favoritePosts.map((post) => (
-          <Link
+          <div
             key={post.id}
-            to={`/posts/${post.slug || post.id}`}
-            className="border border-border rounded-lg overflow-hidden hover:shadow-md transition-shadow group"
+            className="border border-border rounded-lg overflow-hidden hover:shadow-md transition-shadow group relative"
           >
-            {post.coverImage && (
-              <div className="h-40 overflow-hidden">
-                <img src={post.coverImage} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+            <Link to={`/posts/${post.slug || post.id}`}>
+              {post.coverImage && (
+                <div className="h-40 overflow-hidden">
+                  <img src={post.coverImage} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                </div>
+              )}
+              <div className="p-4">
+                <h3 className="text-lg font-semibold text-foreground group-hover:text-blue-600 transition-colors">{post.title}</h3>
+                <div className="flex items-center text-sm text-muted-foreground mt-2">
+                  <span>{formatDate(post.publishedAt)}</span>
+                  <span className="mx-2">•</span>
+                  <span>{post.viewCount} 次阅读</span>
+                </div>
               </div>
-            )}
-            <div className="p-4">
-              <h3 className="text-lg font-semibold text-foreground group-hover:text-blue-600 transition-colors">{post.title}</h3>
-              <div className="flex items-center text-sm text-muted-foreground mt-2">
-                <span>{formatDate(post.publishedAt)}</span>
-                <span className="mx-2">•</span>
-                <span>{post.viewCount} 次阅读</span>
-              </div>
-            </div>
-          </Link>
+            </Link>
+            {/* 取消收藏按钮 */}
+            <button
+              onClick={(e) => handleUnfavorite(post.id, e)}
+              className="absolute top-2 right-2 p-2 bg-white/90 dark:bg-gray-800/90 rounded-full shadow-sm hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 transition-colors"
+              title="取消收藏"
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M5.525 3.025a.5.5 0 00-.707.707l.707.707a.5.5 0 00.707-.707l-.707-.707zM12 2.5a.5.5 0 00-.5.5v1a.5.5 0 001 0v-1a.5.5 0 00-.5-.5zM18.475 3.025l-.707.707a.5.5 0 00.707.707l.707-.707a.5.5 0 00-.707-.707zM4.5 12a.5.5 0 00-.5.5v1a.5.5 0 001 0v-1a.5.5 0 00-.5-.5zM19.5 12a.5.5 0 00-.5.5v1a.5.5 0 001 0v-1a.5.5 0 00-.5-.5zM5.525 20.975a.5.5 0 00.707-.707l-.707-.707a.5.5 0 00-.707.707l.707.707zM12 21.5a.5.5 0 00.5-.5v-1a.5.5 0 00-1 0v1a.5.5 0 00.5.5zM18.475 20.975l.707-.707a.5.5 0 00-.707-.707l-.707.707a.5.5 0 00.707.707zM12 5.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13z" />
+              </svg>
+            </button>
+          </div>
         ))}
       </div>
     );

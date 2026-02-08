@@ -340,6 +340,10 @@ export interface Comment {
     id: number;
     title: string;
     slug: string;
+    coverImage?: string;
+    categoryName?: string;
+    categorySlug?: string;
+    categoryColor?: string;
   };
 }
 
