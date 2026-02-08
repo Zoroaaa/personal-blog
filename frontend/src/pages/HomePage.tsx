@@ -16,7 +16,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../utils/api';
 import { format } from 'date-fns';
 import type { PostListItem } from '../types';
-import { transformPostList } from '../utils/apiTransformer';
+import { transformPostList, transformCategoryList, transformTagList } from '../utils/apiTransformer';
 
 interface Category {
   id: number;
@@ -96,16 +96,7 @@ export function HomePage() {
       setCategoriesLoading(true);
       const response = await api.getCategories();
       if (response.success && response.data) {
-        const transformedCategories = (response.data.categories || []).map((cat: any) => ({
-          id: cat.id,
-          name: cat.name,
-          slug: cat.slug,
-          description: cat.description,
-          icon: cat.icon,
-          color: cat.color,
-          postCount: cat.post_count || 0
-        }));
-        setCategories(transformedCategories);
+        setCategories(transformCategoryList(response.data.categories || []));
       }
     } catch (error) {
       console.error('Failed to load categories:', error);
@@ -113,20 +104,13 @@ export function HomePage() {
       setCategoriesLoading(false);
     }
   };
-  
+
   const loadTags = async () => {
     try {
       setTagsLoading(true);
       const response = await api.getTags();
       if (response.success && response.data) {
-        const transformedTags = (response.data.tags || []).map((tag: any) => ({
-          id: tag.id,
-          name: tag.name,
-          slug: tag.slug,
-          color: tag.color,
-          postCount: tag.post_count || 0
-        }));
-        setTags(transformedTags);
+        setTags(transformTagList(response.data.tags || []));
       }
     } catch (error) {
       console.error('Failed to load tags:', error);

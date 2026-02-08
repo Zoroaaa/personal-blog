@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
+import { transformTagList } from '../utils/apiTransformer';
 
 interface Tag {
   id: number;
@@ -66,15 +67,7 @@ export function TagManager() {
       setError('');
       const response = await api.getTags();
       if (response.success && response.data) {
-        const transformedTags = (response.data.tags || []).map((tag: any) => ({
-          id: tag.id,
-          name: tag.name,
-          slug: tag.slug,
-          description: tag.description,
-          color: tag.color,
-          postCount: tag.post_count || 0
-        }));
-        setTags(transformedTags);
+        setTags(transformTagList(response.data.tags || []));
       }
     } catch (err: any) {
       setError(err.message || '加载标签失败');

@@ -6,7 +6,7 @@ import { api } from '../utils/api';
 import { CategoryManager } from '../components/CategoryManager';
 import { TagManager } from '../components/TagManager';
 import { PostEditor } from '../components/PostEditor';
-import { transformPost } from '../utils/apiTransformer';
+import { transformPost, transformCommentList, transformUserList } from '../utils/apiTransformer';
 
 // 定义管理后台的标签页类型 - 添加 categories 和 tags
 type AdminTab = 'posts' | 'comments' | 'users' | 'analytics' | 'categories' | 'tags';
@@ -181,38 +181,21 @@ export function AdminPage() {
     setCommentsError('');
     try {
       const response = await api.getAdminComments({ page: '1', limit: '10' });
-      const transformedComments = (response.data?.comments || []).map((comment: any) => ({
-        id: comment.id,
-        content: comment.content,
-        status: comment.status,
-        user: comment.user,
-        username: comment.username,
-        postTitle: comment.post_title || comment.postTitle,
-        post: comment.post,
-        createdAt: comment.created_at || comment.createdAt
-      }));
-      setComments(transformedComments);
+      setComments(transformCommentList(response.data?.comments || []));
     } catch (err: any) {
       setCommentsError(err.message || '加载评论失败');
     } finally {
       setCommentsLoading(false);
     }
   };
-  
+
   // 加载用户
   const loadUsers = async () => {
     setUsersLoading(true);
     setUsersError('');
     try {
       const response = await api.getAdminUsers({ page: '1', limit: '10' });
-      const transformedUsers = (response.data?.users || []).map((user: any) => ({
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        createdAt: user.created_at || user.createdAt
-      }));
-      setUsers(transformedUsers);
+      setUsers(transformUserList(response.data?.users || []));
     } catch (err: any) {
       setUsersError(err.message || '加载用户失败');
     } finally {

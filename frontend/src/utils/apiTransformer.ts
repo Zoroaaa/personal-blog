@@ -221,3 +221,10 @@ export function transformCategoryList(categories: any[]): Category[] {
 export function transformTagList(tags: any[]): Tag[] {
   return tags.map(transformTag);
 }
+
+/**
+ * 批量转换用户列表
+ */
+export function transformUserList(users: any[]): User[] {
+  return users.map(transformUser);
+}

@@ -16,6 +16,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../utils/api';
 import { parseDocument, isSupportedDocument } from '../utils/documentParser';
+import { transformCategoryList, transformTagList, transformPost } from '../utils/apiTransformer';
 
 interface Category {
   id: number;
@@ -88,7 +89,7 @@ export function PostEditor({ postId, onSave, onCancel }: PostEditorProps) {
       setCategoriesLoading(true);
       const response = await api.getCategories();
       if (response.success && response.data) {
-        setCategories(response.data.categories || []);
+        setCategories(transformCategoryList(response.data.categories || []));
       }
     } catch (err) {
       console.error('Failed to load categories:', err);
@@ -96,13 +97,13 @@ export function PostEditor({ postId, onSave, onCancel }: PostEditorProps) {
       setCategoriesLoading(false);
     }
   };
-  
+
   const loadTags = async () => {
     try {
       setTagsLoading(true);
       const response = await api.getTags();
       if (response.success && response.data) {
-        setTags(response.data.tags || []);
+        setTags(transformTagList(response.data.tags || []));
       }
     } catch (err) {
       console.error('Failed to load tags:', err);
@@ -116,7 +117,7 @@ export function PostEditor({ postId, onSave, onCancel }: PostEditorProps) {
       setLoading(true);
       const response = await api.getPostById(id);
       if (response.success && response.data) {
-        const post = response.data;
+        const post = transformPost(response.data);
         setTitle(post.title);
         setContent(post.content);
         setSummary(post.summary || '');
