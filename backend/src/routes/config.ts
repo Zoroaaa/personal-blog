@@ -14,13 +14,13 @@
  */
 
 import { Hono } from 'hono';
-import type { Env } from '../types';
+import type { Env, Variables } from '../types';
 import { successResponse, errorResponse } from '../utils/response';
 import { createLogger } from '../middleware/requestLogger';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 
 
-export const configRoutes = new Hono<{ Bindings: Env }>();
+export const configRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // 公开配置白名单 (不需要管理员权限即可访问)
 const PUBLIC_CONFIG_KEYS = [
@@ -112,7 +112,7 @@ async function fetchConfigFromDB(env: Env, keysFilter?: string[]): Promise<Confi
     const { results } = await env.DB.prepare(query).bind(...params).all();
     
     const config: ConfigResponse = {};
-    (results as ConfigItem[]).forEach(item => {
+    (results as unknown as ConfigItem[]).forEach(item => {
       config[item.key] = parseConfigValue(item);
     });
     
@@ -189,7 +189,7 @@ configRoutes.get('/admin', requireAuth, requireAdmin, async (c) => {
     
     // 按分类分组
     const groupedConfig: Record<string, ConfigItem[]> = {};
-    (results as ConfigItem[]).forEach(item => {
+    (results as unknown as ConfigItem[]).forEach(item => {
       if (!groupedConfig[item.category]) {
         groupedConfig[item.category] = [];
       }

@@ -20,7 +20,7 @@
  */
 
 import { Hono } from 'hono';
-import type { Env } from '../types';
+import type { Env, Variables } from '../types';
 import { successResponse, errorResponse } from '../utils/response';
 
 import { requireAuth, requireAdmin, optionalAuth } from '../middleware/auth';
@@ -33,7 +33,8 @@ import {
   safeParseInt
 } from '../utils/validation';
 
-export const postRoutes = new Hono<{ Bindings: Env }>();
+// 定义应用路由类型
+export const postRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // ============= 常量配置 =============
 
@@ -76,8 +77,8 @@ postRoutes.get('/', async (c) => {
     const search = c.req.query('search');
     
     // 将字符串 "null" 转为真正的 null
-    category = (category === 'null' || !category) ? null : category;
-    tag = (tag === 'null' || !tag) ? null : tag;
+    category = (category === 'null' || !category) ? undefined : category;
+    tag = (tag === 'null' || !tag) ? undefined : tag;
     const sortBy = c.req.query('sortBy') || 'published_at';
     const order = c.req.query('order') === 'asc' ? 'ASC' : 'DESC';
     const offset = (page - 1) * limit;
@@ -446,9 +447,9 @@ postRoutes.get('/search', async (c) => {
     let category = c.req.query('category');
     let tag = c.req.query('tag');
     
-    // 将字符串 "null" 转为真正的 null
-    category = (category === 'null' || !category) ? null : category;
-    tag = (tag === 'null' || !tag) ? null : tag;
+    // 将字符串 "null" 转为真正的 undefined
+    category = (category === 'null' || !category) ? undefined : category;
+    tag = (tag === 'null' || !tag) ? undefined : tag;
     const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
     const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
     const sort = c.req.query('sort') || 'published_at';

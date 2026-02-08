@@ -21,7 +21,10 @@
  */
 
 import { Context, Next } from 'hono';
-import { Env } from '../index';
+import { Env, Variables } from '../types';
+
+// 定义应用上下文类型
+type AppContext = Context<{ Bindings: Env; Variables: Variables }>;
 
 /**
  * 速率限制配置选项
@@ -67,7 +70,7 @@ export function rateLimiter(options: RateLimitOptions = {}) {
   /**
    * 中间件函数
    */
-  return async (c: Context<{ Bindings: Env }>, next: Next) => {
+  return async (c: AppContext, next: Next) => {
     try {
       // 生成限流键
       const key = keyGenerator 
@@ -115,10 +118,10 @@ export function rateLimiter(options: RateLimitOptions = {}) {
 /**
  * 生成限流键
  */
-async function generateKey(c: Context<{ Bindings: Env }>, byUser: boolean): Promise<string> {
+async function generateKey(c: AppContext, byUser: boolean): Promise<string> {
   if (byUser) {
     // 基于用户ID
-    const user = c.get('user') as any;
+    const user = c.get('user');
     if (user?.userId) {
       return `ratelimit:user:${user.userId}:${c.req.path}`;
     }
@@ -132,7 +135,7 @@ async function generateKey(c: Context<{ Bindings: Env }>, byUser: boolean): Prom
 /**
  * 获取客户端IP地址
  */
-function getClientIP(c: Context): string {
+function getClientIP(c: AppContext): string {
   // Cloudflare会设置CF-Connecting-IP头
   const cfIP = c.req.header('CF-Connecting-IP');
   if (cfIP) return cfIP;
@@ -154,7 +157,8 @@ function getClientIP(c: Context): string {
 /**
  * 获取当前计数
  */
-async function getCurrentCount(c: Context<{ Bindings: Env }>, key: string): Promise<number> {
+async function getCurrentCount(c: AppContext, key: string): Promise<number> {
+  if (!c.env.CACHE) return 0;
   const value = await c.env.CACHE.get(key);
   return value ? parseInt(value, 10) : 0;
 }
@@ -163,10 +167,11 @@ async function getCurrentCount(c: Context<{ Bindings: Env }>, key: string): Prom
  * 增加计数
  */
 async function incrementCount(
-  c: Context<{ Bindings: Env }>, 
+  c: AppContext, 
   key: string, 
   windowMs: number
 ): Promise<void> {
+  if (!c.env.CACHE) return;
   const current = await getCurrentCount(c, key);
   const newCount = current + 1;
   

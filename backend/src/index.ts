@@ -30,6 +30,9 @@ import { requestLogger } from './middleware/requestLogger';
 // 导入类型定义
 import type { Env, ApiResponse } from './types';
 
+// 导出类型供其他模块使用
+export type { Env, ApiResponse } from './types';
+
 // ============= 常量配置 =============
 
 const API_VERSION = '3.0.1';
@@ -261,8 +264,7 @@ app.get('/health', async (c) => {
   };
 
   // 只有数据库和存储必须健康，缓存是可选的
-  const requiredServices = { ...services };
-  delete requiredServices.cache;
+  const { cache: _, ...requiredServices } = services;
   const allHealthy = Object.values(requiredServices).every(status => status === 'healthy');
 
   return c.json<ApiResponse>({

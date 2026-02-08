@@ -12,12 +12,13 @@
  */
 
 import { Hono } from 'hono';
-import { Env, successResponse, errorResponse } from '../index';
+import { Env, Variables } from '../types';
+import { successResponse, errorResponse } from '../utils/response';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { safeParseInt } from '../utils/validation';
 
-export const analyticsRoutes = new Hono<{ Bindings: Env }>();
+export const analyticsRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // 为需要管理员权限的路由应用认证中间件
 analyticsRoutes.use('/', requireAuth);

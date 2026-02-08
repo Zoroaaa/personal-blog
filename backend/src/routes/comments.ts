@@ -20,7 +20,8 @@
  */
 
 import { Hono } from 'hono';
-import { Env, successResponse, errorResponse } from '../index';
+import { Env, Variables } from '../types';
+import { successResponse, errorResponse } from '../utils/response';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import {
@@ -29,7 +30,7 @@ import {
   safeParseInt
 } from '../utils/validation';
 
-export const commentRoutes = new Hono<{ Bindings: Env }>();
+export const commentRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // ============= 常量配置 =============
 
