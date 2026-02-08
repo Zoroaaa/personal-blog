@@ -9,10 +9,13 @@
  * - 内容区域粘贴图片自动上传
  * - Markdown编辑器
  * - 图片上传成功提示
+ * - 支持拖拽导入文档(txt/md/docx)
+ * - 支持从Word文档提取图片
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../utils/api';
+import { parseDocument, isSupportedDocument } from '../utils/documentParser';
 
 interface Category {
   id: number;
@@ -60,6 +63,12 @@ export function PostEditor({ postId, onSave, onCancel }: PostEditorProps) {
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [tagsLoading, setTagsLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  
+  // 拖拽状态
+  const [isDragging, setIsDragging] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState('');
+  const dropZoneRef = useRef<HTMLDivElement>(null);
   
   // 加载分类和标签
   useEffect(() => {
@@ -216,6 +225,192 @@ export function PostEditor({ postId, onSave, onCancel }: PostEditorProps) {
       }
     }
   };
+
+  // 处理拖拽事件
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // 只有当离开拖拽区域本身时才取消状态
+    if (e.currentTarget === dropZoneRef.current) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+
+    // 只处理第一个文件
+    const file = files[0];
+
+    // 检查是否是支持的文档类型
+    if (!isSupportedDocument(file)) {
+      setError(`不支持的文件类型: ${file.name}。请拖拽 .txt, .md, .markdown 或 .docx 文件`);
+      return;
+    }
+
+    try {
+      setImporting(true);
+      setImportProgress('正在解析文档...');
+
+      // 解析文档
+      const parsed = await parseDocument(file);
+
+      // 询问用户是否覆盖标题
+      if (parsed.title && title && title !== parsed.title) {
+        const shouldUpdateTitle = window.confirm(`检测到文档标题 "${parsed.title}"，是否更新标题？`);
+        if (shouldUpdateTitle) {
+          setTitle(parsed.title);
+        }
+      } else if (parsed.title && !title) {
+        setTitle(parsed.title);
+      }
+
+      // 上传 Word 文档中的图片
+      let finalContent = parsed.content;
+      if (parsed.images.length > 0) {
+        setImportProgress(`正在上传 ${parsed.images.length} 张图片...`);
+        const uploadedImages: Array<{ id: string; url: string }> = [];
+
+        for (let i = 0; i < parsed.images.length; i++) {
+          const img = parsed.images[i];
+          setImportProgress(`正在上传图片 ${i + 1}/${parsed.images.length}...`);
+
+          try {
+            // 将 Blob 转换为 File
+            const imageFile = new File([img.blob], img.filename, { type: img.blob.type || 'image/png' });
+            const response = await api.uploadImage(imageFile);
+
+            if (response.success && response.data) {
+              uploadedImages.push({
+                id: img.id,
+                url: response.data.url
+              });
+            }
+          } catch (err) {
+            console.warn(`图片 ${img.filename} 上传失败:`, err);
+          }
+        }
+
+        // 将图片引用添加到内容末尾
+        if (uploadedImages.length > 0) {
+          const imageMarkdown = uploadedImages
+            .map(img => `![图片](${img.url})`)
+            .join('\n\n');
+          finalContent = finalContent + '\n\n' + imageMarkdown;
+        }
+
+        alert(`成功导入文档，并上传 ${uploadedImages.length}/${parsed.images.length} 张图片`);
+      } else {
+        alert('文档导入成功！');
+      }
+
+      // 设置内容
+      setContent(finalContent);
+
+      // 自动生成摘要（如果为空）
+      if (!summary) {
+        const autoSummary = finalContent
+          .replace(/[#*_`\[\]!]/g, '')
+          .slice(0, 150)
+          .trim();
+        setSummary(autoSummary + (autoSummary.length >= 150 ? '...' : ''));
+      }
+
+    } catch (err) {
+      setError('文档导入失败: ' + (err instanceof Error ? err.message : '未知错误'));
+    } finally {
+      setImporting(false);
+      setImportProgress('');
+    }
+  }, [title, summary]);
+
+  // 处理文件选择导入
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!isSupportedDocument(file)) {
+      setError(`不支持的文件类型: ${file.name}。请选择 .txt, .md, .markdown 或 .docx 文件`);
+      return;
+    }
+
+    try {
+      setImporting(true);
+      setImportProgress('正在解析文档...');
+
+      const parsed = await parseDocument(file);
+
+      if (parsed.title && !title) {
+        setTitle(parsed.title);
+      }
+
+      // 上传 Word 文档中的图片
+      let finalContent = parsed.content;
+      if (parsed.images.length > 0) {
+        setImportProgress(`正在上传 ${parsed.images.length} 张图片...`);
+        const uploadedImages: Array<{ id: string; url: string }> = [];
+
+        for (let i = 0; i < parsed.images.length; i++) {
+          const img = parsed.images[i];
+          setImportProgress(`正在上传图片 ${i + 1}/${parsed.images.length}...`);
+
+          try {
+            const imageFile = new File([img.blob], img.filename, { type: img.blob.type || 'image/png' });
+            const response = await api.uploadImage(imageFile);
+
+            if (response.success && response.data) {
+              uploadedImages.push({
+                id: img.id,
+                url: response.data.url
+              });
+            }
+          } catch (err) {
+            console.warn(`图片 ${img.filename} 上传失败:`, err);
+          }
+        }
+
+        if (uploadedImages.length > 0) {
+          const imageMarkdown = uploadedImages
+            .map(img => `![图片](${img.url})`)
+            .join('\n\n');
+          finalContent = finalContent + '\n\n' + imageMarkdown;
+        }
+
+        alert(`成功导入文档，并上传 ${uploadedImages.length}/${parsed.images.length} 张图片`);
+      } else {
+        alert('文档导入成功！');
+      }
+
+      setContent(finalContent);
+
+      if (!summary) {
+        const autoSummary = finalContent
+          .replace(/[#*_`\[\]!]/g, '')
+          .slice(0, 150)
+          .trim();
+        setSummary(autoSummary + (autoSummary.length >= 150 ? '...' : ''));
+      }
+
+    } catch (err) {
+      setError('文档导入失败: ' + (err instanceof Error ? err.message : '未知错误'));
+    } finally {
+      setImporting(false);
+      setImportProgress('');
+      // 清空 input 以便可以重复选择同一文件
+      e.target.value = '';
+    }
+  };
   
   // 切换标签选择
   const toggleTag = (tagId: number) => {
@@ -243,6 +438,16 @@ export function PostEditor({ postId, onSave, onCancel }: PostEditorProps) {
       {error && (
         <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300">
           {error}
+        </div>
+      )}
+
+      {/* 导入进度提示 */}
+      {importing && (
+        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div className="flex items-center gap-3">
+            <div className="animate-spin w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+            <span className="text-blue-700 dark:text-blue-300">{importProgress || '正在导入...'}</span>
+          </div>
         </div>
       )}
       
@@ -434,6 +639,50 @@ export function PostEditor({ postId, onSave, onCancel }: PostEditorProps) {
           )}
         </div>
         
+        {/* 文档导入区域 */}
+        <div
+          ref={dropZoneRef}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`relative p-6 border-2 border-dashed rounded-lg transition-all ${
+            isDragging
+              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+              : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
+          }`}
+        >
+          <div className="text-center">
+            <svg className="mx-auto w-12 h-12 text-gray-400 dark:text-gray-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              <span className="font-medium">拖拽文件到此处</span> 或
+              <label className="ml-1 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer">
+                点击选择文件
+                <input
+                  type="file"
+                  accept=".txt,.md,.markdown,.docx"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  disabled={importing}
+                />
+              </label>
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-500">
+              支持 .txt, .md, .markdown, .docx 格式（Word 文档中的图片也会被提取）
+            </p>
+          </div>
+          
+          {/* 拖拽时的遮罩提示 */}
+          {isDragging && (
+            <div className="absolute inset-0 bg-blue-500/10 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+              <div className="bg-white dark:bg-slate-800 px-6 py-3 rounded-lg shadow-lg">
+                <p className="text-blue-600 dark:text-blue-400 font-medium">释放以导入文档</p>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* 文章内容 */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -443,7 +692,8 @@ export function PostEditor({ postId, onSave, onCancel }: PostEditorProps) {
             value={content}
             onChange={(e) => setContent(e.target.value)}
             onPaste={handleContentPaste}
-            className="w-full px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono dark:bg-slate-700 dark:text-white"
+            disabled={importing}
+            className="w-full px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono dark:bg-slate-700 dark:text-white disabled:opacity-50"
             rows={20}
             required
           />
