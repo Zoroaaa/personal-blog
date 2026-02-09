@@ -305,9 +305,9 @@ const configGroups: ConfigGroup[] = [
       },
       {
         key: 'feature_rss',
-        label: '启用RSS订阅',
+        label: '启用RSS订阅 (实现中)',
         type: 'boolean',
-        description: '提供RSS订阅功能'
+        description: '提供RSS订阅功能 (此功能正在开发中，暂不可用)'
       },
       {
         key: 'comment_approval_required',
@@ -317,9 +317,9 @@ const configGroups: ConfigGroup[] = [
       },
       {
         key: 'allow_html_comments',
-        label: '允许HTML评论',
+        label: '允许HTML评论 (实现中)',
         type: 'boolean',
-        description: '允许在评论中使用HTML标签(有XSS风险)'
+        description: '允许在评论中使用HTML标签 (此功能正在开发中，暂不可用)'
       },
       {
         key: 'max_comment_length',
@@ -376,9 +376,9 @@ const configGroups: ConfigGroup[] = [
       },
       {
         key: 'max_upload_size_mb',
-        label: '最大上传文件大小(MB)',
+        label: '最大上传文件大小(MB) (实现中)',
         type: 'number',
-        description: '允许上传的最大文件大小',
+        description: '允许上传的最大文件大小 (此功能正在开发中，暂不可用)',
         min: 1,
         max: 100,
         placeholder: '5'

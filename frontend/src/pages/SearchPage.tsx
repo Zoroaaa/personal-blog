@@ -12,8 +12,9 @@
  */
 
 import { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, Navigate } from 'react-router-dom';
 import { api } from '../utils/api';
+import { useSiteConfig } from '../hooks/useSiteConfig';
 import { format } from 'date-fns';
 import type { PostListItem } from '../types';
 import { transformPostList } from '../utils/apiTransformer';
@@ -53,9 +54,17 @@ export function SearchPage() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
+  const { config } = useSiteConfig();
+  const isSearchEnabled = config?.feature_search !== false;
+
   const query = searchParams.get('q') || '';
   const categoryParam = searchParams.get('category');
   const tagParam = searchParams.get('tag');
+
+  // 如果搜索功能被禁用，重定向到首页
+  if (!isSearchEnabled) {
+    return <Navigate to="/" replace />;
+  }
 
   useEffect(() => {
     if (query || categoryParam || tagParam) {

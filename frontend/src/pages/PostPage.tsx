@@ -18,6 +18,7 @@ import rehypeHighlight from 'rehype-highlight';
 import { api } from '../utils/api';
 import { format } from 'date-fns';
 import { useAuthStore } from '../stores/authStore';
+import { useSiteConfig } from '../hooks/useSiteConfig';
 import type { Post, Comment } from '../types';
 import { transformPost, transformCommentList } from '../utils/apiTransformer';
 import { ShareButtons } from '../components/ShareButtons';
@@ -68,6 +69,10 @@ export function PostPage() {
   const progressTimeoutRef = useRef<number | null>(null);
 
   const { isAuthenticated, user } = useAuthStore();
+  const { config } = useSiteConfig();
+  const isCommentsEnabled = config?.feature_comments !== false;
+  const isLikeEnabled = config?.feature_like !== false;
+  const isShareEnabled = config?.feature_share !== false;
 
   useEffect(() => {
     if (slug) {
@@ -558,30 +563,32 @@ export function PostPage() {
         {/* 文章操作 */}
         <div className="mt-8 pt-8 border-t border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center space-x-6">
-            <button
-              onClick={handleLike}
-              disabled={liking}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
-                post.isLiked
-                  ? 'bg-red-50 text-red-600'
-                  : 'bg-muted text-foreground hover:bg-border'
-              } disabled:opacity-50`}
-            >
-              <svg
-                className={`w-5 h-5 ${post.isLiked ? 'fill-current' : ''}`}
-                fill={post.isLiked ? 'currentColor' : 'none'}
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            {isLikeEnabled && (
+              <button
+                onClick={handleLike}
+                disabled={liking}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                  post.isLiked
+                    ? 'bg-red-50 text-red-600'
+                    : 'bg-muted text-foreground hover:bg-border'
+                } disabled:opacity-50`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                />
-              </svg>
-              <span>{post.likeCount ?? 0}</span>
-            </button>
+                <svg
+                  className={`w-5 h-5 ${post.isLiked ? 'fill-current' : ''}`}
+                  fill={post.isLiked ? 'currentColor' : 'none'}
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                  />
+                </svg>
+                <span>{post.likeCount ?? 0}</span>
+              </button>
+            )}
 
             <button
               onClick={handleFavorite}
@@ -604,21 +611,25 @@ export function PostPage() {
               <span>{post.isFavorited ? '已收藏' : '收藏'}</span>
             </button>
 
-            <div className="flex items-center space-x-2 text-muted-foreground">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-              <span>{post.commentCount || 0} 评论</span>
-            </div>
+            {isCommentsEnabled && (
+              <div className="flex items-center space-x-2 text-muted-foreground">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <span>{post.commentCount || 0} 评论</span>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
             {/* 分享按钮 */}
-            <ShareButtons
-              title={post.title}
-              url={window.location.href}
-              description={post.summary || ''}
-            />
+            {isShareEnabled && (
+              <ShareButtons
+                title={post.title}
+                url={window.location.href}
+                description={post.summary || ''}
+              />
+            )}
 
             {user && user.role === 'admin' && (
               <button
@@ -633,59 +644,61 @@ export function PostPage() {
       </article>
 
       {/* 评论区 */}
-      <div className="mt-16 border-t border-border pt-8">
-        <h2 className="text-2xl font-bold text-foreground mb-6">评论 ({comments.length})</h2>
+      {isCommentsEnabled && (
+        <div className="mt-16 border-t border-border pt-8">
+          <h2 className="text-2xl font-bold text-foreground mb-6">评论 ({comments.length})</h2>
 
-        {/* 发表评论 */}
-        {isAuthenticated ? (
-          <form onSubmit={handleSubmitComment} className="mb-8">
-            <textarea
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="写下你的评论..."
-              className="w-full border border-border bg-card rounded-lg p-4 mb-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              rows={4}
-              maxLength={1000}
-            />
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">
-                {newComment.length}/1000
-              </span>
+          {/* 发表评论 */}
+          {isAuthenticated ? (
+            <form onSubmit={handleSubmitComment} className="mb-8">
+              <textarea
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="写下你的评论..."
+                className="w-full border border-border bg-card rounded-lg p-4 mb-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                rows={4}
+                maxLength={1000}
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  {newComment.length}/1000
+                </span>
+                <button
+                  type="submit"
+                  disabled={commentLoading || !newComment.trim()}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {commentLoading ? '发表中...' : '发表评论'}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="mb-8 p-6 bg-muted border border-border rounded-lg text-center">
+              <p className="text-muted-foreground mb-4">请先登录后再发表评论</p>
               <button
-                type="submit"
-                disabled={commentLoading || !newComment.trim()}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => navigate('/login?redirect=' + encodeURIComponent(window.location.pathname))}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
-                {commentLoading ? '发表中...' : '发表评论'}
+                去登录
               </button>
             </div>
-          </form>
-        ) : (
-          <div className="mb-8 p-6 bg-muted border border-border rounded-lg text-center">
-            <p className="text-muted-foreground mb-4">请先登录后再发表评论</p>
-            <button
-              onClick={() => navigate('/login?redirect=' + encodeURIComponent(window.location.pathname))}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              去登录
-            </button>
-          </div>
-        )}
+          )}
 
-        {/* 评论列表 */}
-        {comments.length > 0 ? (
-          <div className="space-y-6">
-            {comments.map((comment) => renderComment(comment))}
-          </div>
-        ) : (
-          <div className="text-center py-12 bg-muted rounded-lg">
-            <svg className="mx-auto h-12 w-12 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-            <p className="mt-2 text-muted-foreground">暂无评论，来发表第一条评论吧！</p>
-          </div>
-        )}
+          {/* 评论列表 */}
+          {comments.length > 0 ? (
+            <div className="space-y-6">
+              {comments.map((comment) => renderComment(comment))}
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-muted rounded-lg">
+              <svg className="mx-auto h-12 w-12 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              <p className="mt-2 text-muted-foreground">暂无评论，来发表第一条评论吧！</p>
+            </div>
+          )}
         </div>
+      )}
       </div>
     </>
   );
