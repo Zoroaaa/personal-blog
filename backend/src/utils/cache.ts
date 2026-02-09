@@ -25,13 +25,7 @@
  *    - TTL: 3600秒 (1小时)
  *    - 函数: safeGetCache, safePutCache
  *
- * 4. API 速率限制 (middleware/rateLimit.ts)
- *    - 用途: 限制 API 请求频率，防止滥用
- *    - Key: ratelimit:{identifier}
- *    - TTL: 根据配置 (通常60秒)
- *    - 注意: 直接使用 c.env.CACHE 操作
- *
- * 5. 健康检查 (index.ts)
+ * 4. 健康检查 (index.ts)
  *    - 用途: 检查 KV 连接状态
  *    - 注意: 只读检查，不影响业务
  *
