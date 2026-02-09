@@ -21,6 +21,9 @@ import {
 import { useAutoSave, useKeyboardShortcuts } from '../hooks/useAutoSave';
 import { LinkEditor } from './LinkEditor';
 import { SplitPreview } from './MarkdownPreview';
+import { ContentStats } from './ContentStats';
+import { AutoSaveStatus } from './AutoSaveStatus';
+import { SEOAssistant } from './SEOAssistant';
 
 interface Category {
   id: number;
@@ -87,6 +90,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   
   // 编辑器状态
   const [activeTab, setActiveTab] = useState<'edit' | 'preview' | 'split'>('edit');
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
   // 链接编辑器状态
@@ -118,6 +122,8 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     { key: 's', ctrl: true, handler: () => { saveNow(); handleSubmit(new Event('submit') as any); }, description: '保存文章' },
     { key: 'p', ctrl: true, handler: () => setActiveTab(prev => prev === 'edit' ? 'split' : 'edit'), description: '切换预览' },
     { key: 'k', ctrl: true, handler: openLinkEditor, description: '插入链接' },
+    { key: 'f11', ctrl: false, handler: () => setIsFullscreen(prev => !prev), description: '全屏模式' },
+    { key: 'Escape', ctrl: false, handler: () => setIsFullscreen(false), description: '退出全屏' },
   ]);
 
   // 加载分类和标签
@@ -504,8 +510,51 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     }, 0);
   };
 
+  // 处理 Tab 键缩进
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const textarea = e.currentTarget;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const value = textarea.value;
+
+      if (e.shiftKey) {
+        // Shift+Tab: 反缩进
+        const beforeCursor = value.substring(0, start);
+        const afterCursor = value.substring(end);
+        const lines = beforeCursor.split('\n');
+        const currentLine = lines[lines.length - 1];
+        
+        // 检查当前行是否有缩进
+        if (currentLine.startsWith('  ')) {
+          const newBeforeCursor = beforeCursor.slice(0, -2);
+          const newValue = newBeforeCursor + afterCursor;
+          setContent(newValue);
+          setTimeout(() => {
+            textarea.setSelectionRange(start - 2, end - 2);
+          }, 0);
+        } else if (currentLine.startsWith('\t')) {
+          const newBeforeCursor = beforeCursor.slice(0, -1);
+          const newValue = newBeforeCursor + afterCursor;
+          setContent(newValue);
+          setTimeout(() => {
+            textarea.setSelectionRange(start - 1, end - 1);
+          }, 0);
+        }
+      } else {
+        // Tab: 缩进（插入两个空格）
+        const newValue = value.substring(0, start) + '  ' + value.substring(end);
+        setContent(newValue);
+        setTimeout(() => {
+          textarea.setSelectionRange(start + 2, start + 2);
+        }, 0);
+      }
+    }
+  };
+
   return (
-    <div className="max-w-7xl mx-auto p-6">
+    <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-white dark:bg-slate-900 overflow-auto' : 'max-w-7xl mx-auto p-6'}`}>
       {/* 链接编辑器弹窗 */}
       <LinkEditor
         isOpen={linkEditorOpen}
@@ -521,27 +570,11 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
         </h1>
         
         {/* 自动保存状态 */}
-        <div className="flex items-center gap-4">
-          {isSaving && (
-            <span className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
-              <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              保存中...
-            </span>
-          )}
-          {lastSaved && !isSaving && (
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              上次保存: {lastSaved.toLocaleTimeString()}
-            </span>
-          )}
-          {hasDraft && (
-            <span className="text-xs px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded">
-              草稿
-            </span>
-          )}
-        </div>
+        <AutoSaveStatus 
+          isSaving={isSaving} 
+          lastSaved={lastSaved} 
+          hasDraft={hasDraft} 
+        />
       </div>
       
       {error && (
@@ -712,6 +745,13 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
           )}
         </div>
         
+        {/* SEO 优化助手 */}
+        <SEOAssistant
+          title={title}
+          summary={summary}
+          content={content}
+        />
+
         {/* 摘要 */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -830,17 +870,38 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
                 分屏
               </button>
               <button
-                type="button"
-                onClick={() => setActiveTab('preview')}
-                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                  activeTab === 'preview'
-                    ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                }`}
-              >
-                预览
-              </button>
-            </div>
+              type="button"
+              onClick={() => setActiveTab('preview')}
+              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                activeTab === 'preview'
+                  ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              预览
+            </button>
+            <div className="w-px h-5 bg-gray-300 dark:bg-slate-600 mx-1" />
+            <button
+              type="button"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              title={isFullscreen ? '退出全屏 (F11/Esc)' : '全屏模式 (F11)'}
+              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                isFullscreen
+                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              {isFullscreen ? (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                </svg>
+              )}
+            </button>
+          </div>
           </div>
 
           {/* 工具栏 */}
@@ -927,12 +988,18 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   onPaste={handleContentPaste}
+                  onKeyDown={handleKeyDown}
                   disabled={importing}
                   className="w-full px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm dark:bg-slate-700 dark:text-white disabled:opacity-50 resize-y"
                   rows={activeTab === 'split' ? 30 : 20}
                   required
-                  placeholder="在此输入 Markdown 内容...\n\n支持：\n- 标题、列表、引用\n- 代码块、表格\n- 图片、链接\n- 任务列表"
+                  placeholder="在此输入 Markdown 内容...\n\n支持：\n- 标题、列表、引用\n- 代码块、表格\n- 图片、链接\n- 任务列表\n- Tab 键缩进"
                 />
+                
+                {/* 内容统计信息 */}
+                <div className="mt-2 flex items-center justify-between">
+                  <ContentStats content={content} />
+                </div>
                 
                 {/* 检测到的链接提示 */}
                 {detectedLinks.length > 0 && activeTab === 'edit' && (
@@ -1035,6 +1102,10 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
             <span>Ctrl+S: 保存</span>
             <span>Ctrl+P: 切换预览</span>
             <span>Ctrl+K: 插入链接</span>
+            <span>F11: 全屏模式</span>
+            <span>Esc: 退出全屏</span>
+            <span>Tab: 缩进</span>
+            <span>Shift+Tab: 反缩进</span>
           </div>
         </div>
       </form>
