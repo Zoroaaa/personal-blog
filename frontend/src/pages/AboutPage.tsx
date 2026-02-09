@@ -1,45 +1,39 @@
 /**
  * 关于页面
- * 
+ *
  * 功能：
  * - 展示网站基本信息
- * - 展示作者信息
  * - 展示社交媒体链接
  * - 响应式设计
- * 
- * @author 优化版本
- * @version 3.0.0
+ *
+ * @version 4.0.0
  */
 
-import { useState } from 'react';
 import { useSiteConfig } from '../hooks/useSiteConfig';
 
 export function AboutPage() {
   const { config } = useSiteConfig();
-  // 保留这些状态以备将来使用
-  const [_loading, _setLoading] = useState(false);
-  const [_error, _setError] = useState<string | null>(null);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-        
+
         {/* 页面标题 */}
         <div className="text-center mb-12 animate-fade-in">
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent mb-4">
             关于我们
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-400">
-            了解更多关于这个网站和作者的信息
+            了解更多关于这个网站的信息
           </p>
         </div>
-        
+
         {/* 内容区域 */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
+
           {/* 左侧: 主要内容 */}
           <div className="lg:col-span-8 space-y-8">
-            
+
             {/* 网站基本信息卡片 */}
             <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 dark:border-slate-700 p-6 transition-all duration-300 hover:shadow-xl">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
@@ -48,22 +42,38 @@ export function AboutPage() {
                 </svg>
                 网站基本信息
               </h2>
-              
+
               <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">网站名称</h3>
+                  <p className="text-xl font-bold text-gray-700 dark:text-gray-300">
+                    {config.site_name || '暂无名称'}
+                  </p>
+                </div>
+
+                {config.site_subtitle && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">网站副标题</h3>
+                    <p className="text-gray-700 dark:text-gray-300">
+                      {config.site_subtitle}
+                    </p>
+                  </div>
+                )}
+
                 <div>
                   <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">网站描述</h3>
                   <p className="text-gray-700 dark:text-gray-300">
                     {config.site_description || '暂无描述'}
                   </p>
                 </div>
-                
+
                 <div>
                   <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">网站关键词</h3>
                   <p className="text-gray-700 dark:text-gray-300">
                     {config.site_keywords || '暂无关键词'}
                   </p>
                 </div>
-                
+
                 <div>
                   <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">网站作者</h3>
                   <p className="text-gray-700 dark:text-gray-300">
@@ -72,62 +82,11 @@ export function AboutPage() {
                 </div>
               </div>
             </div>
-            
-            {/* 作者信息卡片 */}
-            <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 dark:border-slate-700 p-6 transition-all duration-300 hover:shadow-xl">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                作者信息
-              </h2>
-              
-              <div className="flex flex-col md:flex-row md:items-center gap-6">
-                <div className="flex-shrink-0">
-                  {config.author_avatar ? (
-                    <img 
-                      src={config.author_avatar} 
-                      alt={config.author_name || '作者头像'}
-                      className="w-32 h-32 rounded-full object-cover border-4 border-white dark:border-slate-700 shadow-lg"
-                    />
-                  ) : (
-                    <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center border-4 border-white dark:border-slate-700 shadow-lg">
-                      <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="flex-1 space-y-4">
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">作者名称</h3>
-                    <p className="text-xl font-bold text-gray-700 dark:text-gray-300">
-                      {config.author_name || '暂无作者名称'}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">作者简介</h3>
-                    <p className="text-gray-700 dark:text-gray-300">
-                      {config.author_bio || '暂无作者简介'}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">联系邮箱</h3>
-                    <p className="text-gray-700 dark:text-gray-300">
-                      {config.author_email || '暂无联系邮箱'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
-          
+
           {/* 右侧: 社交媒体 */}
           <div className="lg:col-span-4 space-y-6">
-            
+
             {/* 社交媒体卡片 */}
             <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 dark:border-slate-700 p-6 transition-all duration-300 hover:shadow-xl">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
@@ -136,12 +95,12 @@ export function AboutPage() {
                 </svg>
                 社交媒体
               </h2>
-              
+
               <div className="space-y-4">
                 {config.social_github && (
-                  <a 
-                    href={config.social_github} 
-                    target="_blank" 
+                  <a
+                    href={config.social_github}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors group"
                   >
@@ -155,11 +114,11 @@ export function AboutPage() {
                     </span>
                   </a>
                 )}
-                
+
                 {config.social_twitter && (
-                  <a 
-                    href={config.social_twitter} 
-                    target="_blank" 
+                  <a
+                    href={config.social_twitter}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors group"
                   >
@@ -173,46 +132,46 @@ export function AboutPage() {
                     </span>
                   </a>
                 )}
-                
-                {config.social_linkedin && (
-                  <a 
-                    href={config.social_linkedin} 
-                    target="_blank" 
+
+                {config.social_youtube && (
+                  <a
+                    href={config.social_youtube}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors group"
                   >
-                    <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center flex-shrink-0">
                       <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
                       </svg>
                     </div>
                     <span className="text-gray-700 dark:text-gray-300 font-medium group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                      LinkedIn
+                      YouTube
                     </span>
                   </a>
                 )}
-                
-                {config.social_weibo && (
-                  <a 
-                    href={config.social_weibo} 
-                    target="_blank" 
+
+                {config.social_telegram && (
+                  <a
+                    href={config.social_telegram}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors group"
                   >
-                    <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
                       <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm-1.409 19.995c-1.662-.129-3.206-.862-4.338-2.021 1.432-1.316 2.972-2.832 4.489-4.441 1.505 1.599 3.022 3.108 4.43 4.427-1.181 1.197-2.784 2.068-4.581 2.035zm.625-4.101c-1.824-1.942-3.626-3.893-5.359-5.872 1.742-1.96 3.529-3.904 5.324-5.857 1.805 1.963 3.601 3.917 5.366 5.875-1.747 1.963-3.55 3.925-5.331 5.854z"/>
+                        <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
                       </svg>
                     </div>
                     <span className="text-gray-700 dark:text-gray-300 font-medium group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                      微博
+                      Telegram
                     </span>
                   </a>
                 )}
-                
+
                 {config.social_email && (
-                  <a 
-                    href={`mailto:${config.social_email}`} 
+                  <a
+                    href={`mailto:${config.social_email}`}
                     className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors group"
                   >
                     <div className="w-10 h-10 rounded-full bg-gray-800 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
@@ -225,26 +184,8 @@ export function AboutPage() {
                     </span>
                   </a>
                 )}
-                
-                {config.social_wechat_qr && (
-                  <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors group">
-                    <div className="w-10 h-10 rounded-full bg-green-600 flex items-center justify-center flex-shrink-0">
-                      <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm-1.409 19.995c-1.662-.129-3.206-.862-4.338-2.021 1.432-1.316 2.972-2.832 4.489-4.441 1.505 1.599 3.022 3.108 4.43 4.427-1.181 1.197-2.784 2.068-4.581 2.035zm.625-4.101c-1.824-1.942-3.626-3.893-5.359-5.872 1.742-1.96 3.529-3.904 5.324-5.857 1.805 1.963 3.601 3.917 5.366 5.875-1.747 1.963-3.55 3.925-5.331 5.854z"/>
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-2">微信二维码</h3>
-                      <img 
-                        src={config.social_wechat_qr} 
-                        alt="微信二维码"
-                        className="w-32 h-32 rounded-lg border border-gray-200 dark:border-gray-700"
-                      />
-                    </div>
-                  </div>
-                )}
-                
-                {(!config.social_github && !config.social_twitter && !config.social_linkedin && !config.social_weibo && !config.social_email && !config.social_wechat_qr) && (
+
+                {(!config.social_github && !config.social_twitter && !config.social_youtube && !config.social_telegram && !config.social_email) && (
                   <div className="text-center py-8">
                     <p className="text-gray-500 dark:text-gray-400">暂无社交媒体信息</p>
                   </div>
@@ -254,7 +195,7 @@ export function AboutPage() {
           </div>
         </div>
       </div>
-      
+
       {/* 添加必要的CSS动画 */}
       <style>{`
         @keyframes fade-in {
@@ -267,7 +208,7 @@ export function AboutPage() {
             transform: translateY(0);
           }
         }
-        
+
         .animate-fade-in {
           animation: fade-in 0.6s ease-out forwards;
         }

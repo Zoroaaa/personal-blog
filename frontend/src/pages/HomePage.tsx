@@ -17,6 +17,7 @@ import { api } from '../utils/api';
 import { format } from 'date-fns';
 import type { PostListItem } from '../types';
 import { transformPostList, transformCategoryList, transformTagList } from '../utils/apiTransformer';
+import { useSiteConfig } from '../hooks/useSiteConfig';
 
 interface Category {
   id: number;
@@ -38,6 +39,7 @@ interface Tag {
 
 export function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { config } = useSiteConfig();
   
   // 文章相关状态
   const [posts, setPosts] = useState<PostListItem[]>([]);
@@ -45,6 +47,9 @@ export function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  
+  // 获取每页文章数配置
+  const postsPerPage = config.posts_per_page || 10;
   
   // 分类和标签状态
   const [categories, setCategories] = useState<Category[]>([]);
@@ -126,7 +131,7 @@ export function HomePage() {
       
       const params: any = {
         page: page.toString(),
-        limit: '10'
+        limit: postsPerPage.toString()
       };
       
       if (selectedCategory) params.category = selectedCategory;

@@ -12,7 +12,7 @@
  * 2. 确保 refreshConfig 真正从服务器获取最新数据
  * 3. 优化缓存更新策略
  * 
- * @version 3.1.0
+ * @version 4.0.0
  */
 
 import { useState, useEffect } from 'react';
@@ -32,34 +32,24 @@ export interface SiteConfig {
   site_keywords: string;
   site_author: string;
   
-  // 作者信息
-  author_name: string;
-  author_avatar: string;
-  author_bio: string;
-  author_email: string;
-  
   // 主题配置
   theme_primary_color: string;
   theme_default_mode: 'light' | 'dark' | 'system';
   theme_font_family: string;
-  theme_enable_animations: boolean;
+  theme_custom_font_url?: string;
   
   // 社交媒体
   social_github?: string;
   social_twitter?: string;
-  social_linkedin?: string;
+  social_youtube?: string;
+  social_telegram?: string;
   social_email?: string;
-  social_weibo?: string;
-  social_wechat_qr?: string;
   
   // 功能开关
   feature_comments: boolean;
   feature_search: boolean;
   feature_like: boolean;
   feature_share: boolean;
-  feature_rss: boolean;
-  feature_analytics: boolean;
-  feature_newsletter: boolean;
   
   // 评论设置
   comment_approval_required: boolean;
@@ -67,18 +57,11 @@ export interface SiteConfig {
   // 页脚配置
   footer_text: string;
   footer_links?: Record<string, string> | string;
-  footer_show_powered_by: boolean;
-  footer_brand_name?: string;
-  footer_description?: string;
   footer_tech_stack?: string[];
-  
-  // 存储配置
-  storage_public_url?: string;
   
   // 系统设置
   posts_per_page: number;
   max_upload_size_mb: number;
-  enable_maintenance_mode: boolean;
   
   // 索引签名
   [key: string]: any;
@@ -96,50 +79,36 @@ const DEFAULT_CONFIG: SiteConfig = {
   site_keywords: 'blog,技术,编程',
   site_author: 'Admin',
   
-  // 作者信息
-  author_name: 'Admin',
-  author_avatar: '',
-  author_bio: '热爱技术的开发者',
-  author_email: 'admin@example.com',
-  
   // 主题配置
   theme_primary_color: '#3B82F6',
   theme_default_mode: 'system',
   theme_font_family: 'system-ui, -apple-system, sans-serif',
-  theme_enable_animations: true,
+  theme_custom_font_url: '',
   
   // 社交媒体
   social_github: '',
   social_twitter: '',
-  social_linkedin: '',
+  social_youtube: '',
+  social_telegram: '',
   social_email: '',
-  social_weibo: '',
-  social_wechat_qr: '',
   
   // 功能开关
   feature_comments: true,
   feature_search: true,
   feature_like: true,
   feature_share: true,
-  feature_rss: true,
-  feature_analytics: true,
-  feature_newsletter: false,
   
   // 评论设置
   comment_approval_required: false,
   
   // 页脚配置
   footer_text: '© 2024 All rights reserved',
-  footer_show_powered_by: true,
   footer_links: '{}',
-  
-  // 存储配置
-  storage_public_url: '',
+  footer_tech_stack: ['React + TypeScript', 'Cloudflare Workers', 'Tailwind CSS'],
   
   // 系统设置
   posts_per_page: 10,
-  max_upload_size_mb: 5,
-  enable_maintenance_mode: false
+  max_upload_size_mb: 5
 };
 
 // ============= 配置状态管理 =============
@@ -220,11 +189,61 @@ export function useSiteConfig() {
     return value || '{}';
   };
   
+  // 处理footer_tech_stack的JSON格式
+  const processTechStack = (value: any): string[] => {
+    if (Array.isArray(value)) {
+      return value;
+    }
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return value ? [value] : [];
+      }
+    }
+    return DEFAULT_CONFIG.footer_tech_stack || [];
+  };
+  
   // 同步主题配置
   const syncThemeConfig = (config: SiteConfig) => {
     if (config.theme_primary_color || config.theme_default_mode) {
       syncWithTheme(config.theme_primary_color, config.theme_default_mode);
     }
+    
+    // 同步字体配置
+    if (config.theme_font_family || config.theme_custom_font_url) {
+      const root = document.documentElement;
+      if (config.theme_font_family) {
+        root.style.setProperty('--font-family', config.theme_font_family);
+        document.body.style.fontFamily = config.theme_font_family;
+      }
+      
+      // 加载自定义字体文件
+      if (config.theme_custom_font_url) {
+        loadCustomFont(config.theme_custom_font_url);
+      }
+    }
+  };
+  
+  // 加载自定义字体
+  const loadCustomFont = (fontUrl: string): void => {
+    if (typeof document === 'undefined') return;
+    
+    // 检查是否已存在相同的字体链接
+    const existingLink = document.querySelector(`link[data-custom-font="${fontUrl}"]`);
+    if (existingLink) return;
+    
+    // 移除旧的自定义字体链接
+    const oldLinks = document.querySelectorAll('link[data-custom-font]');
+    oldLinks.forEach(link => link.remove());
+    
+    // 创建新的字体链接
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = fontUrl;
+    link.setAttribute('data-custom-font', fontUrl);
+    document.head.appendChild(link);
   };
   
   // 获取配置
@@ -297,6 +316,9 @@ export function useSiteConfig() {
           if (apiConfig.footer_links) {
             apiConfig.footer_links = processFooterLinks(apiConfig.footer_links);
           }
+          if (apiConfig.footer_tech_stack) {
+            apiConfig.footer_tech_stack = processTechStack(apiConfig.footer_tech_stack);
+          }
           
           config = { ...config, ...apiConfig };
         }
@@ -351,15 +373,25 @@ export function useSiteConfig() {
       if (key === 'footer_links' && typeof value === 'object') {
         processedValue = JSON.stringify(value);
       }
+      if (key === 'footer_tech_stack' && Array.isArray(value)) {
+        processedValue = JSON.stringify(value);
+      }
       
       const response = await api.updateConfig(key, processedValue);
       
       if (response.success) {
         // 立即更新本地状态
         setState(prev => {
+          let newValue = processedValue;
+          if (key === 'footer_links') {
+            newValue = processFooterLinks(processedValue);
+          } else if (key === 'footer_tech_stack') {
+            newValue = processTechStack(processedValue);
+          }
+          
           const newConfig = { 
             ...(prev.config || DEFAULT_CONFIG), 
-            [key]: key === 'footer_links' ? processFooterLinks(processedValue) : processedValue 
+            [key]: newValue
           };
           
           // 更新缓存
@@ -458,7 +490,7 @@ export function getConfigValue<K extends keyof SiteConfig>(
  * 检查功能是否启用
  */
 export function isFeatureEnabled(
-  feature: 'comments' | 'search' | 'like' | 'share' | 'rss' | 'analytics' | 'newsletter'
+  feature: 'comments' | 'search' | 'like' | 'share'
 ): boolean {
   const key = `feature_${feature}` as keyof SiteConfig;
   return getConfigValue(key) as boolean;
@@ -468,7 +500,7 @@ export function isFeatureEnabled(
  * 获取社交媒体链接
  */
 export function getSocialLink(
-  platform: 'github' | 'twitter' | 'linkedin' | 'email' | 'weibo' | 'wechat_qr'
+  platform: 'github' | 'twitter' | 'youtube' | 'telegram' | 'email'
 ): string {
   const key = `social_${platform}` as keyof SiteConfig;
   return getConfigValue(key) as string || '';
@@ -487,4 +519,23 @@ export function getFooterLinks(): Record<string, string> {
     }
   }
   return links || {};
+}
+
+/**
+ * 获取技术栈列表
+ */
+export function getTechStack(): string[] {
+  const techStack = getConfigValue('footer_tech_stack');
+  if (Array.isArray(techStack)) {
+    return techStack;
+  }
+  if (typeof techStack === 'string') {
+    try {
+      const parsed = JSON.parse(techStack);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return techStack ? [techStack] : [];
+    }
+  }
+  return DEFAULT_CONFIG.footer_tech_stack || [];
 }
