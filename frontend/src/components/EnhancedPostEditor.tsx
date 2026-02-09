@@ -149,7 +149,8 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   // 检查是否有草稿
   const checkDraft = () => {
     const draft = restoreFromLocalStorage();
-    if (draft && !postId) {
+    // 检查草稿是否有实际内容（标题或内容不为空）
+    if (draft && !postId && (draft.title?.trim() || draft.content?.trim())) {
       const shouldRestore = window.confirm('检测到未保存的草稿，是否恢复？');
       if (shouldRestore) {
         setTitle(draft.title || '');
