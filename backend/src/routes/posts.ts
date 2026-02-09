@@ -25,6 +25,7 @@ import { successResponse, errorResponse } from '../utils/response';
 
 import { requireAuth, requireAdmin, optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
+import { isFeatureEnabled } from './config';
 import {
   validateLength,
   sanitizeInput,
@@ -431,6 +432,15 @@ postRoutes.get('/search', async (c) => {
   const logger = createLogger(c);
   
   try {
+    // ===== 0. 检查是否允许搜索 =====
+    const isSearchEnabled = await isFeatureEnabled(c.env, 'feature_search');
+    if (!isSearchEnabled) {
+      return c.json(errorResponse(
+        'Search disabled',
+        '搜索功能已关闭'
+      ), 403);
+    }
+    
     // ===== 1. 解析和验证查询参数 =====
     const q = c.req.query('q');
     let category = c.req.query('category');
@@ -1278,6 +1288,15 @@ postRoutes.post('/:id/like', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
+    // ===== 0. 检查是否允许点赞 =====
+    const isLikeEnabled = await isFeatureEnabled(c.env, 'feature_like');
+    if (!isLikeEnabled) {
+      return c.json(errorResponse(
+        'Like disabled',
+        '点赞功能已关闭'
+      ), 403);
+    }
+    
     const user = c.get('user') as any;
     const postId = c.req.param('id');
     

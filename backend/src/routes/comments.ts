@@ -29,6 +29,7 @@ import {
   sanitizeInput,
   safeParseInt
 } from '../utils/validation';
+import { isFeatureEnabled, getConfigValue } from './config';
 
 export const commentRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -245,6 +246,19 @@ commentRoutes.post('/', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
+    // ===== 0. 检查是否允许评论 =====
+    const isCommentsEnabled = await isFeatureEnabled(c.env, 'feature_comments');
+    if (!isCommentsEnabled) {
+      return c.json(errorResponse(
+        'Comments disabled',
+        '评论功能已关闭'
+      ), 403);
+    }
+    
+    // ===== 0.5 获取评论相关配置 =====
+    const maxCommentLength = await getConfigValue<number>(c.env, 'max_comment_length', 1000);
+    const commentApprovalRequired = await isFeatureEnabled(c.env, 'comment_approval_required');
+    
     const user = c.get('user') as any;
     const body = await c.req.json();
     let { postId, content, parentId } = body;
@@ -260,7 +274,7 @@ commentRoutes.post('/', requireAuth, async (c) => {
     // ===== 2. 清理和验证内容 =====
     content = sanitizeInput(content);
     
-    const contentError = validateLength(content, MIN_COMMENT_LENGTH, MAX_COMMENT_LENGTH, 'Comment');
+    const contentError = validateLength(content, MIN_COMMENT_LENGTH, maxCommentLength, 'Comment');
     if (contentError) {
       return c.json(errorResponse('Invalid comment', contentError), 400);
     }
@@ -317,7 +331,7 @@ commentRoutes.post('/', requireAuth, async (c) => {
       user.userId,
       parentId || null,
       content,
-      'approved', // 可以改为 'pending' 需要审核
+      commentApprovalRequired ? 'pending' : 'approved', // 根据配置决定是否需要审核
       ip,
       userAgent
     ).run();
@@ -416,6 +430,15 @@ commentRoutes.post('/:id/like', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
+    // ===== 0. 检查是否允许点赞 =====
+    const isLikeEnabled = await isFeatureEnabled(c.env, 'feature_like');
+    if (!isLikeEnabled) {
+      return c.json(errorResponse(
+        'Like disabled',
+        '点赞功能已关闭'
+      ), 403);
+    }
+    
     const user = c.get('user') as any;
     const commentId = c.req.param('id');
     

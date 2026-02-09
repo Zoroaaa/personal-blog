@@ -37,6 +37,7 @@ import {
 } from '../utils/validation';
 import { sendVerificationEmail } from '../utils/resend';
 import type { VerificationEmailType } from '../utils/resend';
+import { isFeatureEnabled } from './config';
 
 export const authRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -192,6 +193,15 @@ authRoutes.post('/register', async (c) => {
   const logger = createLogger(c);
   
   try {
+    // ===== 0. 检查是否允许注册 =====
+    const isRegistrationEnabled = await isFeatureEnabled(c.env, 'feature_registration');
+    if (!isRegistrationEnabled) {
+      return c.json(errorResponse(
+        'Registration disabled',
+        '新用户注册已关闭'
+      ), 403);
+    }
+    
     // 解析请求体
     const body = await c.req.json();
     let { username, email, password, displayName, emailVerificationCode } = body;
@@ -519,6 +529,15 @@ authRoutes.post('/github', async (c) => {
   const logger = createLogger(c);
   
   try {
+    // ===== 0. 检查是否允许GitHub登录 =====
+    const isOAuthEnabled = await isFeatureEnabled(c.env, 'feature_oauth_github');
+    if (!isOAuthEnabled) {
+      return c.json(errorResponse(
+        'GitHub login disabled',
+        'GitHub登录已关闭'
+      ), 403);
+    }
+    
     const { code } = await c.req.json();
     
     if (!code) {
