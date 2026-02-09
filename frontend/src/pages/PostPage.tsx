@@ -10,7 +10,7 @@
  * @version 2.0.1
  */
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -23,9 +23,10 @@ import type { Post, Comment } from '../types';
 import { transformPost, transformCommentList } from '../utils/apiTransformer';
 import { ShareButtons } from '../components/ShareButtons';
 import { SEO } from '../components/SEO';
+import { getMarkdownComponents, generateToc } from '../utils/markdownRenderer';
 
 // 导入代码高亮样式
-import 'highlight.js/styles/github.css';
+import 'highlight.js/styles/github-dark.css';
 
 // ============= 辅助函数 =============
 
@@ -64,9 +65,14 @@ export function PostPage() {
   const [commentLoading, setCommentLoading] = useState(false);
   const [liking, setLiking] = useState(false);
   const [favoriting, setFavoriting] = useState(false);
+  const [showToc, setShowToc] = useState(false);
   const readStartTime = useRef<number>(0);
   const readProgressSent = useRef<boolean>(false);
   const progressTimeoutRef = useRef<number | null>(null);
+
+  // 获取 Markdown 组件和目录
+  const markdownComponents = useMemo(() => getMarkdownComponents(), []);
+  const toc = useMemo(() => post ? generateToc(post.content) : [], [post]);
 
   const { isAuthenticated, user } = useAuthStore();
   const { config } = useSiteConfig();
@@ -521,29 +527,52 @@ export function PostPage() {
         )}
 
         {/* 文章内容 */}
-        <div className="prose prose-lg max-w-none mb-8">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeHighlight]}
-            components={{
-              code: ({ node, inline, className, children, ...props }: any) => {
-                const match = /language-(\w+)/.exec(className || '');
-                return !inline && match ? (
-                  <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
-                    <code className={className} {...props}>
-                      {children}
-                    </code>
-                  </pre>
-                ) : (
-                  <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono" {...props}>
-                    {children}
-                  </code>
-                );
-              }
-            }}
-          >
-            {post.content}
-          </ReactMarkdown>
+        <div className="flex gap-8">
+          {/* 目录侧边栏 */}
+          {toc.length > 0 && (
+            <aside className="hidden xl:block w-64 flex-shrink-0">
+              <div className="sticky top-24">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">
+                    目录
+                  </h4>
+                  <button
+                    onClick={() => setShowToc(!showToc)}
+                    className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  >
+                    {showToc ? '收起' : '展开'}
+                  </button>
+                </div>
+                <nav className={`space-y-1 max-h-[calc(100vh-200px)] overflow-y-auto transition-all ${showToc ? '' : 'max-h-0 xl:max-h-[calc(100vh-200px)]'}`}>
+                  {toc.map((item, index) => (
+                    <a
+                      key={index}
+                      href={`#${item.id}`}
+                      className={`block text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors py-1 ${
+                        item.level === 1 ? 'font-medium' : ''
+                      }`}
+                      style={{ paddingLeft: `${(item.level - 1) * 12}px` }}
+                    >
+                      {item.text}
+                    </a>
+                  ))}
+                </nav>
+              </div>
+            </aside>
+          )}
+
+          {/* 正文内容 */}
+          <div className="flex-1 min-w-0">
+            <div className="prose prose-lg dark:prose-invert max-w-none mb-8">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeHighlight]}
+                components={markdownComponents}
+              >
+                {post.content}
+              </ReactMarkdown>
+            </div>
+          </div>
         </div>
 
         {/* 标签 */}

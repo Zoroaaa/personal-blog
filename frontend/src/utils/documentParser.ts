@@ -1,4 +1,6 @@
+// @ts-ignore - mammoth 和 jszip 是可选依赖
 import mammoth from 'mammoth';
+// @ts-ignore
 import JSZip from 'jszip';
 
 export interface ParsedDocument {
@@ -91,7 +93,7 @@ export async function parseWordDocument(file: File): Promise<ParsedDocument> {
   const content = result.value;
   
   // 尝试提取标题（第一行非空内容）
-  const lines = content.split('\n').filter(line => line.trim());
+  const lines = content.split('\n').filter((line: string) => line.trim());
   const title = lines[0]?.trim() || file.name.replace(/\.[^/.]+$/, '');
   
   return {
