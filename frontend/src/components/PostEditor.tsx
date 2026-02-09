@@ -13,25 +13,25 @@
  * - 支持从Word文档提取图片
  */
 
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../utils/api';
 import { parseDocument, isSupportedDocument } from '../utils/documentParser';
+import { transformCategoryList, transformTagList, transformPost } from '../utils/apiTransformer';
 
 interface Category {
   id: number;
   name: string;
   slug: string;
-  icon: string;
-  color: string;
+  icon?: string;
+  color?: string;
 }
 
 interface Tag {
   id: number;
   name: string;
   slug: string;
-  color: string;
-  post_count: number;
+  color?: string;
+  postCount?: number;
 }
 
 interface PostEditorProps {
@@ -89,7 +89,7 @@ export function PostEditor({ postId, onSave, onCancel }: PostEditorProps) {
       setCategoriesLoading(true);
       const response = await api.getCategories();
       if (response.success && response.data) {
-        setCategories(response.data.categories || []);
+        setCategories(transformCategoryList(response.data.categories || []));
       }
     } catch (err) {
       console.error('Failed to load categories:', err);
@@ -97,13 +97,13 @@ export function PostEditor({ postId, onSave, onCancel }: PostEditorProps) {
       setCategoriesLoading(false);
     }
   };
-  
+
   const loadTags = async () => {
     try {
       setTagsLoading(true);
       const response = await api.getTags();
       if (response.success && response.data) {
-        setTags(response.data.tags || []);
+        setTags(transformTagList(response.data.tags || []));
       }
     } catch (err) {
       console.error('Failed to load tags:', err);
@@ -117,13 +117,13 @@ export function PostEditor({ postId, onSave, onCancel }: PostEditorProps) {
       setLoading(true);
       const response = await api.getPostById(id);
       if (response.success && response.data) {
-        const post = response.data;
+        const post = transformPost(response.data);
         setTitle(post.title);
         setContent(post.content);
         setSummary(post.summary || '');
-        setCoverImage(post.cover_image || post.coverImage || '');
-        setStatus(post.status);
-        setSelectedCategoryId(post.category_id);
+        setCoverImage(post.coverImage || '');
+        setStatus(post.status as 'draft' | 'published');
+        setSelectedCategoryId(post.categoryId || null);
         setSelectedTagIds(post.tags?.map((t: any) => t.id) || []);
       }
     } catch (err: any) {
@@ -150,12 +150,12 @@ export function PostEditor({ postId, onSave, onCancel }: PostEditorProps) {
     try {
       setLoading(true);
       
-      const postData = {
+      const postData: any = {
         title,
         content,
         summary,
         coverImage,
-        categoryId: selectedCategoryId,
+        categoryId: selectedCategoryId ?? undefined,
         tags: selectedTagIds,
         status
       };
@@ -753,4 +753,3 @@ export function PostEditor({ postId, onSave, onCancel }: PostEditorProps) {
     </div>
   );
 }
-

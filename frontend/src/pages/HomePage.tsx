@@ -16,27 +16,14 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../utils/api';
 import { format } from 'date-fns';
 import type { PostListItem } from '../types';
-
-interface Category {
-  id: number;
-  name: string;
-  slug: string;
-  description: string;
-  icon: string;
-  color: string;
-  post_count: number;
-}
-
-interface Tag {
-  id: number;
-  name: string;
-  slug: string;
-  color: string;
-  post_count: number;
-}
+import { transformPostList, transformCategoryList, transformTagList } from '../utils/apiTransformer';
+import { useSiteConfig } from '../hooks/useSiteConfig';
+import { SEO } from '../components/SEO';
+import type { Category, Tag } from '../types';
 
 export function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { config } = useSiteConfig();
   
   // 文章相关状态
   const [posts, setPosts] = useState<PostListItem[]>([]);
@@ -44,6 +31,9 @@ export function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  
+  // 获取每页文章数配置
+  const postsPerPage = config.posts_per_page || 10;
   
   // 分类和标签状态
   const [categories, setCategories] = useState<Category[]>([]);
@@ -95,7 +85,7 @@ export function HomePage() {
       setCategoriesLoading(true);
       const response = await api.getCategories();
       if (response.success && response.data) {
-        setCategories(response.data.categories || []);
+        setCategories(transformCategoryList(response.data.categories || []));
       }
     } catch (error) {
       console.error('Failed to load categories:', error);
@@ -103,13 +93,13 @@ export function HomePage() {
       setCategoriesLoading(false);
     }
   };
-  
+
   const loadTags = async () => {
     try {
       setTagsLoading(true);
       const response = await api.getTags();
       if (response.success && response.data) {
-        setTags(response.data.tags || []);
+        setTags(transformTagList(response.data.tags || []));
       }
     } catch (error) {
       console.error('Failed to load tags:', error);
@@ -125,7 +115,7 @@ export function HomePage() {
       
       const params: any = {
         page: page.toString(),
-        limit: '10'
+        limit: postsPerPage.toString()
       };
       
       if (selectedCategory) params.category = selectedCategory;
@@ -134,21 +124,8 @@ export function HomePage() {
       const response = await api.getPosts(params);
       
       if (response.success && response.data) {
-        const processedPosts = (response.data.posts || []).map((post: any) => ({
-          ...post,
-          authorName: post.author_name || post.author_display_name,
-          authorAvatar: post.author_avatar,
-          viewCount: post.view_count,
-          likeCount: post.like_count,
-          commentCount: post.comment_count,
-          publishedAt: post.published_at,
-          coverImage: post.cover_image,
-          categoryName: post.category_name,
-          categorySlug: post.category_slug,
-          categoryColor: post.category_color
-        }));
-        
-        setPosts(processedPosts);
+        const transformedPosts = transformPostList(response.data.posts || []);
+        setPosts(transformedPosts);
         
         if (response.data.pagination) {
           setTotalPages(response.data.pagination.totalPages);
@@ -204,18 +181,20 @@ export function HomePage() {
     : tags.slice(0, INITIAL_TAG_COUNT);
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+    <>
+      <SEO title="首页" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         
-        {/* 页面标题 */}
-        <div className="text-center mb-12 animate-fade-in">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent mb-4">
-            探索精彩内容
-          </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-400">
-            发现有价值的文章和见解
-          </p>
-        </div>
+          {/* 页面标题 */}
+          <div className="text-center mb-12 animate-fade-in">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent mb-4">
+              探索精彩内容
+            </h1>
+            <p className="text-lg text-gray-600 dark:text-gray-400">
+              发现有价值的文章和见解
+            </p>
+          </div>
         
         {/* 分类和标签区域 */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
@@ -270,7 +249,7 @@ export function HomePage() {
                             ? 'bg-white/20'
                             : 'bg-gray-200 dark:bg-slate-600'
                         }`}>
-                          {category.post_count}
+                          {category.postCount}
                         </span>
                       </button>
                     ))}
@@ -349,7 +328,7 @@ export function HomePage() {
                       >
                         #{tag.name}
                         <span className="ml-2 text-xs opacity-75">
-                          {tag.post_count}
+                          {tag.postCount}
                         </span>
                       </button>
                     ))}
@@ -553,7 +532,7 @@ export function HomePage() {
                         <div className="flex flex-wrap items-center gap-2">
                           {post.categoryName && (
                             <button
-                              onClick={() => handleCategoryClick(post.categorySlug)}
+                              onClick={() => post.categorySlug && handleCategoryClick(post.categorySlug)}
                               className="px-3 py-1.5 rounded-lg text-white text-xs font-medium hover:opacity-80 transition-opacity"
                               style={{ backgroundColor: post.categoryColor || '#3B82F6' }}
                             >
@@ -672,6 +651,7 @@ export function HomePage() {
           overflow: hidden;
         }
       `}</style>
-    </div>
+      </div>
+    </>
   );
 }

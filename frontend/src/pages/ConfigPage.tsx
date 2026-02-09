@@ -16,10 +16,10 @@
  * 4. UI美观度优化
  * 5. 添加实时预览功能
  * 
- * @version 3.0.0
+ * @version 4.0.0
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSiteConfig } from '../hooks/useSiteConfig';
 import { useAuthStore } from '../stores/authStore';
 import { useTheme } from '../stores/themeStore';
@@ -36,14 +36,14 @@ interface ConfigGroup {
 interface ConfigItem {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'boolean' | 'color' | 'email' | 'url' | 'json' | 'select';
+  type: 'text' | 'number' | 'boolean' | 'color' | 'email' | 'url' | 'json' | 'select' | 'textarea' | 'techstack';
   description?: string;
   placeholder?: string;
   min?: number;
   max?: number;
   options?: Array<{ label: string; value: string }>;
   validation?: (value: any) => string | null;
-  preview?: boolean; // 是否支持实时预览
+  preview?: boolean;
 }
 
 // 验证函数
@@ -120,7 +120,7 @@ const configGroups: ConfigGroup[] = [
       {
         key: 'site_description',
         label: '网站描述 (SEO)',
-        type: 'text',
+        type: 'textarea',
         description: '用于搜索引擎优化的网站描述',
         placeholder: '一个分享技术和生活的个人博客'
       },
@@ -141,39 +141,29 @@ const configGroups: ConfigGroup[] = [
     ]
   },
   {
-    title: '作者信息',
-    description: '网站作者的个人信息展示',
-    icon: '👤',
+    title: 'SEO配置',
+    description: '搜索引擎优化相关设置',
+    icon: '🔍',
     items: [
       {
-        key: 'author_name',
-        label: '作者名称',
-        type: 'text',
-        description: '显示在博客中的作者名称',
-        placeholder: 'Admin'
-      },
-      {
-        key: 'author_avatar',
-        label: '作者头像 URL',
+        key: 'site_og_image',
+        label: 'Open Graph 图片',
         type: 'url',
-        description: '作者头像图片的URL地址',
-        placeholder: '/default-avatar.png',
+        description: '社交媒体分享时显示的图片URL (建议尺寸: 1200x630)',
+        placeholder: 'https://example.com/og-image.png',
         validation: validateUrl
       },
       {
-        key: 'author_bio',
-        label: '作者简介',
-        type: 'text',
-        description: '作者的简短介绍',
-        placeholder: '热爱技术的开发者'
-      },
-      {
-        key: 'author_email',
-        label: '作者邮箱',
-        type: 'email',
-        description: '作者联系邮箱',
-        placeholder: 'author@example.com',
-        validation: validateEmail
+        key: 'site_twitter_card',
+        label: 'Twitter 卡片类型',
+        type: 'select',
+        description: 'Twitter分享时的卡片样式',
+        options: [
+          { label: '大图片', value: 'summary_large_image' },
+          { label: '小图片', value: 'summary' },
+          { label: '应用', value: 'app' },
+          { label: '播放器', value: 'player' }
+        ]
       }
     ]
   },
@@ -205,15 +195,23 @@ const configGroups: ConfigGroup[] = [
       {
         key: 'theme_font_family',
         label: '字体族',
-        type: 'text',
-        description: '网站使用的字体,支持系统字体和Web字体',
-        placeholder: 'system-ui, -apple-system, sans-serif'
+        type: 'select',
+        description: '选择网站使用的字体。如需使用自定义字体，请先选择"自定义字体"，然后在下方填写字体文件URL',
+        options: [
+          { label: '系统默认字体', value: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+          { label: '思源黑体 (Noto Sans SC)', value: '"Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif' },
+          { label: '微软雅黑', value: '"Microsoft YaHei", "PingFang SC", sans-serif' },
+          { label: '宋体', value: 'SimSun, "Songti SC", serif' },
+          { label: '自定义字体', value: 'custom' }
+        ]
       },
       {
-        key: 'theme_enable_animations',
-        label: '启用动画效果',
-        type: 'boolean',
-        description: '是否启用页面过渡和交互动画'
+        key: 'theme_font_url',
+        label: '自定义字体文件URL',
+        type: 'url',
+        description: '当字体族选择"自定义字体"时，需要填写字体文件URL。支持woff2/woff/ttf格式。推荐从 Google Fonts 或阿里巴巴普惠体获取字体链接',
+        placeholder: 'https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap',
+        validation: validateUrl
       }
     ]
   },
@@ -239,19 +237,19 @@ const configGroups: ConfigGroup[] = [
         validation: validateUrl
       },
       {
-        key: 'social_linkedin',
-        label: 'LinkedIn',
+        key: 'social_youtube',
+        label: 'YouTube',
         type: 'url',
-        description: 'LinkedIn个人主页链接',
-        placeholder: 'https://linkedin.com/in/username',
+        description: 'YouTube频道链接',
+        placeholder: 'https://youtube.com/@username',
         validation: validateUrl
       },
       {
-        key: 'social_weibo',
-        label: '微博',
+        key: 'social_telegram',
+        label: 'Telegram',
         type: 'url',
-        description: '微博个人主页链接',
-        placeholder: 'https://weibo.com/username',
+        description: 'Telegram频道或群组链接',
+        placeholder: 'https://t.me/username',
         validation: validateUrl
       },
       {
@@ -261,14 +259,6 @@ const configGroups: ConfigGroup[] = [
         description: '公开的联系邮箱地址',
         placeholder: 'contact@example.com',
         validation: validateEmail
-      },
-      {
-        key: 'social_wechat_qr',
-        label: '微信二维码 URL',
-        type: 'url',
-        description: '微信二维码图片的URL地址',
-        placeholder: '/wechat-qr.png',
-        validation: validateUrl
       }
     ]
   },
@@ -302,28 +292,43 @@ const configGroups: ConfigGroup[] = [
         description: '显示社交媒体分享按钮'
       },
       {
+        key: 'feature_registration',
+        label: '启用用户注册',
+        type: 'boolean',
+        description: '允许新用户注册账户'
+      },
+      {
+        key: 'feature_oauth_github',
+        label: '启用GitHub登录',
+        type: 'boolean',
+        description: '允许使用GitHub账号登录'
+      },
+      {
         key: 'feature_rss',
-        label: '启用RSS订阅',
+        label: '启用RSS订阅 (实现中)',
         type: 'boolean',
-        description: '提供RSS订阅功能'
-      },
-      {
-        key: 'feature_analytics',
-        label: '启用访问统计',
-        type: 'boolean',
-        description: '统计网站访问数据'
-      },
-      {
-        key: 'feature_newsletter',
-        label: '启用邮件订阅',
-        type: 'boolean',
-        description: '允许用户订阅邮件通知'
+        description: '提供RSS订阅功能 (此功能正在开发中，暂不可用)'
       },
       {
         key: 'comment_approval_required',
         label: '评论需要审核',
         type: 'boolean',
         description: '新评论需要管理员审核后才能显示'
+      },
+      {
+        key: 'allow_html_comments',
+        label: '允许HTML评论 (实现中)',
+        type: 'boolean',
+        description: '允许在评论中使用HTML标签 (此功能正在开发中，暂不可用)'
+      },
+      {
+        key: 'max_comment_length',
+        label: '评论最大长度',
+        type: 'number',
+        description: '单条评论的最大字符数',
+        min: 100,
+        max: 5000,
+        placeholder: '1000'
       }
     ]
   },
@@ -336,7 +341,7 @@ const configGroups: ConfigGroup[] = [
         key: 'footer_text',
         label: '页脚版权文字',
         type: 'text',
-        description: '显示在页脚的版权信息',
+        description: '显示在页脚的版权信息，留空则使用默认格式',
         placeholder: '© 2024 我的博客. All rights reserved.'
       },
       {
@@ -348,10 +353,10 @@ const configGroups: ConfigGroup[] = [
         validation: validateJson
       },
       {
-        key: 'footer_show_powered_by',
-        label: '显示"Powered by"',
-        type: 'boolean',
-        description: '在页脚显示技术支持信息'
+        key: 'footer_tech_stack',
+        label: '技术栈',
+        type: 'techstack',
+        description: '页脚展示的技术栈列表'
       }
     ]
   },
@@ -371,18 +376,12 @@ const configGroups: ConfigGroup[] = [
       },
       {
         key: 'max_upload_size_mb',
-        label: '最大上传文件大小(MB)',
+        label: '最大上传文件大小(MB) (实现中)',
         type: 'number',
-        description: '允许上传的最大文件大小',
+        description: '允许上传的最大文件大小 (此功能正在开发中，暂不可用)',
         min: 1,
         max: 100,
         placeholder: '5'
-      },
-      {
-        key: 'enable_maintenance_mode',
-        label: '维护模式',
-        type: 'boolean',
-        description: '启用后网站将显示维护页面(管理员仍可访问)'
       }
     ]
   }
@@ -392,14 +391,16 @@ export function ConfigPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { config, loading: configLoading, updateConfig, refreshConfig } = useSiteConfig();
-  const { setPrimaryColor, setThemeMode, config: themeConfig } = useTheme();
-  
+  const { setPrimaryColor, setThemeMode } = useTheme();
+
   const [localConfig, setLocalConfig] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [updating, setUpdating] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
+  const [techStackInput, setTechStackInput] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 验证权限
   useEffect(() => {
@@ -411,6 +412,9 @@ export function ConfigPage() {
   // 初始化本地配置
   useEffect(() => {
     setLocalConfig(config);
+    if (config.footer_tech_stack && Array.isArray(config.footer_tech_stack)) {
+      setTechStackInput(config.footer_tech_stack.join('\n'));
+    }
   }, [config]);
 
   // 处理输入变化
@@ -436,6 +440,13 @@ export function ConfigPage() {
         setThemeMode(value);
       }
     }
+  };
+
+  // 处理技术栈输入变化
+  const handleTechStackChange = (value: string) => {
+    setTechStackInput(value);
+    const stack = value.split('\n').filter(item => item.trim() !== '');
+    handleInputChange('footer_tech_stack', stack);
   };
 
   // 查找配置项
@@ -554,9 +565,12 @@ export function ConfigPage() {
   const handleReset = () => {
     if (confirm('确定要放弃所有未保存的更改吗?')) {
       setLocalConfig(config);
+      if (config.footer_tech_stack && Array.isArray(config.footer_tech_stack)) {
+        setTechStackInput(config.footer_tech_stack.join('\n'));
+      }
       setHasChanges(false);
       setErrors({});
-      
+
       // 重置主题预览
       if (config.theme_primary_color) {
         setPrimaryColor(config.theme_primary_color);
@@ -564,6 +578,74 @@ export function ConfigPage() {
       if (config.theme_default_mode) {
         setThemeMode(config.theme_default_mode);
       }
+    }
+  };
+
+  // 导出配置
+  const handleExport = () => {
+    const exportData = {
+      version: '1.0.0',
+      exportedAt: new Date().toISOString(),
+      config: localConfig
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `site-config-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setSuccessMessage('配置导出成功');
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
+  // 导入配置
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const imported = JSON.parse(content);
+
+        // 验证导入的数据结构
+        if (!imported.config || typeof imported.config !== 'object') {
+          throw new Error('无效的配置文件格式');
+        }
+
+        // 确认导入
+        if (confirm(`确定要导入配置吗?这将覆盖当前的配置设置。\n\n导出时间: ${imported.exportedAt || '未知'}\n版本: ${imported.version || '未知'}`)) {
+          // 只导入已知的配置项
+          const validKeys = configGroups.flatMap(g => g.items.map(i => i.key));
+          const filteredConfig: Record<string, any> = {};
+
+          for (const key of validKeys) {
+            if (imported.config[key] !== undefined) {
+              filteredConfig[key] = imported.config[key];
+            }
+          }
+
+          setLocalConfig(prev => ({ ...prev, ...filteredConfig }));
+          setHasChanges(true);
+          setSuccessMessage(`成功导入 ${Object.keys(filteredConfig).length} 项配置`);
+          setTimeout(() => setSuccessMessage(null), 3000);
+        }
+      } catch (error) {
+        console.error('导入配置失败:', error);
+        alert('导入失败: ' + (error instanceof Error ? error.message : '无效的配置文件'));
+      }
+    };
+    reader.readAsText(file);
+
+    // 重置文件输入
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -653,6 +735,40 @@ export function ConfigPage() {
           />
         );
 
+      case 'textarea':
+        return (
+          <textarea
+            value={value || ''}
+            onChange={(e) => handleInputChange(item.key, e.target.value)}
+            placeholder={item.placeholder}
+            rows={3}
+            className={`input ${error ? 'border-red-500 dark:border-red-500' : ''}`}
+          />
+        );
+
+      case 'techstack':
+        return (
+          <div className="space-y-2">
+            <textarea
+              value={techStackInput}
+              onChange={(e) => handleTechStackChange(e.target.value)}
+              placeholder="React + TypeScript&#10;Cloudflare Workers&#10;Tailwind CSS"
+              rows={5}
+              className={`input font-mono text-sm ${error ? 'border-red-500 dark:border-red-500' : ''}`}
+            />
+            <p className="text-xs text-muted-foreground">每行输入一个技术栈名称</p>
+            {value && Array.isArray(value) && value.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {value.map((tech: string, index: number) => (
+                  <span key={index} className="px-2 py-1 bg-primary/10 text-primary text-xs rounded">
+                    {tech}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+
       default:
         return (
           <input
@@ -685,25 +801,58 @@ export function ConfigPage() {
           <h1 className="text-3xl font-bold mb-2">网站配置</h1>
           <p className="text-muted-foreground">管理网站的各项配置信息</p>
         </div>
-        
-        {hasChanges && (
-          <div className="flex gap-2">
-            <button
-              onClick={handleReset}
-              className="btn btn-outline px-4 py-2"
-              disabled={updating !== null}
-            >
-              放弃更改
-            </button>
-            <button
-              onClick={handleBatchSave}
-              className="btn btn-primary px-4 py-2"
-              disabled={updating !== null}
-            >
-              {updating === 'batch' ? '保存中...' : '保存所有更改'}
-            </button>
-          </div>
-        )}
+
+        <div className="flex flex-wrap gap-2">
+          {/* 导入按钮 */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImport}
+            accept=".json"
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="btn btn-outline px-4 py-2 flex items-center gap-2"
+            disabled={updating !== null}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            导入配置
+          </button>
+
+          {/* 导出按钮 */}
+          <button
+            onClick={handleExport}
+            className="btn btn-outline px-4 py-2 flex items-center gap-2"
+            disabled={updating !== null}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            导出配置
+          </button>
+
+          {hasChanges && (
+            <>
+              <button
+                onClick={handleReset}
+                className="btn btn-outline px-4 py-2"
+                disabled={updating !== null}
+              >
+                放弃更改
+              </button>
+              <button
+                onClick={handleBatchSave}
+                className="btn btn-primary px-4 py-2"
+                disabled={updating !== null}
+              >
+                {updating === 'batch' ? '保存中...' : '保存所有更改'}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* 成功消息 */}
@@ -806,5 +955,3 @@ export function ConfigPage() {
     </div>
   );
 }
-
-

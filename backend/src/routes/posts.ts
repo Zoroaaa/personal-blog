@@ -20,11 +20,12 @@
  */
 
 import { Hono } from 'hono';
-import type { Env } from '../types';
+import type { Env, Variables } from '../types';
 import { successResponse, errorResponse } from '../utils/response';
 
 import { requireAuth, requireAdmin, optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
+import { isFeatureEnabled } from './config';
 import {
   validateLength,
   sanitizeInput,
@@ -33,7 +34,8 @@ import {
   safeParseInt
 } from '../utils/validation';
 
-export const postRoutes = new Hono<{ Bindings: Env }>();
+// 定义应用路由类型
+export const postRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // ============= 常量配置 =============
 
@@ -76,8 +78,8 @@ postRoutes.get('/', async (c) => {
     const search = c.req.query('search');
     
     // 将字符串 "null" 转为真正的 null
-    category = (category === 'null' || !category) ? null : category;
-    tag = (tag === 'null' || !tag) ? null : tag;
+    category = (category === 'null' || !category) ? undefined : category;
+    tag = (tag === 'null' || !tag) ? undefined : tag;
     const sortBy = c.req.query('sortBy') || 'published_at';
     const order = c.req.query('order') === 'asc' ? 'ASC' : 'DESC';
     const offset = (page - 1) * limit;
@@ -391,22 +393,11 @@ postRoutes.get('/admin/:id', requireAuth, async (c) => {
     `).bind(post.id).all();
     
     // 构建响应
+    // 保持 snake_case 格式，让前端转换层统一处理
     const result = {
       ...post,
-      tags,
-      author: {
-        username: post.author_username,
-        displayName: post.author_name,
-        avatarUrl: post.author_avatar,
-        bio: post.author_bio
-      }
+      tags
     };
-    
-    // 清理冗余字段
-    delete result.author_username;
-    delete result.author_name;
-    delete result.author_avatar;
-    delete result.author_bio;
     
     logger.info('Admin post fetched successfully', { id: post.id });
     
@@ -441,14 +432,23 @@ postRoutes.get('/search', async (c) => {
   const logger = createLogger(c);
   
   try {
+    // ===== 0. 检查是否允许搜索 =====
+    const isSearchEnabled = await isFeatureEnabled(c.env, 'feature_search');
+    if (!isSearchEnabled) {
+      return c.json(errorResponse(
+        'Search disabled',
+        '搜索功能已关闭'
+      ), 403);
+    }
+    
     // ===== 1. 解析和验证查询参数 =====
     const q = c.req.query('q');
     let category = c.req.query('category');
     let tag = c.req.query('tag');
     
-    // 将字符串 "null" 转为真正的 null
-    category = (category === 'null' || !category) ? null : category;
-    tag = (tag === 'null' || !tag) ? null : tag;
+    // 将字符串 "null" 转为真正的 undefined
+    category = (category === 'null' || !category) ? undefined : category;
+    tag = (tag === 'null' || !tag) ? undefined : tag;
     const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
     const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
     const sort = c.req.query('sort') || 'published_at';
@@ -976,24 +976,13 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
     }
     
     // ===== 5. 构建响应 =====
+    // 保持 snake_case 格式，让前端转换层统一处理
     const result = {
       ...post,
       tags,
       isLiked,
-      isFavorited,
-      author: {
-        username: post.author_username,
-        displayName: post.author_name,
-        avatarUrl: post.author_avatar,
-        bio: post.author_bio
-      }
+      isFavorited
     };
-    
-    // 清理冗余字段
-    delete result.author_username;
-    delete result.author_name;
-    delete result.author_avatar;
-    delete result.author_bio;
     
     const response = successResponse(result);
     
@@ -1299,6 +1288,15 @@ postRoutes.post('/:id/like', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
+    // ===== 0. 检查是否允许点赞 =====
+    const isLikeEnabled = await isFeatureEnabled(c.env, 'feature_like');
+    if (!isLikeEnabled) {
+      return c.json(errorResponse(
+        'Like disabled',
+        '点赞功能已关闭'
+      ), 403);
+    }
+    
     const user = c.get('user') as any;
     const postId = c.req.param('id');
     

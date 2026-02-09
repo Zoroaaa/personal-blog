@@ -22,7 +22,7 @@
 
 import { Hono } from 'hono';
 import bcrypt from 'bcryptjs';
-import type { Env } from '../types';
+import type { Env, Variables } from '../types';
 import { successResponse, errorResponse } from '../utils/response';
 import { safeGetCache, safePutCache, safeDeleteCache } from '../utils/cache';
 import { generateToken } from '../utils/jwt';
@@ -37,8 +37,9 @@ import {
 } from '../utils/validation';
 import { sendVerificationEmail } from '../utils/resend';
 import type { VerificationEmailType } from '../utils/resend';
+import { isFeatureEnabled } from './config';
 
-export const authRoutes = new Hono<{ Bindings: Env }>();
+export const authRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // ============= 常量配置 =============
 
@@ -192,6 +193,15 @@ authRoutes.post('/register', async (c) => {
   const logger = createLogger(c);
   
   try {
+    // ===== 0. 检查是否允许注册 =====
+    const isRegistrationEnabled = await isFeatureEnabled(c.env, 'feature_registration');
+    if (!isRegistrationEnabled) {
+      return c.json(errorResponse(
+        'Registration disabled',
+        '新用户注册已关闭'
+      ), 403);
+    }
+    
     // 解析请求体
     const body = await c.req.json();
     let { username, email, password, displayName, emailVerificationCode } = body;
@@ -519,6 +529,15 @@ authRoutes.post('/github', async (c) => {
   const logger = createLogger(c);
   
   try {
+    // ===== 0. 检查是否允许GitHub登录 =====
+    const isOAuthEnabled = await isFeatureEnabled(c.env, 'feature_oauth_github');
+    if (!isOAuthEnabled) {
+      return c.json(errorResponse(
+        'GitHub login disabled',
+        'GitHub登录已关闭'
+      ), 403);
+    }
+    
     const { code } = await c.req.json();
     
     if (!code) {
@@ -562,7 +581,7 @@ authRoutes.post('/github', async (c) => {
       logger.info('Token exchange response received', { status: tokenResponse.status });
       
       if (!tokenResponse.ok) {
-        const errorData = await tokenResponse.json().catch(() => ({}));
+        const errorData = await tokenResponse.json().catch(() => ({})) as { error?: string };
         logger.error('GitHub token exchange failed', { status: tokenResponse.status, error: errorData });
         return c.json(errorResponse(
           'OAuth failed',
@@ -595,7 +614,7 @@ authRoutes.post('/github', async (c) => {
       logger.info('GitHub user info response received', { status: userResponse.status });
       
       if (!userResponse.ok) {
-        const errorData = await userResponse.json().catch(() => ({}));
+        const errorData = await userResponse.json().catch(() => ({})) as { message?: string };
         logger.error('GitHub user info fetch failed', { status: userResponse.status, error: errorData });
         return c.json(errorResponse(
           'OAuth failed',

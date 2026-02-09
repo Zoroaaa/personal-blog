@@ -17,8 +17,8 @@
  */
 
 import { Hono } from 'hono';
-import { Env, successResponse, errorResponse } from '../index';
-
+import { Env, Variables } from '../types';
+import { successResponse, errorResponse } from '../utils/response';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import {
@@ -28,7 +28,7 @@ import {
   generateSlug
 } from '../utils/validation';
 
-export const categoryRoutes = new Hono<{ Bindings: Env }>();
+export const categoryRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // ============= 获取分类列表 =============
 

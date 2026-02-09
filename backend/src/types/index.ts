@@ -1,11 +1,13 @@
 /**
  * 类型定义文件
- * 
+ *
  * 包含所有TypeScript类型定义
- * 
+ *
  * @author 优化版本
  * @version 1.0.0
  */
+
+import type { JWTPayload } from '../utils/jwt';
 
 /**
  * Cloudflare Workers环境绑定
@@ -24,6 +26,15 @@ export type Env = {
   CACHE_HOMEPAGE_ONLY?: string; // 是否只缓存首页
   RESEND_API_KEY?: string;     // Resend 邮件 API Key（邮箱验证码）
   RESEND_FROM_EMAIL?: string; // Resend 发件人邮箱（可选，默认使用 Resend 测试发件人）
+};
+
+/**
+ * Hono Context Variables 类型
+ * 用于扩展 Context 中的变量类型
+ */
+export type Variables = {
+  user: JWTPayload;
+  requestId?: string;
 };
 
 /**

@@ -20,7 +20,8 @@
  */
 
 import { Hono } from 'hono';
-import { Env, successResponse, errorResponse } from '../index';
+import { Env, Variables } from '../types';
+import { successResponse, errorResponse } from '../utils/response';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import {
@@ -28,8 +29,9 @@ import {
   sanitizeInput,
   safeParseInt
 } from '../utils/validation';
+import { isFeatureEnabled, getConfigValue } from './config';
 
-export const commentRoutes = new Hono<{ Bindings: Env }>();
+export const commentRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // ============= 常量配置 =============
 
@@ -163,13 +165,25 @@ commentRoutes.get('/', optionalAuth, async (c) => {
       // 构建评论树
       comments = buildCommentTree([...comments, ...replies as any[]]);
     } else if (!postId) {
-      // 按用户ID获取的评论，添加文章信息
+      // 按用户ID获取的评论，添加文章信息（包括分类）
       for (const comment of comments) {
-        const post = await c.env.DB.prepare(
-          'SELECT id, title, slug FROM posts WHERE id = ?'
-        ).bind(comment.post_id).first() as any;
+        const post = await c.env.DB.prepare(`
+          SELECT p.id, p.title, p.slug, p.cover_image,
+                 c.name as category_name, c.slug as category_slug, c.color as category_color
+          FROM posts p
+          LEFT JOIN categories c ON p.category_id = c.id
+          WHERE p.id = ?
+        `).bind(comment.post_id).first() as any;
         if (post) {
-          comment.post = post;
+          comment.post = {
+            id: post.id,
+            title: post.title,
+            slug: post.slug,
+            coverImage: post.cover_image,
+            categoryName: post.category_name,
+            categorySlug: post.category_slug,
+            categoryColor: post.category_color
+          };
         }
       }
     }
@@ -232,6 +246,19 @@ commentRoutes.post('/', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
+    // ===== 0. 检查是否允许评论 =====
+    const isCommentsEnabled = await isFeatureEnabled(c.env, 'feature_comments');
+    if (!isCommentsEnabled) {
+      return c.json(errorResponse(
+        'Comments disabled',
+        '评论功能已关闭'
+      ), 403);
+    }
+    
+    // ===== 0.5 获取评论相关配置 =====
+    const maxCommentLength = await getConfigValue<number>(c.env, 'max_comment_length', 1000);
+    const commentApprovalRequired = await isFeatureEnabled(c.env, 'comment_approval_required');
+    
     const user = c.get('user') as any;
     const body = await c.req.json();
     let { postId, content, parentId } = body;
@@ -247,7 +274,7 @@ commentRoutes.post('/', requireAuth, async (c) => {
     // ===== 2. 清理和验证内容 =====
     content = sanitizeInput(content);
     
-    const contentError = validateLength(content, MIN_COMMENT_LENGTH, MAX_COMMENT_LENGTH, 'Comment');
+    const contentError = validateLength(content, MIN_COMMENT_LENGTH, maxCommentLength, 'Comment');
     if (contentError) {
       return c.json(errorResponse('Invalid comment', contentError), 400);
     }
@@ -304,7 +331,7 @@ commentRoutes.post('/', requireAuth, async (c) => {
       user.userId,
       parentId || null,
       content,
-      'approved', // 可以改为 'pending' 需要审核
+      commentApprovalRequired ? 'pending' : 'approved', // 根据配置决定是否需要审核
       ip,
       userAgent
     ).run();
@@ -403,6 +430,15 @@ commentRoutes.post('/:id/like', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
+    // ===== 0. 检查是否允许点赞 =====
+    const isLikeEnabled = await isFeatureEnabled(c.env, 'feature_like');
+    if (!isLikeEnabled) {
+      return c.json(errorResponse(
+        'Like disabled',
+        '点赞功能已关闭'
+      ), 403);
+    }
+    
     const user = c.get('user') as any;
     const commentId = c.req.param('id');
     

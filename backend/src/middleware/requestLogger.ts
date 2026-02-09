@@ -13,7 +13,10 @@
  */
 
 import { Context, Next } from 'hono';
-import { Env } from '../index';
+import { Env, Variables } from '../types';
+
+// 定义应用上下文类型
+type AppContext = Context<{ Bindings: Env; Variables: Variables }>;
 
 /**
  * 生成唯一请求ID
@@ -35,7 +38,7 @@ function getClientIP(c: Context): string {
 /**
  * 请求日志中间件
  */
-export async function requestLogger(c: Context<{ Bindings: Env }>, next: Next) {
+export async function requestLogger(c: AppContext, next: Next) {
   // 生成请求ID
   const requestId = generateRequestId();
   c.set('requestId', requestId);
@@ -70,7 +73,7 @@ export async function requestLogger(c: Context<{ Bindings: Env }>, next: Next) {
     const duration = Date.now() - startTime;
 
     // 获取用户信息（如果存在）
-    const user = c.get('user') as any;
+    const user = c.get('user');
 
     // 记录响应信息
     const responseInfo = {
@@ -196,9 +199,9 @@ export class Logger {
 /**
  * 创建带上下文的Logger实例
  */
-export function createLogger(c: Context): Logger {
-  const requestId = c.get('requestId') as string;
-  const user = c.get('user') as any;
+export function createLogger(c: AppContext): Logger {
+  const requestId = c.get('requestId');
+  const user = c.get('user');
 
   return new Logger({
     requestId,

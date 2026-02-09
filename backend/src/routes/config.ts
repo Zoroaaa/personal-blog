@@ -14,13 +14,71 @@
  */
 
 import { Hono } from 'hono';
-import type { Env } from '../types';
+import type { Env, Variables } from '../types';
 import { successResponse, errorResponse } from '../utils/response';
 import { createLogger } from '../middleware/requestLogger';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 
 
-export const configRoutes = new Hono<{ Bindings: Env }>();
+export const configRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+
+/**
+ * 检查功能是否启用
+ * @param env 环境变量
+ * @param featureKey 功能配置键名 (如 'feature_comments')
+ * @returns 是否启用 (默认启用，查询失败也返回true避免误杀)
+ */
+export async function isFeatureEnabled(env: Env, featureKey: string): Promise<boolean> {
+  try {
+    const result = await env.DB.prepare(
+      'SELECT value FROM site_config WHERE key = ?'
+    ).bind(featureKey).first() as { value: string } | null;
+    
+    // 如果没有找到配置，默认启用
+    if (!result) return true;
+    
+    // 解析布尔值
+    return result.value === 'true' || result.value === '1';
+  } catch (error) {
+    console.error(`Failed to check feature ${featureKey}:`, error);
+    return true; // 出错时默认启用，避免误杀
+  }
+}
+
+/**
+ * 获取配置值
+ * @param env 环境变量
+ * @param key 配置键名
+ * @param defaultValue 默认值
+ * @returns 配置值
+ */
+export async function getConfigValue<T>(env: Env, key: string, defaultValue: T): Promise<T> {
+  try {
+    const result = await env.DB.prepare(
+      'SELECT value, type FROM site_config WHERE key = ?'
+    ).bind(key).first() as { value: string; type: string } | null;
+    
+    if (!result) return defaultValue;
+    
+    switch (result.type) {
+      case 'boolean':
+        return (result.value === 'true' || result.value === '1') as unknown as T;
+      case 'number':
+        return parseFloat(result.value) as unknown as T;
+      case 'json':
+        try {
+          return JSON.parse(result.value) as T;
+        } catch {
+          return defaultValue;
+        }
+      default:
+        return result.value as unknown as T;
+    }
+  } catch (error) {
+    console.error(`Failed to get config ${key}:`, error);
+    return defaultValue;
+  }
+}
 
 // 公开配置白名单 (不需要管理员权限即可访问)
 const PUBLIC_CONFIG_KEYS = [
@@ -31,25 +89,31 @@ const PUBLIC_CONFIG_KEYS = [
   'site_description',
   'site_keywords',
   'site_author',
-  'author_name',
-  'author_avatar',
-  'author_bio',
+  'site_og_image',
+  'site_twitter_card',
   'theme_primary_color',
   'theme_default_mode',
+  'theme_font_family',
+  'theme_font_url',
   'social_github',
   'social_twitter',
-  'social_linkedin',
+  'social_youtube',
+  'social_telegram',
   'social_email',
-  'social_weibo',
   'feature_comments',
   'feature_search',
   'feature_like',
   'feature_share',
+  'feature_registration',
+  'feature_oauth_github',
   'feature_rss',
   'footer_text',
   'footer_links',
-  'footer_show_powered_by',
-  'posts_per_page'
+  'footer_tech_stack',
+  'posts_per_page',
+  'max_upload_size_mb',
+  'allow_html_comments',
+  'max_comment_length'
 ];
 
 // ============= 类型定义 =============
@@ -112,7 +176,7 @@ async function fetchConfigFromDB(env: Env, keysFilter?: string[]): Promise<Confi
     const { results } = await env.DB.prepare(query).bind(...params).all();
     
     const config: ConfigResponse = {};
-    (results as ConfigItem[]).forEach(item => {
+    (results as unknown as ConfigItem[]).forEach(item => {
       config[item.key] = parseConfigValue(item);
     });
     
@@ -189,7 +253,7 @@ configRoutes.get('/admin', requireAuth, requireAdmin, async (c) => {
     
     // 按分类分组
     const groupedConfig: Record<string, ConfigItem[]> = {};
-    (results as ConfigItem[]).forEach(item => {
+    (results as unknown as ConfigItem[]).forEach(item => {
       if (!groupedConfig[item.category]) {
         groupedConfig[item.category] = [];
       }
