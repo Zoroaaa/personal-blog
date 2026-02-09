@@ -538,17 +538,35 @@ export function PostPage() {
                   </h4>
                   <button
                     onClick={() => setShowToc(!showToc)}
-                    className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
                   >
                     {showToc ? '收起' : '展开'}
                   </button>
                 </div>
-                <nav className={`space-y-1 max-h-[calc(100vh-200px)] overflow-y-auto transition-all ${showToc ? '' : 'max-h-0 xl:max-h-[calc(100vh-200px)]'}`}>
+                <nav 
+                  className={`space-y-1 overflow-y-auto transition-all duration-300 ${
+                    showToc ? 'max-h-[calc(100vh-200px)] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
+                  }`}
+                >
                   {toc.map((item, index) => (
                     <a
                       key={index}
                       href={`#${item.id}`}
-                      className={`block text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors py-1 ${
+                      onClick={(e) => {
+                        e.preventDefault();
+                        const element = document.getElementById(item.id);
+                        if (element) {
+                          const offset = 100; // 留出顶部空间
+                          const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+                          window.scrollTo({
+                            top: elementPosition - offset,
+                            behavior: 'smooth'
+                          });
+                          // 更新 URL hash
+                          window.history.pushState(null, '', `#${item.id}`);
+                        }
+                      }}
+                      className={`block text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors py-1 cursor-pointer ${
                         item.level === 1 ? 'font-medium' : ''
                       }`}
                       style={{ paddingLeft: `${(item.level - 1) * 12}px` }}

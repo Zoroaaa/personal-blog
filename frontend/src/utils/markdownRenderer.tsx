@@ -106,15 +106,41 @@ export const CodeComponent: Components['code'] = ({
 };
 
 /**
+ * 从 React children 中提取纯文本
+ */
+function extractTextFromChildren(children: any): string {
+  if (typeof children === 'string') return children;
+  if (typeof children === 'number') return String(children);
+  if (Array.isArray(children)) {
+    return children.map(extractTextFromChildren).join('');
+  }
+  if (children?.props?.children) {
+    return extractTextFromChildren(children.props.children);
+  }
+  return String(children || '');
+}
+
+/**
+ * 生成 slug id
+ */
+function generateSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
  * 自定义标题组件 - 添加锚点链接
  */
 export const HeadingComponent = (level: number): Components[`h${1 | 2 | 3 | 4 | 5 | 6}`] => {
   return ({ node, children, ...props }: any) => {
     const Tag = `h${level}` as keyof JSX.IntrinsicElements;
-    const id = String(children)
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/\s+/g, '-');
+    const textContent = extractTextFromChildren(children);
+    const id = generateSlug(textContent);
     
     const sizeClasses = {
       1: 'text-3xl mt-8 mb-4',
@@ -134,7 +160,20 @@ export const HeadingComponent = (level: number): Components[`h${1 | 2 | 3 | 4 | 
         {children}
         <a 
           href={`#${id}`}
-          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-600 transition-opacity"
+          onClick={(e) => {
+            e.preventDefault();
+            const offset = 100;
+            const element = document.getElementById(id);
+            if (element) {
+              const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+              window.scrollTo({
+                top: elementPosition - offset,
+                behavior: 'smooth'
+              });
+              window.history.pushState(null, '', `#${id}`);
+            }
+          }}
+          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-600 transition-opacity cursor-pointer"
           title="复制链接"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -341,10 +380,8 @@ export function generateToc(content: string): TocItem[] {
   while ((match = headingRegex.exec(content)) !== null) {
     const level = match[1].length;
     const text = match[2].trim();
-    const id = text
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/\s+/g, '-');
+    // 使用相同的 slug 生成逻辑
+    const id = generateSlug(text);
     
     toc.push({ level, text, id });
   }
