@@ -457,14 +457,16 @@ INSERT OR IGNORE INTO site_config (key, value, type, category, description) VALU
   ('site_favicon', '/favicon.ico', 'string', 'general', '网站Favicon URL'),
   ('site_description', '一个分享技术和生活的个人博客', 'string', 'seo', '网站描述(SEO)'),
   ('site_keywords', 'blog,技术,编程,生活', 'string', 'seo', '网站关键词(SEO)'),
-  ('site_author', 'Admin', 'string', 'general', '网站作者');
+  ('site_author', 'Admin', 'string', 'general', '网站作者'),
+  ('site_og_image', '', 'string', 'seo', 'Open Graph图片URL'),
+  ('site_twitter_card', 'summary_large_image', 'string', 'seo', 'Twitter卡片类型');
 
 -- 主题配置组
 INSERT OR IGNORE INTO site_config (key, value, type, category, description) VALUES
   ('theme_primary_color', '#3B82F6', 'string', 'theme', '主题主色调'),
   ('theme_default_mode', 'system', 'string', 'theme', '默认主题模式 (light/dark/system)'),
   ('theme_font_family', 'system-ui, -apple-system, sans-serif', 'string', 'theme', '字体族'),
-  ('theme_custom_font_url', '', 'string', 'theme', '自定义字体URL');
+  ('theme_font_url', '', 'string', 'theme', '自定义字体URL');
 
 -- 社交媒体组
 INSERT OR IGNORE INTO site_config (key, value, type, category, description) VALUES
@@ -480,7 +482,12 @@ INSERT OR IGNORE INTO site_config (key, value, type, category, description) VALU
   ('feature_search', 'true', 'boolean', 'features', '启用搜索功能'),
   ('feature_like', 'true', 'boolean', 'features', '启用点赞功能'),
   ('feature_share', 'true', 'boolean', 'features', '启用分享功能'),
-  ('comment_approval_required', 'false', 'boolean', 'features', '评论需要审核');
+  ('feature_registration', 'true', 'boolean', 'features', '启用用户注册'),
+  ('feature_oauth_github', 'true', 'boolean', 'features', '启用GitHub登录'),
+  ('feature_rss', 'true', 'boolean', 'features', '启用RSS订阅'),
+  ('comment_approval_required', 'false', 'boolean', 'features', '评论需要审核'),
+  ('allow_html_comments', 'false', 'boolean', 'features', '允许HTML评论'),
+  ('max_comment_length', '1000', 'number', 'features', '评论最大长度');
 
 -- 页脚配置组
 INSERT OR IGNORE INTO site_config (key, value, type, category, description) VALUES
