@@ -1,489 +1,398 @@
-# 🚀 快速入门指南
+# 快速开始
 
-> 10分钟快速部署你的博客系统
+本文档帮助您在 5 分钟内启动并运行个人博客系统。
 
-**体验站点**: [blog.neutronx.uk](https://blog.neutronx.uk)
+**版本**: v3.0.1 | **更新日期**: 2026-02-09
 
----
+## 目录
 
-## 📋 开始之前
+- [环境要求](#环境要求)
+- [安装步骤](#安装步骤)
+- [配置说明](#配置说明)
+- [启动开发服务器](#启动开发服务器)
+- [首次使用](#首次使用)
+- [常见问题](#常见问题)
 
-### 你需要准备
+## 环境要求
 
-- ☁️ [Cloudflare 账号](https://dash.cloudflare.com/sign-up)（免费）
-- 💻 Node.js 18+ 和 npm 9+
-- 🐙 GitHub 账号（可选，用于自动部署）
-- 🌐 域名（可选，Cloudflare 提供免费子域名）
+### 必需软件
 
-### 费用说明
+- **Node.js**: v18.0.0 或更高版本
+- **包管理器**: pnpm (推荐) 或 npm v9+
+- **Git**: 用于克隆项目
 
-**完全免费！**使用 Cloudflare 免费额度，月成本 $0
-
----
-
-## 🎯 三种部署方式
-
-### 方式一：一键部署（推荐新手）
-
-**适合**: 想快速体验的用户
-
-1. **Fork 项目**
-   ```bash
-   访问 GitHub 仓库，点击 Fork 按钮
-   ```
-
-2. **配置 GitHub Secrets**
-   - 前往 Cloudflare Dashboard 创建 API Token
-   - 在 GitHub 仓库 Settings > Secrets 添加：
-     - `CLOUDFLARE_API_TOKEN`
-     - `CLOUDFLARE_ACCOUNT_ID`
-
-3. **推送代码触发部署**
-   ```bash
-   git push origin main
-   ```
-
-4. **完成！**
-   - 访问 Cloudflare Pages 查看你的站点 URL
-
----
-
-### 方式二：命令行部署（推荐开发者）
-
-**适合**: 需要自定义配置的用户
-
-#### 步骤 1: 克隆项目
+### 验证环境
 
 ```bash
+# 检查 Node.js 版本
+node --version
+# 应显示 v18.x.x 或更高
+
+# 检查 pnpm
+pnpm --version
+# 应显示 8.x.x 或更高
+
+# 如未安装 pnpm
+npm install -g pnpm
+```
+
+### Cloudflare 账号
+
+1. 访问 [cloudflare.com](https://cloudflare.com) 注册账号
+2. 验证邮箱地址
+
+## 安装步骤
+
+### 1. 克隆项目
+
+```bash
+# 使用 HTTPS
 git clone https://github.com/yourusername/personal-blog.git
+
+# 或使用 SSH
+git clone git@github.com:yourusername/personal-blog.git
+
+# 进入项目目录
 cd personal-blog
-npm install
 ```
 
-#### 步骤 2: 登录 Cloudflare
+### 2. 安装依赖
 
 ```bash
+# 安装根目录依赖（如有）
+pnpm install
+
+# 安装后端依赖
+cd backend && pnpm install
+
+# 安装前端依赖
+cd ../frontend && pnpm install
+```
+
+### 3. 配置 Wrangler CLI
+
+```bash
+# 全局安装 Wrangler
 npm install -g wrangler
+
+# 登录 Cloudflare
 wrangler login
+
+# 验证登录状态
+wrangler whoami
 ```
 
-#### 步骤 3: 初始化资源
+## 配置说明
+
+### 后端配置
+
+1. **创建环境文件**
 
 ```bash
-chmod +x scripts/*.sh
-./scripts/init.sh
+cd backend
+cp .env.example .env
 ```
 
-这个脚本会自动创建：
-- ✅ D1 数据库
-- ✅ KV 命名空间
-- ✅ R2 存储桶
+2. **编辑 `.env` 文件**
 
-**记录输出的 ID！**
+```env
+# 必需配置
+JWT_SECRET=your-super-secret-jwt-key-min-32-chars-long
+D1_DATABASE_ID=your-database-id-here
 
-#### 步骤 4: 配置项目
+# 可选配置
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+ADMIN_EMAIL=admin@example.com
+```
 
-编辑 `backend/wrangler.toml`，填入刚才得到的 ID：
+3. **创建 D1 数据库**
+
+```bash
+# 创建数据库
+wrangler d1 create personal-blog-dev
+
+# 记录返回的 database_id，填入 .env 文件
+```
+
+4. **初始化数据库**
+
+```bash
+# 执行数据库迁移
+wrangler d1 execute personal-blog-dev --file=./database/schema.sql
+
+# 验证表创建成功
+wrangler d1 execute personal-blog-dev --command="SELECT name FROM sqlite_master WHERE type='table';"
+```
+
+5. **配置 wrangler.toml**
 
 ```toml
+name = "personal-blog-api-dev"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
 [[d1_databases]]
-database_id = "你的数据库ID"
+binding = "DB"
+database_name = "personal-blog-dev"
+database_id = "your-database-id-here"
 
 [[kv_namespaces]]
-id = "你的KV-ID"
+binding = "CACHE"
+id = "your-kv-namespace-id"
+
+[vars]
+SITE_URL = "http://localhost:5173"
+SITE_NAME = "My Personal Blog"
 ```
 
-#### 步骤 5: 设置密钥
+### 前端配置
+
+1. **创建环境文件**
 
 ```bash
-cd backend
-
-# 生成并设置 JWT 密钥
-openssl rand -base64 32 | wrangler secret put JWT_SECRET
-
-# 可选：GitHub OAuth
-echo "your-github-client-id" | wrangler secret put GITHUB_CLIENT_ID
-echo "your-github-client-secret" | wrangler secret put GITHUB_CLIENT_SECRET
-```
-
-#### 步骤 6: 初始化数据库
-
-```bash
-cd ..
-./scripts/migrate.sh
-```
-
-#### 步骤 7: 本地测试
-
-```bash
-# 终端 1: 后端
-cd backend
-npm run dev
-
-# 终端 2: 前端
 cd frontend
-npm run dev
+cp .env.example .env
 ```
 
-访问 `http://localhost:5173`
+2. **编辑 `.env` 文件**
 
-#### 步骤 8: 部署生产环境
+```env
+# 开发环境 API 地址
+VITE_API_URL=http://localhost:8787
+
+# 站点名称
+VITE_SITE_NAME=My Personal Blog
+```
+
+## 启动开发服务器
+
+### 方式一：同时启动前后端（推荐）
+
+使用 concurrently 或其他工具：
 
 ```bash
-# 部署后端
+# 在项目根目录
+pnpm dev
+
+# 或分别启动
+```
+
+### 方式二：分别启动
+
+**终端 1 - 启动后端：**
+
+```bash
 cd backend
-npm run deploy
 
-# 部署前端
+# 方式 A：使用 Wrangler 开发服务器（推荐）
+pnpm dev
+# 服务运行在 http://localhost:8787
+
+# 方式 B：使用 Miniflare（本地模拟 Workers 环境）
+pnpm dev:local
+```
+
+**终端 2 - 启动前端：**
+
+```bash
 cd frontend
-npm run build
-wrangler pages deploy dist --project-name=blog-frontend
+
+# 启动 Vite 开发服务器
+pnpm dev
+# 服务运行在 http://localhost:5173
 ```
 
-#### 步骤 9: 创建管理员
+### 验证启动
+
+1. **前端访问**: 打开浏览器访问 http://localhost:5173
+2. **后端健康检查**: 访问 http://localhost:8787/api/health
+
+预期响应：
+```json
+{
+  "status": "ok",
+  "version": "3.0.1",
+  "timestamp": "2026-02-09T10:00:00.000Z"
+}
+```
+
+## 首次使用
+
+### 1. 访问首页
+
+打开 http://localhost:5173，您将看到博客首页。
+
+### 2. 登录管理后台
+
+点击右上角的"登录"按钮，使用默认管理员账号：
+
+- **邮箱**: `admin@example.com`
+- **密码**: `admin123`
+
+**⚠️ 安全提示**: 首次登录后请立即修改默认密码！
+
+### 3. 创建第一篇文章
+
+1. 登录后进入管理后台
+2. 点击"文章管理"
+3. 点击"新建文章"
+4. 填写标题、内容，选择分类
+5. 点击"发布"
+
+### 4. 配置站点信息
+
+1. 进入管理后台
+2. 点击"系统设置"
+3. 配置站点名称、描述、Logo 等
+
+## 项目结构速览
+
+```
+personal-blog/
+├── backend/                 # 后端服务
+│   ├── src/
+│   │   ├── index.ts        # 应用入口
+│   │   ├── routes/         # API 路由
+│   │   └── types.ts        # 类型定义
+│   ├── database/
+│   │   └── schema.sql      # 数据库架构
+│   ├── .env                # 环境变量
+│   └── wrangler.toml       # Workers 配置
+├── frontend/               # 前端应用
+│   ├── src/
+│   │   ├── pages/          # 页面组件
+│   │   ├── components/     # 可复用组件
+│   │   ├── stores/         # 状态管理
+│   │   └── utils/          # 工具函数
+│   ├── .env                # 环境变量
+│   └── index.html
+└── package.json
+```
+
+## 常用命令
+
+### 后端命令
 
 ```bash
-# 注册第一个账号，然后运行
-wrangler d1 execute blog-db \
-  --command="UPDATE users SET role='admin' WHERE username='your_username'"
+cd backend
+
+# 启动开发服务器
+pnpm dev
+
+# 部署到生产环境
+pnpm deploy
+
+# 查看日志
+pnpm logs
+
+# 数据库操作
+wrangler d1 execute personal-blog-dev --command="SELECT * FROM users;"
 ```
 
-**完成！🎉**
-
----
-
-### 方式三：Docker 部署（实验性）
-
-**适合**: 需要本地开发环境的用户
+### 前端命令
 
 ```bash
-# 构建镜像
-docker-compose build
+cd frontend
 
-# 启动服务
-docker-compose up -d
+# 启动开发服务器
+pnpm dev
 
-# 访问应用
-open http://localhost:5173
+# 构建生产版本
+pnpm build
+
+# 预览生产构建
+pnpm preview
+
+# 部署到 Pages
+pnpm deploy
 ```
 
----
+## 常见问题
 
-## 🎨 自定义配置
+### Q: 后端启动报错 "D1_DATABASE_ID is not defined"
 
-### 修改网站信息
+**A**: 确保已正确配置 `.env` 文件并填入数据库 ID：
 
-登录管理后台 → 系统设置：
+```bash
+# 检查数据库列表
+wrangler d1 list
 
-- 网站名称
-- 网站描述
-- Logo 和 Favicon
-- 社交媒体链接
-- 主题颜色
+# 复制 database_id 到 .env 文件
+```
 
-### 配置域名
+### Q: 前端无法连接后端 API
 
-#### 前端域名
+**A**: 检查以下几点：
 
-1. Cloudflare Pages > 你的项目 > Custom domains
-2. 添加域名: `blog.yourdomain.com`
-3. Cloudflare 会自动配置 DNS
+1. 后端服务是否已启动（端口 8787）
+2. 前端 `.env` 文件中的 `VITE_API_URL` 是否正确
+3. 浏览器控制台是否有 CORS 错误
 
-#### 后端域名
+### Q: 数据库迁移失败
 
-1. 编辑 `backend/wrangler.toml`:
-   ```toml
-   route = { pattern = "apiblog.yourdomain.com/*", zone_name = "yourdomain.com" }
-   ```
+**A**: 检查 SQL 文件路径：
 
-2. 在 Cloudflare DNS 添加记录:
-   - Type: A
-   - Name: apiblog
-   - Content: 192.0.2.1
-   - Proxy: 已启用
+```bash
+# 确认 schema.sql 文件存在
+ls backend/database/schema.sql
 
-3. 重新部署:
-   ```bash
-   cd backend
-   npm run deploy
-   ```
+# 重新执行迁移
+wrangler d1 execute personal-blog-dev --file=./database/schema.sql
+```
 
-### 配置 GitHub OAuth
+### Q: 登录提示 "Invalid credentials"
+
+**A**: 默认管理员账号信息：
+- 邮箱: `admin@example.com`
+- 密码: `admin123`
+
+如忘记密码，可通过数据库重置：
+
+```bash
+wrangler d1 execute personal-blog-dev --command="
+  UPDATE users 
+  SET password_hash = '\$2a\$10\$...' 
+  WHERE email = 'admin@example.com';
+"
+```
+
+### Q: 图片上传失败
+
+**A**: 本地开发环境需要配置 R2 存储桶：
+
+1. 创建 R2 存储桶：
+```bash
+wrangler r2 bucket create personal-blog-images-dev
+```
+
+2. 更新 `wrangler.toml`：
+```toml
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "personal-blog-images-dev"
+```
+
+### Q: 如何启用 GitHub OAuth 登录？
+
+**A**: 
 
 1. 访问 [GitHub Developer Settings](https://github.com/settings/developers)
 2. 创建 OAuth App
-3. 填写:
-   - Homepage URL: `https://blog.yourdomain.com`
-   - Callback URL: `https://blog.yourdomain.com/login`
-4. 获取 Client ID 和 Secret
-5. 设置到 Workers:
-   ```bash
-   cd backend
-   echo "YOUR_CLIENT_ID" | wrangler secret put GITHUB_CLIENT_ID
-   echo "YOUR_CLIENT_SECRET" | wrangler secret put GITHUB_CLIENT_SECRET
-   ```
+3. 设置回调 URL: `http://localhost:5173/api/auth/github/callback`
+4. 将 Client ID 和 Secret 填入 `.env` 文件
+
+## 下一步
+
+- 📖 阅读 [API 文档](./API.md) 了解完整接口
+- 🏗️ 查看 [架构文档](./ARCHITECTURE.md) 了解系统设计
+- 🚀 参考 [部署指南](./DEPLOYMENT.md) 部署到生产环境
+
+## 获取帮助
+
+- 提交 [GitHub Issue](https://github.com/yourusername/personal-blog/issues)
+- 查看 [常见问题](./FAQ.md)
 
 ---
 
-## 📝 第一篇文章
-
-### 方式一：使用界面
-
-1. 登录网站
-2. 点击右上角 "写文章"
-3. 填写标题和内容（支持 Markdown）
-4. 选择分类和标签
-5. 点击 "发布"
-
-### 方式二：使用 API
-
-```bash
-curl -X POST https://apiblog.yourdomain.com/api/posts \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "我的第一篇文章",
-    "content": "# Hello World\n\n这是我的第一篇文章！",
-    "status": "published"
-  }'
-```
-
----
-
-## 🛠️ 常见问题
-
-### 1. 部署失败？
-
-**检查清单**:
-- ✅ 已登录 Cloudflare: `wrangler whoami`
-- ✅ wrangler.toml 配置正确
-- ✅ 所有 ID 已填写
-- ✅ Secrets 已设置
-
-### 2. 无法访问 API？
-
-**解决方案**:
-- 检查 CORS 配置（backend/src/index.ts）
-- 确认域名已正确配置
-- 查看 Workers 日志: `wrangler tail`
-
-### 3. 数据库错误？
-
-**解决方案**:
-```bash
-# 检查数据库
-wrangler d1 list
-
-# 重新运行迁移
-./scripts/migrate.sh
-
-# 查看数据
-wrangler d1 execute blog-db --command="SELECT * FROM users"
-```
-
-### 4. 图片上传失败？
-
-**解决方案**:
-- 检查 R2 存储桶已创建
-- 确认文件大小 < 5MB
-- 检查文件格式（仅支持图片）
-
-### 5. 前端白屏？
-
-**解决方案**:
-```bash
-# 检查浏览器控制台错误
-# 通常是 API URL 配置错误
-
-# 编辑 frontend/src/utils/api.ts
-const API_BASE_URL = 'https://apiblog.yourdomain.com/api'
-
-# 重新构建部署
-cd frontend
-npm run build
-wrangler pages deploy dist --project-name=blog-frontend
-```
-
----
-
-## 📊 功能检查清单
-
-部署完成后，测试以下功能：
-
-### 基础功能
-- [ ] 首页显示文章列表
-- [ ] 点击文章查看详情
-- [ ] 搜索功能正常
-- [ ] 分类和标签筛选
-
-### 用户功能
-- [ ] 注册新账号
-- [ ] 登录/登出
-- [ ] 修改个人资料
-- [ ] 上传头像
-
-### 内容管理
-- [ ] 发布新文章
-- [ ] 编辑文章
-- [ ] 删除文章
-- [ ] 图片上传
-- [ ] Markdown 预览
-
-### 互动功能
-- [ ] 发表评论
-- [ ] 回复评论
-- [ ] 点赞文章
-- [ ] 点赞评论
-
-### 管理功能（管理员）
-- [ ] 用户管理
-- [ ] 评论审核
-- [ ] 分类管理
-- [ ] 系统设置
-
----
-
-## 🚀 进阶配置
-
-### 启用邮件通知
-
-1. 注册 [Resend](https://resend.com) 账号
-2. 获取 API Key
-3. 设置环境变量:
-   ```bash
-   cd backend
-   echo "your-resend-api-key" | wrangler secret put RESEND_API_KEY
-   ```
-4. 在管理后台启用邮件功能
-
-### 配置自动备份
-
-```bash
-# 创建备份脚本
-cat > backup.sh << 'EOF'
-#!/bin/bash
-DATE=$(date +%Y%m%d)
-wrangler d1 export blog-db --output backup-$DATE.sql
-EOF
-
-chmod +x backup.sh
-
-# 添加到 crontab（每天凌晨2点备份）
-crontab -e
-# 添加: 0 2 * * * /path/to/backup.sh
-```
-
-### 性能监控
-
-1. Cloudflare Dashboard > Workers > blog-api > Metrics
-2. 查看：
-   - 请求数
-   - CPU 时间
-   - 错误率
-   - 响应时间
-
-### SEO 优化
-
-在管理后台配置：
-- 网站描述和关键词
-- Open Graph 标签
-- Twitter Card
-- Sitemap（自动生成）
-- RSS Feed
-
----
-
-## 📚 学习资源
-
-### 官方文档
-- [Cloudflare Workers](https://developers.cloudflare.com/workers/)
-- [D1 数据库](https://developers.cloudflare.com/d1/)
-- [Hono 框架](https://hono.dev/)
-- [React](https://react.dev/)
-
-### 视频教程
-- [Cloudflare Workers 入门](https://www.youtube.com/)
-- [React 快速上手](https://www.youtube.com/)
-
-### 社区
-- [GitHub Discussions](https://github.com/yourusername/personal-blog/discussions)
-- [Discord 社区](https://discord.gg/your-server)
-
----
-
-## 💡 使用技巧
-
-### 1. 快速写作
-
-使用 Markdown 快捷键：
-- `Ctrl/Cmd + B`: 粗体
-- `Ctrl/Cmd + I`: 斜体
-- `Ctrl/Cmd + K`: 插入链接
-- `Ctrl/Cmd + Shift + C`: 插入代码块
-
-### 2. SEO 优化
-
-- 使用有意义的 URL slug
-- 添加合适的标签和分类
-- 填写 meta 描述
-- 使用高质量的封面图
-
-### 3. 图片优化
-
-- 使用 WebP 格式
-- 压缩后再上传
-- 添加 alt 文本
-- 控制图片尺寸
-
-### 4. 互动提升
-
-- 及时回复评论
-- 鼓励读者互动
-- 分享到社交媒体
-- 定期更新内容
-
----
-
-## 🎓 下一步
-
-- 📖 阅读 [完整文档](./README.md)
-- 🔧 查看 [部署手册](./DEPLOYMENT.md)
-- 📡 浏览 [API 文档](./API.md)
-- 🏗️ 了解 [系统架构](./ARCHITECTURE.md)
-- 💬 加入 [社区讨论](https://github.com/yourusername/personal-blog/discussions)
-
----
-
-## 🆘 获取帮助
-
-遇到问题？
-
-1. 查看 [常见问题](#常见问题)
-2. 搜索 [GitHub Issues](https://github.com/yourusername/personal-blog/issues)
-3. 提交新 Issue
-4. 加入 Discord 社区
-
----
-
-## 🎉 完成！
-
-恭喜你成功部署了自己的博客系统！
-
-现在开始：
-- ✍️ 写第一篇文章
-- 🎨 自定义主题
-- 📱 分享给朋友
-- ⭐ 给项目点个 Star
-
----
-
-<div align="center">
-
-**快速入门指南版本**: v3.0.1  
-**最后更新**: 2024-01-15
-
-[🏠 返回首页](./README.md) | [📖 完整文档](./DEPLOYMENT.md) | [💬 讨论](https://github.com/yourusername/personal-blog/discussions)
-
-Made with ❤️ using Cloudflare
-
-</div>
+**恭喜！** 您已成功启动个人博客系统。开始创作吧！🎉
