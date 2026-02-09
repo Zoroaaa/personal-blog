@@ -122,14 +122,19 @@ function extractTextFromChildren(children: any): string {
 
 /**
  * 生成 slug id
+ * 支持中文、英文、数字等多种字符
  */
 function generateSlug(text: string): string {
   return text
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, '')
+    // 保留中文、英文、数字、空格和连字符，其他特殊字符替换为空格
+    .replace(/[^\u4e00-\u9fa5a-zA-Z0-9\s-]/g, '')
+    // 将空格替换为连字符
     .replace(/\s+/g, '-')
+    // 多个连字符合并为一个
     .replace(/-+/g, '-')
+    // 移除开头和结尾的连字符
     .replace(/^-|-$/g, '');
 }
 

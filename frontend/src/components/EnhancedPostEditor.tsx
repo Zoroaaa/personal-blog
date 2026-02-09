@@ -750,6 +750,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
           title={title}
           summary={summary}
           content={content}
+          onContentOptimize={(optimizedContent) => setContent(optimizedContent)}
         />
 
         {/* 摘要 */}
