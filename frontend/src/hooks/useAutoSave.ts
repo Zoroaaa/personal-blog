@@ -39,9 +39,28 @@ export function useAutoSave<T>(options: UseAutoSaveOptions<T>) {
     dataRef.current = data;
   }, [data]);
   
+  // 检查数据是否为空（所有字段都是空值或默认值）
+  const isEmptyData = useCallback((dataToCheck: T): boolean => {
+    if (dataToCheck === null || dataToCheck === undefined) return true;
+    if (typeof dataToCheck !== 'object') return false;
+    
+    const values = Object.values(dataToCheck);
+    // 如果所有值都是空字符串、null、undefined 或空数组，则认为数据为空
+    return values.every(value => {
+      if (value === '' || value === null || value === undefined) return true;
+      if (Array.isArray(value) && value.length === 0) return true;
+      return false;
+    });
+  }, []);
+
   // 保存到本地存储
   const saveToLocalStorage = useCallback((dataToSave: T) => {
     try {
+      // 如果数据为空，不保存
+      if (isEmptyData(dataToSave)) {
+        return;
+      }
+      
       const draft = {
         data: dataToSave,
         timestamp: new Date().toISOString(),
@@ -51,7 +70,7 @@ export function useAutoSave<T>(options: UseAutoSaveOptions<T>) {
     } catch (err) {
       console.error('Failed to save draft:', err);
     }
-  }, [key]);
+  }, [key, isEmptyData]);
   
   // 从本地存储恢复
   const restoreFromLocalStorage = useCallback((): T | null => {
