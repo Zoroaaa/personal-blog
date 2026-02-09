@@ -170,7 +170,7 @@ export const HeadingComponent = (level: number): Components[`h${1 | 2 | 3 | 4 | 
                 top: elementPosition - offset,
                 behavior: 'smooth'
               });
-              window.history.pushState(null, '', `#${id}`);
+              window.location.hash = id;
             }
           }}
           className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-600 transition-opacity cursor-pointer"

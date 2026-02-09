@@ -65,7 +65,7 @@ export function PostPage() {
   const [commentLoading, setCommentLoading] = useState(false);
   const [liking, setLiking] = useState(false);
   const [favoriting, setFavoriting] = useState(false);
-  const [showToc, setShowToc] = useState(false);
+  const [showToc, setShowToc] = useState(true);
   const readStartTime = useRef<number>(0);
   const readProgressSent = useRef<boolean>(false);
   const progressTimeoutRef = useRef<number | null>(null);
@@ -85,6 +85,37 @@ export function PostPage() {
       loadPost();
     }
   }, [slug]);
+
+  // 文章加载后，为没有 id 的标题添加 id（兼容旧文章）
+  useEffect(() => {
+    if (!post) return;
+    
+    // 延迟执行，确保 DOM 已经渲染
+    const timer = setTimeout(() => {
+      const proseElement = document.querySelector('.prose');
+      if (!proseElement) return;
+      
+      const headings = proseElement.querySelectorAll('h1, h2, h3, h4, h5, h6');
+      headings.forEach((heading) => {
+        if (!heading.id) {
+          // 从标题文本生成 id
+          const text = heading.textContent || '';
+          const id = text
+            .toLowerCase()
+            .trim()
+            .replace(/[^\w\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-|-$/g, '');
+          if (id) {
+            heading.id = id;
+          }
+        }
+      });
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [post]);
 
   // 阅读进度：进入页面开始计时，离开或滚动时上报（仅登录用户）
   const sendReadingProgress = useCallback(async (readPercentage: number) => {
@@ -543,38 +574,34 @@ export function PostPage() {
                     {showToc ? '收起' : '展开'}
                   </button>
                 </div>
+                {showToc && (
                 <nav 
-                  className={`space-y-1 overflow-y-auto transition-all duration-300 ${
-                    showToc ? 'max-h-[calc(100vh-200px)] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
-                  }`}
+                  className="space-y-1 overflow-y-auto max-h-[calc(100vh-200px)]"
                 >
                   {toc.map((item, index) => (
-                    <a
+                    <button
                       key={index}
-                      href={`#${item.id}`}
-                      onClick={(e) => {
-                        e.preventDefault();
+                      onClick={() => {
                         const element = document.getElementById(item.id);
                         if (element) {
-                          const offset = 100; // 留出顶部空间
-                          const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+                          const offset = 120; // 留出顶部空间，避免被导航栏遮挡
+                          const elementPosition = element.getBoundingClientRect().top + window.pageYOffset;
                           window.scrollTo({
                             top: elementPosition - offset,
                             behavior: 'smooth'
                           });
-                          // 更新 URL hash
-                          window.history.pushState(null, '', `#${item.id}`);
                         }
                       }}
-                      className={`block text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors py-1 cursor-pointer ${
+                      className={`block w-full text-left text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors py-1 cursor-pointer bg-transparent border-none ${
                         item.level === 1 ? 'font-medium' : ''
                       }`}
                       style={{ paddingLeft: `${(item.level - 1) * 12}px` }}
                     >
                       {item.text}
-                    </a>
+                    </button>
                   ))}
                 </nav>
+                )}
               </div>
             </aside>
           )}
