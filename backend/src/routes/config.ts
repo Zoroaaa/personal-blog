@@ -31,8 +31,12 @@ const PUBLIC_CONFIG_KEYS = [
   'site_description',
   'site_keywords',
   'site_author',
+  'site_og_image',
+  'site_twitter_card',
   'theme_primary_color',
   'theme_default_mode',
+  'theme_font_family',
+  'theme_font_url',
   'social_github',
   'social_twitter',
   'social_youtube',
@@ -42,10 +46,16 @@ const PUBLIC_CONFIG_KEYS = [
   'feature_search',
   'feature_like',
   'feature_share',
+  'feature_registration',
+  'feature_oauth_github',
+  'feature_rss',
   'footer_text',
   'footer_links',
   'footer_tech_stack',
-  'posts_per_page'
+  'posts_per_page',
+  'max_upload_size_mb',
+  'allow_html_comments',
+  'max_comment_length'
 ];
 
 // ============= 类型定义 =============
