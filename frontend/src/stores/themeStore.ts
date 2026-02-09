@@ -104,21 +104,21 @@ function darken(rgb: { r: number; g: number; b: number }, amount: number): strin
 }
 
 // 应用主题到DOM - 增强版
-function applyThemeToDOM(mode: ThemeMode, config: ThemeConfig): void {
+function applyThemeToDOM(mode: ThemeMode, config: ThemeConfig & { fontFamily?: string; customFontUrl?: string }): void {
   if (typeof document === 'undefined') return;
-  
+
   const root = document.documentElement;
-  
+
   // 1. 应用主题模式class
   root.classList.remove('light', 'dark');
   root.classList.add(mode);
-  
+
   // 2. 应用主色调到CSS变量
   const rgb = hexToRgb(config.primaryColor);
   if (rgb) {
     root.style.setProperty('--primary-color', config.primaryColor);
     root.style.setProperty('--primary-rgb', `${rgb.r}, ${rgb.g}, ${rgb.b}`);
-    
+
     // 生成并应用色调色板
     const shades = generateColorShades(config.primaryColor);
     Object.entries(shades).forEach(([shade, color]) => {
@@ -129,7 +129,7 @@ function applyThemeToDOM(mode: ThemeMode, config: ThemeConfig): void {
       }
     });
   }
-  
+
   // 3. 应用字体大小
   const fontSizeMap = {
     small: '14px',
@@ -137,9 +137,40 @@ function applyThemeToDOM(mode: ThemeMode, config: ThemeConfig): void {
     large: '18px'
   };
   root.style.setProperty('--base-font-size', fontSizeMap[config.fontSize]);
-  
-  // 4. 为body添加过渡效果
+
+  // 4. 应用自定义字体
+  if (config.fontFamily) {
+    root.style.setProperty('--font-family', config.fontFamily);
+    document.body.style.fontFamily = config.fontFamily;
+  }
+
+  // 5. 加载自定义字体文件
+  if (config.customFontUrl) {
+    loadCustomFont(config.customFontUrl);
+  }
+
+  // 6. 为body添加过渡效果
   document.body.style.transition = 'background-color 0.3s ease, color 0.3s ease';
+}
+
+// 加载自定义字体
+function loadCustomFont(fontUrl: string): void {
+  if (typeof document === 'undefined') return;
+
+  // 检查是否已存在相同的字体链接
+  const existingLink = document.querySelector(`link[data-custom-font="${fontUrl}"]`);
+  if (existingLink) return;
+
+  // 移除旧的自定义字体链接
+  const oldLinks = document.querySelectorAll('link[data-custom-font]');
+  oldLinks.forEach(link => link.remove());
+
+  // 创建新的字体链接
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = fontUrl;
+  link.setAttribute('data-custom-font', fontUrl);
+  document.head.appendChild(link);
 }
 
 // 创建主题状态管理

@@ -6,17 +6,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import { transformCategoryList } from '../utils/apiTransformer';
-
-interface Category {
-  id: number;
-  name: string;
-  slug: string;
-  description: string;
-  icon: string;
-  color: string;
-  postCount: number;
-  displayOrder: number;
-}
+import type { Category } from '../types';
 
 // 预设颜色选项
 const PRESET_COLORS = [

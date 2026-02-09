@@ -5,7 +5,7 @@ import { api } from '../utils/api';
 // 导入新增的组件
 import { CategoryManager } from '../components/CategoryManager';
 import { TagManager } from '../components/TagManager';
-import { PostEditor } from '../components/PostEditor';
+import { EnhancedPostEditor } from '../components/EnhancedPostEditor';
 import { transformPost, transformCommentList, transformUserList } from '../utils/apiTransformer';
 
 // 定义管理后台的标签页类型 - 添加 categories 和 tags
@@ -276,7 +276,7 @@ export function AdminPage() {
                     ✕ 关闭
                   </button>
                 </div>
-                <PostEditor
+                <EnhancedPostEditor
                   postId={editingPostId || undefined}
                   onSave={() => {
                     setShowCreateForm(false);

@@ -10,7 +10,7 @@
  * @version 2.0.1
  */
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -18,11 +18,15 @@ import rehypeHighlight from 'rehype-highlight';
 import { api } from '../utils/api';
 import { format } from 'date-fns';
 import { useAuthStore } from '../stores/authStore';
+import { useSiteConfig } from '../hooks/useSiteConfig';
 import type { Post, Comment } from '../types';
 import { transformPost, transformCommentList } from '../utils/apiTransformer';
+import { ShareButtons } from '../components/ShareButtons';
+import { SEO } from '../components/SEO';
+import { getMarkdownComponents, generateToc } from '../utils/markdownRenderer';
 
 // 导入代码高亮样式
-import 'highlight.js/styles/github.css';
+import 'highlight.js/styles/github-dark.css';
 
 // ============= 辅助函数 =============
 
@@ -61,17 +65,57 @@ export function PostPage() {
   const [commentLoading, setCommentLoading] = useState(false);
   const [liking, setLiking] = useState(false);
   const [favoriting, setFavoriting] = useState(false);
+  const [showToc, setShowToc] = useState(true);
   const readStartTime = useRef<number>(0);
   const readProgressSent = useRef<boolean>(false);
   const progressTimeoutRef = useRef<number | null>(null);
 
+  // 获取 Markdown 组件和目录
+  const markdownComponents = useMemo(() => getMarkdownComponents(), []);
+  const toc = useMemo(() => post ? generateToc(post.content) : [], [post]);
+
   const { isAuthenticated, user } = useAuthStore();
+  const { config } = useSiteConfig();
+  const isCommentsEnabled = config?.feature_comments !== false;
+  const isLikeEnabled = config?.feature_like !== false;
+  const isShareEnabled = config?.feature_share !== false;
 
   useEffect(() => {
     if (slug) {
       loadPost();
     }
   }, [slug]);
+
+  // 文章加载后，为没有 id 的标题添加 id（兼容旧文章）
+  useEffect(() => {
+    if (!post) return;
+    
+    // 延迟执行，确保 DOM 已经渲染
+    const timer = setTimeout(() => {
+      const proseElement = document.querySelector('.prose');
+      if (!proseElement) return;
+      
+      const headings = proseElement.querySelectorAll('h1, h2, h3, h4, h5, h6');
+      headings.forEach((heading) => {
+        if (!heading.id) {
+          // 从标题文本生成 id
+          const text = heading.textContent || '';
+          const id = text
+            .toLowerCase()
+            .trim()
+            .replace(/[^\w\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-|-$/g, '');
+          if (id) {
+            heading.id = id;
+          }
+        }
+      });
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [post]);
 
   // 阅读进度：进入页面开始计时，离开或滚动时上报（仅登录用户）
   const sendReadingProgress = useCallback(async (readPercentage: number) => {
@@ -461,10 +505,21 @@ export function PostPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12">
-      {/* 文章头部 */}
-      <article>
-        <h1 className="text-4xl font-bold text-foreground mb-4">{post.title}</h1>
+    <>
+      <SEO
+        title={post.title}
+        description={post.summary || post.content?.substring(0, 200)}
+        keywords={post.tags?.map((t: any) => t.name).join(', ')}
+        image={post.coverImage}
+        type="article"
+        author={post.authorName || post.author?.displayName}
+        publishedTime={post.publishedAt}
+        modifiedTime={post.updatedAt}
+      />
+      <div className="max-w-4xl mx-auto px-4 py-12">
+        {/* 文章头部 */}
+        <article>
+          <h1 className="text-4xl font-bold text-foreground mb-4">{post.title}</h1>
 
         <div className="flex items-center text-sm text-muted-foreground space-x-4 mb-8">
           <span className="flex items-center">
@@ -503,29 +558,74 @@ export function PostPage() {
         )}
 
         {/* 文章内容 */}
-        <div className="prose prose-lg max-w-none mb-8">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeHighlight]}
-            components={{
-              code: ({ node, inline, className, children, ...props }: any) => {
-                const match = /language-(\w+)/.exec(className || '');
-                return !inline && match ? (
-                  <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
-                    <code className={className} {...props}>
-                      {children}
-                    </code>
-                  </pre>
-                ) : (
-                  <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono" {...props}>
-                    {children}
-                  </code>
-                );
-              }
-            }}
-          >
-            {post.content}
-          </ReactMarkdown>
+        <div className="flex gap-8">
+          {/* 目录侧边栏 */}
+          {toc.length > 0 && (
+            <aside className="hidden xl:block w-64 flex-shrink-0">
+              <div className="sticky top-24">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">
+                    目录
+                  </h4>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowToc(!showToc);
+                    }}
+                    className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                  >
+                    {showToc ? '收起' : '展开'}
+                  </button>
+                </div>
+                {showToc && (
+                <nav 
+                  className="space-y-1 overflow-y-auto max-h-[calc(100vh-200px)]"
+                >
+                  {toc.map((item, index) => (
+                    <button
+                      key={index}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const element = document.getElementById(item.id);
+                        if (element) {
+                          const offset = 120; // 留出顶部空间，避免被导航栏遮挡
+                          const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+                          window.scrollTo({
+                            top: elementPosition - offset,
+                            behavior: 'smooth'
+                          });
+                          // 更新 URL hash
+                          window.history.replaceState(null, '', `#${item.id}`);
+                        }
+                      }}
+                      className={`block w-full text-left text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors py-1 cursor-pointer bg-transparent border-none ${
+                        item.level === 1 ? 'font-medium' : ''
+                      }`}
+                      style={{ paddingLeft: `${(item.level - 1) * 12}px` }}
+                    >
+                      {item.text}
+                    </button>
+                  ))}
+                </nav>
+                )}
+              </div>
+            </aside>
+          )}
+
+          {/* 正文内容 */}
+          <div className="flex-1 min-w-0">
+            <div className="prose prose-lg dark:prose-invert max-w-none mb-8">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeHighlight]}
+                components={markdownComponents}
+              >
+                {post.content}
+              </ReactMarkdown>
+            </div>
+          </div>
         </div>
 
         {/* 标签 */}
@@ -543,32 +643,34 @@ export function PostPage() {
         )}
 
         {/* 文章操作 */}
-        <div className="mt-8 pt-8 border-t border-border flex items-center justify-between">
+        <div className="mt-8 pt-8 border-t border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center space-x-6">
-            <button
-              onClick={handleLike}
-              disabled={liking}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
-                post.isLiked
-                  ? 'bg-red-50 text-red-600'
-                  : 'bg-muted text-foreground hover:bg-border'
-              } disabled:opacity-50`}
-            >
-              <svg
-                className={`w-5 h-5 ${post.isLiked ? 'fill-current' : ''}`}
-                fill={post.isLiked ? 'currentColor' : 'none'}
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            {isLikeEnabled && (
+              <button
+                onClick={handleLike}
+                disabled={liking}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                  post.isLiked
+                    ? 'bg-red-50 text-red-600'
+                    : 'bg-muted text-foreground hover:bg-border'
+                } disabled:opacity-50`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                />
-              </svg>
-              <span>{post.likeCount ?? 0}</span>
-            </button>
+                <svg
+                  className={`w-5 h-5 ${post.isLiked ? 'fill-current' : ''}`}
+                  fill={post.isLiked ? 'currentColor' : 'none'}
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                  />
+                </svg>
+                <span>{post.likeCount ?? 0}</span>
+              </button>
+            )}
 
             <button
               onClick={handleFavorite}
@@ -591,79 +693,95 @@ export function PostPage() {
               <span>{post.isFavorited ? '已收藏' : '收藏'}</span>
             </button>
 
-            <div className="flex items-center space-x-2 text-muted-foreground">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-              <span>{post.commentCount || 0} 评论</span>
-            </div>
+            {isCommentsEnabled && (
+              <div className="flex items-center space-x-2 text-muted-foreground">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <span>{post.commentCount || 0} 评论</span>
+              </div>
+            )}
           </div>
 
-          {user && user.role === 'admin' && (
-            <button
-              onClick={() => navigate(`/admin?edit=${post.id}`)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              编辑文章
-            </button>
-          )}
+          <div className="flex items-center gap-4">
+            {/* 分享按钮 */}
+            {isShareEnabled && (
+              <ShareButtons
+                title={post.title}
+                url={window.location.href}
+                description={post.summary || ''}
+              />
+            )}
+
+            {user && user.role === 'admin' && (
+              <button
+                onClick={() => navigate(`/admin?edit=${post.id}`)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                编辑文章
+              </button>
+            )}
+          </div>
         </div>
       </article>
 
       {/* 评论区 */}
-      <div className="mt-16 border-t border-border pt-8">
-        <h2 className="text-2xl font-bold text-foreground mb-6">评论 ({comments.length})</h2>
+      {isCommentsEnabled && (
+        <div className="mt-16 border-t border-border pt-8">
+          <h2 className="text-2xl font-bold text-foreground mb-6">评论 ({comments.length})</h2>
 
-        {/* 发表评论 */}
-        {isAuthenticated ? (
-          <form onSubmit={handleSubmitComment} className="mb-8">
-            <textarea
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="写下你的评论..."
-              className="w-full border border-border bg-card rounded-lg p-4 mb-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              rows={4}
-              maxLength={1000}
-            />
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">
-                {newComment.length}/1000
-              </span>
+          {/* 发表评论 */}
+          {isAuthenticated ? (
+            <form onSubmit={handleSubmitComment} className="mb-8">
+              <textarea
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="写下你的评论..."
+                className="w-full border border-border bg-card rounded-lg p-4 mb-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                rows={4}
+                maxLength={1000}
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  {newComment.length}/1000
+                </span>
+                <button
+                  type="submit"
+                  disabled={commentLoading || !newComment.trim()}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {commentLoading ? '发表中...' : '发表评论'}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="mb-8 p-6 bg-muted border border-border rounded-lg text-center">
+              <p className="text-muted-foreground mb-4">请先登录后再发表评论</p>
               <button
-                type="submit"
-                disabled={commentLoading || !newComment.trim()}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => navigate('/login?redirect=' + encodeURIComponent(window.location.pathname))}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
-                {commentLoading ? '发表中...' : '发表评论'}
+                去登录
               </button>
             </div>
-          </form>
-        ) : (
-          <div className="mb-8 p-6 bg-muted border border-border rounded-lg text-center">
-            <p className="text-muted-foreground mb-4">请先登录后再发表评论</p>
-            <button
-              onClick={() => navigate('/login?redirect=' + encodeURIComponent(window.location.pathname))}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              去登录
-            </button>
-          </div>
-        )}
+          )}
 
-        {/* 评论列表 */}
-        {comments.length > 0 ? (
-          <div className="space-y-6">
-            {comments.map((comment) => renderComment(comment))}
-          </div>
-        ) : (
-          <div className="text-center py-12 bg-muted rounded-lg">
-            <svg className="mx-auto h-12 w-12 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-            <p className="mt-2 text-muted-foreground">暂无评论，来发表第一条评论吧！</p>
-          </div>
-        )}
+          {/* 评论列表 */}
+          {comments.length > 0 ? (
+            <div className="space-y-6">
+              {comments.map((comment) => renderComment(comment))}
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-muted rounded-lg">
+              <svg className="mx-auto h-12 w-12 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              <p className="mt-2 text-muted-foreground">暂无评论，来发表第一条评论吧！</p>
+            </div>
+          )}
+        </div>
+      )}
       </div>
-    </div>
+    </>
   );
 }
