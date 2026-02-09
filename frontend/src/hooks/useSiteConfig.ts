@@ -95,7 +95,7 @@ const DEFAULT_CONFIG: SiteConfig = {
   // 主题配置
   theme_primary_color: '#3B82F6',
   theme_default_mode: 'system',
-  theme_font_family: 'system-ui, -apple-system, sans-serif',
+  theme_font_family: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   theme_font_url: '',
   
   // 社交媒体

@@ -195,16 +195,22 @@ const configGroups: ConfigGroup[] = [
       {
         key: 'theme_font_family',
         label: '字体族',
-        type: 'text',
-        description: '网站使用的字体,支持系统字体和Web字体',
-        placeholder: 'system-ui, -apple-system, sans-serif'
+        type: 'select',
+        description: '选择网站使用的字体。如需使用自定义字体，请先选择"自定义字体"，然后在下方填写字体文件URL',
+        options: [
+          { label: '系统默认字体', value: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+          { label: '思源黑体 (Noto Sans SC)', value: '"Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif' },
+          { label: '微软雅黑', value: '"Microsoft YaHei", "PingFang SC", sans-serif' },
+          { label: '宋体', value: 'SimSun, "Songti SC", serif' },
+          { label: '自定义字体', value: 'custom' }
+        ]
       },
       {
         key: 'theme_font_url',
-        label: '自定义字体URL',
+        label: '自定义字体文件URL',
         type: 'url',
-        description: '自定义Web字体文件URL (支持woff2/woff/ttf格式)',
-        placeholder: 'https://example.com/font.woff2',
+        description: '当字体族选择"自定义字体"时，需要填写字体文件URL。支持woff2/woff/ttf格式。推荐从 Google Fonts 或阿里巴巴普惠体获取字体链接',
+        placeholder: 'https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap',
         validation: validateUrl
       }
     ]
