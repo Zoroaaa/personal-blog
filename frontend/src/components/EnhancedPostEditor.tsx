@@ -309,17 +309,30 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     }
   };
 
+  // 拖拽计数器，解决拖拽子元素时频繁触发 dragleave 的问题
+  const dragCounterRef = useRef(0);
+
   // 处理拖拽事件
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    setIsDragging(true);
+  }, []);
+
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    // 设置拖拽效果
+    e.dataTransfer.dropEffect = 'copy';
     setIsDragging(true);
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.currentTarget === dropZoneRef.current) {
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
       setIsDragging(false);
     }
   }, []);
@@ -327,6 +340,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    dragCounterRef.current = 0;
     setIsDragging(false);
 
     const files = Array.from(e.dataTransfer.files);
@@ -355,9 +369,11 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
       }
 
       let finalContent = parsed.content;
+      
+      // 处理图片上传和替换
       if (parsed.images.length > 0) {
         setImportProgress(`正在上传 ${parsed.images.length} 张图片...`);
-        const uploadedImages: Array<{ id: string; url: string }> = [];
+        const uploadedImages: Array<{ id: string; url: string; index: number }> = [];
 
         for (let i = 0; i < parsed.images.length; i++) {
           const img = parsed.images[i];
@@ -370,7 +386,8 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
             if (response.success && response.data) {
               uploadedImages.push({
                 id: img.id,
-                url: response.data.url
+                url: response.data.url,
+                index: img.index ?? i
               });
             }
           } catch (err) {
@@ -378,11 +395,13 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
           }
         }
 
+        // 按原文档中的顺序替换图片占位符
         if (uploadedImages.length > 0) {
-          const imageMarkdown = uploadedImages
-            .map(img => `![图片](${img.url})`)
-            .join('\n\n');
-          finalContent = finalContent + '\n\n' + imageMarkdown;
+          // 按索引排序
+          uploadedImages.sort((a, b) => a.index - b.index);
+          
+          // 替换内容中的图片占位符
+          finalContent = replaceImagePlaceholders(finalContent, uploadedImages);
         }
 
         alert(`成功导入文档，并上传 ${uploadedImages.length}/${parsed.images.length} 张图片`);
@@ -478,6 +497,35 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   const convertDetectedLink = (url: string) => {
     const newContent = content.replace(url, `[${url}](${url})`);
     setContent(newContent);
+  };
+
+  /**
+   * 替换内容中的图片占位符为实际的 Markdown 图片
+   * 保持图片在原文档中的位置
+   */
+  const replaceImagePlaceholders = (content: string, images: Array<{ id: string; url: string; index: number }>): string => {
+    let result = content;
+    
+    // 按索引从大到小排序，避免替换时影响位置
+    const sortedImages = [...images].sort((a, b) => b.index - a.index);
+    
+    for (const img of sortedImages) {
+      // 查找图片占位符 [图片X] 或 [图片:...]
+      const placeholderPattern = new RegExp(`\\[图片${img.index + 1}\\]|\\[图片:${img.id}\\]|\\[图片\\]`, 'g');
+      result = result.replace(placeholderPattern, `![图片${img.index + 1}](${img.url})`);
+    }
+    
+    // 如果没有找到占位符，在末尾添加剩余图片
+    const remainingImages = images.filter(img => !result.includes(img.url));
+    if (remainingImages.length > 0) {
+      const additionalMarkdown = remainingImages
+        .sort((a, b) => a.index - b.index)
+        .map(img => `![图片${img.index + 1}](${img.url})`)
+        .join('\n\n');
+      result = result + '\n\n' + additionalMarkdown;
+    }
+    
+    return result;
   };
 
   // 编辑器工具栏按钮
@@ -587,10 +635,26 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
       {/* 导入进度提示 */}
       {importing && (
         <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 mb-3">
             <div className="animate-spin w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-            <span className="text-blue-700 dark:text-blue-300">{importProgress || '正在导入...'}</span>
+            <span className="text-blue-700 dark:text-blue-300 font-medium">{importProgress || '正在导入...'}</span>
           </div>
+          {/* 进度条 */}
+          <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2.5 overflow-hidden">
+            <div
+              className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+              style={{
+                width: importProgress.includes('/') && importProgress.match(/(\d+)\/(\d+)/)
+                  ? `${(parseInt(importProgress.match(/(\d+)\/(\d+)/)?.[1] || '0') / parseInt(importProgress.match(/(\d+)\/(\d+)/)?.[2] || '1') * 100)}%`
+                  : importProgress.includes('解析')
+                  ? '20%'
+                  : '60%'
+              }}
+            ></div>
+          </div>
+          <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+            请勿关闭页面，上传完成后会自动更新内容
+          </p>
         </div>
       )}
       
@@ -793,22 +857,34 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
         {/* 文档导入区域 */}
         <div
           ref={dropZoneRef}
+          onDragEnter={handleDragEnter}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`relative p-6 border-2 border-dashed rounded-lg transition-all ${
+          className={`relative p-8 border-2 border-dashed rounded-xl transition-all duration-200 ${
             isDragging
-              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-              : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
-          }`}
+              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 scale-[1.02] shadow-xl ring-4 ring-blue-200 dark:ring-blue-800'
+              : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800/50'
+          } ${importing ? 'opacity-50 pointer-events-none' : ''}`}
         >
           <div className="text-center">
-            <svg className="mx-auto w-12 h-12 text-gray-400 dark:text-gray-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-              <span className="font-medium">拖拽文件到此处</span> 或
-              <label className="ml-1 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer">
+            <div className={`mx-auto w-16 h-16 mb-4 rounded-full flex items-center justify-center transition-all duration-200 ${
+              isDragging
+                ? 'bg-blue-100 dark:bg-blue-800 scale-110'
+                : 'bg-gray-100 dark:bg-slate-700'
+            }`}>
+              <svg className={`w-8 h-8 transition-all duration-200 ${
+                isDragging
+                  ? 'text-blue-600 dark:text-blue-300 scale-110'
+                  : 'text-gray-400 dark:text-gray-500'
+              }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            </div>
+            <p className="text-base text-gray-700 dark:text-gray-300 mb-2">
+              <span className="font-semibold">拖拽文件到此处</span>
+              <span className="text-gray-500 dark:text-gray-400 mx-2">或</span>
+              <label className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer font-medium underline underline-offset-2">
                 点击选择文件
                 <input
                   type="file"
@@ -825,16 +901,24 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
                 />
               </label>
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-500">
-              支持 .txt, .md, .markdown, .docx 格式（Word 文档中的图片也会被提取）
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              支持 .txt, .md, .markdown, .docx 格式
+            </p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              Word 文档中的图片会被自动提取并按原文档位置插入
             </p>
           </div>
-          
+
           {/* 拖拽时的遮罩提示 */}
           {isDragging && (
-            <div className="absolute inset-0 bg-blue-500/10 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-              <div className="bg-white dark:bg-slate-800 px-6 py-3 rounded-lg shadow-lg">
-                <p className="text-blue-600 dark:text-blue-400 font-medium">释放以导入文档</p>
+            <div className="absolute inset-0 bg-blue-500/5 dark:bg-blue-900/20 rounded-xl flex items-center justify-center pointer-events-none">
+              <div className="bg-white dark:bg-slate-800 px-8 py-4 rounded-xl shadow-2xl border-2 border-blue-200 dark:border-blue-700 transform scale-110">
+                <div className="flex items-center gap-3">
+                  <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <p className="text-blue-600 dark:text-blue-400 font-semibold text-lg">释放以导入文档</p>
+                </div>
               </div>
             </div>
           )}
