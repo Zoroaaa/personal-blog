@@ -543,11 +543,15 @@ export interface SiteConfig {
   site_keywords: string;
   site_author: string;
 
+  // SEO配置
+  site_og_image?: string;
+  site_twitter_card?: 'summary' | 'summary_large_image' | 'app' | 'player';
+
   // 主题配置
   theme_primary_color: string;
   theme_default_mode: 'light' | 'dark' | 'system';
   theme_font_family: string;
-  theme_custom_font_url?: string;
+  theme_font_url?: string;
 
   // 社交媒体
   social_github?: string;
@@ -561,6 +565,9 @@ export interface SiteConfig {
   feature_search: boolean;
   feature_like: boolean;
   feature_share: boolean;
+  feature_registration?: boolean;
+  feature_oauth_github?: boolean;
+  feature_rss?: boolean;
   comment_approval_required: boolean;
 
   // 页脚配置
@@ -571,6 +578,8 @@ export interface SiteConfig {
   // 系统设置
   posts_per_page: number;
   max_upload_size_mb: number;
+  allow_html_comments?: boolean;
+  max_comment_length?: number;
 
   // 索引签名，允许动态访问配置项
   [key: string]: any;

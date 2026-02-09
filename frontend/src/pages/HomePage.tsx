@@ -18,24 +18,8 @@ import { format } from 'date-fns';
 import type { PostListItem } from '../types';
 import { transformPostList, transformCategoryList, transformTagList } from '../utils/apiTransformer';
 import { useSiteConfig } from '../hooks/useSiteConfig';
-
-interface Category {
-  id: number;
-  name: string;
-  slug: string;
-  description: string;
-  icon: string;
-  color: string;
-  postCount: number;
-}
-
-interface Tag {
-  id: number;
-  name: string;
-  slug: string;
-  color: string;
-  postCount: number;
-}
+import { SEO } from '../components/SEO';
+import type { Category, Tag } from '../types';
 
 export function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -197,18 +181,20 @@ export function HomePage() {
     : tags.slice(0, INITIAL_TAG_COUNT);
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+    <>
+      <SEO title="首页" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         
-        {/* 页面标题 */}
-        <div className="text-center mb-12 animate-fade-in">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent mb-4">
-            探索精彩内容
-          </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-400">
-            发现有价值的文章和见解
-          </p>
-        </div>
+          {/* 页面标题 */}
+          <div className="text-center mb-12 animate-fade-in">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent mb-4">
+              探索精彩内容
+            </h1>
+            <p className="text-lg text-gray-600 dark:text-gray-400">
+              发现有价值的文章和见解
+            </p>
+          </div>
         
         {/* 分类和标签区域 */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
@@ -665,6 +651,7 @@ export function HomePage() {
           overflow: hidden;
         }
       `}</style>
-    </div>
+      </div>
+    </>
   );
 }

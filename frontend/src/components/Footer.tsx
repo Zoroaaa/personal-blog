@@ -45,7 +45,7 @@ export function Footer() {
               {Object.entries(quickLinks).map(([label, url], index) => (
                 <li key={index}>
                   <a
-                    href={url}
+                    href={String(url)}
                     className="hover:text-primary-600 transition-colors"
                   >
                     {label}

@@ -20,6 +20,8 @@ import { format } from 'date-fns';
 import { useAuthStore } from '../stores/authStore';
 import type { Post, Comment } from '../types';
 import { transformPost, transformCommentList } from '../utils/apiTransformer';
+import { ShareButtons } from '../components/ShareButtons';
+import { SEO } from '../components/SEO';
 
 // 导入代码高亮样式
 import 'highlight.js/styles/github.css';
@@ -461,10 +463,21 @@ export function PostPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12">
-      {/* 文章头部 */}
-      <article>
-        <h1 className="text-4xl font-bold text-foreground mb-4">{post.title}</h1>
+    <>
+      <SEO
+        title={post.title}
+        description={post.summary || post.content?.substring(0, 200)}
+        keywords={post.tags?.map((t: any) => t.name).join(', ')}
+        image={post.coverImage}
+        type="article"
+        author={post.authorName || post.author?.displayName}
+        publishedTime={post.publishedAt}
+        modifiedTime={post.updatedAt}
+      />
+      <div className="max-w-4xl mx-auto px-4 py-12">
+        {/* 文章头部 */}
+        <article>
+          <h1 className="text-4xl font-bold text-foreground mb-4">{post.title}</h1>
 
         <div className="flex items-center text-sm text-muted-foreground space-x-4 mb-8">
           <span className="flex items-center">
@@ -543,7 +556,7 @@ export function PostPage() {
         )}
 
         {/* 文章操作 */}
-        <div className="mt-8 pt-8 border-t border-border flex items-center justify-between">
+        <div className="mt-8 pt-8 border-t border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center space-x-6">
             <button
               onClick={handleLike}
@@ -599,14 +612,23 @@ export function PostPage() {
             </div>
           </div>
 
-          {user && user.role === 'admin' && (
-            <button
-              onClick={() => navigate(`/admin?edit=${post.id}`)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              编辑文章
-            </button>
-          )}
+          <div className="flex items-center gap-4">
+            {/* 分享按钮 */}
+            <ShareButtons
+              title={post.title}
+              url={window.location.href}
+              description={post.summary || ''}
+            />
+
+            {user && user.role === 'admin' && (
+              <button
+                onClick={() => navigate(`/admin?edit=${post.id}`)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                编辑文章
+              </button>
+            )}
+          </div>
         </div>
       </article>
 
@@ -663,7 +685,8 @@ export function PostPage() {
             <p className="mt-2 text-muted-foreground">暂无评论，来发表第一条评论吧！</p>
           </div>
         )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

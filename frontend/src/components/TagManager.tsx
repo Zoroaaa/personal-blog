@@ -6,15 +6,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import { transformTagList } from '../utils/apiTransformer';
-
-interface Tag {
-  id: number;
-  name: string;
-  slug: string;
-  description: string;
-  color: string;
-  postCount: number;
-}
+import type { Tag } from '../types';
 
 // 预设颜色选项 - 更丰富的配色方案
 const PRESET_COLORS = [

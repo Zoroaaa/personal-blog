@@ -32,11 +32,15 @@ export interface SiteConfig {
   site_keywords: string;
   site_author: string;
   
+  // SEO配置
+  site_og_image?: string;
+  site_twitter_card?: 'summary' | 'summary_large_image' | 'app' | 'player';
+  
   // 主题配置
   theme_primary_color: string;
   theme_default_mode: 'light' | 'dark' | 'system';
   theme_font_family: string;
-  theme_custom_font_url?: string;
+  theme_font_url?: string;
   
   // 社交媒体
   social_github?: string;
@@ -50,9 +54,14 @@ export interface SiteConfig {
   feature_search: boolean;
   feature_like: boolean;
   feature_share: boolean;
+  feature_registration?: boolean;
+  feature_oauth_github?: boolean;
+  feature_rss?: boolean;
   
   // 评论设置
   comment_approval_required: boolean;
+  allow_html_comments?: boolean;
+  max_comment_length?: number;
   
   // 页脚配置
   footer_text: string;
@@ -79,11 +88,15 @@ const DEFAULT_CONFIG: SiteConfig = {
   site_keywords: 'blog,技术,编程',
   site_author: 'Admin',
   
+  // SEO配置
+  site_og_image: '',
+  site_twitter_card: 'summary_large_image',
+  
   // 主题配置
   theme_primary_color: '#3B82F6',
   theme_default_mode: 'system',
   theme_font_family: 'system-ui, -apple-system, sans-serif',
-  theme_custom_font_url: '',
+  theme_font_url: '',
   
   // 社交媒体
   social_github: '',
@@ -97,9 +110,14 @@ const DEFAULT_CONFIG: SiteConfig = {
   feature_search: true,
   feature_like: true,
   feature_share: true,
+  feature_registration: true,
+  feature_oauth_github: true,
+  feature_rss: true,
   
   // 评论设置
   comment_approval_required: false,
+  allow_html_comments: false,
+  max_comment_length: 1000,
   
   // 页脚配置
   footer_text: '© 2024 All rights reserved',
@@ -212,7 +230,7 @@ export function useSiteConfig() {
     }
     
     // 同步字体配置
-    if (config.theme_font_family || config.theme_custom_font_url) {
+    if (config.theme_font_family || config.theme_font_url) {
       const root = document.documentElement;
       if (config.theme_font_family) {
         root.style.setProperty('--font-family', config.theme_font_family);
@@ -220,8 +238,8 @@ export function useSiteConfig() {
       }
       
       // 加载自定义字体文件
-      if (config.theme_custom_font_url) {
-        loadCustomFont(config.theme_custom_font_url);
+      if (config.theme_font_url) {
+        loadCustomFont(config.theme_font_url);
       }
     }
   };

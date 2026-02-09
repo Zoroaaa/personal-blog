@@ -19,7 +19,7 @@
  * @version 4.0.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSiteConfig } from '../hooks/useSiteConfig';
 import { useAuthStore } from '../stores/authStore';
 import { useTheme } from '../stores/themeStore';
@@ -141,6 +141,33 @@ const configGroups: ConfigGroup[] = [
     ]
   },
   {
+    title: 'SEO配置',
+    description: '搜索引擎优化相关设置',
+    icon: '🔍',
+    items: [
+      {
+        key: 'site_og_image',
+        label: 'Open Graph 图片',
+        type: 'url',
+        description: '社交媒体分享时显示的图片URL (建议尺寸: 1200x630)',
+        placeholder: 'https://example.com/og-image.png',
+        validation: validateUrl
+      },
+      {
+        key: 'site_twitter_card',
+        label: 'Twitter 卡片类型',
+        type: 'select',
+        description: 'Twitter分享时的卡片样式',
+        options: [
+          { label: '大图片', value: 'summary_large_image' },
+          { label: '小图片', value: 'summary' },
+          { label: '应用', value: 'app' },
+          { label: '播放器', value: 'player' }
+        ]
+      }
+    ]
+  },
+  {
     title: '主题配置',
     description: '网站的主题和外观设置 (会同步到前端主题)',
     icon: '🎨',
@@ -173,7 +200,7 @@ const configGroups: ConfigGroup[] = [
         placeholder: 'system-ui, -apple-system, sans-serif'
       },
       {
-        key: 'theme_custom_font_url',
+        key: 'theme_font_url',
         label: '自定义字体URL',
         type: 'url',
         description: '自定义Web字体文件URL (支持woff2/woff/ttf格式)',
@@ -259,10 +286,43 @@ const configGroups: ConfigGroup[] = [
         description: '显示社交媒体分享按钮'
       },
       {
+        key: 'feature_registration',
+        label: '启用用户注册',
+        type: 'boolean',
+        description: '允许新用户注册账户'
+      },
+      {
+        key: 'feature_oauth_github',
+        label: '启用GitHub登录',
+        type: 'boolean',
+        description: '允许使用GitHub账号登录'
+      },
+      {
+        key: 'feature_rss',
+        label: '启用RSS订阅',
+        type: 'boolean',
+        description: '提供RSS订阅功能'
+      },
+      {
         key: 'comment_approval_required',
         label: '评论需要审核',
         type: 'boolean',
         description: '新评论需要管理员审核后才能显示'
+      },
+      {
+        key: 'allow_html_comments',
+        label: '允许HTML评论',
+        type: 'boolean',
+        description: '允许在评论中使用HTML标签(有XSS风险)'
+      },
+      {
+        key: 'max_comment_length',
+        label: '评论最大长度',
+        type: 'number',
+        description: '单条评论的最大字符数',
+        min: 100,
+        max: 5000,
+        placeholder: '1000'
       }
     ]
   },
@@ -326,7 +386,7 @@ export function ConfigPage() {
   const { user } = useAuthStore();
   const { config, loading: configLoading, updateConfig, refreshConfig } = useSiteConfig();
   const { setPrimaryColor, setThemeMode } = useTheme();
-  
+
   const [localConfig, setLocalConfig] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [updating, setUpdating] = useState<string | null>(null);
@@ -334,6 +394,7 @@ export function ConfigPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [techStackInput, setTechStackInput] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 验证权限
   useEffect(() => {
@@ -503,7 +564,7 @@ export function ConfigPage() {
       }
       setHasChanges(false);
       setErrors({});
-      
+
       // 重置主题预览
       if (config.theme_primary_color) {
         setPrimaryColor(config.theme_primary_color);
@@ -511,6 +572,74 @@ export function ConfigPage() {
       if (config.theme_default_mode) {
         setThemeMode(config.theme_default_mode);
       }
+    }
+  };
+
+  // 导出配置
+  const handleExport = () => {
+    const exportData = {
+      version: '1.0.0',
+      exportedAt: new Date().toISOString(),
+      config: localConfig
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `site-config-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setSuccessMessage('配置导出成功');
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
+  // 导入配置
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const imported = JSON.parse(content);
+
+        // 验证导入的数据结构
+        if (!imported.config || typeof imported.config !== 'object') {
+          throw new Error('无效的配置文件格式');
+        }
+
+        // 确认导入
+        if (confirm(`确定要导入配置吗?这将覆盖当前的配置设置。\n\n导出时间: ${imported.exportedAt || '未知'}\n版本: ${imported.version || '未知'}`)) {
+          // 只导入已知的配置项
+          const validKeys = configGroups.flatMap(g => g.items.map(i => i.key));
+          const filteredConfig: Record<string, any> = {};
+
+          for (const key of validKeys) {
+            if (imported.config[key] !== undefined) {
+              filteredConfig[key] = imported.config[key];
+            }
+          }
+
+          setLocalConfig(prev => ({ ...prev, ...filteredConfig }));
+          setHasChanges(true);
+          setSuccessMessage(`成功导入 ${Object.keys(filteredConfig).length} 项配置`);
+          setTimeout(() => setSuccessMessage(null), 3000);
+        }
+      } catch (error) {
+        console.error('导入配置失败:', error);
+        alert('导入失败: ' + (error instanceof Error ? error.message : '无效的配置文件'));
+      }
+    };
+    reader.readAsText(file);
+
+    // 重置文件输入
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -666,25 +795,58 @@ export function ConfigPage() {
           <h1 className="text-3xl font-bold mb-2">网站配置</h1>
           <p className="text-muted-foreground">管理网站的各项配置信息</p>
         </div>
-        
-        {hasChanges && (
-          <div className="flex gap-2">
-            <button
-              onClick={handleReset}
-              className="btn btn-outline px-4 py-2"
-              disabled={updating !== null}
-            >
-              放弃更改
-            </button>
-            <button
-              onClick={handleBatchSave}
-              className="btn btn-primary px-4 py-2"
-              disabled={updating !== null}
-            >
-              {updating === 'batch' ? '保存中...' : '保存所有更改'}
-            </button>
-          </div>
-        )}
+
+        <div className="flex flex-wrap gap-2">
+          {/* 导入按钮 */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImport}
+            accept=".json"
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="btn btn-outline px-4 py-2 flex items-center gap-2"
+            disabled={updating !== null}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            导入配置
+          </button>
+
+          {/* 导出按钮 */}
+          <button
+            onClick={handleExport}
+            className="btn btn-outline px-4 py-2 flex items-center gap-2"
+            disabled={updating !== null}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            导出配置
+          </button>
+
+          {hasChanges && (
+            <>
+              <button
+                onClick={handleReset}
+                className="btn btn-outline px-4 py-2"
+                disabled={updating !== null}
+              >
+                放弃更改
+              </button>
+              <button
+                onClick={handleBatchSave}
+                className="btn btn-primary px-4 py-2"
+                disabled={updating !== null}
+              >
+                {updating === 'batch' ? '保存中...' : '保存所有更改'}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* 成功消息 */}
