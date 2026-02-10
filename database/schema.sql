@@ -144,8 +144,56 @@ CREATE INDEX IF NOT EXISTS idx_posts_status_published ON posts(status, published
 -- 复合索引：状态和可见性
 CREATE INDEX IF NOT EXISTS idx_posts_status_visibility ON posts(status, visibility);
 
--- 全文搜索索引（如果D1支持FTS5）
--- CREATE VIRTUAL TABLE IF NOT EXISTS posts_fts USING fts5(title, content, content=posts, content_rowid=id);
+-- 作者已发布文章列表优化（覆盖用户个人主页文章列表查询）
+CREATE INDEX IF NOT EXISTS idx_posts_author_published 
+ON posts(author_id, published_at DESC) 
+WHERE status = 'published';
+
+-- 分类已发布文章列表优化（覆盖分类页面文章列表查询）
+CREATE INDEX IF NOT EXISTS idx_posts_category_published 
+ON posts(category_id, published_at DESC) 
+WHERE status = 'published';
+
+-- 作者文章状态统计优化（覆盖后台管理文章筛选）
+CREATE INDEX IF NOT EXISTS idx_posts_author_status_created 
+ON posts(author_id, status, created_at DESC);
+
+-- =============================================
+-- 全文搜索索引 (FTS5)
+-- =============================================
+
+-- 创建 FTS5 虚拟表用于文章全文搜索
+CREATE VIRTUAL TABLE IF NOT EXISTS posts_fts USING fts5(
+    title, 
+    content, 
+    content='posts', 
+    content_rowid='id'
+);
+
+-- 创建触发器：插入文章时自动更新 FTS 索引
+CREATE TRIGGER IF NOT EXISTS trg_posts_fts_insert 
+AFTER INSERT ON posts
+BEGIN
+    INSERT INTO posts_fts(rowid, title, content) 
+    VALUES (NEW.id, NEW.title, NEW.content);
+END;
+
+-- 创建触发器：更新文章时自动更新 FTS 索引
+CREATE TRIGGER IF NOT EXISTS trg_posts_fts_update 
+AFTER UPDATE ON posts
+BEGIN
+    UPDATE posts_fts 
+    SET title = NEW.title, 
+        content = NEW.content 
+    WHERE rowid = NEW.id;
+END;
+
+-- 创建触发器：删除文章时自动删除 FTS 索引
+CREATE TRIGGER IF NOT EXISTS trg_posts_fts_delete 
+AFTER DELETE ON posts
+BEGIN
+    DELETE FROM posts_fts WHERE rowid = OLD.id;
+END;
 
 -- ============= 文章标签关联表 =============
 
@@ -160,6 +208,10 @@ CREATE TABLE IF NOT EXISTS post_tags (
 
 CREATE INDEX IF NOT EXISTS idx_post_tags_post_id ON post_tags(post_id);
 CREATE INDEX IF NOT EXISTS idx_post_tags_tag_id ON post_tags(tag_id);
+
+-- 标签文章查询优化（用于查询某标签下的文章列表）
+CREATE INDEX IF NOT EXISTS idx_post_tags_tag_post 
+ON post_tags(tag_id, post_id);
 
 -- ============= 评论表 =============
 
@@ -203,6 +255,15 @@ CREATE INDEX IF NOT EXISTS idx_comments_created_at ON comments(created_at DESC);
 
 -- 复合索引用于常见查询
 CREATE INDEX IF NOT EXISTS idx_comments_post_status ON comments(post_id, status, created_at DESC);
+
+-- 文章已审核评论列表优化（覆盖文章详情页评论展示）
+CREATE INDEX IF NOT EXISTS idx_comments_post_approved 
+ON comments(post_id, created_at DESC) 
+WHERE status = 'approved';
+
+-- 用户评论历史优化（覆盖用户个人中心评论列表）
+CREATE INDEX IF NOT EXISTS idx_comments_user_created 
+ON comments(user_id, created_at DESC);
 
 -- ============= 点赞表 =============
 
