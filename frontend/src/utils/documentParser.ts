@@ -1,8 +1,3 @@
-// @ts-ignore - mammoth 和 jszip 是可选依赖
-import mammoth from 'mammoth';
-// @ts-ignore
-import JSZip from 'jszip';
-
 export interface ParsedImage {
   id: string;
   blob: Blob;
@@ -62,6 +57,21 @@ export async function parseMarkdownFile(file: File): Promise<ParsedDocument> {
  */
 export async function parseWordDocument(file: File): Promise<ParsedDocument> {
   const arrayBuffer = await file.arrayBuffer();
+
+  // 动态导入可选依赖 - 使用字符串拼接避免构建时解析
+  let mammoth: any;
+  let JSZip: any;
+
+  try {
+    // 使用 eval 避免构建工具静态分析
+    const mammothModule = await eval("import('mammoth')");
+    mammoth = mammothModule.default || mammothModule;
+
+    const jszipModule = await eval("import('jszip')");
+    JSZip = jszipModule.default || jszipModule;
+  } catch (err) {
+    throw new Error('解析 Word 文档需要安装 mammoth 和 jszip 依赖。请运行: npm install mammoth jszip');
+  }
 
   // 提取图片
   const images: ParsedImage[] = [];
