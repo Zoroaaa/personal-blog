@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
 import { transformColumnList } from '../utils/apiTransformer';
 import type { Column } from '../types';
@@ -14,6 +15,7 @@ export function ColumnManager() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { showSuccess, showError } = useToast();
+  const navigate = useNavigate();
 
   // 表单状态
   const [showForm, setShowForm] = useState(false);
@@ -414,6 +416,16 @@ export function ColumnManager() {
                     序号 {column.displayOrder}
                   </span>
                   <div className="flex gap-2">
+                    <button
+                      onClick={() => navigate(`/columns/${column.slug}`)}
+                      className="px-2 py-1 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 rounded transition-colors"
+                      title="查看专栏详情"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    </button>
                     <button
                       onClick={() => handleRefreshStats(column.id, column.name)}
                       className="px-2 py-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"

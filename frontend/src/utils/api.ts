@@ -494,6 +494,23 @@ export const api = {
     const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
     return apiRequest<{ categories: Category[] }>(`/categories${query}`);
   },
+
+  /**
+   * 获取分类详情
+   */
+  getCategory: (slug: string) =>
+    apiRequest<Category>(`/categories/${slug}`),
+
+  /**
+   * 获取分类下的文章列表
+   */
+  getCategoryPosts: (slug: string, params?: { page?: string; limit?: string; sortBy?: string }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return apiRequest<{
+      posts: PostListItem[];
+      pagination: { page: number; limit: number; total: number; totalPages: number }
+    }>(`/categories/${slug}/posts${query}`);
+  },
   
   /**
    * 创建分类
@@ -540,6 +557,23 @@ export const api = {
   getTags: (params?: { page?: string; limit?: string }) => {
     const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
     return apiRequest<{ tags: Tag[] }>(`/categories/tags${query}`);
+  },
+
+  /**
+   * 获取标签详情
+   */
+  getTag: (slug: string) =>
+    apiRequest<Tag>(`/categories/tags/${slug}`),
+
+  /**
+   * 获取标签下的文章列表
+   */
+  getTagPosts: (slug: string, params?: { page?: string; limit?: string; sortBy?: string }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return apiRequest<{
+      posts: PostListItem[];
+      pagination: { page: number; limit: number; total: number; totalPages: number }
+    }>(`/categories/tags/${slug}/posts${query}`);
   },
   
   /**

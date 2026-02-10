@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
 import { format } from 'date-fns';
 import type { PostListItem } from '../types';
@@ -23,6 +23,7 @@ import type { Category, Column, Tag } from '../types';
 
 export function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { config } = useSiteConfig();
   
   // 文章相关状态
@@ -169,7 +170,7 @@ export function HomePage() {
     }
   };
   
-  // 处理分类点击
+  // 处理分类点击（过滤模式）
   const handleCategoryClick = (slug: string) => {
     if (selectedCategory === slug) {
       setSelectedCategory(null);
@@ -181,7 +182,13 @@ export function HomePage() {
     setPage(1);
   };
 
-  // 处理专栏点击
+  // 处理分类点击穿透（导航到分类详情页）
+  const handleCategoryNavigate = (e: React.MouseEvent, slug: string) => {
+    e.stopPropagation();
+    navigate(`/categories/${slug}`);
+  };
+
+  // 处理专栏点击（过滤模式）
   const handleColumnClick = (slug: string) => {
     if (selectedColumn === slug) {
       setSelectedColumn(null);
@@ -193,7 +200,13 @@ export function HomePage() {
     setPage(1);
   };
 
-  // 处理标签点击
+  // 处理专栏点击穿透（导航到专栏详情页）
+  const handleColumnNavigate = (e: React.MouseEvent, slug: string) => {
+    e.stopPropagation();
+    navigate(`/columns/${slug}`);
+  };
+
+  // 处理标签点击（过滤模式）
   const handleTagClick = (slug: string) => {
     if (selectedTag === slug) {
       setSelectedTag(null);
@@ -203,6 +216,12 @@ export function HomePage() {
       setSelectedColumn(null); // 清除专栏过滤
     }
     setPage(1);
+  };
+
+  // 处理标签点击穿透（导航到标签详情页）
+  const handleTagNavigate = (e: React.MouseEvent, slug: string) => {
+    e.stopPropagation();
+    navigate(`/tags/${slug}`);
   };
 
   // 清除所有过滤
@@ -279,30 +298,46 @@ export function HomePage() {
                 <>
                   <div className="space-y-2">
                     {visibleCategories.map((category) => (
-                      <button
+                      <div
                         key={category.id}
-                        onClick={() => handleCategoryClick(category.slug)}
-                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 ${
+                        className={`group w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer ${
                           selectedCategory === category.slug
                             ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md scale-105'
                             : 'bg-gray-100 dark:bg-slate-700/50 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300'
                         }`}
+                        onClick={() => handleCategoryClick(category.slug)}
                       >
                         <span className="flex items-center gap-2 font-medium">
                           {category.icon && <span className="text-lg">{category.icon}</span>}
                           {category.name}
                         </span>
-                        <span className={`text-sm px-2 py-1 rounded-full ${
-                          selectedCategory === category.slug
-                            ? 'bg-white/20'
-                            : 'bg-gray-200 dark:bg-slate-600'
-                        }`}>
-                          {category.postCount}
-                        </span>
-                      </button>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm px-2 py-1 rounded-full ${
+                            selectedCategory === category.slug
+                              ? 'bg-white/20'
+                              : 'bg-gray-200 dark:bg-slate-600'
+                          }`}>
+                            {category.postCount}
+                          </span>
+                          {/* 点击穿透按钮 */}
+                          <button
+                            onClick={(e) => handleCategoryNavigate(e, category.slug)}
+                            className={`p-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${
+                              selectedCategory === category.slug
+                                ? 'hover:bg-white/20 text-white'
+                                : 'hover:bg-gray-300 dark:hover:bg-slate-500 text-gray-500 dark:text-gray-400'
+                            }`}
+                            title="查看分类详情"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
                     ))}
                   </div>
-                  
+
                   {categories.length > INITIAL_CATEGORY_COUNT && (
                     <button
                       onClick={() => setShowAllCategories(!showAllCategories)}
@@ -356,14 +391,14 @@ export function HomePage() {
                 <>
                   <div className="space-y-2">
                     {visibleColumns.map((column) => (
-                      <button
+                      <div
                         key={column.id}
-                        onClick={() => handleColumnClick(column.slug)}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                        className={`group w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer ${
                           selectedColumn === column.slug
                             ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md scale-105'
                             : 'bg-gray-100 dark:bg-slate-700/50 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300'
                         }`}
+                        onClick={() => handleColumnClick(column.slug)}
                       >
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white text-xs font-bold ${
                           selectedColumn === column.slug
@@ -382,7 +417,21 @@ export function HomePage() {
                             {column.postCount} 篇文章
                           </div>
                         </div>
-                      </button>
+                        {/* 点击穿透按钮 */}
+                        <button
+                          onClick={(e) => handleColumnNavigate(e, column.slug)}
+                          className={`p-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${
+                            selectedColumn === column.slug
+                              ? 'hover:bg-white/20 text-white'
+                              : 'hover:bg-gray-300 dark:hover:bg-slate-500 text-gray-500 dark:text-gray-400'
+                          }`}
+                          title="查看专栏详情"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </button>
+                      </div>
                     ))}
                   </div>
 
@@ -435,36 +484,50 @@ export function HomePage() {
                 <>
                   <div className="flex flex-wrap gap-2">
                     {visibleTags.map((tag) => (
-                      <button
+                      <div
                         key={tag.id}
-                        onClick={() => handleTagClick(tag.slug)}
-                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                          selectedTag === tag.slug
-                            ? 'shadow-lg scale-110 text-white'
-                            : 'hover:scale-105 text-gray-700 dark:text-gray-300'
-                        }`}
-                        style={{
-                          backgroundColor: selectedTag === tag.slug 
-                            ? tag.color || '#6B7280'
-                            : selectedTag 
-                              ? 'rgb(243 244 246)' 
-                              : tag.color 
-                                ? `${tag.color}20` 
-                                : 'rgb(243 244 246)',
-                          borderWidth: '2px',
-                          borderColor: selectedTag === tag.slug 
-                            ? 'transparent'
-                            : tag.color || '#E5E7EB'
-                        }}
+                        className="group relative"
                       >
-                        #{tag.name}
-                        <span className="ml-2 text-xs opacity-75">
-                          {tag.postCount}
-                        </span>
-                      </button>
+                        <button
+                          onClick={() => handleTagClick(tag.slug)}
+                          className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                            selectedTag === tag.slug
+                              ? 'shadow-lg scale-110 text-white'
+                              : 'hover:scale-105 text-gray-700 dark:text-gray-300'
+                          }`}
+                          style={{
+                            backgroundColor: selectedTag === tag.slug
+                              ? tag.color || '#6B7280'
+                              : selectedTag
+                                ? 'rgb(243 244 246)'
+                                : tag.color
+                                  ? `${tag.color}20`
+                                  : 'rgb(243 244 246)',
+                            borderWidth: '2px',
+                            borderColor: selectedTag === tag.slug
+                              ? 'transparent'
+                              : tag.color || '#E5E7EB'
+                          }}
+                        >
+                          #{tag.name}
+                          <span className="ml-2 text-xs opacity-75">
+                            {tag.postCount}
+                          </span>
+                        </button>
+                        {/* 点击穿透按钮 */}
+                        <button
+                          onClick={(e) => handleTagNavigate(e, tag.slug)}
+                          className="absolute -top-1 -right-1 p-1 rounded-full bg-white dark:bg-slate-700 shadow-md opacity-0 group-hover:opacity-100 transition-all hover:bg-gray-100 dark:hover:bg-slate-600 z-10"
+                          title="查看标签详情"
+                        >
+                          <svg className="w-3 h-3 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </button>
+                      </div>
                     ))}
                   </div>
-                  
+
                   {tags.length > INITIAL_TAG_COUNT && (
                     <button
                       onClick={() => setShowAllTags(!showAllTags)}
