@@ -57,6 +57,13 @@ interface PostData {
   status: 'draft' | 'published';
 }
 
+// 生成唯一草稿键的辅助函数
+const generateDraftKey = (): string => {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 8);
+  return `new_post_${timestamp}_${random}`;
+};
+
 export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps) {
   // 文章基本信息
   const [title, setTitle] = useState('');
@@ -64,6 +71,19 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   const [summary, setSummary] = useState('');
   const [coverImage, setCoverImage] = useState('');
   const [status, setStatus] = useState<'draft' | 'published'>('draft');
+  
+  // 为每个新建文章会话生成唯一的草稿键
+  const [draftKey] = useState<string>(() => {
+    if (postId) return `post_${postId}`;
+    // 尝试从 URL 参数获取草稿键（用于从草稿列表打开）
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlDraftKey = urlParams.get('draft');
+    if (urlDraftKey && urlDraftKey.startsWith('new_post_')) {
+      return urlDraftKey;
+    }
+    // 生成新的唯一草稿键
+    return generateDraftKey();
+  });
   
   // 分类和标签
   const [categories, setCategories] = useState<Category[]>([]);
@@ -111,7 +131,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   };
   
   const { lastSaved, isSaving, hasDraft, saveNow, restoreFromLocalStorage, clearLocalStorage } = useAutoSave({
-    key: postId ? `post_${postId}` : 'new_post',
+    key: draftKey,
     data: postData,
     interval: 30000,
     enabled: true,
@@ -131,7 +151,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     loadCategories();
     loadTags();
     checkDraft();
-  }, []);
+  }, [checkDraft]);
   
   // 如果是编辑模式,加载文章数据
   useEffect(() => {
@@ -147,10 +167,16 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   }, [content]);
 
   // 检查是否有草稿
-  const checkDraft = () => {
+  const checkDraft = useCallback(() => {
     const draft = restoreFromLocalStorage();
     // 检查草稿是否有实际内容（标题或内容不为空）
-    if (draft && !postId && (draft.title?.trim() || draft.content?.trim())) {
+    if (draft && (draft.title?.trim() || draft.content?.trim())) {
+      // 编辑模式：检查草稿是否与当前文章数据不同
+      if (postId) {
+        const hasChanges = draft.title !== title || draft.content !== content;
+        if (!hasChanges) return; // 没有变化，不需要恢复
+      }
+      
       const shouldRestore = window.confirm('检测到未保存的草稿，是否恢复？');
       if (shouldRestore) {
         setTitle(draft.title || '');
@@ -161,10 +187,11 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
         setSelectedCategoryId(draft.categoryId || null);
         setSelectedTagIds(draft.tags || []);
       } else {
+        // 用户选择不恢复，只清除当前草稿键对应的草稿
         clearLocalStorage();
       }
     }
-  };
+  }, [postId, title, content, restoreFromLocalStorage, clearLocalStorage]);
   
   const loadCategories = async () => {
     try {
@@ -284,6 +311,9 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   
   // 处理内容区域粘贴图片
   const handleContentPaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
     const items = e.clipboardData.items;
     for (let i = 0; i < items.length; i++) {
       if (items[i].type.indexOf('image') === 0) {
@@ -296,7 +326,22 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
             if (response.success && response.data) {
               const imageUrl = response.data.url;
               const markdownImage = `![图片](${imageUrl})`;
-              setContent(prev => prev + markdownImage);
+
+              // 在光标位置插入图片，而不是追加到末尾
+              const cursorPosition = textarea.selectionStart;
+              const selectionEnd = textarea.selectionEnd;
+              const beforeCursor = content.substring(0, cursorPosition);
+              const afterCursor = content.substring(selectionEnd);
+              const newContent = beforeCursor + markdownImage + afterCursor;
+              setContent(newContent);
+
+              // 恢复光标位置到插入的图片之后
+              setTimeout(() => {
+                textarea.focus();
+                const newPosition = cursorPosition + markdownImage.length;
+                textarea.setSelectionRange(newPosition, newPosition);
+              }, 0);
+
               alert('图片粘贴成功');
             }
           } catch (error) {
