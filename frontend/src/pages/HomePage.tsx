@@ -182,12 +182,6 @@ export function HomePage() {
     setPage(1);
   };
 
-  // 处理分类点击穿透（导航到分类详情页）
-  const handleCategoryNavigate = (e: React.MouseEvent, slug: string) => {
-    e.stopPropagation();
-    navigate(`/categories/${slug}`);
-  };
-
   // 处理专栏点击（过滤模式）
   const handleColumnClick = (slug: string) => {
     if (selectedColumn === slug) {
@@ -198,12 +192,6 @@ export function HomePage() {
       setSelectedTag(null); // 清除标签过滤
     }
     setPage(1);
-  };
-
-  // 处理专栏点击穿透（导航到专栏详情页）
-  const handleColumnNavigate = (e: React.MouseEvent, slug: string) => {
-    e.stopPropagation();
-    navigate(`/columns/${slug}`);
   };
 
   // 处理标签点击（过滤模式）
@@ -218,9 +206,35 @@ export function HomePage() {
     setPage(1);
   };
 
+  // 处理分类点击穿透（导航到分类详情页）
+  const handleCategoryNavigate = (e: React.MouseEvent, slug: string) => {
+    e.stopPropagation();
+    navigate(`/categories/${slug}`);
+  };
+
+  // 处理专栏点击穿透（导航到专栏详情页）
+  const handleColumnNavigate = (e: React.MouseEvent, slug: string) => {
+    e.stopPropagation();
+    navigate(`/columns/${slug}`);
+  };
+
   // 处理标签点击穿透（导航到标签详情页）
   const handleTagNavigate = (e: React.MouseEvent, slug: string) => {
     e.stopPropagation();
+    navigate(`/tags/${slug}`);
+  };
+
+  // 处理文章卡片中的分类点击（导航到分类详情页）
+  const handlePostCategoryClick = (e: React.MouseEvent, slug: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    navigate(`/categories/${slug}`);
+  };
+
+  // 处理文章卡片中的标签点击（导航到标签详情页）
+  const handlePostTagClick = (e: React.MouseEvent, slug: string) => {
+    e.stopPropagation();
+    e.preventDefault();
     navigate(`/tags/${slug}`);
   };
 
@@ -750,8 +764,8 @@ export function HomePage() {
                         <div className="flex flex-wrap items-center gap-2">
                           {post.categoryName && (
                             <button
-                              onClick={() => post.categorySlug && handleCategoryClick(post.categorySlug)}
-                              className="px-3 py-1.5 rounded-lg text-white text-xs font-medium hover:opacity-80 transition-opacity"
+                              onClick={(e) => post.categorySlug && handlePostCategoryClick(e, post.categorySlug)}
+                              className="px-3 py-1.5 rounded-lg text-white text-xs font-medium hover:opacity-80 transition-opacity cursor-pointer"
                               style={{ backgroundColor: post.categoryColor || '#3B82F6' }}
                             >
                               {post.categoryName}
@@ -761,8 +775,8 @@ export function HomePage() {
                           {post.tags && post.tags.length > 0 && post.tags.slice(0, 3).map((tag) => (
                             <button
                               key={tag.id}
-                              onClick={() => handleTagClick(tag.slug)}
-                              className="px-3 py-1.5 rounded-full text-xs font-medium border-2 hover:scale-105 transition-transform"
+                              onClick={(e) => handlePostTagClick(e, tag.slug)}
+                              className="px-3 py-1.5 rounded-full text-xs font-medium border-2 hover:scale-105 transition-transform cursor-pointer"
                               style={{
                                 backgroundColor: tag.color ? `${tag.color}15` : '#F3F4F6',
                                 borderColor: tag.color || '#E5E7EB',
