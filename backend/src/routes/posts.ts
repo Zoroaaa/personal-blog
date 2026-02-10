@@ -49,6 +49,42 @@ const READING_SPEED = 250; // 每分钟阅读字数
 
 // ============= 常量配置 =============
 
+// ============= 工具函数 =============
+
+/**
+ * 转义 FTS5 查询字符串
+ * 根据 SQLite FTS5 语法，包含特殊字符的字符串需要用双引号包裹
+ * 双引号内的内容中，双引号本身需要用两个双引号转义
+ * 
+ * FTS5 bareword 允许的字符：
+ * - 字母（A-Z, a-z）
+ * - 数字（0-9）
+ * - 下划线（_）
+ * - 非 ASCII 字符（Unicode > 127）
+ * 
+ * 其他字符需要用双引号包裹
+ */
+function escapeFts5Query(query: string): string {
+  if (!query || typeof query !== 'string') {
+    return '';
+  }
+  
+  const trimmed = query.trim();
+  
+  // 检查是否是简单的 bareword（只包含允许的字符）
+  // 允许的字符：字母、数字、下划线、非 ASCII 字符
+  const barewordPattern = /^[\w\u0080-\uFFFF]+$/;
+  
+  // 如果是纯 bareword，直接返回
+  if (barewordPattern.test(trimmed)) {
+    return trimmed;
+  }
+  
+  // 需要转义：将双引号替换为两个双引号，然后用双引号包裹
+  const escaped = trimmed.replace(/"/g, '""');
+  return `"${escaped}"`;
+}
+
 // ============= 文章列表 =============
 
 /**
@@ -488,6 +524,9 @@ postRoutes.get('/search', async (c) => {
     const hasChinese = /[\u4e00-\u9fa5]/.test(q || '');
     // 中文用LIKE，英文用FTS
     const shouldUseFts = !hasChinese && useFts && q && q.trim().length > 0;
+    
+    // 对搜索词进行 FTS5 转义处理（如果需要使用FTS）
+    const escapedQuery = shouldUseFts ? escapeFts5Query(q!.trim()) : '';
 
     if (shouldUseFts) {
       // 使用FTS5全文搜索（JOIN方式，使用完整表名）
@@ -507,7 +546,7 @@ postRoutes.get('/search', async (c) => {
         LEFT JOIN columns col ON p.column_id = col.id
         WHERE posts_fts MATCH ? AND p.status = 'published' AND p.visibility = 'public'
       `;
-      params.push(q!.trim());
+      params.push(escapedQuery);
     } else {
       // 使用传统LIKE搜索（兼容旧方式或不使用关键词时）
       query = `
@@ -583,6 +622,7 @@ postRoutes.get('/search', async (c) => {
     
     if (shouldUseFts) {
       // FTS5模式下使用FTS表计算总数
+      // 复用之前转义后的查询词
       countQuery = `
         SELECT COUNT(*) as total
         FROM posts_fts
@@ -590,7 +630,7 @@ postRoutes.get('/search', async (c) => {
         LEFT JOIN categories c ON p.category_id = c.id
         WHERE posts_fts MATCH ? AND p.status = 'published' AND p.visibility = 'public'
       `;
-      countParams.push(q!.trim());
+      countParams.push(escapedQuery);
     } else {
       countQuery = `SELECT COUNT(*) as total FROM posts p 
                     LEFT JOIN categories c ON p.category_id = c.id
