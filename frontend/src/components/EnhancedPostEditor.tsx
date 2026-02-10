@@ -24,6 +24,7 @@ import { SplitPreview } from './MarkdownPreview';
 import { ContentStats } from './ContentStats';
 import { AutoSaveStatus } from './AutoSaveStatus';
 import { SEOAssistant } from './SEOAssistant';
+import { DraftSelector } from './DraftSelector';
 
 interface Category {
   id: number;
@@ -110,6 +111,10 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   // 检测到的链接
   const [detectedLinks, setDetectedLinks] = useState<string[]>([]);
   
+  // 草稿选择器状态
+  const [draftSelectorOpen, setDraftSelectorOpen] = useState(false);
+  const [availableDrafts, setAvailableDrafts] = useState<any[]>([]);
+  
   // 自动保存
   const postData: PostData = {
     title, content, summary, coverImage, 
@@ -118,7 +123,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     status 
   };
   
-  const { lastSaved, isSaving, hasDraft, saveNow, restoreFromLocalStorage, clearLocalStorage } = useAutoSave({
+  const { lastSaved, isSaving, hasDraft, saveNow, clearLocalStorage } = useAutoSave({
     key: draftKey,
     data: postData,
     interval: 30000,
@@ -191,6 +196,27 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     );
   }, []);
 
+  // 处理选择草稿
+  const handleSelectDraft = useCallback((draft: any) => {
+    setTitle(draft.data.title || '');
+    setContent(draft.data.content || '');
+    setSummary(draft.data.summary || '');
+    setCoverImage(draft.data.coverImage || '');
+    setStatus(draft.data.status || 'draft');
+    setSelectedCategoryId(draft.data.categoryId || null);
+    setSelectedTagIds(draft.data.tags || []);
+    setDraftSelectorOpen(false);
+  }, []);
+
+  // 处理清除所有草稿
+  const handleClearAllDrafts = useCallback(() => {
+    availableDrafts.forEach(draft => {
+      localStorage.removeItem(draft.key);
+    });
+    setAvailableDrafts([]);
+    setDraftSelectorOpen(false);
+  }, [availableDrafts]);
+
   // 检查是否有草稿（只在新建文章时执行）
   const checkDraft = useCallback(() => {
     if (postId) return; // 编辑模式不检查
@@ -198,34 +224,10 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     const drafts = getAllNewPostDrafts();
 
     if (drafts.length > 0) {
-      // 取最新的草稿
-      const latestDraft = drafts[0];
-      const timeDiff = Date.now() - new Date(latestDraft.timestamp).getTime();
-      const minutes = Math.floor(timeDiff / 60000);
-
-      const shouldRestore = window.confirm(
-        `检测到 ${minutes} 分钟前的未保存草稿，是否恢复？\n` +
-        `标题: ${latestDraft.data.title || '(无标题)'}\n` +
-        `共有 ${drafts.length} 个草稿`
-      );
-
-      if (shouldRestore) {
-        setTitle(latestDraft.data.title || '');
-        setContent(latestDraft.data.content || '');
-        setSummary(latestDraft.data.summary || '');
-        setCoverImage(latestDraft.data.coverImage || '');
-        setStatus(latestDraft.data.status || 'draft');
-        setSelectedCategoryId(latestDraft.data.categoryId || null);
-        setSelectedTagIds(latestDraft.data.tags || []);
-      } else {
-        // 用户选择不恢复，询问是否清除所有草稿
-        const shouldClear = window.confirm('是否清除所有草稿?');
-        if (shouldClear) {
-          drafts.forEach(draft => {
-            localStorage.removeItem(draft.key);
-          });
-        }
-      }
+      // 只取最新的 5 个草稿
+      const recentDrafts = drafts.slice(0, 5);
+      setAvailableDrafts(recentDrafts);
+      setDraftSelectorOpen(true);
     }
   }, [postId, getAllNewPostDrafts]);
   
@@ -692,6 +694,15 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
         displayText={linkEditorText}
         onClose={() => setLinkEditorOpen(false)}
         onConfirm={handleLinkConfirm}
+      />
+
+      {/* 草稿选择器弹窗 */}
+      <DraftSelector
+        isOpen={draftSelectorOpen}
+        drafts={availableDrafts}
+        onClose={() => setDraftSelectorOpen(false)}
+        onSelect={handleSelectDraft}
+        onClearAll={handleClearAllDrafts}
       />
 
       <div className="flex items-center justify-between mb-8">
