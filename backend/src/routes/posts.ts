@@ -475,12 +475,12 @@ postRoutes.get('/search', async (c) => {
     // ===== 3. 构建查询 =====
     let query: string;
     let params: any[] = [];
-    
+
     // 判断是否使用FTS5全文搜索
     const shouldUseFts = useFts && q && q.trim().length > 0;
-    
+
     if (shouldUseFts) {
-      // 使用FTS5全文搜索
+      // 使用FTS5全文搜索（JOIN方式，使用完整表名）
       query = `
         SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
                p.view_count, p.like_count, p.comment_count, p.reading_time,
@@ -488,14 +488,14 @@ postRoutes.get('/search', async (c) => {
                u.username as author_name, u.display_name as author_display_name,
                u.avatar_url as author_avatar,
                c.name as category_name, c.slug as category_slug, c.color as category_color,
-               fts.rank as search_rank
-        FROM posts_fts fts
-        JOIN posts p ON fts.rowid = p.id
+               posts_fts.rank as search_rank
+        FROM posts_fts
+        JOIN posts p ON posts_fts.rowid = p.id
         LEFT JOIN users u ON p.author_id = u.id
         LEFT JOIN categories c ON p.category_id = c.id
-        WHERE fts MATCH ? AND p.status = 'published' AND p.visibility = 'public'
+        WHERE posts_fts MATCH ? AND p.status = 'published' AND p.visibility = 'public'
       `;
-      params.push(q.trim());
+      params.push(q!.trim());
     } else {
       // 使用传统LIKE搜索（兼容旧方式或不使用关键词时）
       query = `
@@ -539,7 +539,7 @@ postRoutes.get('/search', async (c) => {
     if (finalSortBy === 'relevance' && q) {
       if (shouldUseFts) {
         // FTS5模式下使用BM25相关性排序
-        query += ` ORDER BY fts.rank ASC, p.published_at DESC LIMIT ? OFFSET ?`;
+        query += ` ORDER BY posts_fts.rank ASC, p.published_at DESC LIMIT ? OFFSET ?`;
       } else {
         // LIKE模式下使用标题匹配权重排序
         query += ` ORDER BY 
@@ -571,12 +571,12 @@ postRoutes.get('/search', async (c) => {
       // FTS5模式下使用FTS表计算总数
       countQuery = `
         SELECT COUNT(*) as total
-        FROM posts_fts fts
-        JOIN posts p ON fts.rowid = p.id
+        FROM posts_fts
+        JOIN posts p ON posts_fts.rowid = p.id
         LEFT JOIN categories c ON p.category_id = c.id
-        WHERE fts MATCH ? AND p.status = 'published' AND p.visibility = 'public'
+        WHERE posts_fts MATCH ? AND p.status = 'published' AND p.visibility = 'public'
       `;
-      countParams.push(q.trim());
+      countParams.push(q!.trim());
     } else {
       countQuery = `SELECT COUNT(*) as total FROM posts p 
                     LEFT JOIN categories c ON p.category_id = c.id
