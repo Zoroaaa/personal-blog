@@ -165,10 +165,14 @@ ON posts(author_id, status, created_at DESC);
 -- 创建 FTS5 虚拟表用于文章全文搜索
 CREATE VIRTUAL TABLE IF NOT EXISTS posts_fts USING fts5(
     title, 
-    content, 
-    content='posts', 
-    content_rowid='id'
+    content
 );
+
+-- 填充FTS数据
+-- ========================================
+
+INSERT INTO posts_fts(rowid, title, content)
+SELECT id, title, content FROM posts;
 
 -- 创建触发器：插入文章时自动更新 FTS 索引
 CREATE TRIGGER IF NOT EXISTS trg_posts_fts_insert 
