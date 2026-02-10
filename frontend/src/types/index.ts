@@ -207,6 +207,8 @@ export interface PostListItem {
   categoryName?: string;
   categorySlug?: string;
   categoryColor?: string;
+  columnName?: string;
+  columnSlug?: string;
   viewCount: number;
   likeCount: number;
   commentCount: number;

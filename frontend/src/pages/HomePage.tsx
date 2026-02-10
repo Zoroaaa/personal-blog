@@ -602,11 +602,25 @@ export function HomePage() {
                       
                       <div className="flex-1 p-6">
                         <Link to={`/posts/${post.slug}`}>
-                          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-2">
+                          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-2">
                             {post.title}
                           </h2>
                         </Link>
-                        
+
+                        {/* 专栏归属标识 */}
+                        {post.columnName && post.columnSlug && (
+                          <Link
+                            to={`/columns/${post.columnSlug}`}
+                            className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors mb-3 group/column"
+                            title={`所属专栏: ${post.columnName}`}
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                            <span className="truncate max-w-[200px]">{post.columnName}</span>
+                          </Link>
+                        )}
+
                         {post.summary && (
                           <p className="text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
                             {post.summary}
@@ -669,7 +683,7 @@ export function HomePage() {
                           )}
                         </div>
                         
-                        {/* 分类、专栏和标签 */}
+                        {/* 分类和标签 */}
                         <div className="flex flex-wrap items-center gap-2">
                           {post.categoryName && (
                             <button
@@ -679,15 +693,6 @@ export function HomePage() {
                             >
                               {post.categoryName}
                             </button>
-                          )}
-
-                          {post.columnName && (
-                            <Link
-                              to={`/columns/${post.columnSlug}`}
-                              className="px-3 py-1.5 rounded-lg text-white text-xs font-medium hover:opacity-80 transition-opacity bg-gradient-to-r from-purple-500 to-indigo-600"
-                            >
-                              {post.columnName}
-                            </Link>
                           )}
 
                           {post.tags && post.tags.length > 0 && post.tags.slice(0, 3).map((tag) => (
@@ -704,7 +709,7 @@ export function HomePage() {
                               #{tag.name}
                             </button>
                           ))}
-                          
+
                           {post.tags && post.tags.length > 3 && (
                             <span className="text-xs text-gray-500 dark:text-gray-400">
                               +{post.tags.length - 3} more
