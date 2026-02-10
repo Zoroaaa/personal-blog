@@ -1244,31 +1244,112 @@ postRoutes.put('/:id', requireAuth, async (c) => {
 // ============= 删除文章 =============
 
 /**
+ * 从内容中提取所有图片URL
+ */
+function extractImageUrls(content: string): string[] {
+  const urls: string[] = [];
+  // 匹配 Markdown 图片语法: ![alt](url)
+  const markdownRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  let match;
+  while ((match = markdownRegex.exec(content)) !== null) {
+    urls.push(match[2]);
+  }
+  // 匹配 HTML img 标签: <img src="url" />
+  const htmlRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+  while ((match = htmlRegex.exec(content)) !== null) {
+    urls.push(match[1]);
+  }
+  return urls;
+}
+
+/**
+ * 从URL中提取文件名
+ */
+function extractFilenameFromUrl(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+    const pathname = urlObj.pathname;
+    const filename = pathname.split('/').pop();
+    return filename || null;
+  } catch {
+    // 如果不是完整URL，可能是相对路径
+    const parts = url.split('/');
+    return parts.pop() || null;
+  }
+}
+
+/**
  * DELETE /api/posts/:id
  * 删除文章（需要管理员权限）
+ * 同时删除封面图片和内容中的图片
  */
 postRoutes.delete('/:id', requireAuth, requireAdmin, async (c) => {
   const logger = createLogger(c);
-  
+
   try {
     const id = c.req.param('id');
-    
-    // 获取文章信息
+
+    // 获取文章信息（包括封面图片和内容）
     const post = await c.env.DB.prepare(
-      'SELECT slug FROM posts WHERE id = ?'
+      'SELECT slug, cover_image, content FROM posts WHERE id = ?'
     ).bind(id).first() as any;
-    
+
     if (!post) {
       return c.json(errorResponse('Post not found'), 404);
     }
-    
+
+    // 收集需要删除的图片
+    const imagesToDelete: string[] = [];
+
+    // 1. 封面图片
+    if (post.cover_image) {
+      const coverFilename = extractFilenameFromUrl(post.cover_image);
+      if (coverFilename) {
+        imagesToDelete.push(coverFilename);
+      }
+    }
+
+    // 2. 内容中的图片
+    if (post.content) {
+      const imageUrls = extractImageUrls(post.content);
+      for (const url of imageUrls) {
+        const filename = extractFilenameFromUrl(url);
+        if (filename && !imagesToDelete.includes(filename)) {
+          imagesToDelete.push(filename);
+        }
+      }
+    }
+
     // 删除文章（级联删除会自动处理评论、点赞等）
     await c.env.DB.prepare('DELETE FROM posts WHERE id = ?').bind(id).run();
-    
-    logger.info('Post deleted successfully', { postId: id });
-    
-    return c.json(successResponse({ deleted: true }, 'Post deleted successfully'));
-    
+
+    // 异步删除图片（不阻塞响应）
+    if (imagesToDelete.length > 0) {
+      c.executionCtx.waitUntil(
+        (async () => {
+          for (const filename of imagesToDelete) {
+            try {
+              await c.env.STORAGE.delete(filename);
+              logger.info('Image deleted', { filename, postId: id });
+            } catch (error) {
+              // 忽略删除失败的错误，继续删除其他图片
+              logger.warn('Failed to delete image', { filename, postId: id, error });
+            }
+          }
+        })()
+      );
+    }
+
+    logger.info('Post deleted successfully', {
+      postId: id,
+      imagesDeleted: imagesToDelete.length
+    });
+
+    return c.json(successResponse({
+      deleted: true,
+      imagesDeleted: imagesToDelete.length
+    }, 'Post deleted successfully'));
+
   } catch (error) {
     logger.error('Delete post error', error);
     return c.json(errorResponse(
