@@ -99,6 +99,7 @@ CREATE TABLE IF NOT EXISTS posts (
     -- 关联信息
     author_id INTEGER NOT NULL,
     category_id INTEGER,
+    column_id INTEGER,
     
     -- 状态和可见性
     status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'published', 'archived')),
@@ -123,7 +124,8 @@ CREATE TABLE IF NOT EXISTS posts (
     
     -- 外键约束
     FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
+    FOREIGN KEY (column_id) REFERENCES columns(id) ON DELETE SET NULL
 );
 
 -- 文章表索引
@@ -143,6 +145,11 @@ CREATE INDEX IF NOT EXISTS idx_posts_status_published ON posts(status, published
 
 -- 复合索引：状态和可见性
 CREATE INDEX IF NOT EXISTS idx_posts_status_visibility ON posts(status, visibility);
+
+-- 专栏文章列表优化
+CREATE INDEX IF NOT EXISTS idx_posts_column_published 
+ON posts(column_id, published_at DESC) 
+WHERE status = 'published';
 
 -- 作者已发布文章列表优化（覆盖用户个人主页文章列表查询）
 CREATE INDEX IF NOT EXISTS idx_posts_author_published 
@@ -346,6 +353,47 @@ CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id);
 CREATE INDEX IF NOT EXISTS idx_favorites_post_id ON favorites(post_id);
 CREATE INDEX IF NOT EXISTS idx_favorites_created_at ON favorites(created_at DESC);
 
+-- ============= 专栏表 =============
+
+CREATE TABLE IF NOT EXISTS columns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    -- 基本信息
+    name TEXT NOT NULL UNIQUE,
+    slug TEXT NOT NULL UNIQUE,
+    description TEXT,
+    cover_image TEXT,
+    
+    -- 作者信息
+    author_id INTEGER NOT NULL,
+    
+    -- 统计信息
+    post_count INTEGER DEFAULT 0,
+    total_view_count INTEGER DEFAULT 0,
+    total_like_count INTEGER DEFAULT 0,
+    total_favorite_count INTEGER DEFAULT 0,
+    total_comment_count INTEGER DEFAULT 0,
+    
+    -- 显示顺序
+    display_order INTEGER DEFAULT 0,
+    
+    -- 状态
+    status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'hidden', 'archived')),
+    
+    -- 时间信息
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    
+    -- 外键约束
+    FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 专栏表索引
+CREATE INDEX IF NOT EXISTS idx_columns_slug ON columns(slug);
+CREATE INDEX IF NOT EXISTS idx_columns_author_id ON columns(author_id);
+CREATE INDEX IF NOT EXISTS idx_columns_status ON columns(status);
+CREATE INDEX IF NOT EXISTS idx_columns_display_order ON columns(display_order);
+CREATE INDEX IF NOT EXISTS idx_columns_created_at ON columns(created_at DESC);
+
 -- ============= 网站配置表 =============
 
 CREATE TABLE IF NOT EXISTS site_config (
@@ -408,6 +456,36 @@ BEGIN
     SET post_count = post_count + 1,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = NEW.category_id 
+        AND NEW.status = 'published';
+END;
+
+-- 触发器：文章发布时更新专栏统计
+CREATE TRIGGER IF NOT EXISTS trg_posts_insert_update_column
+AFTER INSERT ON posts
+WHEN NEW.status = 'published' AND NEW.column_id IS NOT NULL
+BEGIN
+    UPDATE columns 
+    SET post_count = post_count + 1,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = NEW.column_id;
+END;
+
+-- 触发器：文章状态或专栏改变时更新专栏统计
+CREATE TRIGGER IF NOT EXISTS trg_posts_update_column
+AFTER UPDATE OF status, column_id ON posts
+BEGIN
+    -- 旧专栏减1
+    UPDATE columns 
+    SET post_count = post_count - 1,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = OLD.column_id 
+        AND OLD.status = 'published';
+    
+    -- 新专栏加1
+    UPDATE columns 
+    SET post_count = post_count + 1,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = NEW.column_id 
         AND NEW.status = 'published';
 END;
 
@@ -590,6 +668,16 @@ SELECT
     u.avatar_url
 FROM comments c
 JOIN users u ON c.user_id = u.id;
+
+-- 专栏详情视图（包含作者信息）
+CREATE VIEW IF NOT EXISTS vw_columns_detailed AS
+SELECT 
+    col.*,
+    u.username as author_username,
+    u.display_name as author_name,
+    u.avatar_url as author_avatar
+FROM columns col
+LEFT JOIN users u ON col.author_id = u.id;
 
 -- ============= 实用查询函数 =============
 
