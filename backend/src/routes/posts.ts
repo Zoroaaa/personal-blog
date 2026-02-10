@@ -420,13 +420,22 @@ postRoutes.get('/admin/:id', requireAuth, async (c) => {
  * 搜索文章（公开）
  * 
  * 查询参数：
- * - q: 搜索关键词
+ * - q: 搜索关键词（支持FTS5全文搜索语法）
  * - category: 分类slug
  * - tag: 标签slug
  * - page: 页码（默认1）
  * - limit: 每页数量（默认10，最大50）
  * - sort: 排序方式（published_at, view_count, like_count, comment_count, relevance）
  * - order: 排序方向（asc, desc）
+ * - use_fts: 是否使用FTS5全文搜索（默认true）
+ * 
+ * FTS5搜索语法：
+ * - 普通关键词: "React"
+ * - AND搜索: "React AND TypeScript"
+ * - OR搜索: "React OR Vue"
+ * - 短语搜索: "\"完整短语\""
+ * - 前缀搜索: "React*"
+ * - 排除搜索: "React -Vue"
  */
 postRoutes.get('/search', async (c) => {
   const logger = createLogger(c);
@@ -445,6 +454,7 @@ postRoutes.get('/search', async (c) => {
     const q = c.req.query('q');
     let category = c.req.query('category');
     let tag = c.req.query('tag');
+    const useFts = c.req.query('use_fts') !== 'false'; // 默认启用FTS5
     
     // 将字符串 "null" 转为真正的 undefined
     category = (category === 'null' || !category) ? undefined : category;
@@ -460,30 +470,53 @@ postRoutes.get('/search', async (c) => {
     const finalSortBy = allowedSortFields.includes(sort) ? sort : 'published_at';
     
     // ===== 2. 直接从数据库读取 - 不使用缓存 =====
-    // 理由: D1查询足够快,无需KV缓存
-    logger.info('Searching posts from D1', { query: q, category, tag, page, limit });
+    logger.info('Searching posts from D1', { query: q, category, tag, page, limit, useFts });
     
     // ===== 3. 构建查询 =====
-    let query = `
-      SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
-             p.view_count, p.like_count, p.comment_count, p.reading_time,
-             p.published_at, p.created_at,
-             u.username as author_name, u.display_name as author_display_name, 
-             u.avatar_url as author_avatar,
-             c.name as category_name, c.slug as category_slug, c.color as category_color
-      FROM posts p
-      LEFT JOIN users u ON p.author_id = u.id
-      LEFT JOIN categories c ON p.category_id = c.id
-      WHERE p.status = 'published' AND p.visibility = 'public'
-    `;
+    let query: string;
+    let params: any[] = [];
     
-    const params: any[] = [];
+    // 判断是否使用FTS5全文搜索
+    const shouldUseFts = useFts && q && q.trim().length > 0;
     
-    // 搜索关键词
-    if (q) {
-      const searchTerm = `%${q}%`;
-      query += ` AND (p.title LIKE ? OR p.summary LIKE ? OR p.content LIKE ?)`;
-      params.push(searchTerm, searchTerm, searchTerm);
+    if (shouldUseFts) {
+      // 使用FTS5全文搜索
+      query = `
+        SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
+               p.view_count, p.like_count, p.comment_count, p.reading_time,
+               p.published_at, p.created_at,
+               u.username as author_name, u.display_name as author_display_name, 
+               u.avatar_url as author_avatar,
+               c.name as category_name, c.slug as category_slug, c.color as category_color,
+               fts.rank as search_rank
+        FROM posts_fts fts
+        JOIN posts p ON fts.rowid = p.id
+        LEFT JOIN users u ON p.author_id = u.id
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE posts_fts MATCH ? AND p.status = 'published' AND p.visibility = 'public'
+      `;
+      params.push(q.trim());
+    } else {
+      // 使用传统LIKE搜索（兼容旧方式或不使用关键词时）
+      query = `
+        SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
+               p.view_count, p.like_count, p.comment_count, p.reading_time,
+               p.published_at, p.created_at,
+               u.username as author_name, u.display_name as author_display_name, 
+               u.avatar_url as author_avatar,
+               c.name as category_name, c.slug as category_slug, c.color as category_color
+        FROM posts p
+        LEFT JOIN users u ON p.author_id = u.id
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE p.status = 'published' AND p.visibility = 'public'
+      `;
+      
+      // 搜索关键词（LIKE方式）
+      if (q) {
+        const searchTerm = `%${q}%`;
+        query += ` AND (p.title LIKE ? OR p.summary LIKE ? OR p.content LIKE ?)`;
+        params.push(searchTerm, searchTerm, searchTerm);
+      }
     }
     
     // 分类过滤
@@ -504,18 +537,24 @@ postRoutes.get('/search', async (c) => {
     
     // 排序
     if (finalSortBy === 'relevance' && q) {
-      // 相关性排序（基于标题匹配权重更高）
-      query += ` ORDER BY 
-        CASE 
-          WHEN p.title LIKE ? THEN 0
-          WHEN p.summary LIKE ? THEN 1
-          WHEN p.content LIKE ? THEN 2
-          ELSE 3
-        END, p.published_at DESC LIMIT ? OFFSET ?`;
-      const searchTerm = `%${q}%`;
-      params.push(searchTerm, searchTerm, searchTerm, limit, offset);
+      if (shouldUseFts) {
+        // FTS5模式下使用BM25相关性排序
+        query += ` ORDER BY fts.rank ASC, p.published_at DESC LIMIT ? OFFSET ?`;
+      } else {
+        // LIKE模式下使用标题匹配权重排序
+        query += ` ORDER BY 
+          CASE 
+            WHEN p.title LIKE ? THEN 0
+            WHEN p.summary LIKE ? THEN 1
+            WHEN p.content LIKE ? THEN 2
+            ELSE 3
+          END, p.published_at DESC LIMIT ? OFFSET ?`;
+        const searchTerm = `%${q}%`;
+        params.push(searchTerm, searchTerm, searchTerm);
+      }
+      params.push(limit, offset);
     } else {
-      query += ` ORDER BY p.${finalSortBy === 'relevance' ? 'published_at' : finalSortBy} ${order} LIMIT ? OFFSET ?`;
+      query += ` ORDER BY ${shouldUseFts ? 'p.' : 'p.'}${finalSortBy === 'relevance' ? 'published_at' : finalSortBy} ${order} LIMIT ? OFFSET ?`;
       params.push(limit, offset);
     }
     
@@ -523,15 +562,29 @@ postRoutes.get('/search', async (c) => {
     const { results } = await c.env.DB.prepare(query).bind(...params).all();
     
     // ===== 5. 获取总数 =====
-    let countQuery = `SELECT COUNT(*) as total FROM posts p 
-                      LEFT JOIN categories c ON p.category_id = c.id
-                      WHERE p.status = 'published' AND p.visibility = 'public'`;
-    const countParams: any[] = [];
+    let countQuery: string;
+    let countParams: any[] = [];
     
-    if (q) {
-      const searchTerm = `%${q}%`;
-      countQuery += ' AND (p.title LIKE ? OR p.summary LIKE ? OR p.content LIKE ?)';
-      countParams.push(searchTerm, searchTerm, searchTerm);
+    if (shouldUseFts) {
+      // FTS5模式下使用FTS表计算总数
+      countQuery = `
+        SELECT COUNT(*) as total 
+        FROM posts_fts fts
+        JOIN posts p ON fts.rowid = p.id
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE posts_fts MATCH ? AND p.status = 'published' AND p.visibility = 'public'
+      `;
+      countParams.push(q.trim());
+    } else {
+      countQuery = `SELECT COUNT(*) as total FROM posts p 
+                    LEFT JOIN categories c ON p.category_id = c.id
+                    WHERE p.status = 'published' AND p.visibility = 'public'`;
+      
+      if (q) {
+        const searchTerm = `%${q}%`;
+        countQuery += ' AND (p.title LIKE ? OR p.summary LIKE ? OR p.content LIKE ?)';
+        countParams.push(searchTerm, searchTerm, searchTerm);
+      }
     }
     
     if (category) {
