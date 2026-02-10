@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -11,6 +11,34 @@ import { ProfilePage } from './pages/ProfilePage';
 import { ConfigPage } from './pages/ConfigPage';
 import { AboutPage } from './pages/AboutPage';
 import { useSiteConfig } from './hooks/useSiteConfig';
+import { ToastProvider } from './components/Toast';
+
+// 页面过渡包装组件
+function PageTransition({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  
+  return (
+    <div key={location.pathname} className="animate-fade-in">
+      {children}
+    </div>
+  );
+}
+
+// 路由配置
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<PageTransition><HomePage /></PageTransition>} />
+      <Route path="/about" element={<PageTransition><AboutPage /></PageTransition>} />
+      <Route path="/posts/:slug" element={<PageTransition><PostPage /></PageTransition>} />
+      <Route path="/login" element={<PageTransition><LoginPage /></PageTransition>} />
+      <Route path="/admin" element={<PageTransition><AdminPage /></PageTransition>} />
+      <Route path="/admin/config" element={<PageTransition><ConfigPage /></PageTransition>} />
+      <Route path="/search" element={<PageTransition><SearchPage /></PageTransition>} />
+      <Route path="/profile" element={<PageTransition><ProfilePage /></PageTransition>} />
+    </Routes>
+  );
+}
 
 function App() {
   const { config } = useSiteConfig();
@@ -50,24 +78,17 @@ function App() {
   }, [config.site_favicon, currentFavicon]);
 
   return (
-    <BrowserRouter>
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <main className="flex-1">
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/posts/:slug" element={<PostPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="/admin/config" element={<ConfigPage />} />
-          <Route path="/search" element={<SearchPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          </Routes>
-        </main>
-        <Footer />
-      </div>
-    </BrowserRouter>
+    <ToastProvider>
+      <BrowserRouter>
+        <div className="min-h-screen flex flex-col">
+          <Header />
+          <main className="flex-1">
+            <AppRoutes />
+          </main>
+          <Footer />
+        </div>
+      </BrowserRouter>
+    </ToastProvider>
   );
 }
 

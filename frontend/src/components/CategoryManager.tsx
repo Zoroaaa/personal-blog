@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import { transformCategoryList } from '../utils/apiTransformer';
 import type { Category } from '../types';
+import { useToast } from './Toast';
 
 // 预设颜色选项
 const PRESET_COLORS = [
@@ -34,6 +35,7 @@ export function CategoryManager() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const { showSuccess, showError } = useToast();
   
   // 表单状态
   const [showForm, setShowForm] = useState(false);
@@ -114,7 +116,7 @@ export function CategoryManager() {
         if (response.success) {
           await loadCategories();
           setShowForm(false);
-          alert('分类更新成功!');
+          showSuccess(`分类 "${formData.name}" 更新成功！`);
         } else {
           throw new Error(response.error || '更新失败');
         }
@@ -124,13 +126,14 @@ export function CategoryManager() {
         if (response.success) {
           await loadCategories();
           setShowForm(false);
-          alert('分类创建成功!');
+          showSuccess(`分类 "${formData.name}" 创建成功！`);
         } else {
           throw new Error(response.error || '创建失败');
         }
       }
     } catch (err: any) {
       setFormError(err.message || '操作失败');
+      showError(err.message || '操作失败，请重试');
     } finally {
       setSubmitting(false);
     }
@@ -143,12 +146,12 @@ export function CategoryManager() {
       const response = await api.deleteCategory(id);
       if (response.success) {
         await loadCategories();
-        alert('分类删除成功!');
+        showSuccess(`分类 "${name}" 删除成功！`);
       } else {
         throw new Error(response.error || '删除失败');
       }
     } catch (err: any) {
-      alert(err.message || '删除失败');
+      showError(err.message || '删除失败，请重试');
     }
   };
   

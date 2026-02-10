@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import { transformTagList } from '../utils/apiTransformer';
 import type { Tag } from '../types';
+import { useToast } from './Toast';
 
 // 预设颜色选项 - 更丰富的配色方案
 const PRESET_COLORS = [
@@ -32,6 +33,7 @@ export function TagManager() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const { showSuccess, showError } = useToast();
   
   // 表单状态
   const [showForm, setShowForm] = useState(false);
@@ -110,7 +112,7 @@ export function TagManager() {
         if (response.success) {
           await loadTags();
           setShowForm(false);
-          alert('标签更新成功!');
+          showSuccess(`标签 "${formData.name}" 更新成功！`);
         } else {
           throw new Error(response.error || '更新失败');
         }
@@ -120,13 +122,14 @@ export function TagManager() {
         if (response.success) {
           await loadTags();
           setShowForm(false);
-          alert('标签创建成功!');
+          showSuccess(`标签 "${formData.name}" 创建成功！`);
         } else {
           throw new Error(response.error || '创建失败');
         }
       }
     } catch (err: any) {
       setFormError(err.message || '操作失败');
+      showError(err.message || '操作失败，请重试');
     } finally {
       setSubmitting(false);
     }
@@ -139,12 +142,12 @@ export function TagManager() {
       const response = await api.deleteTag(id);
       if (response.success) {
         await loadTags();
-        alert('标签删除成功!');
+        showSuccess(`标签 "${name}" 删除成功！`);
       } else {
         throw new Error(response.error || '删除失败');
       }
     } catch (err: any) {
-      alert(err.message || '删除失败');
+      showError(err.message || '删除失败，请重试');
     }
   };
   

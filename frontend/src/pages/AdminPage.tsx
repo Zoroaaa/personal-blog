@@ -7,6 +7,7 @@ import { CategoryManager } from '../components/CategoryManager';
 import { TagManager } from '../components/TagManager';
 import { EnhancedPostEditor } from '../components/EnhancedPostEditor';
 import { transformPost, transformCommentList, transformUserList } from '../utils/apiTransformer';
+import { useToast } from '../components/Toast';
 
 // 定义管理后台的标签页类型 - 添加 categories 和 tags
 type AdminTab = 'posts' | 'comments' | 'users' | 'analytics' | 'categories' | 'tags';
@@ -21,6 +22,7 @@ export function AdminPage() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { showSuccess, showError } = useToast();
   
   // 当前活动的标签页
   const [activeTab, setActiveTab] = useState<AdminTab>('posts');
@@ -142,11 +144,12 @@ export function AdminPage() {
       setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
       // 然后发送删除请求
       await api.deletePost(postId);
-      alert('文章删除成功');
+      showSuccess('文章删除成功');
     } catch (err: any) {
       // 如果删除失败，重新加载列表以恢复正确的状态
       await loadPosts();
       setError(err.message || '删除失败');
+      showError(err.message || '删除失败');
     } finally {
       setLoading(false);
     }

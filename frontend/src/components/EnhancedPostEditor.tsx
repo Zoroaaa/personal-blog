@@ -130,9 +130,28 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     enabled: true,
   });
 
+  // 保存草稿成功提示
+  const [draftSaveMessage, setDraftSaveMessage] = useState<string | null>(null);
+  const draftSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 处理手动保存草稿
+  const handleSaveDraft = useCallback(async () => {
+    await saveNow();
+    // 显示保存成功提示
+    setDraftSaveMessage('草稿已保存到浏览器缓存');
+    // 清除之前的定时器
+    if (draftSaveTimeoutRef.current) {
+      clearTimeout(draftSaveTimeoutRef.current);
+    }
+    // 3秒后清除提示
+    draftSaveTimeoutRef.current = setTimeout(() => {
+      setDraftSaveMessage(null);
+    }, 3000);
+  }, [saveNow]);
+
   // 键盘快捷键
   useKeyboardShortcuts([
-    { key: 's', ctrl: true, handler: () => { saveNow(); handleSubmit(new Event('submit') as any); }, description: '保存文章' },
+    { key: 's', ctrl: true, handler: () => { handleSaveDraft(); handleSubmit(new Event('submit') as any); }, description: '保存文章' },
     { key: 'p', ctrl: true, handler: () => setActiveTab(prev => prev === 'edit' ? 'split' : 'edit'), description: '切换预览' },
     { key: 'k', ctrl: true, handler: openLinkEditor, description: '插入链接' },
     { key: 'f11', ctrl: false, handler: () => setIsFullscreen(prev => !prev), description: '全屏模式' },
@@ -1228,7 +1247,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             发布状态
           </label>
-          <div className="flex gap-4">
+          <div className="flex gap-4 mb-2">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="radio"
@@ -1250,6 +1269,11 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
               <span className="text-gray-700 dark:text-gray-300">发布</span>
             </label>
           </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {status === 'draft' 
+              ? '草稿状态：文章会保存在文章管理中，但前端页面不可见。更新为"发布"状态后前端才能看到。' 
+              : '发布状态：文章将立即在前端页面显示。'}
+          </p>
         </div>
         
         {/* 操作按钮 */}
@@ -1261,14 +1285,17 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
           >
             {loading ? '提交中...' : uploading ? '上传中...' : postId ? '更新文章' : '发布文章'}
           </button>
-          <button
-            type="button"
-            onClick={() => saveNow()}
-            disabled={isSaving}
-            className="px-6 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors font-medium"
-          >
-            {isSaving ? '保存中...' : '保存草稿'}
-          </button>
+          <div className="flex flex-col items-center">
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              disabled={isSaving}
+              className="px-6 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors font-medium"
+            >
+              {isSaving ? '保存中...' : '保存草稿'}
+            </button>
+            <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">仅保存到浏览器缓存</span>
+          </div>
           {onCancel && (
             <button
               type="button"
@@ -1280,6 +1307,18 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
             </button>
           )}
         </div>
+
+        {/* 草稿保存成功提示 */}
+        {draftSaveMessage && (
+          <div className="fixed bottom-6 right-6 z-50">
+            <div className="bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span>{draftSaveMessage}</span>
+            </div>
+          </div>
+        )}
 
         {/* 快捷键提示 */}
         <div className="text-xs text-gray-500 dark:text-gray-400 pt-4 border-t border-gray-200 dark:border-slate-700">

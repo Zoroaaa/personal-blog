@@ -25,6 +25,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useTheme } from '../stores/themeStore';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
+import { useToast } from '../components/Toast';
 
 interface ConfigGroup {
   title: string;
@@ -392,6 +393,7 @@ export function ConfigPage() {
   const { user } = useAuthStore();
   const { config, loading: configLoading, updateConfig, refreshConfig } = useSiteConfig();
   const { setPrimaryColor, setThemeMode } = useTheme();
+  const { showSuccess, showError } = useToast();
 
   const [localConfig, setLocalConfig] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -478,7 +480,7 @@ export function ConfigPage() {
   const handleSave = async (key: string, value: any) => {
     const configItem = findConfigItem(key);
     if (!configItem) {
-      alert('配置项不存在');
+      showError('配置项不存在');
       return;
     }
 
@@ -496,13 +498,11 @@ export function ConfigPage() {
       // 保存后强制刷新缓存
       await refreshConfig();
       
-      setSuccessMessage(`成功更新 ${configItem.label}`);
+      showSuccess(`成功更新 ${configItem.label}`);
       setHasChanges(false);
-      
-      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (error) {
       console.error('更新配置失败:', error);
-      alert('更新配置失败,请重试');
+      showError('更新配置失败,请重试');
     } finally {
       setUpdating(null);
     }
