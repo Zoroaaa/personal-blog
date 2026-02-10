@@ -47,6 +47,7 @@ export function transformPostListItem(post: any): PostListItem {
     commentCount: post.comment_count ?? 0,
     readingTime: post.reading_time,
     publishedAt: post.published_at,
+    createdAt: post.created_at,
     tags: post.tags ? post.tags.map(transformTag) : undefined
   };
 }

@@ -213,7 +213,8 @@ export interface PostListItem {
   likeCount: number;
   commentCount: number;
   readingTime?: number;
-  publishedAt: string;
+  publishedAt?: string;
+  createdAt?: string;
   tags?: Tag[];
 }
 

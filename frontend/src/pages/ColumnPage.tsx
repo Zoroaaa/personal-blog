@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { api } from '../utils/api';
 import { transformColumn, transformPostList } from '../utils/apiTransformer';
 import type { Column, PostListItem } from '../types';
@@ -13,7 +13,6 @@ import type { Column, PostListItem } from '../types';
 
 export function ColumnPage() {
   const { slug } = useParams<{ slug: string }>();
-  const navigate = useNavigate();
 
   const [column, setColumn] = useState<Column | null>(null);
   const [posts, setPosts] = useState<PostListItem[]>([]);
@@ -253,7 +252,7 @@ export function ColumnPage() {
                           {formatNumber(post.likeCount)}
                         </span>
                       </div>
-                      <span>{new Date(post.publishedAt || post.createdAt).toLocaleDateString('zh-CN')}</span>
+                      <span>{new Date(post.publishedAt || post.createdAt || Date.now()).toLocaleDateString('zh-CN')}</span>
                     </div>
                   </div>
                 </article>
