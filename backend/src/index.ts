@@ -23,6 +23,7 @@ import { uploadRoutes } from './routes/upload';
 import { analyticsRoutes } from './routes/analytics';
 import { adminRoutes } from './routes/admin';
 import { configRoutes } from './routes/config';
+import { messageRoutes } from './routes/messages';
 
 // 导入中间件
 import { requestLogger } from './middleware/requestLogger';
@@ -303,6 +304,11 @@ app.route('/api/admin', adminRoutes);
  * 配置路由
  */
 app.route('/api/config', configRoutes);
+
+/**
+ * 私信路由
+ */
+app.route('/api/messages', messageRoutes);
 
 // ============= 错误处理 =============
 

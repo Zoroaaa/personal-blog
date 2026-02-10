@@ -13,8 +13,10 @@ import { AboutPage } from './pages/AboutPage';
 import { ColumnPage } from './pages/ColumnPage';
 import { CategoryPage } from './pages/CategoryPage';
 import { TagPage } from './pages/TagPage';
+import { MessagesPage } from './pages/MessagesPage';
 import { useSiteConfig } from './hooks/useSiteConfig';
 import { ToastProvider } from './components/Toast';
+import { MessageButton } from './components/MessageButton';
 
 // 页面过渡包装组件
 function PageTransition({ children }: { children: React.ReactNode }) {
@@ -42,6 +44,7 @@ function AppRoutes() {
       <Route path="/columns/:slug" element={<PageTransition><ColumnPage /></PageTransition>} />
       <Route path="/categories/:slug" element={<PageTransition><CategoryPage /></PageTransition>} />
       <Route path="/tags/:slug" element={<PageTransition><TagPage /></PageTransition>} />
+      <Route path="/messages" element={<PageTransition><MessagesPage /></PageTransition>} />
     </Routes>
   );
 }
@@ -92,6 +95,7 @@ function App() {
             <AppRoutes />
           </main>
           <Footer />
+          <MessageButton />
         </div>
       </BrowserRouter>
     </ToastProvider>

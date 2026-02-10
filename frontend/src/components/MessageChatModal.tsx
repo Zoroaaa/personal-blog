@@ -1,0 +1,243 @@
+/**
+ * 私信聊天弹窗组件
+ * 
+ * 功能：
+ * - 显示会话列表或聊天界面
+ * - 支持发送和接收消息
+ * - 消息分页加载
+ * - 自动滚动到底部
+ */
+
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useAuthStore } from '../stores/authStore';
+import { useMessageStore } from '../stores/messageStore';
+import { getConversations, getConversation, sendMessage } from '../utils/messageApi';
+import { ConversationList } from './ConversationList';
+import { ChatWindow } from './ChatWindow';
+import type { Conversation, MessageWithStatus } from '../types/messages';
+
+interface MessageChatModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function MessageChatModal({ isOpen, onClose }: MessageChatModalProps) {
+  const { user } = useAuthStore();
+  const {
+    conversations,
+    currentMessages,
+    currentPartnerId,
+    isLoading,
+    isLoadingMore,
+    hasMoreMessages,
+    setConversations,
+    setCurrentMessages,
+    addMessage,
+    updateMessageStatus,
+    prependMessages,
+    setLoading,
+    setLoadingMore,
+    setHasMoreMessages,
+    setCurrentPartnerId,
+    setMessagesPage,
+    incrementMessagesPage,
+    resetMessages,
+    markConversationAsRead,
+    setError,
+  } = useMessageStore();
+
+  const [view, setView] = useState<'list' | 'chat'>('list');
+  const [messageInput, setMessageInput] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // 获取会话列表
+  const fetchConversations = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await getConversations();
+      setConversations(data.conversations);
+    } catch (error) {
+      console.error('获取会话列表失败:', error);
+      setError('获取会话列表失败');
+    } finally {
+      setLoading(false);
+    }
+  }, [setConversations, setError, setLoading]);
+
+  // 获取对话消息
+  const fetchMessages = useCallback(async (partnerId: number, page = 1) => {
+    if (page === 1) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
+    try {
+      const data = await getConversation(partnerId, page);
+      
+      if (page === 1) {
+        setCurrentMessages(data.messages as MessageWithStatus[]);
+      } else {
+        prependMessages(data.messages as MessageWithStatus[]);
+      }
+
+      setHasMoreMessages(data.pagination.page < data.pagination.totalPages);
+      setMessagesPage(data.pagination.page);
+    } catch (error) {
+      console.error('获取对话失败:', error);
+      setError('获取对话失败');
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [setCurrentMessages, prependMessages, setHasMoreMessages, setMessagesPage, setError, setLoading, setLoadingMore]);
+
+  // 加载更多消息
+  const loadMoreMessages = useCallback(() => {
+    if (isLoadingMore || !hasMoreMessages || !currentPartnerId) return;
+    
+    incrementMessagesPage();
+    const nextPage = useMessageStore.getState().messagesPage;
+    fetchMessages(currentPartnerId, nextPage);
+  }, [currentPartnerId, isLoadingMore, hasMoreMessages, incrementMessagesPage, fetchMessages]);
+
+  // 打开对话
+  const openConversation = useCallback((conversation: Conversation) => {
+    setCurrentPartnerId(conversation.partnerId);
+    resetMessages();
+    setView('chat');
+    markConversationAsRead(conversation.partnerId);
+    fetchMessages(conversation.partnerId, 1);
+  }, [setCurrentPartnerId, resetMessages, markConversationAsRead, fetchMessages]);
+
+  // 返回列表
+  const backToList = useCallback(() => {
+    setView('list');
+    setCurrentPartnerId(null);
+    resetMessages();
+    fetchConversations();
+  }, [setCurrentPartnerId, resetMessages, fetchConversations]);
+
+  // 发送消息
+  const handleSendMessage = useCallback(async () => {
+    if (!messageInput.trim() || !currentPartnerId || !user) return;
+
+    const content = messageInput.trim();
+    const tempId = `temp-${Date.now()}`;
+
+    // 创建临时消息
+    const tempMessage: MessageWithStatus = {
+      id: 0,
+      senderId: user.id,
+      senderUsername: user.username,
+      senderDisplayName: user.displayName,
+      senderAvatarUrl: user.avatarUrl,
+      receiverId: currentPartnerId,
+      receiverUsername: '',
+      receiverDisplayName: '',
+      content,
+      isRead: false,
+      createdAt: new Date().toLocaleString(),
+      status: 'sending',
+      tempId,
+    };
+
+    addMessage(tempMessage);
+    setMessageInput('');
+
+    try {
+      const sentMessage = await sendMessage({
+        receiverId: currentPartnerId,
+        content,
+      });
+
+      updateMessageStatus(tempId, 'sent', sentMessage);
+    } catch (error) {
+      console.error('发送消息失败:', error);
+      updateMessageStatus(tempId, 'error');
+      setError('发送消息失败');
+    }
+  }, [messageInput, currentPartnerId, user, addMessage, updateMessageStatus, setError]);
+
+  // 滚动到底部
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
+  // 新消息自动滚动
+  useEffect(() => {
+    if (view === 'chat' && currentMessages.length > 0) {
+      const lastMessage = currentMessages[currentMessages.length - 1];
+      if (lastMessage.senderId === user?.id) {
+        scrollToBottom();
+      }
+    }
+  }, [currentMessages, view, user?.id, scrollToBottom]);
+
+  // 初始加载会话列表
+  useEffect(() => {
+    if (isOpen && view === 'list') {
+      fetchConversations();
+    }
+  }, [isOpen, view, fetchConversations]);
+
+  // 监听ESC关闭
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      window.addEventListener('keydown', handleEsc);
+    }
+
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div 
+      className="fixed inset-0 z-[55] flex items-end justify-end p-4 sm:p-6 pointer-events-none"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div 
+        className="w-full sm:w-[400px] h-[500px] sm:h-[600px] bg-card border border-border rounded-2xl shadow-2xl pointer-events-auto flex flex-col overflow-hidden animate-slide-up"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {view === 'list' ? (
+          <ConversationList
+            conversations={conversations}
+            isLoading={isLoading}
+            onSelect={openConversation}
+            onClose={onClose}
+          />
+        ) : (
+          <ChatWindow
+            messages={currentMessages}
+            partner={conversations.find(c => c.partnerId === currentPartnerId)}
+            currentUserId={user?.id || 0}
+            messageInput={messageInput}
+            isLoading={isLoading}
+            isLoadingMore={isLoadingMore}
+            hasMoreMessages={hasMoreMessages}
+            onMessageInputChange={setMessageInput}
+            onSend={handleSendMessage}
+            onBack={backToList}
+            onClose={onClose}
+            onLoadMore={loadMoreMessages}
+            messagesEndRef={messagesEndRef}
+            chatContainerRef={chatContainerRef}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
