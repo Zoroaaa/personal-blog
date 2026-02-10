@@ -469,6 +469,11 @@ export interface SearchQueryParams {
   type?: 'all' | 'posts' | 'users' | 'tags';
   page?: number;
   limit?: number;
+  /**
+   * 是否使用FTS5全文搜索（默认true）
+   * 设置为false将使用传统LIKE搜索
+   */
+  useFts?: boolean;
 }
 
 // ============= 通知相关类型 =============

@@ -418,6 +418,14 @@ export const api = {
   
   /**
    * 搜索文章
+   * @param params 搜索参数
+   * @param params.q 搜索关键词（支持FTS5语法：AND, OR, "短语", 前缀*）
+   * @param params.category 分类slug过滤
+   * @param params.tag 标签slug过滤
+   * @param params.page 页码
+   * @param params.limit 每页数量
+   * @param params.sort 排序方式（published_at, view_count, like_count, comment_count, relevance）
+   * @param params.use_fts 是否使用FTS5全文搜索（默认true）
    */
   searchPosts: (params: {
     q?: string;
@@ -426,15 +434,16 @@ export const api = {
     page?: string;
     limit?: string;
     sort?: string;
+    use_fts?: string;
   }) => {
     const filteredParams = Object.fromEntries(
       Object.entries(params).filter(([, v]) => v !== undefined && v !== '')
     );
     const query = new URLSearchParams(filteredParams as any).toString();
-    return apiRequest<{ 
-      posts: PostListItem[]; 
+    return apiRequest<{
+      posts: PostListItem[];
       total: number;
-      pagination: { page: number; limit: number; total: number; totalPages: number } 
+      pagination: { page: number; limit: number; total: number; totalPages: number }
     }>(`/posts/search?${query}`);
   },
   
