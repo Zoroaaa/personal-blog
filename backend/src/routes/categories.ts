@@ -25,7 +25,8 @@ import {
   validateLength,
   validateSlug,
   sanitizeInput,
-  generateSlug
+  generateSlug,
+  safeParseInt
 } from '../utils/validation';
 
 export const categoryRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -393,28 +394,364 @@ categoryRoutes.delete('/:id', requireAuth, requireAdmin, async (c) => {
  */
 categoryRoutes.delete('/tags/:id', requireAuth, requireAdmin, async (c) => {
   const logger = createLogger(c);
-  
+
   try {
     const id = c.req.param('id');
-    
+
     // 检查标签是否存在
     const tag = await c.env.DB.prepare(
       'SELECT * FROM tags WHERE id = ?'
     ).bind(id).first() as any;
-    
+
     if (!tag) {
       return c.json(errorResponse('Tag not found'), 404);
     }
-    
+
     // 删除标签（会自动删除post_tags中的关联）
     await c.env.DB.prepare('DELETE FROM tags WHERE id = ?').bind(id).run();
 
     logger.info('Tag deleted', { tagId: id });
-    
+
     return c.json(successResponse({ deleted: true }, 'Tag deleted successfully'));
-    
+
   } catch (error) {
     logger.error('Delete tag error', error);
     return c.json(errorResponse('Failed to delete tag'), 500);
+  }
+});
+
+// ============= 获取分类详情 =============
+
+/**
+ * GET /api/categories/:slug
+ * 获取分类详情（公开）
+ */
+categoryRoutes.get('/:slug', async (c) => {
+  const logger = createLogger(c);
+
+  try {
+    const slug = c.req.param('slug');
+
+    if (!slug) {
+      return c.json(errorResponse('Invalid slug'), 400);
+    }
+
+    // 获取分类详情
+    const category = await c.env.DB.prepare(`
+      SELECT *
+      FROM categories
+      WHERE slug = ?
+    `).bind(slug).first() as any;
+
+    if (!category) {
+      logger.warn('Category not found', { slug });
+      return c.json(errorResponse(
+        'Category not found',
+        'The requested category does not exist'
+      ), 404);
+    }
+
+    logger.info('Category fetched successfully', { slug, categoryId: category.id });
+    return c.json(successResponse(category));
+
+  } catch (error) {
+    logger.error('Get category error', error);
+    return c.json(errorResponse(
+      'Failed to fetch category',
+      'An error occurred while fetching the category'
+    ), 500);
+  }
+});
+
+// ============= 获取分类下的文章列表 =============
+
+/**
+ * GET /api/categories/:slug/posts
+ * 获取分类下的文章列表（公开）
+ */
+categoryRoutes.get('/:slug/posts', async (c) => {
+  const logger = createLogger(c);
+
+  try {
+    const slug = c.req.param('slug');
+
+    if (!slug) {
+      return c.json(errorResponse('Invalid slug'), 400);
+    }
+
+    // 解析查询参数
+    const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
+    const limit = Math.min(50, Math.max(1, safeParseInt(c.req.query('limit'), 10)));
+    const sortBy = c.req.query('sortBy') || 'published_at';
+    const order = c.req.query('order') === 'asc' ? 'ASC' : 'DESC';
+    const offset = (page - 1) * limit;
+
+    // 验证排序字段
+    const allowedSortFields = ['published_at', 'view_count', 'like_count', 'comment_count', 'created_at'];
+    const finalSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'published_at';
+
+    // 先获取分类ID
+    const category = await c.env.DB.prepare(
+      'SELECT id FROM categories WHERE slug = ?'
+    ).bind(slug).first() as any;
+
+    if (!category) {
+      return c.json(errorResponse('Category not found'), 404);
+    }
+
+    // 获取文章列表
+    let query = `
+      SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
+             p.view_count, p.like_count, p.comment_count, p.reading_time,
+             p.published_at, p.created_at,
+             u.username as author_name, u.display_name as author_display_name,
+             u.avatar_url as author_avatar,
+             c.name as category_name, c.slug as category_slug, c.color as category_color
+      FROM posts p
+      LEFT JOIN users u ON p.author_id = u.id
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE p.category_id = ? AND p.status = 'published' AND p.visibility = 'public'
+    `;
+
+    query += ` ORDER BY p.${finalSortBy} ${order} LIMIT ? OFFSET ?`;
+
+    const { results } = await c.env.DB.prepare(query).bind(category.id, limit, offset).all();
+
+    // 获取总数
+    const countResult = await c.env.DB.prepare(`
+      SELECT COUNT(*) as total
+      FROM posts
+      WHERE category_id = ? AND status = 'published' AND visibility = 'public'
+    `).bind(category.id).first() as any;
+    const total = countResult?.total || 0;
+
+    // 为每篇文章获取标签
+    const postIds = results.map((p: any) => p.id);
+    let postsWithTags = results;
+
+    if (postIds.length > 0) {
+      const tagsQuery = `
+        SELECT pt.post_id, t.id, t.name, t.slug, t.color
+        FROM post_tags pt
+        JOIN tags t ON pt.tag_id = t.id
+        WHERE pt.post_id IN (${postIds.map(() => '?').join(',')})
+      `;
+      const { results: tagResults } = await c.env.DB.prepare(tagsQuery).bind(...postIds).all();
+
+      // 组织标签数据
+      const tagsByPost = new Map();
+      (tagResults as any[]).forEach(tag => {
+        if (!tagsByPost.has(tag.post_id)) {
+          tagsByPost.set(tag.post_id, []);
+        }
+        tagsByPost.get(tag.post_id).push({
+          id: tag.id,
+          name: tag.name,
+          slug: tag.slug,
+          color: tag.color
+        });
+      });
+
+      // 添加标签到文章
+      postsWithTags = results.map((post: any) => ({
+        ...post,
+        tags: tagsByPost.get(post.id) || []
+      }));
+    }
+
+    const response = successResponse({
+      posts: postsWithTags,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+
+    logger.info('Category posts fetched successfully', {
+      slug,
+      categoryId: category.id,
+      count: postsWithTags.length,
+      total
+    });
+
+    return c.json(response);
+
+  } catch (error) {
+    logger.error('Get category posts error', error);
+    return c.json(errorResponse(
+      'Failed to fetch category posts',
+      'An error occurred while fetching category posts'
+    ), 500);
+  }
+});
+
+// ============= 获取标签详情 =============
+
+/**
+ * GET /api/categories/tags/:slug
+ * 获取标签详情（公开）
+ */
+categoryRoutes.get('/tags/:slug', async (c) => {
+  const logger = createLogger(c);
+
+  try {
+    const slug = c.req.param('slug');
+
+    if (!slug) {
+      return c.json(errorResponse('Invalid slug'), 400);
+    }
+
+    // 获取标签详情
+    const tag = await c.env.DB.prepare(`
+      SELECT *
+      FROM tags
+      WHERE slug = ?
+    `).bind(slug).first() as any;
+
+    if (!tag) {
+      logger.warn('Tag not found', { slug });
+      return c.json(errorResponse(
+        'Tag not found',
+        'The requested tag does not exist'
+      ), 404);
+    }
+
+    logger.info('Tag fetched successfully', { slug, tagId: tag.id });
+    return c.json(successResponse(tag));
+
+  } catch (error) {
+    logger.error('Get tag error', error);
+    return c.json(errorResponse(
+      'Failed to fetch tag',
+      'An error occurred while fetching the tag'
+    ), 500);
+  }
+});
+
+// ============= 获取标签下的文章列表 =============
+
+/**
+ * GET /api/categories/tags/:slug/posts
+ * 获取标签下的文章列表（公开）
+ */
+categoryRoutes.get('/tags/:slug/posts', async (c) => {
+  const logger = createLogger(c);
+
+  try {
+    const slug = c.req.param('slug');
+
+    if (!slug) {
+      return c.json(errorResponse('Invalid slug'), 400);
+    }
+
+    // 解析查询参数
+    const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
+    const limit = Math.min(50, Math.max(1, safeParseInt(c.req.query('limit'), 10)));
+    const sortBy = c.req.query('sortBy') || 'published_at';
+    const order = c.req.query('order') === 'asc' ? 'ASC' : 'DESC';
+    const offset = (page - 1) * limit;
+
+    // 验证排序字段
+    const allowedSortFields = ['published_at', 'view_count', 'like_count', 'comment_count', 'created_at'];
+    const finalSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'published_at';
+
+    // 先获取标签ID
+    const tag = await c.env.DB.prepare(
+      'SELECT id FROM tags WHERE slug = ?'
+    ).bind(slug).first() as any;
+
+    if (!tag) {
+      return c.json(errorResponse('Tag not found'), 404);
+    }
+
+    // 获取文章列表（通过post_tags关联）
+    let query = `
+      SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
+             p.view_count, p.like_count, p.comment_count, p.reading_time,
+             p.published_at, p.created_at,
+             u.username as author_name, u.display_name as author_display_name,
+             u.avatar_url as author_avatar,
+             c.name as category_name, c.slug as category_slug, c.color as category_color
+      FROM posts p
+      LEFT JOIN users u ON p.author_id = u.id
+      LEFT JOIN categories c ON p.category_id = c.id
+      INNER JOIN post_tags pt ON p.id = pt.post_id
+      WHERE pt.tag_id = ? AND p.status = 'published' AND p.visibility = 'public'
+    `;
+
+    query += ` ORDER BY p.${finalSortBy} ${order} LIMIT ? OFFSET ?`;
+
+    const { results } = await c.env.DB.prepare(query).bind(tag.id, limit, offset).all();
+
+    // 获取总数
+    const countResult = await c.env.DB.prepare(`
+      SELECT COUNT(*) as total
+      FROM posts p
+      INNER JOIN post_tags pt ON p.id = pt.post_id
+      WHERE pt.tag_id = ? AND p.status = 'published' AND p.visibility = 'public'
+    `).bind(tag.id).first() as any;
+    const total = countResult?.total || 0;
+
+    // 为每篇文章获取标签
+    const postIds = results.map((p: any) => p.id);
+    let postsWithTags = results;
+
+    if (postIds.length > 0) {
+      const tagsQuery = `
+        SELECT pt.post_id, t.id, t.name, t.slug, t.color
+        FROM post_tags pt
+        JOIN tags t ON pt.tag_id = t.id
+        WHERE pt.post_id IN (${postIds.map(() => '?').join(',')})
+      `;
+      const { results: tagResults } = await c.env.DB.prepare(tagsQuery).bind(...postIds).all();
+
+      // 组织标签数据
+      const tagsByPost = new Map();
+      (tagResults as any[]).forEach(t => {
+        if (!tagsByPost.has(t.post_id)) {
+          tagsByPost.set(t.post_id, []);
+        }
+        tagsByPost.get(t.post_id).push({
+          id: t.id,
+          name: t.name,
+          slug: t.slug,
+          color: t.color
+        });
+      });
+
+      // 添加标签到文章
+      postsWithTags = results.map((post: any) => ({
+        ...post,
+        tags: tagsByPost.get(post.id) || []
+      }));
+    }
+
+    const response = successResponse({
+      posts: postsWithTags,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+
+    logger.info('Tag posts fetched successfully', {
+      slug,
+      tagId: tag.id,
+      count: postsWithTags.length,
+      total
+    });
+
+    return c.json(response);
+
+  } catch (error) {
+    logger.error('Get tag posts error', error);
+    return c.json(errorResponse(
+      'Failed to fetch tag posts',
+      'An error occurred while fetching tag posts'
+    ), 500);
   }
 });
