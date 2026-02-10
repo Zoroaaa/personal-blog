@@ -198,6 +198,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
 
   // 处理选择草稿
   const handleSelectDraft = useCallback((draft: any) => {
+    // 恢复草稿数据
     setTitle(draft.data.title || '');
     setContent(draft.data.content || '');
     setSummary(draft.data.summary || '');
@@ -205,6 +206,13 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     setStatus(draft.data.status || 'draft');
     setSelectedCategoryId(draft.data.categoryId || null);
     setSelectedTagIds(draft.data.tags || []);
+
+    // 删除已恢复的草稿，避免重复
+    localStorage.removeItem(draft.key);
+
+    // 从可用草稿列表中移除
+    setAvailableDrafts(prev => prev.filter(d => d.key !== draft.key));
+
     setDraftSelectorOpen(false);
   }, []);
 

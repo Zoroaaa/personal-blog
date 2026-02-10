@@ -25,25 +25,23 @@ export interface UseAutoSaveOptions<T> {
 
 export function useAutoSave<T>(options: UseAutoSaveOptions<T>) {
   const { key, data, onSave, interval = 30000, enabled = true } = options;
-  
+
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [hasDraft, setHasDraft] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const dataRef = useRef(data);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  
-  // 更新 ref
-  useEffect(() => {
-    dataRef.current = data;
-  }, [data]);
-  
+  const initialDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasUserStartedTyping = useRef(false);
+  const wasEverNonEmpty = useRef(false);
+
   // 检查数据是否为空（所有字段都是空值或默认值）
   const isEmptyData = useCallback((dataToCheck: T): boolean => {
     if (dataToCheck === null || dataToCheck === undefined) return true;
     if (typeof dataToCheck !== 'object') return false;
-    
+
     const values = Object.values(dataToCheck);
     // 如果所有值都是空字符串、null、undefined 或空数组，则认为数据为空
     return values.every(value => {
@@ -52,6 +50,17 @@ export function useAutoSave<T>(options: UseAutoSaveOptions<T>) {
       return false;
     });
   }, []);
+
+  // 更新 ref
+  useEffect(() => {
+    dataRef.current = data;
+
+    // 检测用户是否开始输入（数据从空变为非空）
+    if (!wasEverNonEmpty.current && !isEmptyData(data)) {
+      wasEverNonEmpty.current = true;
+      hasUserStartedTyping.current = true;
+    }
+  }, [data, isEmptyData]);
 
   // 保存到本地存储
   const saveToLocalStorage = useCallback((dataToSave: T) => {
@@ -125,37 +134,63 @@ export function useAutoSave<T>(options: UseAutoSaveOptions<T>) {
   useEffect(() => {
     if (!enabled) return;
 
-    // 延迟首次保存，避免立即覆盖草稿（3秒后）
-    const initialDelay = setTimeout(() => {
-      saveToLocalStorage(data);
-    }, 3000);
+    // 监听数据变化，当用户开始输入后 5 秒进行首次保存
+    const checkAndScheduleInitialSave = () => {
+      // 如果已经有草稿了，不需要等待首次保存
+      const existingDraft = localStorage.getItem(`draft_${key}`);
+      if (existingDraft) {
+        setHasDraft(true);
+        return;
+      }
 
-    // 设置定时器
+      // 如果用户已开始输入且数据非空，设置 5 秒后保存
+      if (hasUserStartedTyping.current && !isEmptyData(dataRef.current)) {
+        if (!initialDelayRef.current) {
+          initialDelayRef.current = setTimeout(() => {
+            saveToLocalStorage(dataRef.current);
+            initialDelayRef.current = null;
+          }, 5000); // 5 秒后首次保存
+        }
+      }
+    };
+
+    // 立即检查一次
+    checkAndScheduleInitialSave();
+
+    // 设置定期保存定时器（首次保存后才开始）
     intervalRef.current = setInterval(() => {
-      doSave();
+      // 只有用户开始输入过才执行定期保存
+      if (wasEverNonEmpty.current) {
+        doSave();
+      }
     }, interval);
 
     return () => {
-      clearTimeout(initialDelay);
+      if (initialDelayRef.current) {
+        clearTimeout(initialDelayRef.current);
+      }
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
     };
-  }, [enabled, interval, data, doSave, saveToLocalStorage]);
+  }, [enabled, interval, data, doSave, saveToLocalStorage, key, isEmptyData]);
   
-  // 页面关闭前保存
+  // 页面关闭前保存（只有有实际内容时才保存）
   useEffect(() => {
     if (!enabled) return;
-    
+
     const handleBeforeUnload = () => {
-      saveToLocalStorage(dataRef.current);
+      // 只有用户输入过内容且数据非空时才保存
+      if (wasEverNonEmpty.current && !isEmptyData(dataRef.current)) {
+        saveToLocalStorage(dataRef.current);
+      }
     };
-    
+
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [enabled, saveToLocalStorage]);
+  }, [enabled, saveToLocalStorage, isEmptyData]);
   
   // 手动保存
   const saveNow = useCallback(async () => {
