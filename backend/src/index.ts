@@ -18,6 +18,7 @@ import { authRoutes } from './routes/auth';
 import { postRoutes } from './routes/posts';
 import { commentRoutes } from './routes/comments';
 import { categoryRoutes } from './routes/categories';
+import { columnRoutes } from './routes/columns';
 import { uploadRoutes } from './routes/upload';
 import { analyticsRoutes } from './routes/analytics';
 import { adminRoutes } from './routes/admin';
@@ -277,6 +278,11 @@ app.route('/api/comments', commentRoutes);
  * 分类和标签路由
  */
 app.route('/api/categories', categoryRoutes);
+
+/**
+ * 专栏路由
+ */
+app.route('/api/columns', columnRoutes);
 
 /**
  * 文件上传路由

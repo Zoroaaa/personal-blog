@@ -1092,7 +1092,7 @@ postRoutes.post('/', requireAuth, async (c) => {
   try {
     const user = c.get('user') as any;
     const body = await c.req.json();
-    let { title, content, summary, categoryId, tags, coverImage, status, visibility, password } = body;
+    let { title, content, summary, categoryId, columnId, tags, coverImage, status, visibility, password } = body;
     
     // ===== 1. 验证必填字段 =====
     if (!title || !content) {
@@ -1134,15 +1134,29 @@ postRoutes.post('/', requireAuth, async (c) => {
       ), 400);
     }
     
-    // ===== 6. 插入文章 =====
+    // ===== 6. 验证专栏ID（如果提供）=====
+    if (columnId) {
+      const columnExists = await c.env.DB.prepare(
+        'SELECT id FROM columns WHERE id = ? AND status = ?'
+      ).bind(columnId, 'active').first();
+      
+      if (!columnExists) {
+        return c.json(errorResponse(
+          'Invalid column',
+          'The specified column does not exist or is not active'
+        ), 400);
+      }
+    }
+
+    // ===== 7. 插入文章 =====
     const finalStatus = status || 'draft';
     const result = await c.env.DB.prepare(`
       INSERT INTO posts (
-        title, slug, content, summary, author_id, category_id,
+        title, slug, content, summary, author_id, category_id, column_id,
         cover_image, status, visibility, password, reading_time, 
         published_at, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `).bind(
       title,
       slug,
@@ -1150,6 +1164,7 @@ postRoutes.post('/', requireAuth, async (c) => {
       summary,
       user.userId,
       categoryId || null,
+      columnId || null,
       coverImage || null,
       finalStatus,
       finalVisibility,
@@ -1207,7 +1222,7 @@ postRoutes.put('/:id', requireAuth, async (c) => {
     const user = c.get('user') as any;
     const id = c.req.param('id');
     const body = await c.req.json();
-    let { title, content, summary, categoryId, tags, coverImage, status, visibility, password } = body;
+    let { title, content, summary, categoryId, columnId, tags, coverImage, status, visibility, password } = body;
     
     // ===== 1. 检查文章是否存在 =====
     const post = await c.env.DB.prepare(
@@ -1246,14 +1261,28 @@ postRoutes.put('/:id', requireAuth, async (c) => {
     if (summary !== undefined) {
       summary = sanitizeInput(summary);
     }
+
+    // ===== 4. 验证专栏ID（如果提供）=====
+    if (columnId !== undefined && columnId !== null) {
+      const columnExists = await c.env.DB.prepare(
+        'SELECT id FROM columns WHERE id = ? AND status = ?'
+      ).bind(columnId, 'active').first();
+      
+      if (!columnExists) {
+        return c.json(errorResponse(
+          'Invalid column',
+          'The specified column does not exist or is not active'
+        ), 400);
+      }
+    }
     
-    // ===== 4. 计算阅读时间 =====
+    // ===== 5. 计算阅读时间 =====
     const readingTime = content ? Math.ceil(content.length / READING_SPEED) : post.reading_time;
     
-    // ===== 5. 更新文章 =====
+    // ===== 6. 更新文章 =====
     await c.env.DB.prepare(`
       UPDATE posts 
-      SET title = ?, content = ?, summary = ?, category_id = ?,
+      SET title = ?, content = ?, summary = ?, category_id = ?, column_id = ?,
           cover_image = ?, status = ?, visibility = ?, password = ?,
           reading_time = ?, published_at = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
@@ -1262,6 +1291,7 @@ postRoutes.put('/:id', requireAuth, async (c) => {
       content || post.content,
       summary !== undefined ? summary : post.summary,
       categoryId !== undefined ? categoryId : post.category_id,
+      columnId !== undefined ? columnId : post.column_id,
       coverImage !== undefined ? coverImage : post.cover_image,
       status || post.status,
       visibility || post.visibility,
