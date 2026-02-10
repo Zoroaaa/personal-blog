@@ -554,7 +554,9 @@ postRoutes.get('/search', async (c) => {
       }
       params.push(limit, offset);
     } else {
-      query += ` ORDER BY ${shouldUseFts ? 'p.' : 'p.'}${finalSortBy === 'relevance' ? 'published_at' : finalSortBy} ${order} LIMIT ? OFFSET ?`;
+      // 非相关性排序
+      const sortField = finalSortBy === 'relevance' ? 'published_at' : finalSortBy;
+      query += ` ORDER BY p.${sortField} ${order} LIMIT ? OFFSET ?`;
       params.push(limit, offset);
     }
     
