@@ -97,12 +97,14 @@ postRoutes.get('/', async (c) => {
       SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
              p.view_count, p.like_count, p.comment_count, p.reading_time,
              p.published_at, p.created_at,
-             u.username as author_name, u.display_name as author_display_name, 
+             u.username as author_name, u.display_name as author_display_name,
              u.avatar_url as author_avatar,
-             c.name as category_name, c.slug as category_slug, c.color as category_color
+             c.name as category_name, c.slug as category_slug, c.color as category_color,
+             col.name as column_name, col.slug as column_slug
       FROM posts p
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN columns col ON p.column_id = col.id
       WHERE p.status = 'published' AND p.visibility = 'public'
     `;
     
@@ -263,12 +265,14 @@ postRoutes.get('/admin', requireAuth, async (c) => {
       SELECT p.id, p.title, p.slug, p.summary, p.cover_image, p.status,
              p.view_count, p.like_count, p.comment_count, p.reading_time,
              p.published_at, p.created_at, p.updated_at,
-             u.username as author_name, u.display_name as author_display_name, 
+             u.username as author_name, u.display_name as author_display_name,
              u.avatar_url as author_avatar,
-             c.name as category_name, c.slug as category_slug, c.color as category_color
+             c.name as category_name, c.slug as category_slug, c.color as category_color,
+             col.name as column_name, col.slug as column_slug
       FROM posts p
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN columns col ON p.column_id = col.id
       ORDER BY p.created_at DESC
       LIMIT ? OFFSET ?
     `).bind(limit, offset).all();
@@ -352,18 +356,22 @@ postRoutes.get('/admin/:id', requireAuth, async (c) => {
     
     // 从数据库获取文章（不限制状态）
     const post = await c.env.DB.prepare(`
-      SELECT p.*, 
+      SELECT p.*,
              u.username as author_username,
              u.display_name as author_name,
              u.avatar_url as author_avatar,
              u.bio as author_bio,
-             c.name as category_name, 
+             c.name as category_name,
              c.slug as category_slug,
              c.color as category_color,
-             c.icon as category_icon
+             c.icon as category_icon,
+             col.id as column_id,
+             col.name as column_name,
+             col.slug as column_slug
       FROM posts p
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN columns col ON p.column_id = col.id
       WHERE p.id = ?
     `).bind(id).first() as any;
     
@@ -490,11 +498,13 @@ postRoutes.get('/search', async (c) => {
                u.username as author_name, u.display_name as author_display_name,
                u.avatar_url as author_avatar,
                c.name as category_name, c.slug as category_slug, c.color as category_color,
+               col.name as column_name, col.slug as column_slug,
                posts_fts.rank as search_rank
         FROM posts_fts
         JOIN posts p ON posts_fts.rowid = p.id
         LEFT JOIN users u ON p.author_id = u.id
         LEFT JOIN categories c ON p.category_id = c.id
+        LEFT JOIN columns col ON p.column_id = col.id
         WHERE posts_fts MATCH ? AND p.status = 'published' AND p.visibility = 'public'
       `;
       params.push(q!.trim());
@@ -504,11 +514,13 @@ postRoutes.get('/search', async (c) => {
         SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
                p.view_count, p.like_count, p.comment_count, p.reading_time,
                p.published_at, p.created_at,
-               u.username as author_name, u.display_name as author_display_name, 
+               u.username as author_name, u.display_name as author_display_name,
                u.avatar_url as author_avatar,
-               c.name as category_name, c.slug as category_slug, c.color as category_color
+               c.name as category_name, c.slug as category_slug, c.color as category_color,
+               col.name as column_name, col.slug as column_slug
         FROM posts p
         LEFT JOIN users u ON p.author_id = u.id
+        LEFT JOIN columns col ON p.column_id = col.id
         LEFT JOIN categories c ON p.category_id = c.id
         WHERE p.status = 'published' AND p.visibility = 'public'
       `;
@@ -696,13 +708,15 @@ postRoutes.get('/likes', requireAuth, async (c) => {
       SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
              p.view_count, p.like_count, p.comment_count, p.reading_time,
              p.published_at, p.created_at,
-             u.username as author_name, u.display_name as author_display_name, 
+             u.username as author_name, u.display_name as author_display_name,
              u.avatar_url as author_avatar,
-             c.name as category_name, c.slug as category_slug, c.color as category_color
+             c.name as category_name, c.slug as category_slug, c.color as category_color,
+             col.name as column_name, col.slug as column_slug
       FROM posts p
       JOIN likes l ON p.id = l.post_id
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN columns col ON p.column_id = col.id
       WHERE l.user_id = ? AND p.status = 'published' AND p.visibility = 'public'
       ORDER BY l.created_at DESC
       LIMIT ? OFFSET ?
@@ -817,11 +831,13 @@ postRoutes.get('/reading-history', requireAuth, async (c) => {
       SELECT rh.id, rh.post_id, rh.first_read_at, rh.last_read_at, rh.read_duration_seconds, rh.read_percentage,
              p.title, p.slug, p.summary, p.cover_image, p.view_count, p.like_count, p.comment_count, p.reading_time, p.published_at,
              u.username as author_name, u.display_name as author_display_name, u.avatar_url as author_avatar,
-             c.name as category_name, c.slug as category_slug, c.color as category_color
+             c.name as category_name, c.slug as category_slug, c.color as category_color,
+             col.name as column_name, col.slug as column_slug
       FROM reading_history rh
       JOIN posts p ON p.id = rh.post_id
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN columns col ON p.column_id = col.id
       WHERE rh.user_id = ? AND p.status = 'published' AND p.visibility = 'public'
       ORDER BY rh.last_read_at DESC
       LIMIT ? OFFSET ?
@@ -906,11 +922,13 @@ postRoutes.get('/favorites', requireAuth, async (c) => {
              p.view_count, p.like_count, p.comment_count, p.reading_time,
              p.published_at, p.created_at,
              u.username as author_name, u.display_name as author_display_name, u.avatar_url as author_avatar,
-             c.name as category_name, c.slug as category_slug, c.color as category_color
+             c.name as category_name, c.slug as category_slug, c.color as category_color,
+             col.name as column_name, col.slug as column_slug
       FROM posts p
       JOIN favorites f ON p.id = f.post_id
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN columns col ON p.column_id = col.id
       WHERE f.user_id = ? AND p.status = 'published' AND p.visibility = 'public'
       ORDER BY f.created_at DESC
       LIMIT ? OFFSET ?
@@ -987,18 +1005,22 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
     
     // ===== 1. 先查询文章基本信息(包括浏览量) =====
     const post = await c.env.DB.prepare(`
-      SELECT p.*, 
+      SELECT p.*,
              u.username as author_username,
              u.display_name as author_name,
              u.avatar_url as author_avatar,
              u.bio as author_bio,
-             c.name as category_name, 
+             c.name as category_name,
              c.slug as category_slug,
              c.color as category_color,
-             c.icon as category_icon
+             c.icon as category_icon,
+             col.id as column_id,
+             col.name as column_name,
+             col.slug as column_slug
       FROM posts p
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN columns col ON p.column_id = col.id
       WHERE p.slug = ? AND p.status = 'published' AND p.visibility = 'public'
     `).bind(slug).first() as any;
     
