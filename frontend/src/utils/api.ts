@@ -418,6 +418,14 @@ export const api = {
   
   /**
    * 搜索文章
+   * @param params 搜索参数
+   * @param params.q 搜索关键词（支持FTS5语法：AND, OR, "短语", 前缀*）
+   * @param params.category 分类slug过滤
+   * @param params.tag 标签slug过滤
+   * @param params.page 页码
+   * @param params.limit 每页数量
+   * @param params.sort 排序方式（published_at, view_count, like_count, comment_count, relevance）
+   * @param params.use_fts 是否使用FTS5全文搜索（默认true）
    */
   searchPosts: (params: {
     q?: string;
@@ -426,15 +434,16 @@ export const api = {
     page?: string;
     limit?: string;
     sort?: string;
+    use_fts?: string;
   }) => {
     const filteredParams = Object.fromEntries(
       Object.entries(params).filter(([, v]) => v !== undefined && v !== '')
     );
     const query = new URLSearchParams(filteredParams as any).toString();
-    return apiRequest<{ 
-      posts: PostListItem[]; 
+    return apiRequest<{
+      posts: PostListItem[];
       total: number;
-      pagination: { page: number; limit: number; total: number; totalPages: number } 
+      pagination: { page: number; limit: number; total: number; totalPages: number }
     }>(`/posts/search?${query}`);
   },
   
@@ -485,6 +494,23 @@ export const api = {
     const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
     return apiRequest<{ categories: Category[] }>(`/categories${query}`);
   },
+
+  /**
+   * 获取分类详情
+   */
+  getCategory: (slug: string) =>
+    apiRequest<Category>(`/categories/${slug}`),
+
+  /**
+   * 获取分类下的文章列表
+   */
+  getCategoryPosts: (slug: string, params?: { page?: string; limit?: string; sortBy?: string }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return apiRequest<{
+      posts: PostListItem[];
+      pagination: { page: number; limit: number; total: number; totalPages: number }
+    }>(`/categories/${slug}/posts${query}`);
+  },
   
   /**
    * 创建分类
@@ -532,6 +558,23 @@ export const api = {
     const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
     return apiRequest<{ tags: Tag[] }>(`/categories/tags${query}`);
   },
+
+  /**
+   * 获取标签详情
+   */
+  getTag: (slug: string) =>
+    apiRequest<Tag>(`/categories/tags/${slug}`),
+
+  /**
+   * 获取标签下的文章列表
+   */
+  getTagPosts: (slug: string, params?: { page?: string; limit?: string; sortBy?: string }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return apiRequest<{
+      posts: PostListItem[];
+      pagination: { page: number; limit: number; total: number; totalPages: number }
+    }>(`/categories/tags/${slug}/posts${query}`);
+  },
   
   /**
    * 创建标签
@@ -567,7 +610,77 @@ export const api = {
     apiRequest<{ deleted: boolean }>(`/categories/tags/${id}`, {
       method: 'DELETE',
     }),
-  
+
+  // ============= 专栏相关 =============
+
+  /**
+   * 获取专栏列表
+   */
+  getColumns: (params?: { page?: string; limit?: string; author?: string; sortBy?: string }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return apiRequest<{
+      columns: import('../types').Column[];
+      pagination: { page: number; limit: number; total: number; totalPages: number }
+    }>(`/columns${query}`);
+  },
+
+  /**
+   * 获取专栏详情
+   */
+  getColumn: (slug: string) =>
+    apiRequest<import('../types').Column>(`/columns/${slug}`),
+
+  /**
+   * 获取专栏下的文章列表
+   */
+  getColumnPosts: (slug: string, params?: { page?: string; limit?: string; sortBy?: string }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return apiRequest<{
+      posts: PostListItem[];
+      pagination: { page: number; limit: number; total: number; totalPages: number }
+    }>(`/columns/${slug}/posts${query}`);
+  },
+
+  /**
+   * 创建专栏
+   */
+  createColumn: (data: import('../types').CreateColumnRequest) =>
+    apiRequest<{ id: number; slug: string }>('/columns', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * 更新专栏
+   */
+  updateColumn: (id: number, data: import('../types').UpdateColumnRequest) =>
+    apiRequest<{ updated: boolean }>(`/columns/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * 删除专栏
+   */
+  deleteColumn: (id: number) =>
+    apiRequest<{ deleted: boolean }>(`/columns/${id}`, {
+      method: 'DELETE',
+    }),
+
+  /**
+   * 刷新专栏统计数据
+   */
+  refreshColumnStats: (id: number) =>
+    apiRequest<{
+      postCount: number;
+      totalViewCount: number;
+      totalLikeCount: number;
+      totalFavoriteCount: number;
+      totalCommentCount: number;
+    }>(`/columns/${id}/refresh-stats`, {
+      method: 'POST',
+    }),
+
   // ============= 文件上传 =============
   
   /**

@@ -11,7 +11,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../utils/api';
 import { parseDocument, isSupportedDocument } from '../utils/documentParser';
-import { transformCategoryList, transformTagList, transformPost } from '../utils/apiTransformer';
+import { transformCategoryList, transformTagList, transformColumnList, transformPost } from '../utils/apiTransformer';
 import { 
   detectUrls, 
   insertOrUpdateMarkdownLink,
@@ -24,6 +24,7 @@ import { SplitPreview } from './MarkdownPreview';
 import { ContentStats } from './ContentStats';
 import { AutoSaveStatus } from './AutoSaveStatus';
 import { SEOAssistant } from './SEOAssistant';
+import { DraftSelector } from './DraftSelector';
 
 interface Category {
   id: number;
@@ -31,6 +32,14 @@ interface Category {
   slug: string;
   icon?: string;
   color?: string;
+}
+
+interface Column {
+  id: number;
+  name: string;
+  slug: string;
+  coverImage?: string;
+  postCount?: number;
 }
 
 interface Tag {
@@ -53,6 +62,7 @@ interface PostData {
   summary: string;
   coverImage: string;
   categoryId: number | null;
+  columnId: number | null;
   tags: number[];
   status: 'draft' | 'published';
 }
@@ -64,11 +74,21 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   const [summary, setSummary] = useState('');
   const [coverImage, setCoverImage] = useState('');
   const [status, setStatus] = useState<'draft' | 'published'>('draft');
+
+  // 为每个新建文章会话生成唯一的 sessionId
+  const [sessionId] = useState(() => {
+    return postId ? null : Date.now().toString();
+  });
+
+  // 构建草稿键
+  const draftKey = postId ? `post_${postId}` : `new_post_${sessionId}`;
   
-  // 分类和标签
+  // 分类、专栏和标签
   const [categories, setCategories] = useState<Category[]>([]);
+  const [columns, setColumns] = useState<Column[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [selectedColumnId, setSelectedColumnId] = useState<number | null>(null);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   
   // 标签搜索
@@ -79,6 +99,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [columnsLoading, setColumnsLoading] = useState(true);
   const [tagsLoading, setTagsLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   
@@ -102,36 +123,68 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   // 检测到的链接
   const [detectedLinks, setDetectedLinks] = useState<string[]>([]);
   
+  // 草稿选择器状态
+  const [draftSelectorOpen, setDraftSelectorOpen] = useState(false);
+  const [availableDrafts, setAvailableDrafts] = useState<any[]>([]);
+  
   // 自动保存
   const postData: PostData = {
-    title, content, summary, coverImage, 
-    categoryId: selectedCategoryId, 
-    tags: selectedTagIds, 
-    status 
+    title, content, summary, coverImage,
+    categoryId: selectedCategoryId,
+    columnId: selectedColumnId,
+    tags: selectedTagIds,
+    status
   };
   
-  const { lastSaved, isSaving, hasDraft, saveNow, restoreFromLocalStorage, clearLocalStorage } = useAutoSave({
-    key: postId ? `post_${postId}` : 'new_post',
+  const { lastSaved, isSaving, hasDraft, saveNow, clearLocalStorage } = useAutoSave({
+    key: draftKey,
     data: postData,
     interval: 30000,
     enabled: true,
   });
 
+  // 保存草稿成功提示
+  const [draftSaveMessage, setDraftSaveMessage] = useState<string | null>(null);
+  const draftSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 处理手动保存草稿
+  const handleSaveDraft = useCallback(async () => {
+    await saveNow();
+    // 显示保存成功提示
+    setDraftSaveMessage('草稿已保存到浏览器缓存');
+    // 清除之前的定时器
+    if (draftSaveTimeoutRef.current) {
+      clearTimeout(draftSaveTimeoutRef.current);
+    }
+    // 3秒后清除提示
+    draftSaveTimeoutRef.current = setTimeout(() => {
+      setDraftSaveMessage(null);
+    }, 3000);
+  }, [saveNow]);
+
   // 键盘快捷键
   useKeyboardShortcuts([
-    { key: 's', ctrl: true, handler: () => { saveNow(); handleSubmit(new Event('submit') as any); }, description: '保存文章' },
+    { key: 's', ctrl: true, handler: () => { handleSaveDraft(); handleSubmit(new Event('submit') as any); }, description: '保存文章' },
     { key: 'p', ctrl: true, handler: () => setActiveTab(prev => prev === 'edit' ? 'split' : 'edit'), description: '切换预览' },
     { key: 'k', ctrl: true, handler: openLinkEditor, description: '插入链接' },
     { key: 'f11', ctrl: false, handler: () => setIsFullscreen(prev => !prev), description: '全屏模式' },
     { key: 'Escape', ctrl: false, handler: () => setIsFullscreen(false), description: '退出全屏' },
   ]);
 
-  // 加载分类和标签
+  // 加载分类、专栏和标签，并检查草稿
   useEffect(() => {
     loadCategories();
+    loadColumns();
     loadTags();
-    checkDraft();
   }, []);
+
+  // 新建文章时检查草稿
+  useEffect(() => {
+    if (!postId) {
+      checkDraft();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postId]);
   
   // 如果是编辑模式,加载文章数据
   useEffect(() => {
@@ -146,25 +199,79 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     setDetectedLinks(urls);
   }, [content]);
 
-  // 检查是否有草稿
-  const checkDraft = () => {
-    const draft = restoreFromLocalStorage();
-    // 检查草稿是否有实际内容（标题或内容不为空）
-    if (draft && !postId && (draft.title?.trim() || draft.content?.trim())) {
-      const shouldRestore = window.confirm('检测到未保存的草稿，是否恢复？');
-      if (shouldRestore) {
-        setTitle(draft.title || '');
-        setContent(draft.content || '');
-        setSummary(draft.summary || '');
-        setCoverImage(draft.coverImage || '');
-        setStatus(draft.status || 'draft');
-        setSelectedCategoryId(draft.categoryId || null);
-        setSelectedTagIds(draft.tags || []);
-      } else {
-        clearLocalStorage();
+  // 获取所有新建文章的草稿
+  const getAllNewPostDrafts = useCallback(() => {
+    const drafts = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('draft_new_post_')) {
+        try {
+          const item = localStorage.getItem(key);
+          if (item) {
+            const draft = JSON.parse(item);
+            // 只保留有内容的草稿
+            if (draft.data?.title?.trim() || draft.data?.content?.trim()) {
+              drafts.push({
+                key,
+                ...draft,
+                sessionId: key.replace('draft_new_post_', '')
+              });
+            }
+          }
+        } catch (err) {
+          console.error('Failed to parse draft:', err);
+        }
       }
     }
-  };
+    // 按时间倒序排序
+    return drafts.sort((a, b) =>
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+  }, []);
+
+  // 处理选择草稿
+  const handleSelectDraft = useCallback((draft: any) => {
+    // 恢复草稿数据
+    setTitle(draft.data.title || '');
+    setContent(draft.data.content || '');
+    setSummary(draft.data.summary || '');
+    setCoverImage(draft.data.coverImage || '');
+    setStatus(draft.data.status || 'draft');
+    setSelectedCategoryId(draft.data.categoryId || null);
+    setSelectedColumnId(draft.data.columnId || null);
+    setSelectedTagIds(draft.data.tags || []);
+
+    // 删除已恢复的草稿，避免重复
+    localStorage.removeItem(draft.key);
+
+    // 从可用草稿列表中移除
+    setAvailableDrafts(prev => prev.filter(d => d.key !== draft.key));
+
+    setDraftSelectorOpen(false);
+  }, []);
+
+  // 处理清除所有草稿
+  const handleClearAllDrafts = useCallback(() => {
+    availableDrafts.forEach(draft => {
+      localStorage.removeItem(draft.key);
+    });
+    setAvailableDrafts([]);
+    setDraftSelectorOpen(false);
+  }, [availableDrafts]);
+
+  // 检查是否有草稿（只在新建文章时执行）
+  const checkDraft = useCallback(() => {
+    if (postId) return; // 编辑模式不检查
+
+    const drafts = getAllNewPostDrafts();
+
+    if (drafts.length > 0) {
+      // 只取最新的 5 个草稿
+      const recentDrafts = drafts.slice(0, 5);
+      setAvailableDrafts(recentDrafts);
+      setDraftSelectorOpen(true);
+    }
+  }, [postId, getAllNewPostDrafts]);
   
   const loadCategories = async () => {
     try {
@@ -177,6 +284,20 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
       console.error('Failed to load categories:', err);
     } finally {
       setCategoriesLoading(false);
+    }
+  };
+
+  const loadColumns = async () => {
+    try {
+      setColumnsLoading(true);
+      const response = await api.getColumns({ limit: '100' });
+      if (response.success && response.data) {
+        setColumns(transformColumnList(response.data.columns || []));
+      }
+    } catch (err) {
+      console.error('Failed to load columns:', err);
+    } finally {
+      setColumnsLoading(false);
     }
   };
 
@@ -206,6 +327,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
         setCoverImage(post.coverImage || '');
         setStatus(post.status as 'draft' | 'published');
         setSelectedCategoryId(post.categoryId || null);
+        setSelectedColumnId(post.columnId || null);
         setSelectedTagIds(post.tags?.map((t: any) => t.id) || []);
       }
     } catch (err: any) {
@@ -238,6 +360,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
         summary,
         coverImage,
         categoryId: selectedCategoryId ?? undefined,
+        columnId: selectedColumnId ?? undefined,
         tags: selectedTagIds,
         status
       };
@@ -284,6 +407,9 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   
   // 处理内容区域粘贴图片
   const handleContentPaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
     const items = e.clipboardData.items;
     for (let i = 0; i < items.length; i++) {
       if (items[i].type.indexOf('image') === 0) {
@@ -296,7 +422,22 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
             if (response.success && response.data) {
               const imageUrl = response.data.url;
               const markdownImage = `![图片](${imageUrl})`;
-              setContent(prev => prev + markdownImage);
+
+              // 在光标位置插入图片，而不是追加到末尾
+              const cursorPosition = textarea.selectionStart;
+              const selectionEnd = textarea.selectionEnd;
+              const beforeCursor = content.substring(0, cursorPosition);
+              const afterCursor = content.substring(selectionEnd);
+              const newContent = beforeCursor + markdownImage + afterCursor;
+              setContent(newContent);
+
+              // 恢复光标位置到插入的图片之后
+              setTimeout(() => {
+                textarea.focus();
+                const newPosition = cursorPosition + markdownImage.length;
+                textarea.setSelectionRange(newPosition, newPosition);
+              }, 0);
+
               alert('图片粘贴成功');
             }
           } catch (error) {
@@ -613,6 +754,15 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
         onConfirm={handleLinkConfirm}
       />
 
+      {/* 草稿选择器弹窗 */}
+      <DraftSelector
+        isOpen={draftSelectorOpen}
+        drafts={availableDrafts}
+        onClose={() => setDraftSelectorOpen(false)}
+        onSelect={handleSelectDraft}
+        onClearAll={handleClearAllDrafts}
+      />
+
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
           {postId ? '编辑文章' : '创建文章'}
@@ -711,7 +861,68 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
             </div>
           )}
         </div>
-        
+
+        {/* 专栏选择 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            选择专栏
+          </label>
+          {columnsLoading ? (
+            <div className="text-gray-500 dark:text-gray-400">加载专栏中...</div>
+          ) : columns.length === 0 ? (
+            <div className="text-gray-500 dark:text-gray-400 text-sm">
+              暂无专栏，请在专栏管理中创建
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedColumnId(null)}
+                className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all ${
+                  selectedColumnId === null
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 scale-105'
+                    : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
+                }`}
+              >
+                <div className="w-10 h-10 rounded-lg bg-gray-200 dark:bg-slate-600 flex items-center justify-center">
+                  <svg className="w-6 h-6 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  不选择
+                </span>
+              </button>
+              {columns.map((column) => (
+                <button
+                  key={column.id}
+                  type="button"
+                  onClick={() => setSelectedColumnId(
+                    selectedColumnId === column.id ? null : column.id
+                  )}
+                  className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all ${
+                    selectedColumnId === column.id
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 scale-105'
+                      : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">
+                    {column.name.slice(0, 2)}
+                  </div>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate max-w-full">
+                    {column.name}
+                  </span>
+                  {column.postCount !== undefined && (
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {column.postCount} 篇文章
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* 标签选择 */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -1128,7 +1339,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             发布状态
           </label>
-          <div className="flex gap-4">
+          <div className="flex gap-4 mb-2">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="radio"
@@ -1150,6 +1361,11 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
               <span className="text-gray-700 dark:text-gray-300">发布</span>
             </label>
           </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {status === 'draft' 
+              ? '草稿状态：文章会保存在文章管理中，但前端页面不可见。更新为"发布"状态后前端才能看到。' 
+              : '发布状态：文章将立即在前端页面显示。'}
+          </p>
         </div>
         
         {/* 操作按钮 */}
@@ -1161,14 +1377,17 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
           >
             {loading ? '提交中...' : uploading ? '上传中...' : postId ? '更新文章' : '发布文章'}
           </button>
-          <button
-            type="button"
-            onClick={() => saveNow()}
-            disabled={isSaving}
-            className="px-6 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors font-medium"
-          >
-            {isSaving ? '保存中...' : '保存草稿'}
-          </button>
+          <div className="flex flex-col items-center">
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              disabled={isSaving}
+              className="px-6 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors font-medium"
+            >
+              {isSaving ? '保存中...' : '保存草稿'}
+            </button>
+            <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">仅保存到浏览器缓存</span>
+          </div>
           {onCancel && (
             <button
               type="button"
@@ -1180,6 +1399,18 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
             </button>
           )}
         </div>
+
+        {/* 草稿保存成功提示 */}
+        {draftSaveMessage && (
+          <div className="fixed bottom-6 right-6 z-50">
+            <div className="bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span>{draftSaveMessage}</span>
+            </div>
+          </div>
+        )}
 
         {/* 快捷键提示 */}
         <div className="text-xs text-gray-500 dark:text-gray-400 pt-4 border-t border-gray-200 dark:border-slate-700">

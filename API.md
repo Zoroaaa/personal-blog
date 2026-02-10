@@ -2,7 +2,9 @@
 
 本文档详细描述个人博客系统的所有 API 接口。
 
-**版本**: v3.0.1 | **基础 URL**: `https://api.example.com/api` | **更新日期**: 2026-02-09
+**版本**: v1.2.0 | **基础 URL**: `/api` | **更新日期**: 2026-02-10
+
+---
 
 ## 目录
 
@@ -11,18 +13,21 @@
 - [文章模块](#文章模块)
 - [评论模块](#评论模块)
 - [分类模块](#分类模块)
+- [专栏模块](#专栏模块)
 - [管理模块](#管理模块)
 - [配置模块](#配置模块)
 - [上传模块](#上传模块)
 - [统计模块](#统计模块)
 - [健康检查](#健康检查)
 
+---
+
 ## 通用规范
 
 ### 请求格式
 
 - 基础 URL: `/api`
-- 请求方法: GET, POST, PUT, DELETE
+- 请求方法: GET, POST, PUT, DELETE, PATCH
 - 请求头:
   ```
   Content-Type: application/json
@@ -35,7 +40,8 @@
 {
   "success": true,
   "data": {},
-  "message": "操作成功"
+  "message": "操作成功",
+  "timestamp": "2026-02-10T10:00:00.000Z"
 }
 ```
 
@@ -44,10 +50,9 @@
 ```json
 {
   "success": false,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "错误描述"
-  }
+  "error": "ERROR_CODE",
+  "message": "错误描述",
+  "timestamp": "2026-02-10T10:00:00.000Z"
 }
 ```
 
@@ -61,6 +66,7 @@
 | 401 | 未授权 |
 | 403 | 禁止访问 |
 | 404 | 资源不存在 |
+| 409 | 资源冲突 |
 | 500 | 服务器内部错误 |
 
 ### 分页参数
@@ -99,9 +105,11 @@
 请求体：
 ```json
 {
+  "username": "用户名",
   "email": "user@example.com",
   "password": "password123",
-  "nickname": "用户名"
+  "displayName": "显示名称",
+  "emailVerificationCode": "123456"
 }
 ```
 
@@ -113,12 +121,13 @@
     "token": "eyJhbGciOiJIUzI1NiIs...",
     "user": {
       "id": 1,
+      "username": "用户名",
       "email": "user@example.com",
-      "nickname": "用户名",
+      "displayName": "显示名称",
       "role": "user",
-      "avatar": null,
+      "avatarUrl": null,
       "bio": null,
-      "created_at": "2026-02-09T10:00:00.000Z"
+      "createdAt": "2026-02-10T10:00:00.000Z"
     }
   },
   "message": "注册成功"
@@ -132,7 +141,7 @@
 请求体：
 ```json
 {
-  "email": "user@example.com",
+  "username": "用户名",
   "password": "password123"
 }
 ```
@@ -145,10 +154,11 @@
     "token": "eyJhbGciOiJIUzI1NiIs...",
     "user": {
       "id": 1,
+      "username": "用户名",
       "email": "user@example.com",
-      "nickname": "用户名",
+      "displayName": "显示名称",
       "role": "user",
-      "avatar": null
+      "avatarUrl": null
     }
   }
 }
@@ -156,13 +166,16 @@
 
 ### GitHub OAuth 登录
 
-**GET** `/auth/github`
+**POST** `/auth/github`
 
-重定向到 GitHub 授权页面。
+请求体：
+```json
+{
+  "code": "github_oauth_code"
+}
+```
 
-**GET** `/auth/github/callback?code=xxx`
-
-回调地址，返回：
+响应：
 ```json
 {
   "success": true,
@@ -185,15 +198,19 @@
   "success": true,
   "data": {
     "id": 1,
+    "username": "用户名",
     "email": "user@example.com",
-    "nickname": "用户名",
+    "displayName": "显示名称",
     "role": "user",
-    "avatar": "https://...",
+    "avatarUrl": "https://...",
     "bio": "个人简介",
-    "github_id": null,
-    "email_verified": false,
-    "created_at": "2026-02-09T10:00:00.000Z",
-    "updated_at": "2026-02-09T10:00:00.000Z"
+    "oauthProvider": null,
+    "status": "active",
+    "postCount": 10,
+    "commentCount": 50,
+    "createdAt": "2026-02-10T10:00:00.000Z",
+    "updatedAt": "2026-02-10T10:00:00.000Z",
+    "lastLoginAt": "2026-02-10T10:00:00.000Z"
   }
 }
 ```
@@ -207,9 +224,9 @@
 请求体：
 ```json
 {
-  "nickname": "新昵称",
+  "displayName": "新昵称",
   "bio": "新简介",
-  "avatar": "https://..."
+  "avatarUrl": "https://..."
 }
 ```
 
@@ -223,7 +240,50 @@
 ```json
 {
   "currentPassword": "旧密码",
-  "newPassword": "新密码"
+  "newPassword": "新密码",
+  "emailVerificationCode": "123456"
+}
+```
+
+### 重置密码
+
+**POST** `/auth/reset-password`
+
+请求体：
+```json
+{
+  "email": "user@example.com",
+  "verificationCode": "123456",
+  "newPassword": "newpassword123"
+}
+```
+
+### 发送验证码
+
+**POST** `/auth/send-verification-code`
+
+请求体：
+```json
+{
+  "email": "user@example.com",
+  "type": "register"
+}
+```
+
+类型可选值：`register`, `password`, `forgot_password`, `delete`
+
+### 删除账号
+
+**POST** `/auth/delete`
+
+请求头：`Authorization: Bearer <token>`
+
+请求体：
+```json
+{
+  "password": "当前密码",
+  "confirmation": "DELETE",
+  "emailVerificationCode": "123456"
 }
 ```
 
@@ -255,39 +315,68 @@
 |------|------|------|
 | page | number | 页码 |
 | limit | number | 每页数量 |
-| category | string | 分类别名 |
-| tag | string | 标签别名 |
+| category | string | 分类slug |
+| tag | string | 标签slug |
+| author | string | 作者用户名 |
 | search | string | 搜索关键词 |
-| status | string | 状态：published/draft |
+| sortBy | string | 排序字段：published_at, view_count, like_count, comment_count |
+| order | string | 排序方向：asc, desc |
 
 响应：
 ```json
 {
   "success": true,
   "data": {
-    "items": [
+    "posts": [
       {
         "id": 1,
         "title": "文章标题",
         "slug": "article-slug",
         "summary": "文章摘要",
-        "cover_image": "https://...",
-        "category_id": 1,
-        "category_name": "分类名",
-        "author_id": 1,
-        "author_name": "作者名",
-        "view_count": 100,
-        "like_count": 10,
-        "comment_count": 5,
-        "is_pinned": false,
-        "published_at": "2026-02-09T10:00:00.000Z",
-        "created_at": "2026-02-09T10:00:00.000Z"
+        "coverImage": "https://...",
+        "categoryName": "分类名",
+        "categorySlug": "category-slug",
+        "categoryColor": "#3B82F6",
+        "authorName": "作者名",
+        "authorDisplayName": "作者显示名",
+        "authorAvatar": "https://...",
+        "viewCount": 100,
+        "likeCount": 10,
+        "commentCount": 5,
+        "readingTime": 5,
+        "publishedAt": "2026-02-10T10:00:00.000Z",
+        "tags": [{"id": 1, "name": "标签1", "slug": "tag1"}]
       }
     ],
     "pagination": {...}
   }
 }
 ```
+
+### 搜索文章
+
+**GET** `/posts/search`
+
+查询参数：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| q | string | 搜索关键词（支持FTS5语法） |
+| category | string | 分类slug |
+| tag | string | 标签slug |
+| page | number | 页码 |
+| limit | number | 每页数量 |
+| sort | string | 排序方式：published_at, view_count, like_count, comment_count, relevance |
+| order | string | 排序方向：asc, desc |
+| use_fts | boolean | 是否使用FTS5全文搜索（默认true） |
+
+FTS5搜索语法：
+- 普通关键词: `React`
+- AND搜索: `React AND TypeScript`
+- OR搜索: `React OR Vue`
+- 短语搜索: `"完整短语"`
+- 前缀搜索: `React*`
+- 排除搜索: `React -Vue`
 
 ### 获取文章详情
 
@@ -303,26 +392,51 @@
     "slug": "article-slug",
     "content": "文章内容（Markdown）",
     "summary": "文章摘要",
-    "cover_image": "https://...",
-    "category_id": 1,
-    "category_name": "分类名",
-    "tags": ["标签1", "标签2"],
-    "author_id": 1,
-    "author_name": "作者名",
-    "author_avatar": "https://...",
-    "view_count": 100,
-    "like_count": 10,
-    "comment_count": 5,
-    "is_pinned": false,
-    "published_at": "2026-02-09T10:00:00.000Z",
-    "created_at": "2026-02-09T10:00:00.000Z",
-    "updated_at": "2026-02-09T10:00:00.000Z",
-    "is_liked": false,
-    "is_favorited": false,
-    "reading_progress": 0
+    "coverImage": "https://...",
+    "categoryId": 1,
+    "categoryName": "分类名",
+    "categorySlug": "category-slug",
+    "categoryColor": "#3B82F6",
+    "columnId": 1,
+    "tags": [{"id": 1, "name": "标签1", "slug": "tag1"}],
+    "authorId": 1,
+    "authorUsername": "author",
+    "authorName": "作者名",
+    "authorAvatar": "https://...",
+    "authorBio": "作者简介",
+    "viewCount": 100,
+    "likeCount": 10,
+    "commentCount": 5,
+    "readingTime": 5,
+    "status": "published",
+    "visibility": "public",
+    "metaTitle": "SEO标题",
+    "metaDescription": "SEO描述",
+    "metaKeywords": "关键词1,关键词2",
+    "publishedAt": "2026-02-10T10:00:00.000Z",
+    "createdAt": "2026-02-10T10:00:00.000Z",
+    "updatedAt": "2026-02-10T10:00:00.000Z",
+    "isLiked": false,
+    "isFavorited": false
   }
 }
 ```
+
+### 获取管理员文章列表
+
+**GET** `/posts/admin`
+
+请求头：`Authorization: Bearer <token>`
+
+返回所有文章（不限状态），用于管理后台。
+
+### 通过ID获取文章（用于编辑）
+
+**GET** `/posts/admin/:id`
+
+请求头：`Authorization: Bearer <token>`
+
+用于编辑时获取文章详情（包括非公开文章）。
 
 ### 创建文章
 
@@ -336,13 +450,21 @@
   "title": "文章标题",
   "content": "文章内容（Markdown）",
   "summary": "文章摘要",
-  "cover_image": "https://...",
-  "category_id": 1,
-  "tags": ["标签1", "标签2"],
-  "is_pinned": false,
-  "status": "published"
+  "coverImage": "https://...",
+  "categoryId": 1,
+  "columnId": 1,
+  "tags": [1, 2, 3],
+  "status": "published",
+  "visibility": "public",
+  "password": "",
+  "metaTitle": "SEO标题",
+  "metaDescription": "SEO描述",
+  "metaKeywords": "关键词"
 }
 ```
+
+状态可选值：`draft`, `published`, `archived`
+可见性可选值：`public`, `private`, `password`
 
 ### 更新文章
 
@@ -350,13 +472,24 @@
 
 请求头：`Authorization: Bearer <token>`
 
-请求体：同创建文章
+请求体：同创建文章（所有字段可选）
 
 ### 删除文章
 
 **DELETE** `/posts/:id`
 
-请求头：`Authorization: Bearer <token>`
+请求头：`Authorization: Bearer <token>`（需要管理员权限）
+
+响应：
+```json
+{
+  "success": true,
+  "data": {
+    "deleted": true,
+    "imagesDeleted": 5
+  }
+}
+```
 
 ### 点赞文章
 
@@ -370,16 +503,10 @@
   "success": true,
   "data": {
     "liked": true,
-    "like_count": 11
+    "likeCount": 11
   }
 }
 ```
-
-### 取消点赞
-
-**DELETE** `/posts/:id/like`
-
-请求头：`Authorization: Bearer <token>`
 
 ### 收藏文章
 
@@ -397,13 +524,7 @@
 }
 ```
 
-### 取消收藏
-
-**DELETE** `/posts/:id/favorite`
-
-请求头：`Authorization: Bearer <token>`
-
-### 更新阅读进度
+### 记录阅读进度
 
 **POST** `/posts/:id/reading-progress`
 
@@ -412,7 +533,8 @@
 请求体：
 ```json
 {
-  "progress": 50
+  "readDurationSeconds": 120,
+  "readPercentage": 50
 }
 ```
 
@@ -422,9 +544,17 @@
 
 请求头：`Authorization: Bearer <token>`
 
+响应包含阅读时长和阅读百分比。
+
 ### 获取收藏列表
 
 **GET** `/posts/favorites`
+
+请求头：`Authorization: Bearer <token>`
+
+### 获取点赞文章列表
+
+**GET** `/posts/likes`
 
 请求头：`Authorization: Bearer <token>`
 
@@ -440,27 +570,30 @@
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| post_id | number | 文章 ID |
+| postId | number | 文章ID |
 | page | number | 页码 |
 | limit | number | 每页数量 |
+| status | string | 状态筛选：pending, approved, rejected |
 
 响应：
 ```json
 {
   "success": true,
   "data": {
-    "items": [
+    "comments": [
       {
         "id": 1,
         "content": "评论内容",
-        "author_id": 1,
-        "author_name": "评论者",
-        "author_avatar": "https://...",
-        "post_id": 1,
-        "parent_id": null,
-        "like_count": 5,
-        "is_pinned": false,
-        "created_at": "2026-02-09T10:00:00.000Z",
+        "userId": 1,
+        "username": "评论者",
+        "displayName": "评论者显示名",
+        "avatarUrl": "https://...",
+        "postId": 1,
+        "parentId": null,
+        "likeCount": 5,
+        "replyCount": 2,
+        "status": "approved",
+        "createdAt": "2026-02-10T10:00:00.000Z",
         "replies": [...]
       }
     ],
@@ -478,9 +611,9 @@
 请求体：
 ```json
 {
-  "post_id": 1,
+  "postId": 1,
   "content": "评论内容",
-  "parent_id": null
+  "parentId": null
 }
 ```
 
@@ -498,12 +631,6 @@
 
 请求头：`Authorization: Bearer <token>`
 
-### 取消点赞评论
-
-**DELETE** `/comments/:id/like`
-
-请求头：`Authorization: Bearer <token>`
-
 ---
 
 ## 分类模块
@@ -516,23 +643,24 @@
 ```json
 {
   "success": true,
-  "data": [
-    {
-      "id": 1,
-      "name": "技术",
-      "slug": "tech",
-      "description": "技术文章",
-      "post_count": 10,
-      "sort_order": 1,
-      "created_at": "2026-02-09T10:00:00.000Z"
-    }
-  ]
+  "data": {
+    "categories": [
+      {
+        "id": 1,
+        "name": "技术",
+        "slug": "tech",
+        "description": "技术文章",
+        "icon": "💻",
+        "color": "#3B82F6",
+        "postCount": 10,
+        "displayOrder": 1,
+        "createdAt": "2026-02-10T10:00:00.000Z",
+        "updatedAt": "2026-02-10T10:00:00.000Z"
+      }
+    ]
+  }
 }
 ```
-
-### 获取分类详情
-
-**GET** `/categories/:slug`
 
 ### 创建分类
 
@@ -546,7 +674,9 @@
   "name": "分类名",
   "slug": "category-slug",
   "description": "分类描述",
-  "sort_order": 1
+  "icon": "💻",
+  "color": "#3B82F6",
+  "displayOrder": 1
 }
 ```
 
@@ -564,40 +694,165 @@
 
 ### 获取所有标签
 
-**GET** `/tags`
+**GET** `/categories/tags`
 
 响应：
 ```json
 {
   "success": true,
-  "data": [
-    {
-      "id": 1,
-      "name": "React",
-      "slug": "react",
-      "post_count": 5
-    }
-  ]
+  "data": {
+    "tags": [
+      {
+        "id": 1,
+        "name": "React",
+        "slug": "react",
+        "description": "React相关",
+        "color": "#3B82F6",
+        "postCount": 5,
+        "createdAt": "2026-02-10T10:00:00.000Z",
+        "updatedAt": "2026-02-10T10:00:00.000Z"
+      }
+    ]
+  }
 }
 ```
 
 ### 创建标签
 
-**POST** `/tags`
+**POST** `/categories/tags`
 
 请求头：`Authorization: Bearer <token>`（需要管理员权限）
 
 ### 更新标签
 
-**PUT** `/tags/:id`
+**PUT** `/categories/tags/:id`
 
 请求头：`Authorization: Bearer <token>`（需要管理员权限）
 
 ### 删除标签
 
-**DELETE** `/tags/:id`
+**DELETE** `/categories/tags/:id`
 
 请求头：`Authorization: Bearer <token>`（需要管理员权限）
+
+---
+
+## 专栏模块
+
+### 获取专栏列表
+
+**GET** `/columns`
+
+查询参数：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| page | number | 页码 |
+| limit | number | 每页数量 |
+| author | string | 作者用户名 |
+| sortBy | string | 排序字段：created_at, post_count, total_view_count |
+| order | string | 排序方向：asc, desc |
+
+响应：
+```json
+{
+  "success": true,
+  "data": {
+    "columns": [
+      {
+        "id": 1,
+        "name": "专栏名称",
+        "slug": "column-slug",
+        "description": "专栏描述",
+        "coverImage": "https://...",
+        "authorId": 1,
+        "authorUsername": "author",
+        "authorName": "作者名",
+        "authorAvatar": "https://...",
+        "postCount": 10,
+        "totalViewCount": 1000,
+        "totalLikeCount": 100,
+        "totalFavoriteCount": 50,
+        "totalCommentCount": 200,
+        "displayOrder": 1,
+        "status": "active",
+        "createdAt": "2026-02-10T10:00:00.000Z",
+        "updatedAt": "2026-02-10T10:00:00.000Z"
+      }
+    ],
+    "pagination": {...}
+  }
+}
+```
+
+### 获取专栏详情
+
+**GET** `/columns/:slug`
+
+### 获取专栏下的文章列表
+
+**GET** `/columns/:slug/posts`
+
+查询参数：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| page | number | 页码 |
+| limit | number | 每页数量 |
+| sortBy | string | 排序字段：published_at, view_count, like_count |
+| order | string | 排序方向：asc, desc |
+
+### 创建专栏
+
+**POST** `/columns`
+
+请求头：`Authorization: Bearer <token>`（需要管理员权限）
+
+请求体：
+```json
+{
+  "name": "专栏名称",
+  "slug": "column-slug",
+  "description": "专栏描述",
+  "coverImage": "https://...",
+  "displayOrder": 1
+}
+```
+
+### 更新专栏
+
+**PUT** `/columns/:id`
+
+请求头：`Authorization: Bearer <token>`（需要管理员权限）
+
+请求体：
+```json
+{
+  "name": "新名称",
+  "description": "新描述",
+  "coverImage": "https://...",
+  "displayOrder": 1,
+  "status": "active"
+}
+```
+
+状态可选值：`active`, `hidden`, `archived`
+
+### 删除专栏
+
+**DELETE** `/columns/:id`
+
+请求头：`Authorization: Bearer <token>`（需要管理员权限）
+
+**注意**: 专栏下存在已发布文章时禁止删除。
+
+### 刷新专栏统计
+
+**POST** `/columns/:id/refresh-stats`
+
+请求头：`Authorization: Bearer <token>`（需要管理员权限）
+
+手动同步专栏统计数据。
 
 ---
 
@@ -615,22 +870,7 @@
 |------|------|------|
 | page | number | 页码 |
 | limit | number | 每页数量 |
-| search | string | 搜索关键词 |
-| role | string | 角色筛选 |
-| status | string | 状态筛选 |
-
-### 更新用户状态
-
-**PUT** `/admin/users/:id/status`
-
-请求头：`Authorization: Bearer <token>`（需要管理员权限）
-
-请求体：
-```json
-{
-  "status": "active"
-}
-```
+| role | string | 角色筛选：admin, user, moderator |
 
 ### 更新用户角色
 
@@ -645,55 +885,50 @@
 }
 ```
 
-### 获取待审核评论
+### 删除用户
 
-**GET** `/admin/comments/pending`
-
-请求头：`Authorization: Bearer <token>`（需要管理员权限）
-
-### 审核评论
-
-**PUT** `/admin/comments/:id/approve`
+**DELETE** `/admin/users/:id`
 
 请求头：`Authorization: Bearer <token>`（需要管理员权限）
 
-### 拒绝评论
+### 获取评论管理列表
 
-**PUT** `/admin/comments/:id/reject`
-
-请求头：`Authorization: Bearer <token>`（需要管理员权限）
-
-### 获取系统统计
-
-**GET** `/admin/stats`
+**GET** `/admin/comments`
 
 请求头：`Authorization: Bearer <token>`（需要管理员权限）
 
-响应：
+查询参数：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| page | number | 页码 |
+| limit | number | 每页数量 |
+| status | string | 状态筛选：pending, approved, rejected, spam |
+
+### 更新评论状态
+
+**PUT** `/admin/comments/:id/status`
+
+请求头：`Authorization: Bearer <token>`（需要管理员权限）
+
+请求体：
 ```json
 {
-  "success": true,
-  "data": {
-    "users": {
-      "total": 100,
-      "new_today": 5
-    },
-    "posts": {
-      "total": 50,
-      "published": 45,
-      "draft": 5
-    },
-    "comments": {
-      "total": 200,
-      "pending": 10
-    },
-    "views": {
-      "total": 10000,
-      "today": 500
-    }
-  }
+  "status": "approved"
 }
 ```
+
+### 获取系统设置
+
+**GET** `/admin/settings`
+
+请求头：`Authorization: Bearer <token>`（需要管理员权限）
+
+### 更新系统设置
+
+**PUT** `/admin/settings`
+
+请求头：`Authorization: Bearer <token>`（需要管理员权限）
 
 ---
 
@@ -709,27 +944,52 @@
   "success": true,
   "data": {
     "site_name": "我的博客",
-    "site_description": "个人技术博客",
+    "site_subtitle": "分享技术与生活",
     "site_logo": "https://...",
     "site_favicon": "https://...",
+    "site_description": "个人技术博客",
+    "site_keywords": "blog,技术,编程",
+    "site_author": "Admin",
+    "theme_primary_color": "#3B82F6",
+    "theme_default_mode": "system",
+    "feature_comments": true,
+    "feature_search": true,
+    "feature_like": true,
+    "feature_share": true,
     "posts_per_page": 10,
-    "enable_comment": true,
-    "enable_github_oauth": true,
-    "enable_email_verify": false,
-    "icp": "",
-    "custom_css": "",
-    "custom_js": "",
-    "seo_title": "",
-    "seo_description": "",
-    "seo_keywords": "",
-    "social_github": "",
-    "social_twitter": "",
-    "social_weibo": ""
+    "max_upload_size_mb": 5
   }
 }
 ```
 
-### 更新站点配置
+### 获取存储配置
+
+**GET** `/config/storage`
+
+响应：
+```json
+{
+  "success": true,
+  "data": {
+    "storagePublicUrl": "https://..."
+  }
+}
+```
+
+### 更新配置项
+
+**PUT** `/config/:key`
+
+请求头：`Authorization: Bearer <token>`（需要管理员权限）
+
+请求体：
+```json
+{
+  "value": "新值"
+}
+```
+
+### 批量更新配置
 
 **PUT** `/config`
 
@@ -738,10 +998,20 @@
 请求体：
 ```json
 {
-  "site_name": "新名称",
-  "site_description": "新描述"
+  "configs": {
+    "site_name": "新名称",
+    "site_description": "新描述"
+  }
 }
 ```
+
+### 获取所有配置（管理员）
+
+**GET** `/config/admin`
+
+请求头：`Authorization: Bearer <token>`（需要管理员权限）
+
+返回包含配置元数据的完整配置列表。
 
 ---
 
@@ -749,7 +1019,7 @@
 
 ### 上传图片
 
-**POST** `/upload/image`
+**POST** `/upload`
 
 请求头：`Authorization: Bearer <token>`
 
@@ -769,12 +1039,18 @@ file: <图片文件>
   "success": true,
   "data": {
     "url": "https://...",
-    "thumbnail": "https://...",
     "filename": "image.jpg",
-    "size": 1024
+    "size": 1024,
+    "type": "image/jpeg"
   }
 }
 ```
+
+### 删除文件
+
+**DELETE** `/upload/:filename`
+
+请求头：`Authorization: Bearer <token>`
 
 ---
 
@@ -782,17 +1058,23 @@ file: <图片文件>
 
 ### 获取系统统计
 
-**GET** `/analytics/stats`
+**GET** `/analytics`
 
 响应：
 ```json
 {
   "success": true,
   "data": {
-    "posts": 50,
-    "users": 100,
-    "comments": 200,
-    "views": 10000
+    "totalPosts": 50,
+    "totalUsers": 100,
+    "totalComments": 200,
+    "totalViews": 10000,
+    "recentPosts": [...],
+    "recentComments": [...],
+    "viewTrend": [
+      {"date": "2026-02-01", "views": 100},
+      {"date": "2026-02-02", "views": 150}
+    ]
   }
 }
 ```
@@ -808,37 +1090,6 @@ file: <图片文件>
 | limit | number | 返回数量 | 5 |
 | days | number | 统计天数 | 7 |
 
-### 获取用户统计
-
-**GET** `/analytics/users`
-
-请求头：`Authorization: Bearer <token>`
-
-响应：
-```json
-{
-  "success": true,
-  "data": {
-    "total_posts": 10,
-    "total_comments": 50,
-    "total_likes": 100,
-    "total_views": 1000
-  }
-}
-```
-
-### 记录页面访问
-
-**POST** `/analytics/page-view`
-
-请求体：
-```json
-{
-  "path": "/posts/article-slug",
-  "referrer": "https://google.com"
-}
-```
-
 ---
 
 ## 健康检查
@@ -850,24 +1101,38 @@ file: <图片文件>
 响应：
 ```json
 {
-  "status": "ok",
-  "version": "3.0.1",
-  "timestamp": "2026-02-09T10:00:00.000Z"
+  "success": true,
+  "data": {
+    "status": "healthy",
+    "version": "1.2.0",
+    "timestamp": "2026-02-10T10:00:00.000Z",
+    "environment": "production",
+    "services": {
+      "database": "healthy",
+      "cache": "healthy",
+      "storage": "healthy"
+    },
+    "config": {
+      "jwt_secret": true,
+      "github_oauth": true,
+      "frontend_url": true,
+      "storage_url": true
+    }
+  }
 }
 ```
 
-### 数据库健康检查
+### API健康检查
 
-**GET** `/health/db`
+**GET** `/api/health`
 
-响应：
-```json
-{
-  "status": "ok",
-  "database": "connected",
-  "timestamp": "2026-02-09T10:00:00.000Z"
-}
-```
+简化版健康检查端点。
+
+### 根路径信息
+
+**GET** `/`
+
+返回API基本信息和功能列表。
 
 ---
 
@@ -880,6 +1145,7 @@ file: <图片文件>
 | `NOT_FOUND` | 资源不存在 |
 | `VALIDATION_ERROR` | 参数验证失败 |
 | `EMAIL_EXISTS` | 邮箱已存在 |
+| `USERNAME_EXISTS` | 用户名已存在 |
 | `INVALID_CREDENTIALS` | 用户名或密码错误 |
 | `RATE_LIMITED` | 请求过于频繁 |
 | `INTERNAL_ERROR` | 服务器内部错误 |
@@ -891,8 +1157,10 @@ file: <图片文件>
 | 接口 | 限制 |
 |------|------|
 | 登录/注册 | 5次/分钟 |
+| 发送验证码 | 3次/分钟 |
 | 发表评论 | 10次/分钟 |
 | 点赞 | 30次/分钟 |
+| 搜索 | 20次/分钟 |
 | 其他接口 | 100次/分钟 |
 
 ---

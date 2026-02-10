@@ -21,6 +21,7 @@ import { useVerificationCountdown } from '../hooks/useVerificationCountdown';
 import { transformCommentList } from '../utils/apiTransformer';
 import type { User, Comment, PostListItem, ReadingHistoryItem } from '../types';
 import { format } from 'date-fns';
+import { useToast } from '../components/Toast';
 
 // ============= 辅助函数 =============
 
@@ -61,6 +62,7 @@ function getRandomAvatar(username: string): string {
 export function ProfilePage() {
   const { user, logout, setUser } = useAuthStore();
   const navigate = useNavigate();
+  const { showSuccess, showError } = useToast();
   
   // 状态管理
   const [activeTab, setActiveTab] = useState<'info' | 'comments' | 'likes' | 'history' | 'favorites' | 'settings'>('info');
@@ -79,7 +81,6 @@ export function ProfilePage() {
     delete: false
   });
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
   // 表单状态
   const [formData, setFormData] = useState({
@@ -235,7 +236,6 @@ export function ProfilePage() {
     try {
       setLoading(prev => ({ ...prev, update: true }));
       setError(null);
-      setSuccessMessage(null);
       
       // 先上传头像（如果有）
       let avatarUrl = userInfo?.avatarUrl;
@@ -254,7 +254,7 @@ export function ProfilePage() {
       });
       
       if (response.success && response.data) {
-        setSuccessMessage('资料更新成功');
+        showSuccess('资料更新成功');
         await loadUserInfo(); // 重新加载用户信息
         // 更新authStore中的用户信息，确保页面上方的头像也能更新
         if (response.data.user) {
@@ -264,6 +264,7 @@ export function ProfilePage() {
     } catch (error) {
       console.error('Failed to update profile:', error);
       setError('更新资料失败');
+      showError('更新资料失败');
     } finally {
       setLoading(prev => ({ ...prev, update: false }));
     }
@@ -272,11 +273,11 @@ export function ProfilePage() {
   const handleSendCode = async (type: 'password' | 'delete') => {
     // 检查是否在倒计时中
     if (type === 'password' && isPasswordCounting) {
-      setError(`请等待 ${passwordCountdown} 秒后重试`);
+      showError(`请等待 ${passwordCountdown} 秒后重试`);
       return;
     }
     if (type === 'delete' && isDeleteCounting) {
-      setError(`请等待 ${deleteCountdown} 秒后重试`);
+      showError(`请等待 ${deleteCountdown} 秒后重试`);
       return;
     }
     
@@ -291,12 +292,14 @@ export function ProfilePage() {
         } else {
           startDeleteCountdown();
         }
-        setSuccessMessage('验证码已发送到您的邮箱，请查收');
+        showSuccess('验证码已发送到您的邮箱，请查收');
       } else {
         setError(response.message || response.error || '发送失败');
+        showError(response.message || response.error || '发送失败');
       }
     } catch (e: any) {
       setError(e.message || '发送验证码失败');
+      showError(e.message || '发送验证码失败');
     } finally {
       setCodeSending(false);
     }
@@ -307,10 +310,9 @@ export function ProfilePage() {
     try {
       setLoading(prev => ({ ...prev, update: true }));
       setError(null);
-      setSuccessMessage(null);
       
       if (formData.newPassword !== formData.confirmPassword) {
-        setError('两次输入的密码不一致');
+        showError('两次输入的密码不一致');
         return;
       }
       
@@ -321,7 +323,7 @@ export function ProfilePage() {
       });
       
       if (response.success) {
-        setSuccessMessage('密码修改成功');
+        showSuccess('密码修改成功');
         setFormData(prev => ({
           ...prev,
           password: '',
@@ -332,6 +334,7 @@ export function ProfilePage() {
       }
     } catch (error: any) {
       setError(error.message || '修改密码失败');
+      showError(error.message || '修改密码失败');
     } finally {
       setLoading(prev => ({ ...prev, update: false }));
     }
@@ -347,18 +350,19 @@ export function ProfilePage() {
       const response = await api.deleteComment(commentId);
       if (response.success) {
         setComments(prev => prev.filter(comment => comment.id !== commentId));
-        setSuccessMessage('评论删除成功');
+        showSuccess('评论删除成功');
       }
     } catch (error) {
       console.error('Failed to delete comment:', error);
       setError('删除评论失败');
+      showError('删除评论失败');
     }
   };
   
   // 删除账号
   const handleDeleteAccount = async () => {
     if (!deleteConfirmation || deleteConfirmation !== 'DELETE') {
-      setError('请在下方输入 DELETE 确认删除');
+      showError('请在下方输入 DELETE 确认删除');
       return;
     }
     
@@ -368,12 +372,13 @@ export function ProfilePage() {
       
       const response = await api.deleteAccount(deletePassword, deleteVerificationCode);
       if (response.success) {
-        alert('账号删除成功');
+        showSuccess('账号删除成功');
         logout();
         navigate('/');
       }
     } catch (error: any) {
       setError(error.message || '删除账号失败，请检查密码和验证码');
+      showError(error.message || '删除账号失败，请检查密码和验证码');
     } finally {
       setLoading(prev => ({ ...prev, delete: false }));
     }
@@ -648,11 +653,12 @@ export function ProfilePage() {
       if (response.success) {
         // 从列表中移除
         setFavoritePosts(prev => prev.filter(post => post.id !== postId));
-        setSuccessMessage('已取消收藏');
+        showSuccess('已取消收藏');
       }
     } catch (error) {
       console.error('Failed to unfavorite:', error);
       setError('取消收藏失败');
+      showError('取消收藏失败');
     }
   };
 
@@ -910,16 +916,10 @@ export function ProfilePage() {
         <p className="text-muted-foreground">管理您的个人信息和账号设置</p>
       </div>
       
-      {/* 错误和成功消息 */}
+      {/* 错误消息 */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
           <p className="text-red-800">{error}</p>
-        </div>
-      )}
-      
-      {successMessage && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-          <p className="text-green-800">{successMessage}</p>
         </div>
       )}
       

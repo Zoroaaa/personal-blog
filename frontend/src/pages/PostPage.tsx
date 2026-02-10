@@ -24,6 +24,7 @@ import { transformPost, transformCommentList } from '../utils/apiTransformer';
 import { ShareButtons } from '../components/ShareButtons';
 import { SEO } from '../components/SEO';
 import { getMarkdownComponents, generateToc } from '../utils/markdownRenderer';
+import { useToast } from '../components/Toast';
 
 // 导入代码高亮样式
 import 'highlight.js/styles/github-dark.css';
@@ -57,6 +58,7 @@ function formatDate(date: any, formatStr: string = 'yyyy-MM-dd HH:mm'): string {
 export function PostPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const { showSuccess, showError } = useToast();
   const [post, setPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -230,12 +232,13 @@ export function PostPage() {
         setNewComment('');
         // 重新加载评论列表
         await loadComments(post.id);
+        showSuccess('评论发表成功');
       } else {
         throw new Error(response.error || '发表评论失败');
       }
     } catch (error) {
       console.error('Failed to create comment:', error);
-      alert(error instanceof Error ? error.message : '发表评论失败');
+      showError(error instanceof Error ? error.message : '发表评论失败');
     } finally {
       setCommentLoading(false);
     }
@@ -256,15 +259,16 @@ export function PostPage() {
       const response = await api.likePost(post.id);
       if (!response.success) {
         setPost({ ...post, isLiked: !newIsLiked, likeCount: prevLikeCount });
-        alert('点赞失败，请重试');
+        showError('点赞失败，请重试');
         return;
       }
       if (response.data?.likeCount !== undefined) {
         setPost(prev => prev ? { ...prev, likeCount: response.data!.likeCount! } : null);
       }
+      showSuccess(newIsLiked ? '点赞成功' : '已取消点赞');
     } catch (error) {
       setPost({ ...post, isLiked: !newIsLiked, likeCount: prevLikeCount });
-      alert('点赞失败，请重试');
+      showError('点赞失败，请重试');
     } finally {
       setLiking(false);
     }
@@ -281,10 +285,11 @@ export function PostPage() {
       const response = await api.toggleFavorite(post.id);
       if (response.success && response.data) {
         setPost(prev => prev ? { ...prev, isFavorited: response.data!.favorited } : null);
+        showSuccess(response.data.favorited ? '收藏成功' : '已取消收藏');
       }
     } catch (e) {
       console.error('Favorite failed', e);
-      alert('操作失败，请重试');
+      showError('操作失败，请重试');
     } finally {
       setFavoriting(false);
     }
@@ -353,12 +358,13 @@ export function PostPage() {
         setReplyingTo(null);
         // 重新加载评论列表
         await loadComments(post.id);
+        showSuccess('回复发表成功');
       } else {
         throw new Error(response.error || '发表回复失败');
       }
     } catch (error) {
       console.error('Failed to create reply:', error);
-      alert(error instanceof Error ? error.message : '发表回复失败');
+      showError(error instanceof Error ? error.message : '发表回复失败');
     } finally {
       setCommentLoading(false);
     }

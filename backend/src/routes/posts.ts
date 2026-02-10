@@ -97,12 +97,14 @@ postRoutes.get('/', async (c) => {
       SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
              p.view_count, p.like_count, p.comment_count, p.reading_time,
              p.published_at, p.created_at,
-             u.username as author_name, u.display_name as author_display_name, 
+             u.username as author_name, u.display_name as author_display_name,
              u.avatar_url as author_avatar,
-             c.name as category_name, c.slug as category_slug, c.color as category_color
+             c.name as category_name, c.slug as category_slug, c.color as category_color,
+             col.name as column_name, col.slug as column_slug
       FROM posts p
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN columns col ON p.column_id = col.id
       WHERE p.status = 'published' AND p.visibility = 'public'
     `;
     
@@ -263,12 +265,14 @@ postRoutes.get('/admin', requireAuth, async (c) => {
       SELECT p.id, p.title, p.slug, p.summary, p.cover_image, p.status,
              p.view_count, p.like_count, p.comment_count, p.reading_time,
              p.published_at, p.created_at, p.updated_at,
-             u.username as author_name, u.display_name as author_display_name, 
+             u.username as author_name, u.display_name as author_display_name,
              u.avatar_url as author_avatar,
-             c.name as category_name, c.slug as category_slug, c.color as category_color
+             c.name as category_name, c.slug as category_slug, c.color as category_color,
+             col.name as column_name, col.slug as column_slug
       FROM posts p
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN columns col ON p.column_id = col.id
       ORDER BY p.created_at DESC
       LIMIT ? OFFSET ?
     `).bind(limit, offset).all();
@@ -352,18 +356,22 @@ postRoutes.get('/admin/:id', requireAuth, async (c) => {
     
     // 从数据库获取文章（不限制状态）
     const post = await c.env.DB.prepare(`
-      SELECT p.*, 
+      SELECT p.*,
              u.username as author_username,
              u.display_name as author_name,
              u.avatar_url as author_avatar,
              u.bio as author_bio,
-             c.name as category_name, 
+             c.name as category_name,
              c.slug as category_slug,
              c.color as category_color,
-             c.icon as category_icon
+             c.icon as category_icon,
+             col.id as column_id,
+             col.name as column_name,
+             col.slug as column_slug
       FROM posts p
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN columns col ON p.column_id = col.id
       WHERE p.id = ?
     `).bind(id).first() as any;
     
@@ -420,13 +428,22 @@ postRoutes.get('/admin/:id', requireAuth, async (c) => {
  * 搜索文章（公开）
  * 
  * 查询参数：
- * - q: 搜索关键词
+ * - q: 搜索关键词（支持FTS5全文搜索语法）
  * - category: 分类slug
  * - tag: 标签slug
  * - page: 页码（默认1）
  * - limit: 每页数量（默认10，最大50）
  * - sort: 排序方式（published_at, view_count, like_count, comment_count, relevance）
  * - order: 排序方向（asc, desc）
+ * - use_fts: 是否使用FTS5全文搜索（默认true）
+ * 
+ * FTS5搜索语法：
+ * - 普通关键词: "React"
+ * - AND搜索: "React AND TypeScript"
+ * - OR搜索: "React OR Vue"
+ * - 短语搜索: "\"完整短语\""
+ * - 前缀搜索: "React*"
+ * - 排除搜索: "React -Vue"
  */
 postRoutes.get('/search', async (c) => {
   const logger = createLogger(c);
@@ -445,6 +462,7 @@ postRoutes.get('/search', async (c) => {
     const q = c.req.query('q');
     let category = c.req.query('category');
     let tag = c.req.query('tag');
+    const useFts = c.req.query('use_fts') !== 'false'; // 默认启用FTS5
     
     // 将字符串 "null" 转为真正的 undefined
     category = (category === 'null' || !category) ? undefined : category;
@@ -460,30 +478,59 @@ postRoutes.get('/search', async (c) => {
     const finalSortBy = allowedSortFields.includes(sort) ? sort : 'published_at';
     
     // ===== 2. 直接从数据库读取 - 不使用缓存 =====
-    // 理由: D1查询足够快,无需KV缓存
-    logger.info('Searching posts from D1', { query: q, category, tag, page, limit });
+    logger.info('Searching posts from D1', { query: q, category, tag, page, limit, useFts });
     
     // ===== 3. 构建查询 =====
-    let query = `
-      SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
-             p.view_count, p.like_count, p.comment_count, p.reading_time,
-             p.published_at, p.created_at,
-             u.username as author_name, u.display_name as author_display_name, 
-             u.avatar_url as author_avatar,
-             c.name as category_name, c.slug as category_slug, c.color as category_color
-      FROM posts p
-      LEFT JOIN users u ON p.author_id = u.id
-      LEFT JOIN categories c ON p.category_id = c.id
-      WHERE p.status = 'published' AND p.visibility = 'public'
-    `;
-    
-    const params: any[] = [];
-    
-    // 搜索关键词
-    if (q) {
-      const searchTerm = `%${q}%`;
-      query += ` AND (p.title LIKE ? OR p.summary LIKE ? OR p.content LIKE ?)`;
-      params.push(searchTerm, searchTerm, searchTerm);
+    let query: string;
+    let params: any[] = [];
+
+    // 检测是否包含中文
+    const hasChinese = /[\u4e00-\u9fa5]/.test(q || '');
+    // 中文用LIKE，英文用FTS
+    const shouldUseFts = !hasChinese && useFts && q && q.trim().length > 0;
+
+    if (shouldUseFts) {
+      // 使用FTS5全文搜索（JOIN方式，使用完整表名）
+      query = `
+        SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
+               p.view_count, p.like_count, p.comment_count, p.reading_time,
+               p.published_at, p.created_at,
+               u.username as author_name, u.display_name as author_display_name,
+               u.avatar_url as author_avatar,
+               c.name as category_name, c.slug as category_slug, c.color as category_color,
+               col.name as column_name, col.slug as column_slug,
+               posts_fts.rank as search_rank
+        FROM posts_fts
+        JOIN posts p ON posts_fts.rowid = p.id
+        LEFT JOIN users u ON p.author_id = u.id
+        LEFT JOIN categories c ON p.category_id = c.id
+        LEFT JOIN columns col ON p.column_id = col.id
+        WHERE posts_fts MATCH ? AND p.status = 'published' AND p.visibility = 'public'
+      `;
+      params.push(q!.trim());
+    } else {
+      // 使用传统LIKE搜索（兼容旧方式或不使用关键词时）
+      query = `
+        SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
+               p.view_count, p.like_count, p.comment_count, p.reading_time,
+               p.published_at, p.created_at,
+               u.username as author_name, u.display_name as author_display_name,
+               u.avatar_url as author_avatar,
+               c.name as category_name, c.slug as category_slug, c.color as category_color,
+               col.name as column_name, col.slug as column_slug
+        FROM posts p
+        LEFT JOIN users u ON p.author_id = u.id
+        LEFT JOIN columns col ON p.column_id = col.id
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE p.status = 'published' AND p.visibility = 'public'
+      `;
+      
+      // 搜索关键词（LIKE方式）
+      if (q) {
+        const searchTerm = `%${q}%`;
+        query += ` AND (p.title LIKE ? OR p.summary LIKE ? OR p.content LIKE ?)`;
+        params.push(searchTerm, searchTerm, searchTerm);
+      }
     }
     
     // 分类过滤
@@ -504,18 +551,26 @@ postRoutes.get('/search', async (c) => {
     
     // 排序
     if (finalSortBy === 'relevance' && q) {
-      // 相关性排序（基于标题匹配权重更高）
-      query += ` ORDER BY 
-        CASE 
-          WHEN p.title LIKE ? THEN 0
-          WHEN p.summary LIKE ? THEN 1
-          WHEN p.content LIKE ? THEN 2
-          ELSE 3
-        END, p.published_at DESC LIMIT ? OFFSET ?`;
-      const searchTerm = `%${q}%`;
-      params.push(searchTerm, searchTerm, searchTerm, limit, offset);
+      if (shouldUseFts) {
+        // FTS5模式下使用BM25相关性排序
+        query += ` ORDER BY posts_fts.rank ASC, p.published_at DESC LIMIT ? OFFSET ?`;
+      } else {
+        // LIKE模式下使用标题匹配权重排序
+        query += ` ORDER BY 
+          CASE 
+            WHEN p.title LIKE ? THEN 0
+            WHEN p.summary LIKE ? THEN 1
+            WHEN p.content LIKE ? THEN 2
+            ELSE 3
+          END, p.published_at DESC LIMIT ? OFFSET ?`;
+        const searchTerm = `%${q}%`;
+        params.push(searchTerm, searchTerm, searchTerm);
+      }
+      params.push(limit, offset);
     } else {
-      query += ` ORDER BY p.${finalSortBy === 'relevance' ? 'published_at' : finalSortBy} ${order} LIMIT ? OFFSET ?`;
+      // 非相关性排序
+      const sortField = finalSortBy === 'relevance' ? 'published_at' : finalSortBy;
+      query += ` ORDER BY p.${sortField} ${order} LIMIT ? OFFSET ?`;
       params.push(limit, offset);
     }
     
@@ -523,15 +578,29 @@ postRoutes.get('/search', async (c) => {
     const { results } = await c.env.DB.prepare(query).bind(...params).all();
     
     // ===== 5. 获取总数 =====
-    let countQuery = `SELECT COUNT(*) as total FROM posts p 
-                      LEFT JOIN categories c ON p.category_id = c.id
-                      WHERE p.status = 'published' AND p.visibility = 'public'`;
-    const countParams: any[] = [];
+    let countQuery: string;
+    let countParams: any[] = [];
     
-    if (q) {
-      const searchTerm = `%${q}%`;
-      countQuery += ' AND (p.title LIKE ? OR p.summary LIKE ? OR p.content LIKE ?)';
-      countParams.push(searchTerm, searchTerm, searchTerm);
+    if (shouldUseFts) {
+      // FTS5模式下使用FTS表计算总数
+      countQuery = `
+        SELECT COUNT(*) as total
+        FROM posts_fts
+        JOIN posts p ON posts_fts.rowid = p.id
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE posts_fts MATCH ? AND p.status = 'published' AND p.visibility = 'public'
+      `;
+      countParams.push(q!.trim());
+    } else {
+      countQuery = `SELECT COUNT(*) as total FROM posts p 
+                    LEFT JOIN categories c ON p.category_id = c.id
+                    WHERE p.status = 'published' AND p.visibility = 'public'`;
+      
+      if (q) {
+        const searchTerm = `%${q}%`;
+        countQuery += ' AND (p.title LIKE ? OR p.summary LIKE ? OR p.content LIKE ?)';
+        countParams.push(searchTerm, searchTerm, searchTerm);
+      }
     }
     
     if (category) {
@@ -639,13 +708,15 @@ postRoutes.get('/likes', requireAuth, async (c) => {
       SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
              p.view_count, p.like_count, p.comment_count, p.reading_time,
              p.published_at, p.created_at,
-             u.username as author_name, u.display_name as author_display_name, 
+             u.username as author_name, u.display_name as author_display_name,
              u.avatar_url as author_avatar,
-             c.name as category_name, c.slug as category_slug, c.color as category_color
+             c.name as category_name, c.slug as category_slug, c.color as category_color,
+             col.name as column_name, col.slug as column_slug
       FROM posts p
       JOIN likes l ON p.id = l.post_id
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN columns col ON p.column_id = col.id
       WHERE l.user_id = ? AND p.status = 'published' AND p.visibility = 'public'
       ORDER BY l.created_at DESC
       LIMIT ? OFFSET ?
@@ -760,11 +831,13 @@ postRoutes.get('/reading-history', requireAuth, async (c) => {
       SELECT rh.id, rh.post_id, rh.first_read_at, rh.last_read_at, rh.read_duration_seconds, rh.read_percentage,
              p.title, p.slug, p.summary, p.cover_image, p.view_count, p.like_count, p.comment_count, p.reading_time, p.published_at,
              u.username as author_name, u.display_name as author_display_name, u.avatar_url as author_avatar,
-             c.name as category_name, c.slug as category_slug, c.color as category_color
+             c.name as category_name, c.slug as category_slug, c.color as category_color,
+             col.name as column_name, col.slug as column_slug
       FROM reading_history rh
       JOIN posts p ON p.id = rh.post_id
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN columns col ON p.column_id = col.id
       WHERE rh.user_id = ? AND p.status = 'published' AND p.visibility = 'public'
       ORDER BY rh.last_read_at DESC
       LIMIT ? OFFSET ?
@@ -849,11 +922,13 @@ postRoutes.get('/favorites', requireAuth, async (c) => {
              p.view_count, p.like_count, p.comment_count, p.reading_time,
              p.published_at, p.created_at,
              u.username as author_name, u.display_name as author_display_name, u.avatar_url as author_avatar,
-             c.name as category_name, c.slug as category_slug, c.color as category_color
+             c.name as category_name, c.slug as category_slug, c.color as category_color,
+             col.name as column_name, col.slug as column_slug
       FROM posts p
       JOIN favorites f ON p.id = f.post_id
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN columns col ON p.column_id = col.id
       WHERE f.user_id = ? AND p.status = 'published' AND p.visibility = 'public'
       ORDER BY f.created_at DESC
       LIMIT ? OFFSET ?
@@ -930,18 +1005,22 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
     
     // ===== 1. 先查询文章基本信息(包括浏览量) =====
     const post = await c.env.DB.prepare(`
-      SELECT p.*, 
+      SELECT p.*,
              u.username as author_username,
              u.display_name as author_name,
              u.avatar_url as author_avatar,
              u.bio as author_bio,
-             c.name as category_name, 
+             c.name as category_name,
              c.slug as category_slug,
              c.color as category_color,
-             c.icon as category_icon
+             c.icon as category_icon,
+             col.id as column_id,
+             col.name as column_name,
+             col.slug as column_slug
       FROM posts p
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN columns col ON p.column_id = col.id
       WHERE p.slug = ? AND p.status = 'published' AND p.visibility = 'public'
     `).bind(slug).first() as any;
     
@@ -1035,7 +1114,7 @@ postRoutes.post('/', requireAuth, async (c) => {
   try {
     const user = c.get('user') as any;
     const body = await c.req.json();
-    let { title, content, summary, categoryId, tags, coverImage, status, visibility, password } = body;
+    let { title, content, summary, categoryId, columnId, tags, coverImage, status, visibility, password } = body;
     
     // ===== 1. 验证必填字段 =====
     if (!title || !content) {
@@ -1077,15 +1156,29 @@ postRoutes.post('/', requireAuth, async (c) => {
       ), 400);
     }
     
-    // ===== 6. 插入文章 =====
+    // ===== 6. 验证专栏ID（如果提供）=====
+    if (columnId) {
+      const columnExists = await c.env.DB.prepare(
+        'SELECT id FROM columns WHERE id = ? AND status = ?'
+      ).bind(columnId, 'active').first();
+      
+      if (!columnExists) {
+        return c.json(errorResponse(
+          'Invalid column',
+          'The specified column does not exist or is not active'
+        ), 400);
+      }
+    }
+
+    // ===== 7. 插入文章 =====
     const finalStatus = status || 'draft';
     const result = await c.env.DB.prepare(`
       INSERT INTO posts (
-        title, slug, content, summary, author_id, category_id,
+        title, slug, content, summary, author_id, category_id, column_id,
         cover_image, status, visibility, password, reading_time, 
         published_at, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `).bind(
       title,
       slug,
@@ -1093,6 +1186,7 @@ postRoutes.post('/', requireAuth, async (c) => {
       summary,
       user.userId,
       categoryId || null,
+      columnId || null,
       coverImage || null,
       finalStatus,
       finalVisibility,
@@ -1150,7 +1244,7 @@ postRoutes.put('/:id', requireAuth, async (c) => {
     const user = c.get('user') as any;
     const id = c.req.param('id');
     const body = await c.req.json();
-    let { title, content, summary, categoryId, tags, coverImage, status, visibility, password } = body;
+    let { title, content, summary, categoryId, columnId, tags, coverImage, status, visibility, password } = body;
     
     // ===== 1. 检查文章是否存在 =====
     const post = await c.env.DB.prepare(
@@ -1189,14 +1283,28 @@ postRoutes.put('/:id', requireAuth, async (c) => {
     if (summary !== undefined) {
       summary = sanitizeInput(summary);
     }
+
+    // ===== 4. 验证专栏ID（如果提供）=====
+    if (columnId !== undefined && columnId !== null) {
+      const columnExists = await c.env.DB.prepare(
+        'SELECT id FROM columns WHERE id = ? AND status = ?'
+      ).bind(columnId, 'active').first();
+      
+      if (!columnExists) {
+        return c.json(errorResponse(
+          'Invalid column',
+          'The specified column does not exist or is not active'
+        ), 400);
+      }
+    }
     
-    // ===== 4. 计算阅读时间 =====
+    // ===== 5. 计算阅读时间 =====
     const readingTime = content ? Math.ceil(content.length / READING_SPEED) : post.reading_time;
     
-    // ===== 5. 更新文章 =====
+    // ===== 6. 更新文章 =====
     await c.env.DB.prepare(`
       UPDATE posts 
-      SET title = ?, content = ?, summary = ?, category_id = ?,
+      SET title = ?, content = ?, summary = ?, category_id = ?, column_id = ?,
           cover_image = ?, status = ?, visibility = ?, password = ?,
           reading_time = ?, published_at = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
@@ -1205,6 +1313,7 @@ postRoutes.put('/:id', requireAuth, async (c) => {
       content || post.content,
       summary !== undefined ? summary : post.summary,
       categoryId !== undefined ? categoryId : post.category_id,
+      columnId !== undefined ? columnId : post.column_id,
       coverImage !== undefined ? coverImage : post.cover_image,
       status || post.status,
       visibility || post.visibility,
@@ -1244,31 +1353,112 @@ postRoutes.put('/:id', requireAuth, async (c) => {
 // ============= 删除文章 =============
 
 /**
+ * 从内容中提取所有图片URL
+ */
+function extractImageUrls(content: string): string[] {
+  const urls: string[] = [];
+  // 匹配 Markdown 图片语法: ![alt](url)
+  const markdownRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  let match;
+  while ((match = markdownRegex.exec(content)) !== null) {
+    urls.push(match[2]);
+  }
+  // 匹配 HTML img 标签: <img src="url" />
+  const htmlRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+  while ((match = htmlRegex.exec(content)) !== null) {
+    urls.push(match[1]);
+  }
+  return urls;
+}
+
+/**
+ * 从URL中提取文件名
+ */
+function extractFilenameFromUrl(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+    const pathname = urlObj.pathname;
+    const filename = pathname.split('/').pop();
+    return filename || null;
+  } catch {
+    // 如果不是完整URL，可能是相对路径
+    const parts = url.split('/');
+    return parts.pop() || null;
+  }
+}
+
+/**
  * DELETE /api/posts/:id
  * 删除文章（需要管理员权限）
+ * 同时删除封面图片和内容中的图片
  */
 postRoutes.delete('/:id', requireAuth, requireAdmin, async (c) => {
   const logger = createLogger(c);
-  
+
   try {
     const id = c.req.param('id');
-    
-    // 获取文章信息
+
+    // 获取文章信息（包括封面图片和内容）
     const post = await c.env.DB.prepare(
-      'SELECT slug FROM posts WHERE id = ?'
+      'SELECT slug, cover_image, content FROM posts WHERE id = ?'
     ).bind(id).first() as any;
-    
+
     if (!post) {
       return c.json(errorResponse('Post not found'), 404);
     }
-    
+
+    // 收集需要删除的图片
+    const imagesToDelete: string[] = [];
+
+    // 1. 封面图片
+    if (post.cover_image) {
+      const coverFilename = extractFilenameFromUrl(post.cover_image);
+      if (coverFilename) {
+        imagesToDelete.push(coverFilename);
+      }
+    }
+
+    // 2. 内容中的图片
+    if (post.content) {
+      const imageUrls = extractImageUrls(post.content);
+      for (const url of imageUrls) {
+        const filename = extractFilenameFromUrl(url);
+        if (filename && !imagesToDelete.includes(filename)) {
+          imagesToDelete.push(filename);
+        }
+      }
+    }
+
     // 删除文章（级联删除会自动处理评论、点赞等）
     await c.env.DB.prepare('DELETE FROM posts WHERE id = ?').bind(id).run();
-    
-    logger.info('Post deleted successfully', { postId: id });
-    
-    return c.json(successResponse({ deleted: true }, 'Post deleted successfully'));
-    
+
+    // 异步删除图片（不阻塞响应）
+    if (imagesToDelete.length > 0) {
+      c.executionCtx.waitUntil(
+        (async () => {
+          for (const filename of imagesToDelete) {
+            try {
+              await c.env.STORAGE.delete(filename);
+              logger.info('Image deleted', { filename, postId: id });
+            } catch (error) {
+              // 忽略删除失败的错误，继续删除其他图片
+              logger.warn('Failed to delete image', { filename, postId: id, error });
+            }
+          }
+        })()
+      );
+    }
+
+    logger.info('Post deleted successfully', {
+      postId: id,
+      imagesDeleted: imagesToDelete.length
+    });
+
+    return c.json(successResponse({
+      deleted: true,
+      imagesDeleted: imagesToDelete.length
+    }, 'Post deleted successfully'));
+
   } catch (error) {
     logger.error('Delete post error', error);
     return c.json(errorResponse(

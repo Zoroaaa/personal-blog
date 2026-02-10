@@ -12,17 +12,18 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
 import { format } from 'date-fns';
 import type { PostListItem } from '../types';
-import { transformPostList, transformCategoryList, transformTagList } from '../utils/apiTransformer';
+import { transformPostList, transformCategoryList, transformColumnList, transformTagList } from '../utils/apiTransformer';
 import { useSiteConfig } from '../hooks/useSiteConfig';
 import { SEO } from '../components/SEO';
-import type { Category, Tag } from '../types';
+import type { Category, Column, Tag } from '../types';
 
 export function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { config } = useSiteConfig();
   
   // 文章相关状态
@@ -35,50 +36,63 @@ export function HomePage() {
   // 获取每页文章数配置
   const postsPerPage = config.posts_per_page || 10;
   
-  // 分类和标签状态
+  // 分类、专栏和标签状态
   const [categories, setCategories] = useState<Category[]>([]);
+  const [columns, setColumns] = useState<Column[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [columnsLoading, setColumnsLoading] = useState(true);
   const [tagsLoading, setTagsLoading] = useState(true);
-  
+
   // 展开/收起状态
   const [showAllCategories, setShowAllCategories] = useState(false);
+  const [showAllColumns, setShowAllColumns] = useState(false);
   const [showAllTags, setShowAllTags] = useState(false);
-  
+
   // 过滤状态
   const [selectedCategory, setSelectedCategory] = useState<string | null>(
     searchParams.get('category')
   );
+  const [selectedColumn, setSelectedColumn] = useState<string | null>(
+    searchParams.get('column')
+  );
   const [selectedTag, setSelectedTag] = useState<string | null>(
     searchParams.get('tag')
   );
-  
+
   // 显示数量
   const INITIAL_CATEGORY_COUNT = 10;
+  const INITIAL_COLUMN_COUNT = 10;
   const INITIAL_TAG_COUNT = 10;
   
   // 加载分类
   useEffect(() => {
     loadCategories();
   }, []);
-  
+
+  // 加载专栏
+  useEffect(() => {
+    loadColumns();
+  }, []);
+
   // 加载标签
   useEffect(() => {
     loadTags();
   }, []);
-  
+
   // 加载文章
   useEffect(() => {
     loadPosts();
-  }, [page, selectedCategory, selectedTag]);
+  }, [page, selectedCategory, selectedColumn, selectedTag]);
   
   // 同步URL参数
   useEffect(() => {
     const params: any = {};
     if (selectedCategory) params.category = selectedCategory;
+    if (selectedColumn) params.column = selectedColumn;
     if (selectedTag) params.tag = selectedTag;
     setSearchParams(params);
-  }, [selectedCategory, selectedTag]);
+  }, [selectedCategory, selectedColumn, selectedTag]);
   
   const loadCategories = async () => {
     try {
@@ -91,6 +105,20 @@ export function HomePage() {
       console.error('Failed to load categories:', error);
     } finally {
       setCategoriesLoading(false);
+    }
+  };
+
+  const loadColumns = async () => {
+    try {
+      setColumnsLoading(true);
+      const response = await api.getColumns({ limit: '100' });
+      if (response.success && response.data) {
+        setColumns(transformColumnList(response.data.columns || []));
+      }
+    } catch (error) {
+      console.error('Failed to load columns:', error);
+    } finally {
+      setColumnsLoading(false);
     }
   };
 
@@ -119,8 +147,9 @@ export function HomePage() {
       };
       
       if (selectedCategory) params.category = selectedCategory;
+      if (selectedColumn) params.column = selectedColumn;
       if (selectedTag) params.tag = selectedTag;
-      
+
       const response = await api.getPosts(params);
       
       if (response.success && response.data) {
@@ -141,43 +170,95 @@ export function HomePage() {
     }
   };
   
-  // 处理分类点击
+  // 处理分类点击（过滤模式）
   const handleCategoryClick = (slug: string) => {
     if (selectedCategory === slug) {
       setSelectedCategory(null);
     } else {
       setSelectedCategory(slug);
+      setSelectedColumn(null); // 清除专栏过滤
       setSelectedTag(null); // 清除标签过滤
     }
     setPage(1);
   };
-  
-  // 处理标签点击
+
+  // 处理专栏点击（过滤模式）
+  const handleColumnClick = (slug: string) => {
+    if (selectedColumn === slug) {
+      setSelectedColumn(null);
+    } else {
+      setSelectedColumn(slug);
+      setSelectedCategory(null); // 清除分类过滤
+      setSelectedTag(null); // 清除标签过滤
+    }
+    setPage(1);
+  };
+
+  // 处理标签点击（过滤模式）
   const handleTagClick = (slug: string) => {
     if (selectedTag === slug) {
       setSelectedTag(null);
     } else {
       setSelectedTag(slug);
       setSelectedCategory(null); // 清除分类过滤
+      setSelectedColumn(null); // 清除专栏过滤
     }
     setPage(1);
   };
-  
+
+  // 处理分类点击穿透（导航到分类详情页）
+  const handleCategoryNavigate = (e: React.MouseEvent, slug: string) => {
+    e.stopPropagation();
+    navigate(`/categories/${slug}`);
+  };
+
+  // 处理专栏点击穿透（导航到专栏详情页）
+  const handleColumnNavigate = (e: React.MouseEvent, slug: string) => {
+    e.stopPropagation();
+    navigate(`/columns/${slug}`);
+  };
+
+  // 处理标签点击穿透（导航到标签详情页）
+  const handleTagNavigate = (e: React.MouseEvent, slug: string) => {
+    e.stopPropagation();
+    navigate(`/tags/${slug}`);
+  };
+
+  // 处理文章卡片中的分类点击（导航到分类详情页）
+  const handlePostCategoryClick = (e: React.MouseEvent, slug: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    navigate(`/categories/${slug}`);
+  };
+
+  // 处理文章卡片中的标签点击（导航到标签详情页）
+  const handlePostTagClick = (e: React.MouseEvent, slug: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    navigate(`/tags/${slug}`);
+  };
+
   // 清除所有过滤
   const clearFilters = () => {
     setSelectedCategory(null);
+    setSelectedColumn(null);
     setSelectedTag(null);
     setPage(1);
   };
   
   // 渲染分类列表
-  const visibleCategories = showAllCategories 
-    ? categories 
+  const visibleCategories = showAllCategories
+    ? categories
     : categories.slice(0, INITIAL_CATEGORY_COUNT);
-  
+
+  // 渲染专栏列表
+  const visibleColumns = showAllColumns
+    ? columns
+    : columns.slice(0, INITIAL_COLUMN_COUNT);
+
   // 渲染标签列表
-  const visibleTags = showAllTags 
-    ? tags 
+  const visibleTags = showAllTags
+    ? tags
     : tags.slice(0, INITIAL_TAG_COUNT);
   
   return (
@@ -231,30 +312,46 @@ export function HomePage() {
                 <>
                   <div className="space-y-2">
                     {visibleCategories.map((category) => (
-                      <button
+                      <div
                         key={category.id}
-                        onClick={() => handleCategoryClick(category.slug)}
-                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 ${
+                        className={`group w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer ${
                           selectedCategory === category.slug
                             ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md scale-105'
                             : 'bg-gray-100 dark:bg-slate-700/50 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300'
                         }`}
+                        onClick={() => handleCategoryClick(category.slug)}
                       >
                         <span className="flex items-center gap-2 font-medium">
                           {category.icon && <span className="text-lg">{category.icon}</span>}
                           {category.name}
                         </span>
-                        <span className={`text-sm px-2 py-1 rounded-full ${
-                          selectedCategory === category.slug
-                            ? 'bg-white/20'
-                            : 'bg-gray-200 dark:bg-slate-600'
-                        }`}>
-                          {category.postCount}
-                        </span>
-                      </button>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm px-2 py-1 rounded-full ${
+                            selectedCategory === category.slug
+                              ? 'bg-white/20'
+                              : 'bg-gray-200 dark:bg-slate-600'
+                          }`}>
+                            {category.postCount}
+                          </span>
+                          {/* 点击穿透按钮 */}
+                          <button
+                            onClick={(e) => handleCategoryNavigate(e, category.slug)}
+                            className={`p-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${
+                              selectedCategory === category.slug
+                                ? 'hover:bg-white/20 text-white'
+                                : 'hover:bg-gray-300 dark:hover:bg-slate-500 text-gray-500 dark:text-gray-400'
+                            }`}
+                            title="查看分类详情"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
                     ))}
                   </div>
-                  
+
                   {categories.length > INITIAL_CATEGORY_COUNT && (
                     <button
                       onClick={() => setShowAllCategories(!showAllCategories)}
@@ -274,7 +371,104 @@ export function HomePage() {
                 </>
               )}
             </div>
-            
+
+            {/* 专栏卡片 */}
+            <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 dark:border-slate-700 p-6 transition-all duration-300 hover:shadow-xl">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  专栏
+                </h2>
+                {selectedColumn && (
+                  <button
+                    onClick={clearFilters}
+                    className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                  >
+                    清除
+                  </button>
+                )}
+              </div>
+
+              {columnsLoading ? (
+                <div className="space-y-2">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="h-14 bg-gray-200 dark:bg-slate-700 rounded-lg animate-pulse" />
+                  ))}
+                </div>
+              ) : columns.length === 0 ? (
+                <div className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">
+                  暂无专栏
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    {visibleColumns.map((column) => (
+                      <div
+                        key={column.id}
+                        className={`group w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer ${
+                          selectedColumn === column.slug
+                            ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md scale-105'
+                            : 'bg-gray-100 dark:bg-slate-700/50 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300'
+                        }`}
+                        onClick={() => handleColumnClick(column.slug)}
+                      >
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white text-xs font-bold ${
+                          selectedColumn === column.slug
+                            ? 'bg-white/20'
+                            : 'bg-gradient-to-br from-blue-500 to-indigo-600'
+                        }`}>
+                          {column.name.slice(0, 2)}
+                        </div>
+                        <div className="flex-1 text-left">
+                          <div className="font-medium truncate">{column.name}</div>
+                          <div className={`text-xs ${
+                            selectedColumn === column.slug
+                              ? 'text-white/70'
+                              : 'text-gray-500 dark:text-gray-400'
+                          }`}>
+                            {column.postCount} 篇文章
+                          </div>
+                        </div>
+                        {/* 点击穿透按钮 */}
+                        <button
+                          onClick={(e) => handleColumnNavigate(e, column.slug)}
+                          className={`p-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${
+                            selectedColumn === column.slug
+                              ? 'hover:bg-white/20 text-white'
+                              : 'hover:bg-gray-300 dark:hover:bg-slate-500 text-gray-500 dark:text-gray-400'
+                          }`}
+                          title="查看专栏详情"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {columns.length > INITIAL_COLUMN_COUNT && (
+                    <button
+                      onClick={() => setShowAllColumns(!showAllColumns)}
+                      className="w-full mt-4 px-4 py-2 text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      {showAllColumns ? '收起' : `查看更多 (${columns.length - INITIAL_COLUMN_COUNT})`}
+                      <svg
+                        className={`w-4 h-4 transition-transform ${showAllColumns ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+
             {/* 标签云卡片 */}
             <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 dark:border-slate-700 p-6 transition-all duration-300 hover:shadow-xl">
               <div className="flex items-center justify-between mb-4">
@@ -304,36 +498,50 @@ export function HomePage() {
                 <>
                   <div className="flex flex-wrap gap-2">
                     {visibleTags.map((tag) => (
-                      <button
+                      <div
                         key={tag.id}
-                        onClick={() => handleTagClick(tag.slug)}
-                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                          selectedTag === tag.slug
-                            ? 'shadow-lg scale-110 text-white'
-                            : 'hover:scale-105 text-gray-700 dark:text-gray-300'
-                        }`}
-                        style={{
-                          backgroundColor: selectedTag === tag.slug 
-                            ? tag.color || '#6B7280'
-                            : selectedTag 
-                              ? 'rgb(243 244 246)' 
-                              : tag.color 
-                                ? `${tag.color}20` 
-                                : 'rgb(243 244 246)',
-                          borderWidth: '2px',
-                          borderColor: selectedTag === tag.slug 
-                            ? 'transparent'
-                            : tag.color || '#E5E7EB'
-                        }}
+                        className="group relative"
                       >
-                        #{tag.name}
-                        <span className="ml-2 text-xs opacity-75">
-                          {tag.postCount}
-                        </span>
-                      </button>
+                        <button
+                          onClick={() => handleTagClick(tag.slug)}
+                          className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                            selectedTag === tag.slug
+                              ? 'shadow-lg scale-110 text-white'
+                              : 'hover:scale-105 text-gray-700 dark:text-gray-300'
+                          }`}
+                          style={{
+                            backgroundColor: selectedTag === tag.slug
+                              ? tag.color || '#6B7280'
+                              : selectedTag
+                                ? 'rgb(243 244 246)'
+                                : tag.color
+                                  ? `${tag.color}20`
+                                  : 'rgb(243 244 246)',
+                            borderWidth: '2px',
+                            borderColor: selectedTag === tag.slug
+                              ? 'transparent'
+                              : tag.color || '#E5E7EB'
+                          }}
+                        >
+                          #{tag.name}
+                          <span className="ml-2 text-xs opacity-75">
+                            {tag.postCount}
+                          </span>
+                        </button>
+                        {/* 点击穿透按钮 */}
+                        <button
+                          onClick={(e) => handleTagNavigate(e, tag.slug)}
+                          className="absolute -top-1 -right-1 p-1 rounded-full bg-white dark:bg-slate-700 shadow-md opacity-0 group-hover:opacity-100 transition-all hover:bg-gray-100 dark:hover:bg-slate-600 z-10"
+                          title="查看标签详情"
+                        >
+                          <svg className="w-3 h-3 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </button>
+                      </div>
                     ))}
                   </div>
-                  
+
                   {tags.length > INITIAL_TAG_COUNT && (
                     <button
                       onClick={() => setShowAllTags(!showAllTags)}
@@ -359,13 +567,23 @@ export function HomePage() {
           <div className="lg:col-span-9">
             
             {/* 当前过滤标签 */}
-            {(selectedCategory || selectedTag) && (
+            {(selectedCategory || selectedColumn || selectedTag) && (
               <div className="mb-6 flex flex-wrap items-center gap-3 animate-fade-in">
                 <span className="text-sm text-gray-600 dark:text-gray-400">筛选条件:</span>
                 {selectedCategory && (
                   <span className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-sm font-medium">
                     {categories.find(c => c.slug === selectedCategory)?.name}
                     <button onClick={clearFilters} className="hover:text-blue-900 dark:hover:text-blue-100">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+                )}
+                {selectedColumn && (
+                  <span className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-sm font-medium">
+                    {columns.find(c => c.slug === selectedColumn)?.name}
+                    <button onClick={clearFilters} className="hover:text-purple-900 dark:hover:text-purple-100">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
@@ -428,9 +646,9 @@ export function HomePage() {
                 </svg>
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">暂无文章</h3>
                 <p className="text-gray-600 dark:text-gray-400 mb-6">
-                  {selectedCategory || selectedTag ? '该分类/标签下暂无文章' : '还没有发布任何文章'}
+                  {selectedCategory || selectedColumn || selectedTag ? '该分类/专栏/标签下暂无文章' : '还没有发布任何文章'}
                 </p>
-                {(selectedCategory || selectedTag) && (
+                {(selectedCategory || selectedColumn || selectedTag) && (
                   <button
                     onClick={clearFilters}
                     className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all duration-200 font-medium shadow-md hover:shadow-lg"
@@ -461,11 +679,25 @@ export function HomePage() {
                       
                       <div className="flex-1 p-6">
                         <Link to={`/posts/${post.slug}`}>
-                          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-2">
+                          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-2">
                             {post.title}
                           </h2>
                         </Link>
-                        
+
+                        {/* 专栏归属标识 */}
+                        {post.columnName && post.columnSlug && (
+                          <Link
+                            to={`/columns/${post.columnSlug}`}
+                            className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors mb-3 group/column"
+                            title={`所属专栏: ${post.columnName}`}
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                            <span className="truncate max-w-[200px]">{post.columnName}</span>
+                          </Link>
+                        )}
+
                         {post.summary && (
                           <p className="text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
                             {post.summary}
@@ -532,19 +764,19 @@ export function HomePage() {
                         <div className="flex flex-wrap items-center gap-2">
                           {post.categoryName && (
                             <button
-                              onClick={() => post.categorySlug && handleCategoryClick(post.categorySlug)}
-                              className="px-3 py-1.5 rounded-lg text-white text-xs font-medium hover:opacity-80 transition-opacity"
+                              onClick={(e) => post.categorySlug && handlePostCategoryClick(e, post.categorySlug)}
+                              className="px-3 py-1.5 rounded-lg text-white text-xs font-medium hover:opacity-80 transition-opacity cursor-pointer"
                               style={{ backgroundColor: post.categoryColor || '#3B82F6' }}
                             >
                               {post.categoryName}
                             </button>
                           )}
-                          
+
                           {post.tags && post.tags.length > 0 && post.tags.slice(0, 3).map((tag) => (
                             <button
                               key={tag.id}
-                              onClick={() => handleTagClick(tag.slug)}
-                              className="px-3 py-1.5 rounded-full text-xs font-medium border-2 hover:scale-105 transition-transform"
+                              onClick={(e) => handlePostTagClick(e, tag.slug)}
+                              className="px-3 py-1.5 rounded-full text-xs font-medium border-2 hover:scale-105 transition-transform cursor-pointer"
                               style={{
                                 backgroundColor: tag.color ? `${tag.color}15` : '#F3F4F6',
                                 borderColor: tag.color || '#E5E7EB',
@@ -554,7 +786,7 @@ export function HomePage() {
                               #{tag.name}
                             </button>
                           ))}
-                          
+
                           {post.tags && post.tags.length > 3 && (
                             <span className="text-xs text-gray-500 dark:text-gray-400">
                               +{post.tags.length - 3} more

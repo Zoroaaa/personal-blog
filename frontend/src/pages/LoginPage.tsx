@@ -25,6 +25,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useSiteConfig } from '../hooks/useSiteConfig';
 import { api } from '../utils/api';
 import { useVerificationCountdown } from '../hooks/useVerificationCountdown';
+import { useToast } from '../components/Toast';
 
 export function LoginPage() {
   const { config } = useSiteConfig();
@@ -55,6 +56,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuthStore();
+  const { showSuccess, showError } = useToast();
   
   // 获取重定向路径
   const from = (location.state as any)?.from?.pathname || '/';
@@ -173,10 +175,14 @@ export function LoginPage() {
           // 保存到store
           login(user, token);
           
+          showSuccess('登录成功');
+          
           // 跳转
           navigate(redirectPath, { replace: true });
         } else {
-          throw new Error(response.error || response.message || '登录失败');
+          const errorMsg = response.error || response.message || '登录失败';
+          showError(errorMsg);
+          throw new Error(errorMsg);
         }
       } else {
         // ===== 注册 =====
@@ -191,14 +197,19 @@ export function LoginPage() {
         if (response.success && response.data) {
           const { user, token } = response.data;
           login(user, token);
+          showSuccess('注册成功');
           navigate(redirectPath, { replace: true });
         } else {
-          throw new Error(response.error || response.message || '注册失败');
+          const errorMsg = response.error || response.message || '注册失败';
+          showError(errorMsg);
+          throw new Error(errorMsg);
         }
       }
     } catch (err: any) {
       console.error('Auth error:', err);
-      setError(err.message || '操作失败,请稍后重试');
+      const errorMsg = err.message || '操作失败,请稍后重试';
+      setError(errorMsg);
+      showError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -227,29 +238,43 @@ export function LoginPage() {
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    
     if (resetPassword !== resetConfirmPassword) {
       setError('两次输入的密码不一致');
+      showError('两次输入的密码不一致');
       return;
     }
+    
+    if (resetPassword.length < 6) {
+      setError('密码长度至少为6位');
+      showError('密码长度至少为6位');
+      return;
+    }
+    
     setLoading(true);
+    
     try {
       const response = await api.resetPassword({
         email: resetEmail.trim(),
         verificationCode: resetCode.trim(),
         newPassword: resetPassword,
       });
+      
       if (response.success) {
-        alert('密码重置成功，请使用新密码登录');
+        showSuccess('密码重置成功，请使用新密码登录');
         setShowForgotPassword(false);
         setResetEmail('');
         setResetCode('');
         setResetPassword('');
         setResetConfirmPassword('');
       } else {
-        throw new Error(response.error || response.message || '重置失败');
+        setError(response.error || response.message || '重置失败');
+        showError(response.error || response.message || '重置失败');
       }
     } catch (err: any) {
+      console.error('Password reset failed:', err);
       setError(err.message || '重置密码失败');
+      showError(err.message || '重置密码失败');
     } finally {
       setLoading(false);
     }
@@ -452,19 +477,22 @@ export function LoginPage() {
                   <button
                     type="button"
                     onClick={async () => {
-                      if (!email.trim()) { setError('请先填写邮箱'); return; }
-                      if (isRegisterCounting) { setError(`请等待 ${registerCountdown} 秒后重试`); return; }
+                      if (!email.trim()) { setError('请先填写邮箱'); showError('请先填写邮箱'); return; }
+                      if (isRegisterCounting) { setError(`请等待 ${registerCountdown} 秒后重试`); showError(`请等待 ${registerCountdown} 秒后重试`); return; }
                       setCodeSending(true); setError('');
                       try {
                         const res = await api.sendVerificationCode({ email: email.trim(), type: 'register' });
                         if (res.success) {
                           startRegisterCountdown();
                           setError('');
+                          showSuccess('验证码已发送到您的邮箱');
                         } else {
                           setError(res.message || res.error || '发送失败');
+                          showError(res.message || res.error || '发送失败');
                         }
                       } catch (e: any) {
                         setError(e.message || '发送验证码失败');
+                        showError(e.message || '发送验证码失败');
                       } finally {
                         setCodeSending(false);
                       }

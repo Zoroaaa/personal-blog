@@ -5,11 +5,13 @@ import { api } from '../utils/api';
 // 导入新增的组件
 import { CategoryManager } from '../components/CategoryManager';
 import { TagManager } from '../components/TagManager';
+import { ColumnManager } from '../components/ColumnManager';
 import { EnhancedPostEditor } from '../components/EnhancedPostEditor';
 import { transformPost, transformCommentList, transformUserList } from '../utils/apiTransformer';
+import { useToast } from '../components/Toast';
 
-// 定义管理后台的标签页类型 - 添加 categories 和 tags
-type AdminTab = 'posts' | 'comments' | 'users' | 'analytics' | 'categories' | 'tags';
+// 定义管理后台的标签页类型 - 添加 categories, tags 和 columns
+type AdminTab = 'posts' | 'comments' | 'users' | 'analytics' | 'categories' | 'tags' | 'columns';
 
 // 定义评论状态类型
 type CommentStatus = 'approved' | 'pending' | 'spam';
@@ -21,6 +23,7 @@ export function AdminPage() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { showSuccess, showError } = useToast();
   
   // 当前活动的标签页
   const [activeTab, setActiveTab] = useState<AdminTab>('posts');
@@ -142,11 +145,12 @@ export function AdminPage() {
       setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
       // 然后发送删除请求
       await api.deletePost(postId);
-      alert('文章删除成功');
+      showSuccess('文章删除成功');
     } catch (err: any) {
       // 如果删除失败，重新加载列表以恢复正确的状态
       await loadPosts();
       setError(err.message || '删除失败');
+      showError(err.message || '删除失败');
     } finally {
       setLoading(false);
     }
@@ -378,7 +382,10 @@ export function AdminPage() {
       
       case 'tags':
         return <TagManager />;
-      
+
+      case 'columns':
+        return <ColumnManager />;
+
       case 'comments':
         return (
           <div className="space-y-6">
@@ -684,6 +691,7 @@ export function AdminPage() {
                 { id: 'posts' as AdminTab, label: '文章管理' },
                 { id: 'categories' as AdminTab, label: '分类管理' },
                 { id: 'tags' as AdminTab, label: '标签管理' },
+                { id: 'columns' as AdminTab, label: '专栏管理' },
                 { id: 'comments' as AdminTab, label: '评论管理' },
                 { id: 'users' as AdminTab, label: '用户管理' },
                 { id: 'analytics' as AdminTab, label: '数据分析' }

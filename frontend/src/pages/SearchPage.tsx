@@ -3,12 +3,13 @@
  *
  * 功能：
  * - 显示搜索结果列表
+ * - 支持FTS5全文搜索语法
  * - 支持分页
  * - 显示搜索关键词
  * - 处理无结果情况
  *
  * @author 优化版本
- * @version 2.0.0
+ * @version 2.1.0
  */
 
 import { useEffect, useState } from 'react';
@@ -84,7 +85,9 @@ export function SearchPage() {
         category: categoryParam || undefined,
         tag: tagParam || undefined,
         page: pageNum.toString(),
-        limit: '10'
+        limit: '10',
+        sort: query ? 'relevance' : 'published_at', // 有关键词时使用相关性排序
+        use_fts: 'true' // 启用FTS5全文搜索
       });
 
       if (response.success && response.data) {
@@ -155,6 +158,18 @@ export function SearchPage() {
           </svg>
           <h3 className="mt-4 text-lg font-medium text-gray-900">请输入搜索关键词</h3>
           <p className="mt-2 text-gray-500">在顶部搜索框中输入关键词来查找相关文章</p>
+
+          {/* FTS5搜索语法提示 */}
+          <div className="mt-6 text-left max-w-md mx-auto px-6">
+            <p className="text-sm text-gray-600 mb-2">高级搜索语法：</p>
+            <ul className="text-xs text-gray-500 space-y-1">
+              <li><code className="bg-gray-200 px-1 rounded">React AND TypeScript</code> - 同时包含两个词</li>
+              <li><code className="bg-gray-200 px-1 rounded">React OR Vue</code> - 包含任一关键词</li>
+              <li><code className="bg-gray-200 px-1 rounded">&quot;完整短语&quot;</code> - 精确匹配短语</li>
+              <li><code className="bg-gray-200 px-1 rounded">React*</code> - 前缀匹配</li>
+              <li><code className="bg-gray-200 px-1 rounded">React -Vue</code> - 包含React但不包含Vue</li>
+            </ul>
+          </div>
         </div>
       )}
 
