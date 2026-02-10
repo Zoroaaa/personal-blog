@@ -485,7 +485,7 @@ postRoutes.get('/search', async (c) => {
         SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
                p.view_count, p.like_count, p.comment_count, p.reading_time,
                p.published_at, p.created_at,
-               u.username as author_name, u.display_name as author_display_name, 
+               u.username as author_name, u.display_name as author_display_name,
                u.avatar_url as author_avatar,
                c.name as category_name, c.slug as category_slug, c.color as category_color,
                fts.rank as search_rank
@@ -493,7 +493,7 @@ postRoutes.get('/search', async (c) => {
         JOIN posts p ON fts.rowid = p.id
         LEFT JOIN users u ON p.author_id = u.id
         LEFT JOIN categories c ON p.category_id = c.id
-        WHERE posts_fts MATCH ? AND p.status = 'published' AND p.visibility = 'public'
+        WHERE fts MATCH ? AND p.status = 'published' AND p.visibility = 'public'
       `;
       params.push(q.trim());
     } else {
@@ -568,11 +568,11 @@ postRoutes.get('/search', async (c) => {
     if (shouldUseFts) {
       // FTS5模式下使用FTS表计算总数
       countQuery = `
-        SELECT COUNT(*) as total 
+        SELECT COUNT(*) as total
         FROM posts_fts fts
         JOIN posts p ON fts.rowid = p.id
         LEFT JOIN categories c ON p.category_id = c.id
-        WHERE posts_fts MATCH ? AND p.status = 'published' AND p.visibility = 'public'
+        WHERE fts MATCH ? AND p.status = 'published' AND p.visibility = 'public'
       `;
       countParams.push(q.trim());
     } else {
