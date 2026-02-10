@@ -23,7 +23,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSiteConfig } from '../hooks/useSiteConfig';
 import { useAuthStore } from '../stores/authStore';
 import { useTheme } from '../stores/themeStore';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../utils/api';
 import { useToast } from '../components/Toast';
 
@@ -390,17 +390,25 @@ const configGroups: ConfigGroup[] = [
 
 export function ConfigPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuthStore();
   const { config, loading: configLoading, updateConfig, refreshConfig } = useSiteConfig();
   const { setPrimaryColor, setThemeMode } = useTheme();
   const { showSuccess, showError } = useToast();
+
+  // 从URL参数获取当前标签页索引
+  const getTabIndexFromUrl = (): number => {
+    const tab = searchParams.get('tab');
+    const index = parseInt(tab || '0', 10);
+    return isNaN(index) || index < 0 || index >= configGroups.length ? 0 : index;
+  };
 
   const [localConfig, setLocalConfig] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [updating, setUpdating] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState(getTabIndexFromUrl());
   const [techStackInput, setTechStackInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -410,6 +418,14 @@ export function ConfigPage() {
       navigate('/login');
     }
   }, [user, navigate]);
+
+  // 当URL参数变化时，同步更新activeTab状态
+  useEffect(() => {
+    const tabFromUrl = getTabIndexFromUrl();
+    if (tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchParams]);
 
   // 初始化本地配置
   useEffect(() => {
@@ -871,7 +887,10 @@ export function ConfigPage() {
           {configGroups.map((group, index) => (
             <button
               key={index}
-              onClick={() => setActiveTab(index)}
+              onClick={() => {
+                setActiveTab(index);
+                setSearchParams({ tab: index.toString() });
+              }}
               className={`px-4 py-2 font-medium transition-colors relative ${
                 activeTab === index
                   ? 'text-primary border-b-2 border-primary'

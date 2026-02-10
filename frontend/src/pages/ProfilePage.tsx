@@ -14,7 +14,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../utils/api';
 import { useVerificationCountdown } from '../hooks/useVerificationCountdown';
@@ -62,10 +62,18 @@ function getRandomAvatar(username: string): string {
 export function ProfilePage() {
   const { user, logout, setUser } = useAuthStore();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { showSuccess, showError } = useToast();
-  
+
+  // 从URL参数获取当前标签页，默认为'info'
+  const getTabFromUrl = (): 'info' | 'comments' | 'likes' | 'history' | 'favorites' | 'settings' => {
+    const tab = searchParams.get('tab');
+    const validTabs: Array<'info' | 'comments' | 'likes' | 'history' | 'favorites' | 'settings'> = ['info', 'comments', 'likes', 'history', 'favorites', 'settings'];
+    return validTabs.includes(tab as typeof validTabs[number]) ? (tab as typeof validTabs[number]) : 'info';
+  };
+
   // 状态管理
-  const [activeTab, setActiveTab] = useState<'info' | 'comments' | 'likes' | 'history' | 'favorites' | 'settings'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'comments' | 'likes' | 'history' | 'favorites' | 'settings'>(getTabFromUrl());
   const [userInfo, setUserInfo] = useState<User | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [likedPosts, setLikedPosts] = useState<PostListItem[]>([]);
@@ -109,6 +117,14 @@ export function ProfilePage() {
       loadLikedPosts(); // 同时加载点赞数据，确保统计信息准确
     }
   }, [user]);
+
+  // 当URL参数变化时，同步更新activeTab状态
+  useEffect(() => {
+    const tabFromUrl = getTabFromUrl();
+    if (tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchParams]);
   
   // 加载用户信息
   const loadUserInfo = async () => {
@@ -927,37 +943,55 @@ export function ProfilePage() {
       <div className="border-b border-border mb-6">
         <nav className="flex space-x-8">
           <button
-            onClick={() => setActiveTab('info')}
+            onClick={() => {
+              setActiveTab('info');
+              setSearchParams({ tab: 'info' });
+            }}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'info' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
           >
             个人信息
           </button>
           <button
-            onClick={() => setActiveTab('comments')}
+            onClick={() => {
+              setActiveTab('comments');
+              setSearchParams({ tab: 'comments' });
+            }}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'comments' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
           >
             我的评论
           </button>
           <button
-            onClick={() => setActiveTab('likes')}
+            onClick={() => {
+              setActiveTab('likes');
+              setSearchParams({ tab: 'likes' });
+            }}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'likes' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
           >
             我的点赞
           </button>
           <button
-            onClick={() => setActiveTab('history')}
+            onClick={() => {
+              setActiveTab('history');
+              setSearchParams({ tab: 'history' });
+            }}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'history' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
           >
             阅读历史
           </button>
           <button
-            onClick={() => setActiveTab('favorites')}
+            onClick={() => {
+              setActiveTab('favorites');
+              setSearchParams({ tab: 'favorites' });
+            }}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'favorites' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
           >
             我的收藏
           </button>
           <button
-            onClick={() => setActiveTab('settings')}
+            onClick={() => {
+              setActiveTab('settings');
+              setSearchParams({ tab: 'settings' });
+            }}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'settings' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
           >
             账号设置

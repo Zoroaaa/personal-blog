@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+
+// 定义有效的标签页列表
+const VALID_ADMIN_TABS = ['posts', 'categories', 'tags', 'columns', 'comments', 'users', 'analytics'] as const;
+type ValidAdminTab = typeof VALID_ADMIN_TABS[number];
 import { api } from '../utils/api';
 // 导入新增的组件
 import { CategoryManager } from '../components/CategoryManager';
@@ -22,11 +26,17 @@ type UserRole = 'admin' | 'user';
 export function AdminPage() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { showSuccess, showError } = useToast();
-  
+
+  // 从URL参数获取当前标签页
+  const getTabFromUrl = (): AdminTab => {
+    const tab = searchParams.get('tab');
+    return VALID_ADMIN_TABS.includes(tab as ValidAdminTab) ? (tab as AdminTab) : 'posts';
+  };
+
   // 当前活动的标签页
-  const [activeTab, setActiveTab] = useState<AdminTab>('posts');
+  const [activeTab, setActiveTab] = useState<AdminTab>(getTabFromUrl());
   
   // 文章创建状态 (保留状态但使用下划线前缀表示暂时未使用)
   const [_title, _setTitle] = useState('');
@@ -60,6 +70,14 @@ export function AdminPage() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState('');
   
+  // 当URL参数变化时，同步更新activeTab状态
+  useEffect(() => {
+    const tabFromUrl = getTabFromUrl();
+    if (tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchParams]);
+
   // 检查权限
   if (!user || user.role !== 'admin') {
     return (
@@ -698,7 +716,10 @@ export function AdminPage() {
               ].map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    setSearchParams({ tab: tab.id });
+                  }}
                   className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                     activeTab === tab.id
                       ? 'border-blue-600 text-blue-600'
