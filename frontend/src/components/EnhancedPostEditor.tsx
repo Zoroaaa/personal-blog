@@ -57,13 +57,6 @@ interface PostData {
   status: 'draft' | 'published';
 }
 
-// 生成唯一草稿键的辅助函数
-const generateDraftKey = (): string => {
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 8);
-  return `new_post_${timestamp}_${random}`;
-};
-
 export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps) {
   // 文章基本信息
   const [title, setTitle] = useState('');
@@ -71,19 +64,14 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   const [summary, setSummary] = useState('');
   const [coverImage, setCoverImage] = useState('');
   const [status, setStatus] = useState<'draft' | 'published'>('draft');
-  
-  // 为每个新建文章会话生成唯一的草稿键
-  const [draftKey] = useState<string>(() => {
-    if (postId) return `post_${postId}`;
-    // 尝试从 URL 参数获取草稿键（用于从草稿列表打开）
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlDraftKey = urlParams.get('draft');
-    if (urlDraftKey && urlDraftKey.startsWith('new_post_')) {
-      return urlDraftKey;
-    }
-    // 生成新的唯一草稿键
-    return generateDraftKey();
+
+  // 为每个新建文章会话生成唯一的 sessionId
+  const [sessionId] = useState(() => {
+    return postId ? null : Date.now().toString();
   });
+
+  // 构建草稿键
+  const draftKey = postId ? `post_${postId}` : `new_post_${sessionId}`;
   
   // 分类和标签
   const [categories, setCategories] = useState<Category[]>([]);
@@ -146,12 +134,19 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     { key: 'Escape', ctrl: false, handler: () => setIsFullscreen(false), description: '退出全屏' },
   ]);
 
-  // 加载分类和标签
+  // 加载分类和标签，并检查草稿
   useEffect(() => {
     loadCategories();
     loadTags();
-    checkDraft();
-  }, [checkDraft]);
+  }, []);
+
+  // 新建文章时检查草稿
+  useEffect(() => {
+    if (!postId) {
+      checkDraft();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postId]);
   
   // 如果是编辑模式,加载文章数据
   useEffect(() => {
@@ -166,32 +161,73 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     setDetectedLinks(urls);
   }, [content]);
 
-  // 检查是否有草稿
-  const checkDraft = useCallback(() => {
-    const draft = restoreFromLocalStorage();
-    // 检查草稿是否有实际内容（标题或内容不为空）
-    if (draft && (draft.title?.trim() || draft.content?.trim())) {
-      // 编辑模式：检查草稿是否与当前文章数据不同
-      if (postId) {
-        const hasChanges = draft.title !== title || draft.content !== content;
-        if (!hasChanges) return; // 没有变化，不需要恢复
-      }
-      
-      const shouldRestore = window.confirm('检测到未保存的草稿，是否恢复？');
-      if (shouldRestore) {
-        setTitle(draft.title || '');
-        setContent(draft.content || '');
-        setSummary(draft.summary || '');
-        setCoverImage(draft.coverImage || '');
-        setStatus(draft.status || 'draft');
-        setSelectedCategoryId(draft.categoryId || null);
-        setSelectedTagIds(draft.tags || []);
-      } else {
-        // 用户选择不恢复，只清除当前草稿键对应的草稿
-        clearLocalStorage();
+  // 获取所有新建文章的草稿
+  const getAllNewPostDrafts = useCallback(() => {
+    const drafts = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('draft_new_post_')) {
+        try {
+          const item = localStorage.getItem(key);
+          if (item) {
+            const draft = JSON.parse(item);
+            // 只保留有内容的草稿
+            if (draft.data?.title?.trim() || draft.data?.content?.trim()) {
+              drafts.push({
+                key,
+                ...draft,
+                sessionId: key.replace('draft_new_post_', '')
+              });
+            }
+          }
+        } catch (err) {
+          console.error('Failed to parse draft:', err);
+        }
       }
     }
-  }, [postId, title, content, restoreFromLocalStorage, clearLocalStorage]);
+    // 按时间倒序排序
+    return drafts.sort((a, b) =>
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+  }, []);
+
+  // 检查是否有草稿（只在新建文章时执行）
+  const checkDraft = useCallback(() => {
+    if (postId) return; // 编辑模式不检查
+
+    const drafts = getAllNewPostDrafts();
+
+    if (drafts.length > 0) {
+      // 取最新的草稿
+      const latestDraft = drafts[0];
+      const timeDiff = Date.now() - new Date(latestDraft.timestamp).getTime();
+      const minutes = Math.floor(timeDiff / 60000);
+
+      const shouldRestore = window.confirm(
+        `检测到 ${minutes} 分钟前的未保存草稿，是否恢复？\n` +
+        `标题: ${latestDraft.data.title || '(无标题)'}\n` +
+        `共有 ${drafts.length} 个草稿`
+      );
+
+      if (shouldRestore) {
+        setTitle(latestDraft.data.title || '');
+        setContent(latestDraft.data.content || '');
+        setSummary(latestDraft.data.summary || '');
+        setCoverImage(latestDraft.data.coverImage || '');
+        setStatus(latestDraft.data.status || 'draft');
+        setSelectedCategoryId(latestDraft.data.categoryId || null);
+        setSelectedTagIds(latestDraft.data.tags || []);
+      } else {
+        // 用户选择不恢复，询问是否清除所有草稿
+        const shouldClear = window.confirm('是否清除所有草稿?');
+        if (shouldClear) {
+          drafts.forEach(draft => {
+            localStorage.removeItem(draft.key);
+          });
+        }
+      }
+    }
+  }, [postId, getAllNewPostDrafts]);
   
   const loadCategories = async () => {
     try {

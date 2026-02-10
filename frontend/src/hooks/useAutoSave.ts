@@ -124,16 +124,19 @@ export function useAutoSave<T>(options: UseAutoSaveOptions<T>) {
   // 设置定时保存
   useEffect(() => {
     if (!enabled) return;
-    
-    // 立即保存一次到本地存储
-    saveToLocalStorage(data);
-    
+
+    // 延迟首次保存，避免立即覆盖草稿（3秒后）
+    const initialDelay = setTimeout(() => {
+      saveToLocalStorage(data);
+    }, 3000);
+
     // 设置定时器
     intervalRef.current = setInterval(() => {
       doSave();
     }, interval);
-    
+
     return () => {
+      clearTimeout(initialDelay);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
