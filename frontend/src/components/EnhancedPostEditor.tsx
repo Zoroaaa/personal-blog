@@ -11,7 +11,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../utils/api';
 import { parseDocument, isSupportedDocument } from '../utils/documentParser';
-import { transformCategoryList, transformTagList, transformPost } from '../utils/apiTransformer';
+import { transformCategoryList, transformTagList, transformColumnList, transformPost } from '../utils/apiTransformer';
 import { 
   detectUrls, 
   insertOrUpdateMarkdownLink,
@@ -34,6 +34,14 @@ interface Category {
   color?: string;
 }
 
+interface Column {
+  id: number;
+  name: string;
+  slug: string;
+  coverImage?: string;
+  postCount?: number;
+}
+
 interface Tag {
   id: number;
   name: string;
@@ -54,6 +62,7 @@ interface PostData {
   summary: string;
   coverImage: string;
   categoryId: number | null;
+  columnId: number | null;
   tags: number[];
   status: 'draft' | 'published';
 }
@@ -74,10 +83,12 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   // 构建草稿键
   const draftKey = postId ? `post_${postId}` : `new_post_${sessionId}`;
   
-  // 分类和标签
+  // 分类、专栏和标签
   const [categories, setCategories] = useState<Category[]>([]);
+  const [columns, setColumns] = useState<Column[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [selectedColumnId, setSelectedColumnId] = useState<number | null>(null);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   
   // 标签搜索
@@ -88,6 +99,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [columnsLoading, setColumnsLoading] = useState(true);
   const [tagsLoading, setTagsLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   
@@ -117,10 +129,11 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   
   // 自动保存
   const postData: PostData = {
-    title, content, summary, coverImage, 
-    categoryId: selectedCategoryId, 
-    tags: selectedTagIds, 
-    status 
+    title, content, summary, coverImage,
+    categoryId: selectedCategoryId,
+    columnId: selectedColumnId,
+    tags: selectedTagIds,
+    status
   };
   
   const { lastSaved, isSaving, hasDraft, saveNow, clearLocalStorage } = useAutoSave({
@@ -158,9 +171,10 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     { key: 'Escape', ctrl: false, handler: () => setIsFullscreen(false), description: '退出全屏' },
   ]);
 
-  // 加载分类和标签，并检查草稿
+  // 加载分类、专栏和标签，并检查草稿
   useEffect(() => {
     loadCategories();
+    loadColumns();
     loadTags();
   }, []);
 
@@ -224,6 +238,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     setCoverImage(draft.data.coverImage || '');
     setStatus(draft.data.status || 'draft');
     setSelectedCategoryId(draft.data.categoryId || null);
+    setSelectedColumnId(draft.data.columnId || null);
     setSelectedTagIds(draft.data.tags || []);
 
     // 删除已恢复的草稿，避免重复
@@ -272,6 +287,20 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     }
   };
 
+  const loadColumns = async () => {
+    try {
+      setColumnsLoading(true);
+      const response = await api.getColumns({ limit: '100' });
+      if (response.success && response.data) {
+        setColumns(transformColumnList(response.data.columns || []));
+      }
+    } catch (err) {
+      console.error('Failed to load columns:', err);
+    } finally {
+      setColumnsLoading(false);
+    }
+  };
+
   const loadTags = async () => {
     try {
       setTagsLoading(true);
@@ -298,6 +327,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
         setCoverImage(post.coverImage || '');
         setStatus(post.status as 'draft' | 'published');
         setSelectedCategoryId(post.categoryId || null);
+        setSelectedColumnId(post.columnId || null);
         setSelectedTagIds(post.tags?.map((t: any) => t.id) || []);
       }
     } catch (err: any) {
@@ -330,6 +360,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
         summary,
         coverImage,
         categoryId: selectedCategoryId ?? undefined,
+        columnId: selectedColumnId ?? undefined,
         tags: selectedTagIds,
         status
       };
@@ -830,7 +861,68 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
             </div>
           )}
         </div>
-        
+
+        {/* 专栏选择 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            选择专栏
+          </label>
+          {columnsLoading ? (
+            <div className="text-gray-500 dark:text-gray-400">加载专栏中...</div>
+          ) : columns.length === 0 ? (
+            <div className="text-gray-500 dark:text-gray-400 text-sm">
+              暂无专栏，请在专栏管理中创建
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedColumnId(null)}
+                className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all ${
+                  selectedColumnId === null
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 scale-105'
+                    : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
+                }`}
+              >
+                <div className="w-10 h-10 rounded-lg bg-gray-200 dark:bg-slate-600 flex items-center justify-center">
+                  <svg className="w-6 h-6 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  不选择
+                </span>
+              </button>
+              {columns.map((column) => (
+                <button
+                  key={column.id}
+                  type="button"
+                  onClick={() => setSelectedColumnId(
+                    selectedColumnId === column.id ? null : column.id
+                  )}
+                  className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all ${
+                    selectedColumnId === column.id
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 scale-105'
+                      : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">
+                    {column.name.slice(0, 2)}
+                  </div>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate max-w-full">
+                    {column.name}
+                  </span>
+                  {column.postCount !== undefined && (
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {column.postCount} 篇文章
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* 标签选择 */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

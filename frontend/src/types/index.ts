@@ -160,6 +160,7 @@ export interface Post {
   coverImage?: string;
   authorId: number;
   categoryId?: number;
+  columnId?: number;
   status: PostStatus;
   visibility: PostVisibility;
   viewCount: number;
@@ -182,6 +183,9 @@ export interface Post {
   categoryName?: string;
   categorySlug?: string;
   categoryColor?: string;
+  column?: Column;
+  columnName?: string;
+  columnSlug?: string;
   tags?: Tag[];
   
   // 交互状态
@@ -220,6 +224,7 @@ export interface CreatePostRequest {
   summary?: string;
   coverImage?: string;
   categoryId?: number;
+  columnId?: number;
   tags?: number[];
   status?: PostStatus;
   visibility?: PostVisibility;
@@ -267,6 +272,60 @@ export interface Category {
   displayOrder: number;
   createdAt: string;
   updatedAt: string;
+}
+
+// ============= 专栏相关类型 =============
+
+/**
+ * 专栏状态
+ */
+export type ColumnStatus = 'active' | 'hidden' | 'archived';
+
+/**
+ * 专栏
+ */
+export interface Column {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  coverImage?: string;
+  authorId: number;
+  authorUsername?: string;
+  authorName?: string;
+  authorAvatar?: string;
+  authorBio?: string;
+  postCount: number;
+  totalViewCount: number;
+  totalLikeCount: number;
+  totalFavoriteCount: number;
+  totalCommentCount: number;
+  displayOrder: number;
+  status: ColumnStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * 创建专栏请求
+ */
+export interface CreateColumnRequest {
+  name: string;
+  slug?: string;
+  description?: string;
+  coverImage?: string;
+  displayOrder?: number;
+}
+
+/**
+ * 更新专栏请求
+ */
+export interface UpdateColumnRequest {
+  name?: string;
+  description?: string;
+  coverImage?: string;
+  displayOrder?: number;
+  status?: ColumnStatus;
 }
 
 /**

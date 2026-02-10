@@ -16,6 +16,7 @@ import type {
   PostListItem,
   Comment,
   Category,
+  Column,
   Tag,
   User,
   UserPublicProfile
@@ -82,6 +83,9 @@ export function transformPost(post: any): Post {
     categoryName: post.category_name,
     categorySlug: post.category_slug,
     categoryColor: post.category_color,
+    column: post.column ? transformColumn(post.column) : undefined,
+    columnName: post.column_name,
+    columnSlug: post.column_slug,
     tags: post.tags ? post.tags.map(transformTag) : undefined,
     // 交互状态（后端可能返回 camelCase 或 snake_case）
     isLiked: post.isLiked !== undefined ? post.isLiked : post.is_liked,
@@ -139,6 +143,42 @@ export function transformCategory(category: any): Category {
     createdAt: category.created_at,
     updatedAt: category.updated_at
   };
+}
+
+// ============= 专栏相关转换 =============
+
+/**
+ * 转换专栏
+ */
+export function transformColumn(column: any): Column {
+  return {
+    id: column.id,
+    name: column.name,
+    slug: column.slug,
+    description: column.description,
+    coverImage: column.cover_image,
+    authorId: column.author_id,
+    authorUsername: column.author_username,
+    authorName: column.author_name,
+    authorAvatar: column.author_avatar,
+    authorBio: column.author_bio,
+    postCount: column.post_count ?? 0,
+    totalViewCount: column.total_view_count ?? 0,
+    totalLikeCount: column.total_like_count ?? 0,
+    totalFavoriteCount: column.total_favorite_count ?? 0,
+    totalCommentCount: column.total_comment_count ?? 0,
+    displayOrder: column.display_order ?? 0,
+    status: column.status,
+    createdAt: column.created_at,
+    updatedAt: column.updated_at
+  };
+}
+
+/**
+ * 批量转换专栏列表
+ */
+export function transformColumnList(columns: any[]): Column[] {
+  return columns.map(transformColumn);
 }
 
 // ============= 标签相关转换 =============

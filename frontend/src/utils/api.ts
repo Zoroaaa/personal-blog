@@ -576,7 +576,77 @@ export const api = {
     apiRequest<{ deleted: boolean }>(`/categories/tags/${id}`, {
       method: 'DELETE',
     }),
-  
+
+  // ============= 专栏相关 =============
+
+  /**
+   * 获取专栏列表
+   */
+  getColumns: (params?: { page?: string; limit?: string; author?: string; sortBy?: string }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return apiRequest<{
+      columns: import('../types').Column[];
+      pagination: { page: number; limit: number; total: number; totalPages: number }
+    }>(`/columns${query}`);
+  },
+
+  /**
+   * 获取专栏详情
+   */
+  getColumn: (slug: string) =>
+    apiRequest<import('../types').Column>(`/columns/${slug}`),
+
+  /**
+   * 获取专栏下的文章列表
+   */
+  getColumnPosts: (slug: string, params?: { page?: string; limit?: string; sortBy?: string }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return apiRequest<{
+      posts: PostListItem[];
+      pagination: { page: number; limit: number; total: number; totalPages: number }
+    }>(`/columns/${slug}/posts${query}`);
+  },
+
+  /**
+   * 创建专栏
+   */
+  createColumn: (data: import('../types').CreateColumnRequest) =>
+    apiRequest<{ id: number; slug: string }>('/columns', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * 更新专栏
+   */
+  updateColumn: (id: number, data: import('../types').UpdateColumnRequest) =>
+    apiRequest<{ updated: boolean }>(`/columns/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * 删除专栏
+   */
+  deleteColumn: (id: number) =>
+    apiRequest<{ deleted: boolean }>(`/columns/${id}`, {
+      method: 'DELETE',
+    }),
+
+  /**
+   * 刷新专栏统计数据
+   */
+  refreshColumnStats: (id: number) =>
+    apiRequest<{
+      postCount: number;
+      totalViewCount: number;
+      totalLikeCount: number;
+      totalFavoriteCount: number;
+      totalCommentCount: number;
+    }>(`/columns/${id}/refresh-stats`, {
+      method: 'POST',
+    }),
+
   // ============= 文件上传 =============
   
   /**

@@ -10,6 +10,7 @@ import { SearchPage } from './pages/SearchPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { ConfigPage } from './pages/ConfigPage';
 import { AboutPage } from './pages/AboutPage';
+import { ColumnPage } from './pages/ColumnPage';
 import { useSiteConfig } from './hooks/useSiteConfig';
 import { ToastProvider } from './components/Toast';
 
@@ -36,6 +37,7 @@ function AppRoutes() {
       <Route path="/admin/config" element={<PageTransition><ConfigPage /></PageTransition>} />
       <Route path="/search" element={<PageTransition><SearchPage /></PageTransition>} />
       <Route path="/profile" element={<PageTransition><ProfilePage /></PageTransition>} />
+      <Route path="/columns/:slug" element={<PageTransition><ColumnPage /></PageTransition>} />
     </Routes>
   );
 }
