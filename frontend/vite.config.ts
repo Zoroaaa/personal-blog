@@ -21,8 +21,5 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
-    rollupOptions: {
-      external: ['mammoth', 'jszip'],
-    },
   },
 })
