@@ -476,8 +476,10 @@ postRoutes.get('/search', async (c) => {
     let query: string;
     let params: any[] = [];
 
-    // 判断是否使用FTS5全文搜索
-    const shouldUseFts = useFts && q && q.trim().length > 0;
+    // 检测是否包含中文
+    const hasChinese = /[\u4e00-\u9fa5]/.test(q || '');
+    // 中文用LIKE，英文用FTS
+    const shouldUseFts = !hasChinese && useFts && q && q.trim().length > 0;
 
     if (shouldUseFts) {
       // 使用FTS5全文搜索（JOIN方式，使用完整表名）
