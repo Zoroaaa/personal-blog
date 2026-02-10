@@ -3,12 +3,14 @@
 一个基于 Cloudflare 全栈技术构建的现代化个人博客系统。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-3.0.1-green.svg)](https://github.com/yourusername/personal-blog)
+[![Version](https://img.shields.io/badge/version-1.2.0-green.svg)](https://github.com/yourusername/personal-blog)
 [![Cloudflare](https://img.shields.io/badge/Cloudflare-Workers-orange.svg)](https://workers.cloudflare.com/)
 
 **体验地址**: [blog.neutronx.uk](https://blog.neutronx.uk)
 
-# 效果图
+---
+
+## 效果图
 
 <img width="1920" height="871" alt="image" src="https://github.com/user-attachments/assets/af431faa-c4c3-46c7-9b32-45d01c8d66e4" />
 <img width="1920" height="865" alt="image" src="https://github.com/user-attachments/assets/0eaa7576-376f-4cac-afea-5f9b5bcb150b" />
@@ -26,13 +28,16 @@
 
 - **现代化技术栈**：React 18 + TypeScript + Tailwind CSS + Hono
 - **边缘计算架构**：基于 Cloudflare Workers/Pages，全球低延迟访问
-- **完整内容管理**：文章、分类、标签、评论的全生命周期管理
-- **用户系统**：支持邮箱注册、GitHub OAuth 登录
+- **完整内容管理**：文章、专栏、分类、标签、评论的全生命周期管理
+- **用户系统**：支持邮箱注册、GitHub OAuth 登录、邮箱验证码
 - **互动功能**：点赞、收藏、阅读历史、嵌套评论（最多5层）
+- **全文搜索**：支持 FTS5 全文搜索引擎
 - **管理后台**：用户管理、内容审核、系统配置、数据分析
 - **SEO 优化**：动态 meta 标签、结构化数据、搜索引擎友好
 - **响应式设计**：完美适配桌面端、平板和移动设备
 - **暗色模式**：支持亮色/暗色主题切换
+
+---
 
 ## 技术架构
 
@@ -60,6 +65,8 @@
 | bcryptjs | 2.x | 密码哈希 |
 | zod | 3.x | 数据验证 |
 
+---
+
 ## 快速开始
 
 ### 环境要求
@@ -78,9 +85,11 @@
 
 2. **安装依赖**
    ```bash
-   pnpm install
-   # 或
-   npm install
+   # 安装后端依赖
+   cd backend && pnpm install
+   
+   # 安装前端依赖
+   cd ../frontend && pnpm install
    ```
 
 3. **配置环境变量**
@@ -90,7 +99,14 @@
    ```
    根据 `.env.example` 中的说明填写必要配置。
 
-4. **启动开发服务器**
+4. **创建数据库**
+   ```bash
+   cd backend
+   wrangler d1 create personal-blog-dev
+   wrangler d1 execute personal-blog-dev --file=./database/schema.sql
+   ```
+
+5. **启动开发服务器**
    ```bash
    # 启动后端（端口 8787）
    cd backend && pnpm dev
@@ -100,6 +116,8 @@
    ```
 
 详细配置请参考 [QUICKSTART.md](./QUICKSTART.md)。
+
+---
 
 ## 项目结构
 
@@ -111,30 +129,34 @@ personal-blog/
 │   │   ├── routes/         # API 路由
 │   │   │   ├── auth.ts     # 认证相关
 │   │   │   ├── posts.ts    # 文章管理
+│   │   │   ├── columns.ts  # 专栏管理
 │   │   │   ├── comments.ts # 评论系统
 │   │   │   ├── admin.ts    # 后台管理
 │   │   │   ├── categories.ts # 分类标签
 │   │   │   ├── config.ts   # 站点配置
 │   │   │   ├── upload.ts   # 文件上传
 │   │   │   └── analytics.ts # 数据分析
-│   │   └── types.ts        # 类型定义
+│   │   ├── middleware/     # 中间件
+│   │   ├── utils/          # 工具函数
+│   │   └── types/          # 类型定义
 │   ├── database/
-│   │   └── schema.sql      # 数据库架构
+│   │   └── schema.sql      # 数据库架构 v2.0.0
 │   └── wrangler.toml       # Workers 配置
 ├── frontend/               # 前端应用
 │   ├── src/
 │   │   ├── pages/          # 页面组件
 │   │   ├── components/     # 可复用组件
 │   │   ├── stores/         # 状态管理
-│   │   └── utils/          # 工具函数
+│   │   ├── utils/          # 工具函数
+│   │   └── types/          # 类型定义
 │   └── index.html
-├── database/               # 数据库相关
-│   └── schema.sql          # 数据库架构 v2.0.0
 ├── DEPLOYMENT.md           # 部署指南
 ├── API.md                  # API 文档
 ├── ARCHITECTURE.md         # 架构文档
 └── QUICKSTART.md           # 快速开始
 ```
+
+---
 
 ## 功能模块
 
@@ -143,9 +165,18 @@ personal-blog/
 - ✅ Markdown 编辑器支持
 - ✅ 代码语法高亮
 - ✅ 文章分类和标签
+- ✅ 文章专栏归类
 - ✅ 文章置顶功能
 - ✅ 浏览量统计
-- ✅ 文章搜索
+- ✅ 文章搜索（FTS5全文搜索）
+- ✅ SEO 元数据配置
+
+### 专栏系统
+
+- ✅ 专栏创建与管理
+- ✅ 专栏封面和描述
+- ✅ 专栏统计（文章数、浏览量、点赞数等）
+- ✅ 专栏文章列表
 
 ### 评论系统
 
@@ -158,6 +189,7 @@ personal-blog/
 
 - ✅ 邮箱注册/登录
 - ✅ GitHub OAuth 登录
+- ✅ 邮箱验证码（Resend）
 - ✅ 密码重置
 - ✅ 用户资料管理
 - ✅ 阅读历史
@@ -167,25 +199,31 @@ personal-blog/
 
 - ✅ 仪表盘统计
 - ✅ 文章管理（CRUD）
+- ✅ 专栏管理
 - ✅ 评论审核
 - ✅ 用户管理
 - ✅ 分类/标签管理
 - ✅ 系统配置
 - ✅ 数据分析
 
+---
+
 ## API 文档
 
 完整的 API 文档请参考 [API.md](./API.md)。
 
 主要 API 模块：
-- **认证模块**：`/api/auth/*` - 登录、注册、OAuth
-- **文章模块**：`/api/posts/*` - 文章 CRUD、搜索
+- **认证模块**：`/api/auth/*` - 登录、注册、OAuth、邮箱验证码
+- **文章模块**：`/api/posts/*` - 文章 CRUD、搜索、阅读历史
+- **专栏模块**：`/api/columns/*` - 专栏管理
 - **评论模块**：`/api/comments/*` - 评论管理
 - **分类模块**：`/api/categories/*` - 分类标签
 - **管理模块**：`/api/admin/*` - 后台管理
 - **配置模块**：`/api/config/*` - 站点配置
 - **上传模块**：`/api/upload/*` - 文件上传
 - **统计模块**：`/api/analytics/*` - 数据分析
+
+---
 
 ## 部署
 
@@ -198,8 +236,11 @@ personal-blog/
 - **数据库**：Cloudflare D1
 - **缓存**：Cloudflare KV
 - **存储**：Cloudflare R2
+- **邮件**：Resend
 
 详细部署步骤请参考 [DEPLOYMENT.md](./DEPLOYMENT.md)。
+
+---
 
 ## 系统要求
 
@@ -209,6 +250,7 @@ personal-blog/
 - Cloudflare D1 免费版（500MB 存储）
 - Cloudflare KV 免费版（1GB 存储）
 - Cloudflare Pages 免费版
+- Cloudflare R2 免费版（10GB 存储）
 
 ### 推荐配置
 
@@ -216,12 +258,16 @@ personal-blog/
 - Cloudflare D1 付费版（更大存储）
 - 自定义域名
 
+---
+
 ## 浏览器支持
 
 - Chrome 90+
 - Firefox 88+
 - Safari 14+
 - Edge 90+
+
+---
 
 ## 贡献指南
 
@@ -233,11 +279,13 @@ personal-blog/
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 创建 Pull Request
 
+---
+
 ## 开源协议
 
 本项目基于 [MIT License](./LICENSE) 开源。
 
-
+---
 
 ## 相关文档
 
@@ -245,6 +293,9 @@ personal-blog/
 - [部署指南](./DEPLOYMENT.md) - 详细部署说明
 - [API 文档](./API.md) - 完整接口参考
 - [架构文档](./ARCHITECTURE.md) - 系统设计说明
+- [版本更新](./CHANGELOG.md) - 版本更新说明
+
+---
 
 ## 支持与反馈
 
@@ -255,4 +306,4 @@ personal-blog/
 
 ---
 
-**版本**: v3.0.1 | **更新日期**: 2026-02-09
+**版本**: v1.2.0 | **更新日期**: 2026-02-10

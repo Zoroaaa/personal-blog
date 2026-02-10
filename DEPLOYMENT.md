@@ -2,7 +2,9 @@
 
 本文档详细介绍如何将个人博客系统部署到 Cloudflare 平台。
 
-**版本**: v3.0.1 | **更新日期**: 2026-02-09
+**版本**: v1.2.0 | **更新日期**: 2026-02-10
+
+---
 
 ## 目录
 
@@ -14,6 +16,8 @@
 - [验证部署](#验证部署)
 - [故障排查](#故障排查)
 - [更新部署](#更新部署)
+
+---
 
 ## 环境准备
 
@@ -37,6 +41,8 @@
 
 4. **Git** (可选，用于版本控制)
 
+---
+
 ## 配置 Cloudflare 资源
 
 ### 1. 创建 D1 数据库
@@ -51,26 +57,23 @@ wrangler d1 create personal-blog-db
 # 记录返回的 database_id，后续配置需要
 ```
 
-### 2. 创建 KV 命名空间
-
-```bash
-# 创建缓存 KV
-wrangler kv:namespace create "CACHE"
-
-# 创建会话 KV
-wrangler kv:namespace create "SESSIONS"
-
-# 记录返回的 id，后续配置需要
-```
-
-### 3. 创建 R2 存储桶
+### 2. 创建 R2 存储桶
 
 ```bash
 # 创建图片存储桶
 wrangler r2 bucket create personal-blog-images
 
-# 可选：配置公开访问（如需直接访问图片）
+# 配置公开访问（如需直接访问图片）
 # 在 Cloudflare Dashboard > R2 > 存储桶 > 设置中配置
+```
+
+### 3. 创建 KV 命名空间（可选）
+
+```bash
+# 创建缓存 KV
+wrangler kv:namespace create "CACHE"
+
+# 记录返回的 id，后续配置需要
 ```
 
 ### 4. 配置 GitHub OAuth (可选)
@@ -82,8 +85,18 @@ wrangler r2 bucket create personal-blog-images
 3. 填写信息：
    - Application name: Personal Blog
    - Homepage URL: `https://your-domain.pages.dev`
-   - Authorization callback URL: `https://your-domain.pages.dev/api/auth/github/callback`
+   - Authorization callback URL: `https://your-domain.pages.dev/api/auth/github`
 4. 记录 Client ID 和 Client Secret
+
+### 5. 配置 Resend 邮箱服务（可选）
+
+如需支持邮箱验证码功能：
+
+1. 访问 [Resend](https://resend.com) 注册账号
+2. 验证域名
+3. 获取 API Key
+
+---
 
 ## 本地配置
 
@@ -102,17 +115,17 @@ JWT_SECRET=your-super-secret-jwt-key-min-32-chars-long
 GITHUB_CLIENT_ID=your-github-client-id
 GITHUB_CLIENT_SECRET=your-github-client-secret
 
+# Resend 邮箱服务（可选）
+RESEND_API_KEY=your-resend-api-key
+RESEND_FROM_EMAIL=noreply@your-domain.com
+
 # 管理员邮箱（用于接收系统通知）
 ADMIN_EMAIL=admin@example.com
-
-# 站点配置
-SITE_URL=https://your-domain.pages.dev
-SITE_NAME=My Personal Blog
 ```
 
 ### 2. 配置前端环境变量
 
-编辑 `frontend/.env`：
+编辑 `frontend/.env.production`：
 
 ```env
 # API 基础 URL
@@ -137,29 +150,29 @@ binding = "DB"
 database_name = "personal-blog-db"
 database_id = "your-database-id-here"
 
-# KV 命名空间绑定
+# R2 存储桶绑定
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "personal-blog-images"
+
+# KV 命名空间绑定（可选）
 [[kv_namespaces]]
 binding = "CACHE"
 id = "your-cache-kv-id-here"
 
-[[kv_namespaces]]
-binding = "SESSIONS"
-id = "your-sessions-kv-id-here"
-
-# R2 存储桶绑定
-[[r2_buckets]]
-binding = "IMAGES"
-bucket_name = "personal-blog-images"
-
 # 环境变量
 [vars]
-SITE_URL = "https://your-domain.pages.dev"
-SITE_NAME = "My Personal Blog"
+FRONTEND_URL = "https://your-domain.pages.dev"
+STORAGE_PUBLIC_URL = "https://your-r2-public-url"
+ENVIRONMENT = "production"
 
 # 密钥（使用 wrangler secret 设置）
 # wrangler secret put JWT_SECRET
 # wrangler secret put GITHUB_CLIENT_SECRET
+# wrangler secret put RESEND_API_KEY
 ```
+
+---
 
 ## 部署步骤
 
@@ -176,18 +189,18 @@ wrangler d1 execute personal-blog-db --command="SELECT name FROM sqlite_master W
 ```
 
 数据库架构 v2.0.0 包含以下表：
-- `users` - 用户信息
-- `posts` - 文章数据
+- `users` - 用户信息（支持OAuth、邮箱验证）
+- `posts` - 文章数据（支持专栏、SEO）
+- `columns` - 专栏数据
 - `comments` - 评论数据
 - `categories` - 文章分类
 - `tags` - 文章标签
 - `post_tags` - 文章标签关联
 - `likes` - 点赞记录
-- `view_history` - 浏览历史
 - `reading_history` - 阅读历史
 - `favorites` - 收藏记录
 - `site_config` - 站点配置
-- `schema_version` - 架构版本
+- `posts_fts` - 全文搜索虚拟表
 
 ### 第二步：部署后端
 
@@ -201,22 +214,16 @@ wrangler secret put JWT_SECRET
 wrangler secret put GITHUB_CLIENT_SECRET
 # 输入你的 GitHub Client Secret（如使用 GitHub OAuth）
 
+wrangler secret put RESEND_API_KEY
+# 输入你的 Resend API Key（如使用邮箱验证）
+
 # 部署 Workers
 wrangler deploy
 
 # 记录部署后的 Workers URL
 ```
 
-### 第三步：配置前端
-
-编辑 `frontend/.env.production`：
-
-```env
-VITE_API_URL=https://personal-blog-api.your-subdomain.workers.dev
-VITE_SITE_NAME=My Personal Blog
-```
-
-### 第四步：构建并部署前端
+### 第三步：构建并部署前端
 
 ```bash
 cd frontend
@@ -240,12 +247,15 @@ wrangler pages deploy dist --project-name=personal-blog
    - Build output directory: `dist`
    - Root directory: `frontend`
 
-### 第五步：配置自定义域名（可选）
+### 第四步：配置自定义域名（可选）
 
 1. 在 Cloudflare Dashboard 添加域名
 2. 配置 DNS 记录：
    - CNAME `blog` → `your-project.pages.dev`
 3. 在 Pages 项目设置中绑定自定义域名
+4. 更新后端 `FRONTEND_URL` 环境变量
+
+---
 
 ## 环境变量说明
 
@@ -255,8 +265,8 @@ wrangler pages deploy dist --project-name=personal-blog
 |--------|------|------|
 | `JWT_SECRET` | JWT 签名密钥 | 随机字符串，至少32位 |
 | `D1_DATABASE_ID` | D1 数据库 ID | xxxxxxxx-xxxx-xxxx |
-| `SITE_URL` | 站点 URL | https://blog.example.com |
-| `SITE_NAME` | 站点名称 | My Blog |
+| `FRONTEND_URL` | 前端 URL | https://blog.example.com |
+| `STORAGE_PUBLIC_URL` | R2 公开访问 URL | https://images.example.com |
 
 ### 后端可选变量
 
@@ -264,9 +274,9 @@ wrangler pages deploy dist --project-name=personal-blog
 |--------|------|------|
 | `GITHUB_CLIENT_ID` | GitHub OAuth ID | GitHub 登录 |
 | `GITHUB_CLIENT_SECRET` | GitHub OAuth 密钥 | GitHub 登录 |
-| `ADMIN_EMAIL` | 管理员邮箱 | 接收通知 |
 | `RESEND_API_KEY` | Resend API 密钥 | 邮件发送 |
-| `ENABLE_EMAIL_VERIFY` | 启用邮箱验证 | true/false |
+| `RESEND_FROM_EMAIL` | 发件人邮箱 | 邮件发送 |
+| `ADMIN_EMAIL` | 管理员邮箱 | 接收通知 |
 
 ### 前端变量
 
@@ -275,27 +285,37 @@ wrangler pages deploy dist --project-name=personal-blog
 | `VITE_API_URL` | API 基础 URL | https://api.example.com |
 | `VITE_SITE_NAME` | 站点名称 | My Blog |
 
+---
+
 ## 验证部署
 
 ### 1. 检查 API 健康状态
 
 ```bash
-curl https://your-worker.workers.dev/api/health
+curl https://your-worker.workers.dev/health
 ```
 
 预期响应：
 ```json
 {
-  "status": "ok",
-  "version": "3.0.1",
-  "timestamp": "2026-02-09T10:00:00.000Z"
+  "success": true,
+  "data": {
+    "status": "healthy",
+    "version": "1.2.0",
+    "timestamp": "2026-02-10T10:00:00.000Z",
+    "services": {
+      "database": "healthy",
+      "cache": "healthy",
+      "storage": "healthy"
+    }
+  }
 }
 ```
 
 ### 2. 检查数据库连接
 
 ```bash
-curl https://your-worker.workers.dev/api/health/db
+wrangler d1 execute personal-blog-db --command="SELECT COUNT(*) FROM users;"
 ```
 
 ### 3. 验证前端访问
@@ -304,12 +324,22 @@ curl https://your-worker.workers.dev/api/health/db
 - 首页正常加载
 - 文章列表显示
 - 分类/标签正常
+- 专栏页面正常
 
 ### 4. 测试管理员登录
 
 使用默认管理员账号登录：
-- 邮箱：`admin@example.com`
-- 密码：`admin123`（**生产环境请立即修改**）
+- 用户名：`admin`
+- 密码：`Admin123!`（**生产环境请立即修改**）
+
+### 5. 测试邮箱验证（如启用）
+
+1. 访问注册页面
+2. 输入邮箱
+3. 点击"发送验证码"
+4. 检查邮箱是否收到验证码邮件
+
+---
 
 ## 故障排查
 
@@ -321,14 +351,16 @@ curl https://your-worker.workers.dev/api/health/db
 1. 检查 `wrangler.toml` 中的 `database_id` 是否正确
 2. 确认数据库已创建：`wrangler d1 list`
 3. 检查数据库绑定名称是否为 `DB`
+4. 确认数据库迁移已执行
 
 ### CORS 错误
 
 **症状**: 浏览器控制台显示 CORS 错误
 
 **解决**:
-1. 检查后端 `CORS_ORIGIN` 环境变量是否包含前端域名
-2. 确认 `wrangler.toml` 中的 `SITE_URL` 配置正确
+1. 检查后端 `FRONTEND_URL` 环境变量是否包含前端域名
+2. 确认 `wrangler.toml` 中的 `FRONTEND_URL` 配置正确
+3. 检查后端 CORS 中间件配置
 
 ### 图片上传失败
 
@@ -338,6 +370,7 @@ curl https://your-worker.workers.dev/api/health/db
 1. 检查 R2 存储桶绑定是否正确
 2. 确认存储桶名称与 `wrangler.toml` 一致
 3. 检查文件大小限制（默认 5MB）
+4. 确认 `STORAGE_PUBLIC_URL` 已正确设置
 
 ### 认证失败
 
@@ -346,7 +379,29 @@ curl https://your-worker.workers.dev/api/health/db
 **解决**:
 1. 检查 `JWT_SECRET` 是否正确设置
 2. 确认浏览器允许第三方 Cookie
-3. 检查 `SESSIONS` KV 绑定是否正确
+3. 检查 Token 是否过期
+
+### 邮箱验证码发送失败
+
+**症状**: 发送验证码返回错误
+
+**解决**:
+1. 检查 `RESEND_API_KEY` 是否正确设置
+2. 确认发件人域名已在 Resend 验证
+3. 检查 `RESEND_FROM_EMAIL` 格式是否正确
+4. 查看 Resend 控制台发送日志
+
+### 专栏功能异常
+
+**症状**: 专栏页面无法加载或文章不显示
+
+**解决**:
+1. 检查专栏数据是否正确创建
+2. 确认文章已关联到专栏
+3. 检查专栏统计触发器是否正常工作
+4. 手动刷新专栏统计：`POST /api/columns/:id/refresh-stats`
+
+---
 
 ## 更新部署
 
@@ -380,15 +435,15 @@ wrangler pages deploy dist
 如需更新数据库架构：
 
 ```bash
-# 创建迁移文件
-cd backend
-
 # 执行迁移
+cd backend
 wrangler d1 execute personal-blog-db --file=./database/migrations/xxx.sql
 
 # 验证迁移结果
-wrangler d1 execute personal-blog-db --command="SELECT * FROM schema_version;"
+wrangler d1 execute personal-blog-db --command="SELECT name FROM sqlite_master WHERE type='table';"
 ```
+
+---
 
 ## 性能优化
 
@@ -410,6 +465,8 @@ routes = [
    - 静态资源：缓存 1 天
    - API 响应：根据 Cache-Control 头
 
+---
+
 ## 安全建议
 
 1. **使用强密码**: 修改默认管理员密码
@@ -417,13 +474,18 @@ routes = [
 3. **定期备份**: 定期导出 D1 数据库
 4. **监控日志**: 启用 Workers 日志记录
 5. **限制访问**: 使用 Cloudflare Access 保护管理后台
+6. **密钥管理**: 使用 wrangler secret 管理敏感信息
+
+---
 
 ## 参考资源
 
 - [Cloudflare Workers 文档](https://developers.cloudflare.com/workers/)
 - [Cloudflare D1 文档](https://developers.cloudflare.com/d1/)
 - [Cloudflare Pages 文档](https://developers.cloudflare.com/pages/)
+- [Cloudflare R2 文档](https://developers.cloudflare.com/r2/)
 - [Wrangler CLI 文档](https://developers.cloudflare.com/workers/wrangler/)
+- [Resend 文档](https://resend.com/docs)
 
 ---
 
