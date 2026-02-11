@@ -32,7 +32,12 @@ function NotificationItem({
 
     // 根据通知类型跳转
     if (notification.relatedData?.postSlug) {
-      navigate(`/posts/${notification.relatedData.postSlug}`);
+      // 如果有评论ID，跳转到文章详情并滚动到评论位置
+      if (notification.relatedData?.commentId) {
+        navigate(`/posts/${notification.relatedData.postSlug}?comment=${notification.relatedData.commentId}`);
+      } else {
+        navigate(`/posts/${notification.relatedData.postSlug}`);
+      }
     } else if (notification.type === 'private_message') {
       navigate('/messages');
     }
@@ -81,6 +86,19 @@ function NotificationItem({
             <p className="text-sm text-gray-600 mt-1 line-clamp-2">
               {notification.content}
             </p>
+          )}
+          {/* 评论回复通知：显示被回复的评论内容 */}
+          {notification.subtype === 'reply' && notification.relatedData?.parentCommentContent && (
+            <div className="mt-2 p-2 bg-gray-100 rounded text-xs text-gray-500">
+              <span className="font-medium">{notification.relatedData.parentCommentAuthor}:</span>
+              <span className="ml-1">{notification.relatedData.parentCommentContent}</span>
+            </div>
+          )}
+          {/* 文章标题（如果存在） */}
+          {notification.relatedData?.postTitle && notification.subtype !== 'reply' && (
+            <div className="mt-1 text-xs text-gray-500">
+              文章: {notification.relatedData.postTitle}
+            </div>
           )}
           <div className="flex items-center justify-between mt-2">
             <span className="text-xs text-gray-400">

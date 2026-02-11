@@ -29,6 +29,12 @@ export interface NotificationRelatedData {
   postTitle?: string;
   postSlug?: string;
   commentId?: number;
+  // 被回复的评论信息
+  parentCommentId?: number;
+  parentCommentContent?: string;
+  parentCommentAuthor?: string;
+  // 回复内容
+  replyContent?: string;
   senderId?: number;
   senderName?: string;
   senderAvatar?: string;
