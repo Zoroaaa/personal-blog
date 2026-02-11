@@ -360,7 +360,8 @@ commentRoutes.post('/', requireAuth, async (c) => {
       if (parentId) {
         // 回复评论 - 通知被回复者
         const parentComment = await c.env.DB.prepare(
-          'SELECT user_id, content FROM comments WHERE id = ?'
+          'SELECT c.user_id, c.content, u.display_name, u.username FROM comments c ' +
+          'LEFT JOIN users u ON c.user_id = u.id WHERE c.id = ?'
         ).bind(parentId).first() as any;
 
         if (parentComment && parentComment.user_id !== user.userId) {
@@ -372,6 +373,11 @@ commentRoutes.post('/', requireAuth, async (c) => {
           );
 
           if (isEnabled) {
+            // 获取文章信息用于跳转
+            const postInfo = await c.env.DB.prepare(
+              'SELECT title, slug FROM posts WHERE id = ?'
+            ).bind(postId).first() as any;
+
             await createInteractionNotification(c.env.DB, {
               userId: parentComment.user_id,
               subtype: 'reply',
@@ -379,8 +385,13 @@ commentRoutes.post('/', requireAuth, async (c) => {
               content: content.length > 100 ? content.substring(0, 100) + '...' : content,
               relatedData: {
                 postId: postId,
+                postTitle: postInfo?.title,
+                postSlug: postInfo?.slug,
                 commentId: commentId,
                 parentCommentId: parentId,
+                parentCommentContent: parentComment.content,
+                parentCommentAuthor: parentComment.display_name || parentComment.username,
+                replyContent: content,
                 senderId: user.userId,
                 senderName: user.displayName || user.username,
                 senderAvatar: user.avatarUrl,
