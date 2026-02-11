@@ -11,11 +11,8 @@ import type {
   AdminMessagesResponse,
 } from '../types/messages';
 
-// 处理 API 基础 URL
-// 如果 VITE_API_URL 以 /api 结尾，去掉它，因为代码中会自动添加 /api
-const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8787';
-const baseUrl = rawApiUrl.replace(/\/api$/, '');
-const API_BASE_URL = `${baseUrl}/api`;
+// API 基础 URL - 直接使用 VITE_API_URL，不在代码中添加 /api 前缀
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
 
 /**
  * 获取请求头
@@ -32,7 +29,7 @@ function getHeaders(): HeadersInit {
  * 发送私信
  */
 export async function sendMessage(data: SendMessageRequest): Promise<Message> {
-  const response = await fetch(`${API_BASE_URL}/api/messages`, {
+  const response = await fetch(`${API_BASE_URL}/messages`, {
     method: 'POST',
     headers: getHeaders(),
     body: JSON.stringify(data),
@@ -50,7 +47,7 @@ export async function sendMessage(data: SendMessageRequest): Promise<Message> {
  */
 export async function getConversations(page = 1, limit = 20): Promise<ConversationsResponse> {
   const response = await fetch(
-    `${API_BASE_URL}/api/messages/conversations?page=${page}&limit=${limit}`,
+    `${API_BASE_URL}/messages/conversations?page=${page}&limit=${limit}`,
     {
       headers: getHeaders(),
     }
@@ -72,7 +69,7 @@ export async function getConversation(
   limit = 20
 ): Promise<ConversationDetail> {
   const response = await fetch(
-    `${API_BASE_URL}/api/messages/conversation/${userId}?page=${page}&limit=${limit}`,
+    `${API_BASE_URL}/messages/conversation/${userId}?page=${page}&limit=${limit}`,
     {
       headers: getHeaders(),
     }
@@ -89,7 +86,7 @@ export async function getConversation(
  * 标记消息为已读
  */
 export async function markMessageAsRead(messageId: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/messages/${messageId}/read`, {
+  const response = await fetch(`${API_BASE_URL}/messages/${messageId}/read`, {
     method: 'PUT',
     headers: getHeaders(),
   });
@@ -104,7 +101,7 @@ export async function markMessageAsRead(messageId: number): Promise<void> {
  * 标记所有消息为已读
  */
 export async function markAllAsRead(): Promise<{ markedCount: number }> {
-  const response = await fetch(`${API_BASE_URL}/api/messages/read-all`, {
+  const response = await fetch(`${API_BASE_URL}/messages/read-all`, {
     method: 'PUT',
     headers: getHeaders(),
   });
@@ -120,7 +117,7 @@ export async function markAllAsRead(): Promise<{ markedCount: number }> {
  * 删除消息
  */
 export async function deleteMessage(messageId: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/messages/${messageId}`, {
+  const response = await fetch(`${API_BASE_URL}/messages/${messageId}`, {
     method: 'DELETE',
     headers: getHeaders(),
   });
@@ -135,7 +132,7 @@ export async function deleteMessage(messageId: number): Promise<void> {
  * 获取未读消息数
  */
 export async function getUnreadCount(): Promise<number> {
-  const response = await fetch(`${API_BASE_URL}/api/messages/unread-count`, {
+  const response = await fetch(`${API_BASE_URL}/messages/unread-count`, {
     headers: getHeaders(),
   });
 
@@ -159,7 +156,7 @@ export async function getAllMessages(
   if (senderId) params.append('senderId', String(senderId));
   if (receiverId) params.append('receiverId', String(receiverId));
 
-  const response = await fetch(`${API_BASE_URL}/api/messages/admin/all?${params}`, {
+  const response = await fetch(`${API_BASE_URL}/messages/admin/all?${params}`, {
     headers: getHeaders(),
   });
 
@@ -174,7 +171,7 @@ export async function getAllMessages(
  * 管理员：彻底删除私信
  */
 export async function adminDeleteMessage(messageId: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/messages/admin/${messageId}`, {
+  const response = await fetch(`${API_BASE_URL}/messages/admin/${messageId}`, {
     method: 'DELETE',
     headers: getHeaders(),
   });
