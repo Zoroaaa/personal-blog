@@ -709,7 +709,7 @@ CREATE TABLE IF NOT EXISTS schema_version (
 );
 
 INSERT OR REPLACE INTO schema_version (version, description) VALUES
-('2.0.0', 'Optimized schema with triggers, indexes, and audit fields');
+('1.0.0', 'Optimized schema with triggers, indexes, and audit fields');
 
 -- =============================================
 -- Schema 创建完成
