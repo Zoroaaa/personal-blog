@@ -11,15 +11,19 @@ import type {
   NotificationFilter,
   PartialNotificationSettings,
 } from '../types/notifications';
+import { useAuthStore } from '../stores/authStore';
 
-// API 基础 URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+// 处理 API 基础 URL
+// 如果 VITE_API_URL 以 /api 结尾，去掉它，因为代码中会自动添加 /api
+const rawApiUrl = import.meta.env.VITE_API_URL || '';
+const baseUrl = rawApiUrl.replace(/\/api$/, '');
+const API_BASE_URL = baseUrl ? `${baseUrl}/api` : '/api';
 
 /**
  * 获取请求配置
  */
 function getRequestConfig(): RequestInit {
-  const token = localStorage.getItem('token');
+  const { token } = useAuthStore.getState();
   return {
     headers: {
       'Content-Type': 'application/json',
