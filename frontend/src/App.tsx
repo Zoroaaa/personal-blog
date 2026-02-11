@@ -14,6 +14,8 @@ import { ColumnPage } from './pages/ColumnPage';
 import { CategoryPage } from './pages/CategoryPage';
 import { TagPage } from './pages/TagPage';
 import { MessagesPage } from './pages/MessagesPage';
+import NotificationCenter from './pages/NotificationCenter';
+import NotificationSettings from './pages/NotificationSettings';
 import { useSiteConfig } from './hooks/useSiteConfig';
 import { ToastProvider } from './components/Toast';
 import { MessageButton } from './components/MessageButton';
@@ -45,6 +47,8 @@ function AppRoutes() {
       <Route path="/categories/:slug" element={<PageTransition><CategoryPage /></PageTransition>} />
       <Route path="/tags/:slug" element={<PageTransition><TagPage /></PageTransition>} />
       <Route path="/messages" element={<PageTransition><MessagesPage /></PageTransition>} />
+      <Route path="/notifications" element={<PageTransition><NotificationCenter /></PageTransition>} />
+      <Route path="/notification-settings" element={<PageTransition><NotificationSettings /></PageTransition>} />
     </Routes>
   );
 }

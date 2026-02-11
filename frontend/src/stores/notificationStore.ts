@@ -1,0 +1,328 @@
+/**
+ * 通知状态管理
+ *
+ * 使用 Zustand 管理通知状态
+ *
+ * @version 1.0.0
+ */
+
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import type {
+  Notification,
+  NotificationSettings,
+  UnreadCountResponse,
+  NotificationFilter,
+} from '../types/notifications';
+import * as notificationApi from '../utils/notificationApi';
+
+interface NotificationState {
+  // 通知列表
+  notifications: Notification[];
+  unreadCount: UnreadCountResponse;
+  hasMore: boolean;
+  currentPage: number;
+
+  // 加载状态
+  isLoading: boolean;
+  isLoadingMore: boolean;
+  error: string | null;
+
+  // 通知设置
+  settings: NotificationSettings | null;
+  isSettingsLoading: boolean;
+
+  // 筛选条件
+  filter: NotificationFilter;
+
+  // Actions
+  fetchNotifications: (reset?: boolean) => Promise<void>;
+  loadMore: () => Promise<void>;
+  fetchUnreadCount: () => Promise<void>;
+  markAsRead: (notificationId: number) => Promise<void>;
+  markAllAsRead: (type?: string) => Promise<{ markedCount: number }>;
+  deleteNotification: (notificationId: number) => Promise<void>;
+  setFilter: (filter: NotificationFilter) => void;
+
+  // 设置相关
+  fetchSettings: () => Promise<void>;
+  updateSettings: (settings: import('../types/notifications').PartialNotificationSettings) => Promise<void>;
+
+  // 清除错误
+  clearError: () => void;
+}
+
+const defaultSettings: NotificationSettings = {
+  system: {
+    inApp: true,
+    email: true,
+    push: false,
+    frequency: 'realtime',
+  },
+  interaction: {
+    inApp: true,
+    email: false,
+    push: true,
+    frequency: 'realtime',
+    subtypes: {
+      comment: true,
+      like: true,
+      favorite: true,
+      mention: true,
+      follow: true,
+      reply: true,
+    },
+  },
+  privateMessage: {
+    inApp: true,
+    email: false,
+    push: true,
+    frequency: 'realtime',
+  },
+  doNotDisturb: {
+    enabled: false,
+    start: '22:00',
+    end: '08:00',
+  },
+  digestTime: {
+    daily: '09:00',
+    weeklyDay: 1,
+    weeklyTime: '09:00',
+  },
+};
+
+const defaultUnreadCount: UnreadCountResponse = {
+  total: 0,
+  byType: {
+    system: 0,
+    interaction: 0,
+    private_message: 0,
+  },
+};
+
+export const useNotificationStore = create<NotificationState>()(
+  persist(
+    (set, get) => ({
+      // 初始状态
+      notifications: [],
+      unreadCount: defaultUnreadCount,
+      hasMore: true,
+      currentPage: 1,
+      isLoading: false,
+      isLoadingMore: false,
+      error: null,
+      settings: null,
+      isSettingsLoading: false,
+      filter: {
+        type: 'all',
+      },
+
+      // 获取通知列表
+      fetchNotifications: async (reset = true) => {
+        const { filter } = get();
+        const page = reset ? 1 : get().currentPage;
+
+        set({
+          isLoading: reset,
+          isLoadingMore: !reset,
+          error: null,
+          ...(reset ? { notifications: [], currentPage: 1 } : {}),
+        });
+
+        try {
+          const response = await notificationApi.getNotifications(page, 20, filter);
+
+          set((state) => ({
+            notifications: reset
+              ? response.notifications
+              : [...state.notifications, ...response.notifications],
+            hasMore: response.pagination.page < response.pagination.totalPages,
+            currentPage: page + 1,
+            isLoading: false,
+            isLoadingMore: false,
+          }));
+        } catch (error) {
+          set({
+            error: error instanceof Error ? error.message : '获取通知失败',
+            isLoading: false,
+            isLoadingMore: false,
+          });
+        }
+      },
+
+      // 加载更多
+      loadMore: async () => {
+        const { hasMore, isLoadingMore } = get();
+        if (!hasMore || isLoadingMore) return;
+
+        await get().fetchNotifications(false);
+      },
+
+      // 获取未读数
+      fetchUnreadCount: async () => {
+        try {
+          const count = await notificationApi.getUnreadCount();
+          set({ unreadCount: count });
+        } catch (error) {
+          console.error('获取未读数失败:', error);
+        }
+      },
+
+      // 标记已读
+      markAsRead: async (notificationId: number) => {
+        try {
+          await notificationApi.markAsRead(notificationId);
+
+          set((state) => {
+            const notification = state.notifications.find(
+              (n) => n.id === notificationId
+            );
+
+            if (!notification || notification.isRead) {
+              return state;
+            }
+
+            // 更新通知列表
+            const updatedNotifications = state.notifications.map((n) =>
+              n.id === notificationId ? { ...n, isRead: true } : n
+            );
+
+            // 更新未读数
+            const type = notification.type;
+            const updatedUnreadCount = {
+              ...state.unreadCount,
+              total: Math.max(0, state.unreadCount.total - 1),
+              byType: {
+                ...state.unreadCount.byType,
+                [type]: Math.max(0, state.unreadCount.byType[type] - 1),
+              },
+            };
+
+            return {
+              notifications: updatedNotifications,
+              unreadCount: updatedUnreadCount,
+            };
+          });
+        } catch (error) {
+          console.error('标记已读失败:', error);
+          throw error;
+        }
+      },
+
+      // 标记全部已读
+      markAllAsRead: async (type?: string) => {
+        try {
+          const result = await notificationApi.markAllAsRead(type);
+
+          set((state) => {
+            // 更新通知列表
+            const updatedNotifications = state.notifications.map((n) =>
+              !type || n.type === type ? { ...n, isRead: true } : n
+            );
+
+            // 更新未读数
+            const updatedUnreadCount = type
+              ? {
+                  ...state.unreadCount,
+                  total: state.unreadCount.total - state.unreadCount.byType[type as keyof typeof state.unreadCount.byType],
+                  byType: {
+                    ...state.unreadCount.byType,
+                    [type]: 0,
+                  },
+                }
+              : defaultUnreadCount;
+
+            return {
+              notifications: updatedNotifications,
+              unreadCount: updatedUnreadCount,
+            };
+          });
+
+          return result;
+        } catch (error) {
+          console.error('标记全部已读失败:', error);
+          throw error;
+        }
+      },
+
+      // 删除通知
+      deleteNotification: async (notificationId: number) => {
+        try {
+          await notificationApi.deleteNotification(notificationId);
+
+          set((state) => {
+            const notification = state.notifications.find(
+              (n) => n.id === notificationId
+            );
+
+            // 更新通知列表
+            const updatedNotifications = state.notifications.filter(
+              (n) => n.id !== notificationId
+            );
+
+            // 如果删除的是未读通知，更新未读数
+            if (notification && !notification.isRead) {
+              const type = notification.type;
+              return {
+                notifications: updatedNotifications,
+                unreadCount: {
+                  ...state.unreadCount,
+                  total: Math.max(0, state.unreadCount.total - 1),
+                  byType: {
+                    ...state.unreadCount.byType,
+                    [type]: Math.max(0, state.unreadCount.byType[type] - 1),
+                  },
+                },
+              };
+            }
+
+            return { notifications: updatedNotifications };
+          });
+        } catch (error) {
+          console.error('删除通知失败:', error);
+          throw error;
+        }
+      },
+
+      // 设置筛选条件
+      setFilter: (filter: NotificationFilter) => {
+        set({ filter });
+        // 重置并重新获取
+        get().fetchNotifications(true);
+      },
+
+      // 获取设置
+      fetchSettings: async () => {
+        set({ isSettingsLoading: true });
+        try {
+          const settings = await notificationApi.getNotificationSettings();
+          set({ settings, isSettingsLoading: false });
+        } catch (error) {
+          console.error('获取通知设置失败:', error);
+          set({ settings: defaultSettings, isSettingsLoading: false });
+        }
+      },
+
+      // 更新设置
+      updateSettings: async (newSettings: import('../types/notifications').PartialNotificationSettings) => {
+        try {
+          const updated = await notificationApi.updateNotificationSettings(newSettings);
+          set({ settings: updated });
+        } catch (error) {
+          console.error('更新通知设置失败:', error);
+          throw error;
+        }
+      },
+
+      // 清除错误
+      clearError: () => set({ error: null }),
+    }),
+    {
+      name: 'notification-storage',
+      partialize: (state) => ({
+        settings: state.settings,
+        unreadCount: state.unreadCount,
+      }),
+    }
+  )
+);

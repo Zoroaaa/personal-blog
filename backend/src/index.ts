@@ -24,6 +24,10 @@ import { analyticsRoutes } from './routes/analytics';
 import { adminRoutes } from './routes/admin';
 import { configRoutes } from './routes/config';
 import { messageRoutes } from './routes/messages';
+import { notificationRoutes } from './routes/notifications';
+import { notificationSettingsRoutes } from './routes/notificationSettings';
+import { pushRoutes } from './routes/push';
+import { adminNotificationRoutes } from './routes/adminNotifications';
 
 // 导入中间件
 import { requestLogger } from './middleware/requestLogger';
@@ -309,6 +313,26 @@ app.route('/api/config', configRoutes);
  * 私信路由
  */
 app.route('/api/messages', messageRoutes);
+
+/**
+ * 通知路由
+ */
+app.route('/api/notifications', notificationRoutes);
+
+/**
+ * 通知设置路由
+ */
+app.route('/api/notifications/settings', notificationSettingsRoutes);
+
+/**
+ * 浏览器推送路由
+ */
+app.route('/api/notifications/push', pushRoutes);
+
+/**
+ * 管理员通知路由
+ */
+app.route('/api/admin/notifications', adminNotificationRoutes);
 
 // ============= 错误处理 =============
 

@@ -19,6 +19,7 @@ import { successResponse, errorResponse } from '../utils/response';
 import { requireAuth, requireAdmin, isAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { sanitizeInput } from '../utils/validation';
+import { createPrivateMessageNotification } from '../services/notificationService';
 
 export const messageRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -157,12 +158,33 @@ messageRoutes.post('/', requireAuth, async (c) => {
       'SELECT username, display_name, avatar_url FROM users WHERE id = ?'
     ).bind(currentUser.userId).first() as any;
     
-    logger.info('Message sent', { 
-      messageId, 
-      senderId: currentUser.userId, 
-      receiverId 
+    logger.info('Message sent', {
+      messageId,
+      senderId: currentUser.userId,
+      receiverId
     });
-    
+
+    // 发送私信通知
+    try {
+      await createPrivateMessageNotification(c.env.DB, {
+        userId: receiverId,
+        title: `${sender.display_name || sender.username} 发来一条私信`,
+        content: sanitizedContent.length > 100
+          ? sanitizedContent.substring(0, 100) + '...'
+          : sanitizedContent,
+        messageId: messageId,
+        relatedData: {
+          senderId: currentUser.userId,
+          senderName: sender.display_name || sender.username,
+          senderAvatar: sender.avatar_url,
+          messageId: messageId,
+        },
+      });
+    } catch (notifyError) {
+      // 通知发送失败不影响私信发送
+      logger.error('Send message notification error', notifyError);
+    }
+
     return c.json(successResponse({
       message: {
         id: messageId,
@@ -180,7 +202,7 @@ messageRoutes.post('/', requireAuth, async (c) => {
         createdAt: formatDateTime(new Date().toISOString())
       }
     }, '私信发送成功'), 201);
-    
+
   } catch (error) {
     logger.error('Send message error', error);
     return c.json(errorResponse(
