@@ -17,6 +17,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useSiteConfig } from '../hooks/useSiteConfig';
 import { ThemeToggle } from './ThemeToggle';
+import NotificationBadge from './NotificationBadge';
 
 export function Header() {
   const navigate = useNavigate();
@@ -142,6 +143,9 @@ export function Header() {
 
             {/* 主题切换 */}
             <ThemeToggle />
+
+            {/* 通知角标 */}
+            <NotificationBadge />
 
             {/* 用户菜单 */}
             {user ? (
