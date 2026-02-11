@@ -30,6 +30,8 @@ import {
   safeParseInt
 } from '../utils/validation';
 import { isFeatureEnabled, getConfigValue } from './config';
+import { createInteractionNotification } from '../services/notificationService';
+import { isNotificationEnabled, isInteractionSubtypeEnabled } from '../services/notificationSettingsService';
 
 export const commentRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -352,6 +354,77 @@ commentRoutes.post('/', requireAuth, async (c) => {
       parentId,
       userId: user.userId 
     });
+
+    // ===== 8. 发送通知 =====
+    try {
+      if (parentId) {
+        // 回复评论 - 通知被回复者
+        const parentComment = await c.env.DB.prepare(
+          'SELECT user_id, content FROM comments WHERE id = ?'
+        ).bind(parentId).first() as any;
+
+        if (parentComment && parentComment.user_id !== user.userId) {
+          // 检查用户是否开启了回复通知
+          const isEnabled = await isInteractionSubtypeEnabled(
+            c.env.DB,
+            parentComment.user_id,
+            'reply'
+          );
+
+          if (isEnabled) {
+            await createInteractionNotification(c.env.DB, {
+              userId: parentComment.user_id,
+              subtype: 'reply',
+              title: `${user.displayName || user.username} 回复了你的评论`,
+              content: content.length > 100 ? content.substring(0, 100) + '...' : content,
+              relatedData: {
+                postId: postId,
+                commentId: commentId,
+                parentCommentId: parentId,
+                senderId: user.userId,
+                senderName: user.displayName || user.username,
+                senderAvatar: user.avatarUrl,
+              },
+            });
+          }
+        }
+      } else {
+        // 评论文章 - 通知文章作者
+        const postInfo = await c.env.DB.prepare(
+          'SELECT author_id, title, slug FROM posts WHERE id = ?'
+        ).bind(postId).first() as any;
+
+        if (postInfo && postInfo.author_id !== user.userId) {
+          // 检查用户是否开启了评论通知
+          const isEnabled = await isInteractionSubtypeEnabled(
+            c.env.DB,
+            postInfo.author_id,
+            'comment'
+          );
+
+          if (isEnabled) {
+            await createInteractionNotification(c.env.DB, {
+              userId: postInfo.author_id,
+              subtype: 'comment',
+              title: `${user.displayName || user.username} 评论了你的文章《${postInfo.title}》`,
+              content: content.length > 100 ? content.substring(0, 100) + '...' : content,
+              relatedData: {
+                postId: postId,
+                postTitle: postInfo.title,
+                postSlug: postInfo.slug,
+                commentId: commentId,
+                senderId: user.userId,
+                senderName: user.displayName || user.username,
+                senderAvatar: user.avatarUrl,
+              },
+            });
+          }
+        }
+      }
+    } catch (notifyError) {
+      // 通知发送失败不影响评论创建
+      logger.error('Send comment notification error', notifyError);
+    }
     
     return c.json(successResponse({
       id: commentId
@@ -440,8 +513,12 @@ commentRoutes.post('/:id/like', requireAuth, async (c) => {
     }
     
     const user = c.get('user') as any;
-    const commentId = c.req.param('id');
-    
+    const commentId = parseInt(c.req.param('id'));
+
+    if (isNaN(commentId)) {
+      return c.json(errorResponse('Invalid comment ID'), 400);
+    }
+
     // 检查评论是否存在
     const comment = await c.env.DB.prepare(
       'SELECT id FROM comments WHERE id = ?'
@@ -476,6 +553,48 @@ commentRoutes.post('/:id/like', requireAuth, async (c) => {
       ).bind(commentId).run();
       liked = true;
       logger.info('Comment liked', { commentId, userId: user.userId });
+
+      // 发送点赞通知
+      try {
+        const commentInfo = await c.env.DB.prepare(
+          `SELECT c.user_id, c.content, p.id as post_id, p.title, p.slug 
+           FROM comments c 
+           JOIN posts p ON c.post_id = p.id 
+           WHERE c.id = ?`
+        ).bind(commentId).first() as any;
+
+        if (commentInfo && commentInfo.user_id !== user.userId) {
+          // 检查用户是否开启了点赞通知
+          const isEnabled = await isInteractionSubtypeEnabled(
+            c.env.DB,
+            commentInfo.user_id,
+            'like'
+          );
+
+          if (isEnabled) {
+            await createInteractionNotification(c.env.DB, {
+              userId: commentInfo.user_id,
+              subtype: 'like',
+              title: `${user.displayName || user.username} 赞了你的评论`,
+              content: commentInfo.content.length > 100 
+                ? commentInfo.content.substring(0, 100) + '...' 
+                : commentInfo.content,
+              relatedData: {
+                postId: commentInfo.post_id,
+                postTitle: commentInfo.title,
+                postSlug: commentInfo.slug,
+                commentId: commentId,
+                senderId: user.userId,
+                senderName: user.displayName || user.username,
+                senderAvatar: user.avatarUrl,
+              },
+            });
+          }
+        }
+      } catch (notifyError) {
+        // 通知发送失败不影响点赞操作
+        logger.error('Send like notification error', notifyError);
+      }
     }
     
     return c.json(successResponse({ liked }));

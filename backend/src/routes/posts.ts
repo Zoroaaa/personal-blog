@@ -33,6 +33,8 @@ import {
   generateSlug,
   safeParseInt
 } from '../utils/validation';
+import { createInteractionNotification } from '../services/notificationService';
+import { isInteractionSubtypeEnabled } from '../services/notificationSettingsService';
 
 // 定义应用路由类型
 export const postRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -1564,14 +1566,49 @@ postRoutes.post('/:id/like', requireAuth, async (c) => {
       ).bind(postId).run();
       liked = true;
       logger.info('Post liked', { postId, userId: user.userId });
+
+      // 发送点赞通知
+      try {
+        const postInfo = await c.env.DB.prepare(
+          'SELECT author_id, title, slug FROM posts WHERE id = ?'
+        ).bind(postId).first() as any;
+
+        if (postInfo && postInfo.author_id !== user.userId) {
+          // 检查用户是否开启了点赞通知
+          const isEnabled = await isInteractionSubtypeEnabled(
+            c.env.DB,
+            postInfo.author_id,
+            'like'
+          );
+
+          if (isEnabled) {
+            await createInteractionNotification(c.env.DB, {
+              userId: postInfo.author_id,
+              subtype: 'like',
+              title: `${user.displayName || user.username} 赞了你的文章《${postInfo.title}》`,
+              relatedData: {
+                postId: parseInt(postId),
+                postTitle: postInfo.title,
+                postSlug: postInfo.slug,
+                senderId: user.userId,
+                senderName: user.displayName || user.username,
+                senderAvatar: user.avatarUrl,
+              },
+            });
+          }
+        }
+      } catch (notifyError) {
+        // 通知发送失败不影响点赞操作
+        logger.error('Send like notification error', notifyError);
+      }
     }
-    
+
     // 返回最新点赞数，便于前端实时更新
     const updated = await c.env.DB.prepare('SELECT like_count FROM posts WHERE id = ?').bind(postId).first() as any;
     const likeCount = updated?.like_count ?? 0;
-    
+
     return c.json(successResponse({ liked, likeCount }));
-    
+
   } catch (error) {
     logger.error('Like post error', error);
     return c.json(errorResponse(
@@ -1665,8 +1702,43 @@ postRoutes.post('/:id/favorite', requireAuth, async (c) => {
       await c.env.DB.prepare('INSERT INTO favorites (user_id, post_id) VALUES (?, ?)').bind(user.userId, postId).run();
       favorited = true;
       logger.info('Post favorited', { postId, userId: user.userId });
+
+      // 发送收藏通知
+      try {
+        const postInfo = await c.env.DB.prepare(
+          'SELECT author_id, title, slug FROM posts WHERE id = ?'
+        ).bind(postId).first() as any;
+
+        if (postInfo && postInfo.author_id !== user.userId) {
+          // 检查用户是否开启了收藏通知
+          const isEnabled = await isInteractionSubtypeEnabled(
+            c.env.DB,
+            postInfo.author_id,
+            'favorite'
+          );
+
+          if (isEnabled) {
+            await createInteractionNotification(c.env.DB, {
+              userId: postInfo.author_id,
+              subtype: 'favorite',
+              title: `${user.displayName || user.username} 收藏了你的文章《${postInfo.title}》`,
+              relatedData: {
+                postId: parseInt(postId),
+                postTitle: postInfo.title,
+                postSlug: postInfo.slug,
+                senderId: user.userId,
+                senderName: user.displayName || user.username,
+                senderAvatar: user.avatarUrl,
+              },
+            });
+          }
+        }
+      } catch (notifyError) {
+        // 通知发送失败不影响收藏操作
+        logger.error('Send favorite notification error', notifyError);
+      }
     }
-    
+
     return c.json(successResponse({ favorited }));
   } catch (error) {
     logger.error('Favorite post error', error);
