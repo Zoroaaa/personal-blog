@@ -3,7 +3,7 @@
 一个基于 Cloudflare 全栈技术构建的现代化个人博客系统。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.2.0-green.svg)](https://github.com/yourusername/personal-blog)
+[![Version](https://img.shields.io/badge/version-1.3.0-green.svg)](https://github.com/yourusername/personal-blog)
 [![Cloudflare](https://img.shields.io/badge/Cloudflare-Workers-orange.svg)](https://workers.cloudflare.com/)
 
 **体验地址**: [blog.neutronx.uk](https://blog.neutronx.uk)
@@ -28,16 +28,16 @@
 
 ### 核心特性
 
-- **现代化技术栈**：React 18 + TypeScript + Tailwind CSS + Hono
-- **边缘计算架构**：基于 Cloudflare Workers/Pages，全球低延迟访问
-- **完整内容管理**：文章、专栏、分类、标签、评论的全生命周期管理
-- **用户系统**：支持邮箱注册、GitHub OAuth 登录、邮箱验证码
-- **互动功能**：点赞、收藏、阅读历史、嵌套评论（最多5层）
-- **全文搜索**：支持 FTS5 全文搜索引擎
-- **管理后台**：用户管理、内容审核、系统配置、数据分析
-- **SEO 优化**：动态 meta 标签、结构化数据、搜索引擎友好
-- **响应式设计**：完美适配桌面端、平板和移动设备
-- **暗色模式**：支持亮色/暗色主题切换
+- **现代化技术栈**: React 18 + TypeScript + Tailwind CSS + Hono
+- **边缘计算架构**: 基于 Cloudflare Workers/Pages，全球低延迟访问
+- **完整内容管理**: 文章、专栏、分类、标签、评论的全生命周期管理
+- **用户系统**: 支持邮箱注册、GitHub OAuth 登录、邮箱验证码
+- **互动功能**: 点赞、收藏、阅读历史、嵌套评论（最多5层）
+- **全文搜索**: 支持 FTS5 全文搜索引擎
+- **管理后台**: 用户管理、内容审核、系统配置、数据分析
+- **SEO 优化**: 动态 meta 标签、结构化数据、搜索引擎友好
+- **响应式设计**: 完美适配桌面端、平板和移动设备
+- **暗色模式**: 支持亮色/暗色主题切换
 
 ---
 
@@ -54,6 +54,7 @@
 | React Router | 6.x | 路由管理 |
 | React Markdown | 9.x | Markdown 渲染 |
 | PrismJS | 1.x | 代码高亮 |
+| Framer Motion | 11.x | 动画效果 |
 
 ### 后端技术栈
 
@@ -137,12 +138,18 @@ personal-blog/
 │   │   │   ├── categories.ts # 分类标签
 │   │   │   ├── config.ts   # 站点配置
 │   │   │   ├── upload.ts   # 文件上传
-│   │   │   └── analytics.ts # 数据分析
+│   │   │   ├── analytics.ts # 数据分析
+│   │   │   ├── notifications.ts # 通知系统
+│   │   │   ├── notificationSettings.ts # 通知设置
+│   │   │   ├── adminNotifications.ts # 管理员通知
+│   │   │   ├── messages.ts # 私信系统
+│   │   │   └── push.ts     # 浏览器推送
 │   │   ├── middleware/     # 中间件
+│   │   ├── services/       # 业务服务
 │   │   ├── utils/          # 工具函数
 │   │   └── types/          # 类型定义
 │   ├── database/
-│   │   └── schema.sql      # 数据库架构 v2.0.0
+│   │   └── schema.sql      # 数据库架构
 │   └── wrangler.toml       # Workers 配置
 ├── frontend/               # 前端应用
 │   ├── src/
@@ -168,10 +175,11 @@ personal-blog/
 - ✅ 代码语法高亮
 - ✅ 文章分类和标签
 - ✅ 文章专栏归类
-- ✅ 文章置顶功能
 - ✅ 浏览量统计
 - ✅ 文章搜索（FTS5全文搜索）
 - ✅ SEO 元数据配置
+- ✅ 文章密码保护
+- ✅ 阅读进度追踪
 
 ### 专栏系统
 
@@ -179,6 +187,9 @@ personal-blog/
 - ✅ 专栏封面和描述
 - ✅ 专栏统计（文章数、浏览量、点赞数等）
 - ✅ 专栏文章列表
+- ✅ 专栏排序功能
+- ✅ 专栏状态管理（active/hidden/archived）
+- ✅ 专栏统计刷新
 
 ### 评论系统
 
@@ -186,6 +197,7 @@ personal-blog/
 - ✅ 评论审核
 - ✅ 评论点赞
 - ✅ 管理员回复标识
+- ✅ 评论@用户功能
 
 ### 用户系统
 
@@ -197,6 +209,22 @@ personal-blog/
 - ✅ 阅读历史
 - ✅ 收藏文章
 
+### 通知系统
+
+- ✅ 站内通知中心
+- ✅ 通知类型：系统通知、互动通知、私信通知
+- ✅ 首页通知轮播
+- ✅ 通知设置管理
+- ✅ 免打扰模式
+
+### 私信系统
+
+- ✅ 用户间私信发送
+- ✅ 消息撤回（3分钟内）
+- ✅ 消息编辑重发
+- ✅ 会话列表管理
+- ✅ 未读消息计数
+
 ### 管理后台
 
 - ✅ 仪表盘统计
@@ -207,6 +235,7 @@ personal-blog/
 - ✅ 分类/标签管理
 - ✅ 系统配置
 - ✅ 数据分析
+- ✅ 系统通知发布
 
 ---
 
@@ -215,15 +244,17 @@ personal-blog/
 完整的 API 文档请参考 [API.md](./API.md)。
 
 主要 API 模块：
-- **认证模块**：`/api/auth/*` - 登录、注册、OAuth、邮箱验证码
-- **文章模块**：`/api/posts/*` - 文章 CRUD、搜索、阅读历史
-- **专栏模块**：`/api/columns/*` - 专栏管理
-- **评论模块**：`/api/comments/*` - 评论管理
-- **分类模块**：`/api/categories/*` - 分类标签
-- **管理模块**：`/api/admin/*` - 后台管理
-- **配置模块**：`/api/config/*` - 站点配置
-- **上传模块**：`/api/upload/*` - 文件上传
-- **统计模块**：`/api/analytics/*` - 数据分析
+- **认证模块**: `/api/auth/*` - 登录、注册、OAuth、邮箱验证码
+- **文章模块**: `/api/posts/*` - 文章 CRUD、搜索、阅读历史
+- **专栏模块**: `/api/columns/*` - 专栏管理、统计刷新
+- **评论模块**: `/api/comments/*` - 评论管理
+- **分类模块**: `/api/categories/*` - 分类标签
+- **管理模块**: `/api/admin/*` - 后台管理
+- **配置模块**: `/api/config/*` - 站点配置
+- **上传模块**: `/api/upload/*` - 文件上传
+- **统计模块**: `/api/analytics/*` - 数据分析
+- **通知模块**: `/api/notifications/*` - 通知管理
+- **私信模块**: `/api/messages/*` - 私信系统
 
 ---
 
@@ -233,14 +264,27 @@ personal-blog/
 
 ### 部署架构
 
-- **前端**：Cloudflare Pages
-- **后端**：Cloudflare Workers
-- **数据库**：Cloudflare D1
-- **缓存**：Cloudflare KV
-- **存储**：Cloudflare R2
-- **邮件**：Resend
+- **前端**: Cloudflare Pages
+- **后端**: Cloudflare Workers
+- **数据库**: Cloudflare D1
+- **缓存**: Cloudflare KV
+- **存储**: Cloudflare R2
+- **邮件**: Resend
 
 详细部署步骤请参考 [DEPLOYMENT.md](./DEPLOYMENT.md)。
+
+### 快速部署
+
+```bash
+# 部署后端
+cd backend
+wrangler deploy
+
+# 部署前端
+cd ../frontend
+pnpm build
+wrangler pages deploy dist
+```
 
 ---
 
@@ -295,17 +339,7 @@ personal-blog/
 - [部署指南](./DEPLOYMENT.md) - 详细部署说明
 - [API 文档](./API.md) - 完整接口参考
 - [架构文档](./ARCHITECTURE.md) - 系统设计说明
-- [版本更新](./CHANGELOG.md) - 版本更新说明
 
 ---
 
-## 支持与反馈
-
-如有问题或建议，欢迎通过以下方式联系：
-
-- 提交 [GitHub Issue](https://github.com/Zoroaaa/personal-blog/issues)
-- 发送邮件至：zoroasx@gmail.com
-
----
-
-**版本**: v1.2.0 | **更新日期**: 2026-02-10
+**版本**: v1.3.0 | **更新日期**: 2026-02-12

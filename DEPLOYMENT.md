@@ -2,7 +2,7 @@
 
 本文档详细介绍如何将个人博客系统部署到 Cloudflare 平台。
 
-**版本**: v1.2.0 | **更新日期**: 2026-02-10
+**版本**: v1.3.0 | **更新日期**: 2026-02-12
 
 ---
 
@@ -188,7 +188,7 @@ wrangler d1 execute personal-blog-db --file=./database/schema.sql
 wrangler d1 execute personal-blog-db --command="SELECT name FROM sqlite_master WHERE type='table';"
 ```
 
-数据库架构 v2.0.0 包含以下表：
+数据库架构包含以下表：
 - `users` - 用户信息（支持OAuth、邮箱验证）
 - `posts` - 文章数据（支持专栏、SEO）
 - `columns` - 专栏数据
@@ -199,6 +199,9 @@ wrangler d1 execute personal-blog-db --command="SELECT name FROM sqlite_master W
 - `likes` - 点赞记录
 - `reading_history` - 阅读历史
 - `favorites` - 收藏记录
+- `notifications` - 通知数据
+- `messages` - 私信数据
+- `message_attachments` - 私信附件
 - `site_config` - 站点配置
 - `posts_fts` - 全文搜索虚拟表
 
@@ -301,8 +304,8 @@ curl https://your-worker.workers.dev/health
   "success": true,
   "data": {
     "status": "healthy",
-    "version": "1.2.0",
-    "timestamp": "2026-02-10T10:00:00.000Z",
+    "version": "3.0.1",
+    "timestamp": "2026-02-12T10:00:00.000Z",
     "services": {
       "database": "healthy",
       "cache": "healthy",

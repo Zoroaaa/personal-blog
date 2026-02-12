@@ -2,7 +2,7 @@
 
 本文档帮助您在 5 分钟内启动并运行个人博客系统。
 
-**版本**: v1.2.0 | **更新日期**: 2026-02-10
+**版本**: v1.3.0 | **更新日期**: 2026-02-12
 
 ---
 
@@ -230,8 +230,8 @@ pnpm dev
   "success": true,
   "data": {
     "status": "healthy",
-    "version": "1.2.0",
-    "timestamp": "2026-02-10T10:00:00.000Z",
+    "version": "3.0.1",
+    "timestamp": "2026-02-12T10:00:00.000Z",
     "services": {
       "database": "healthy",
       "cache": "healthy",
@@ -298,8 +298,14 @@ personal-blog/
 │   │   │   ├── categories.ts # 分类标签
 │   │   │   ├── config.ts   # 站点配置
 │   │   │   ├── upload.ts   # 文件上传
-│   │   │   └── analytics.ts # 数据分析
+│   │   │   ├── analytics.ts # 数据分析
+│   │   │   ├── notifications.ts # 通知系统
+│   │   │   ├── notificationSettings.ts # 通知设置
+│   │   │   ├── adminNotifications.ts # 管理员通知
+│   │   │   ├── messages.ts # 私信系统
+│   │   │   └── push.ts     # 浏览器推送
 │   │   ├── middleware/     # 中间件
+│   │   ├── services/       # 业务服务
 │   │   ├── utils/          # 工具函数
 │   │   └── types/          # 类型定义
 │   ├── database/
