@@ -12,7 +12,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../utils/api';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 interface CarouselNotification {
   id: number;
@@ -81,8 +81,6 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
-
   const fetchNotifications = useCallback(async () => {
     try {
       const response = await api.get('/notifications/carousel');
@@ -105,7 +103,6 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
 
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % notifications.length);
-      setExpandedId(null);
     }, CAROUSEL_INTERVAL);
 
     return () => clearInterval(interval);
@@ -113,28 +110,20 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
 
   const goTo = useCallback((index: number) => {
     setCurrentIndex(index);
-    setExpandedId(null);
   }, []);
 
   const next = useCallback(() => {
     setCurrentIndex((prev) => (prev + 1) % notifications.length);
-    setExpandedId(null);
   }, [notifications.length]);
 
   const prev = useCallback(() => {
     setCurrentIndex((prev) => (prev - 1 + notifications.length) % notifications.length);
-    setExpandedId(null);
   }, [notifications.length]);
 
   const handleClick = useCallback((notification: CarouselNotification) => {
     if (notification.link) {
       window.open(notification.link, '_blank');
     }
-  }, []);
-
-  const toggleExpand = useCallback((id: number, e: React.MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    setExpandedId((prev) => (prev === id ? null : id));
   }, []);
 
   const defaultContent = {
@@ -160,8 +149,6 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
   }
 
   const displayNotification = currentNotification || defaultContent;
-  const isExpanded = expandedId === displayNotification.id;
-  const hasContent = displayNotification.content && displayNotification.content.length > 0;
 
   return (
     <div
@@ -238,60 +225,19 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
             {displayNotification.title}
           </motion.h1>
 
-          {/* 可折叠内容区域 */}
-          <div className="relative">
-            {/* 内容预览/完整内容 */}
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={isExpanded ? 'expanded' : 'collapsed'}
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              >
-                <p className={`
-                  text-base sm:text-lg
-                  text-gray-600 dark:text-gray-400
-                  leading-relaxed
-                  ${isExpanded ? '' : 'line-clamp-2'}
-                `}>
-                  {displayNotification.content}
-                </p>
-              </motion.div>
-            </AnimatePresence>
-
-            {/* 展开/收起按钮 */}
-            {hasContent && (
-              <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-                onClick={(e) => displayNotification.id && toggleExpand(displayNotification.id, e)}
-                className={`
-                  mt-4 inline-flex items-center gap-2
-                  px-4 py-2 rounded-xl
-                  text-sm font-medium
-                  transition-all duration-300
-                  ${isExpanded
-                    ? 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
-                    : 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-105'
-                  }
-                `}
-              >
-                <span>{isExpanded ? '收起内容' : '查看详情'}</span>
-                <motion.svg
-                  animate={{ rotate: isExpanded ? 180 : 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </motion.svg>
-              </motion.button>
-            )}
-          </div>
+          {/* 内容区域 */}
+          <motion.p
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="
+              text-base sm:text-lg
+              text-gray-600 dark:text-gray-400
+              leading-relaxed
+            "
+          >
+            {displayNotification.content}
+          </motion.p>
 
           {/* 底部元信息 */}
           <motion.div
