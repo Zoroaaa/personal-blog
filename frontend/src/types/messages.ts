@@ -21,8 +21,10 @@ export interface Message {
   receiverDisplayName: string;
   receiverAvatarUrl?: string;
   content: string;
-  parentId?: number;
+  originalContent?: string; // 撤回前的原始内容
   isRead: boolean;
+  isRecalled?: boolean; // 是否已撤回
+  canRecall?: boolean; // 是否可以撤回（3分钟内）
   hasAttachments?: boolean;
   attachments?: MessageAttachment[];
   createdAt: string;
@@ -38,6 +40,7 @@ export interface Conversation {
   lastMessage: {
     id: number;
     content: string;
+    isRecalled?: boolean;
     senderId: number;
     isRead: boolean;
     createdAt: string;
@@ -64,7 +67,16 @@ export interface ConversationDetail {
 export interface SendMessageRequest {
   receiverId: number;
   content: string;
-  parentId?: number;
+  attachments?: Array<{
+    fileName: string;
+    fileUrl: string;
+    fileType: 'image' | 'file';
+    fileSize?: number;
+  }>;
+}
+
+export interface EditMessageRequest {
+  content: string;
   attachments?: Array<{
     fileName: string;
     fileUrl: string;
@@ -106,6 +118,7 @@ export interface AdminMessage {
     avatarUrl?: string;
   };
   content: string;
+  isRecalled?: boolean;
   isRead: boolean;
   createdAt: string;
   readAt?: string;
@@ -121,9 +134,16 @@ export interface AdminMessagesResponse {
   };
 }
 
-export type MessageStatus = 'sending' | 'sent' | 'error';
+export type MessageStatus = 'sending' | 'sent' | 'error' | 'recalled' | 'editing';
 
 export interface MessageWithStatus extends Message {
   status?: MessageStatus;
   tempId?: string;
+}
+
+// 编辑状态
+export interface EditingMessage {
+  messageId: number;
+  content: string;
+  attachments: MessageAttachment[];
 }

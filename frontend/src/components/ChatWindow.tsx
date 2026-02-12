@@ -4,6 +4,8 @@
  * 功能：
  * - 显示与特定用户的对话
  * - 发送消息
+ * - 撤回消息（3分钟内）
+ * - 编辑撤回的消息
  * - 加载更多历史消息
  * - 显示消息状态
  * - 支持粘贴图片
@@ -11,7 +13,7 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import type { Conversation, MessageWithStatus, MessageAttachment } from '../types/messages';
+import type { Conversation, MessageWithStatus, MessageAttachment, EditingMessage } from '../types/messages';
 import { api } from '../utils/api';
 
 interface ChatWindowProps {
@@ -22,8 +24,12 @@ interface ChatWindowProps {
   isLoading: boolean;
   isLoadingMore: boolean;
   hasMoreMessages: boolean;
+  editingMessage: EditingMessage | null;
   onMessageInputChange: (value: string) => void;
   onSend: (attachments?: MessageAttachment[]) => void;
+  onRecall: (messageId: number) => void;
+  onEdit: (messageId: number, content: string, attachments: MessageAttachment[]) => void;
+  onCancelEdit: () => void;
   onBack: () => void;
   onClose: () => void;
   onLoadMore: () => void;
@@ -39,8 +45,12 @@ export function ChatWindow({
   isLoading,
   isLoadingMore,
   hasMoreMessages,
+  editingMessage,
   onMessageInputChange,
   onSend,
+  onRecall,
+  onEdit,
+  onCancelEdit,
   onBack,
   onClose,
   onLoadMore,
@@ -51,13 +61,21 @@ export function ChatWindow({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [showActions, setShowActions] = useState<number | null>(null);
 
   // 处理发送
   const handleSend = useCallback(() => {
     if (!messageInput.trim() && pendingAttachments.length === 0) return;
-    onSend(pendingAttachments.length > 0 ? pendingAttachments : undefined);
+    
+    if (editingMessage) {
+      // 编辑模式：调用编辑接口
+      onEdit(editingMessage.messageId, messageInput, pendingAttachments);
+    } else {
+      // 正常发送
+      onSend(pendingAttachments.length > 0 ? pendingAttachments : undefined);
+    }
     setPendingAttachments([]);
-  }, [messageInput, pendingAttachments, onSend]);
+  }, [messageInput, pendingAttachments, editingMessage, onSend, onEdit]);
 
   // 处理按键
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -75,6 +93,13 @@ export function ChatWindow({
       textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
     }
   }, [messageInput]);
+
+  // 编辑模式时设置附件
+  useEffect(() => {
+    if (editingMessage) {
+      setPendingAttachments(editingMessage.attachments);
+    }
+  }, [editingMessage]);
 
   // 滚动检测加载更多
   const handleScroll = useCallback(() => {
@@ -106,7 +131,7 @@ export function ChatWindow({
       for (const item of imageItems) {
         const blob = item.getAsFile();
         if (blob) {
-          const attachment = await uploadImage(blob);
+          const attachment = await uploadFile(blob);
           if (attachment) {
             setPendingAttachments(prev => [...prev, attachment]);
           }
@@ -119,16 +144,17 @@ export function ChatWindow({
     }
   }, []);
 
-  // 上传图片
-  const uploadImage = async (file: File): Promise<MessageAttachment | null> => {
+  // 上传文件
+  const uploadFile = async (file: File): Promise<MessageAttachment | null> => {
     try {
-      const response = await api.uploadImage(file);
+      const isImage = file.type.startsWith('image/');
+      const response = await api.uploadFile(file);
       if (response.success && response.data) {
         return {
           id: Date.now(), // 临时ID
           fileName: file.name,
           fileUrl: response.data.url,
-          fileType: 'image',
+          fileType: isImage ? 'image' : 'file',
           fileSize: file.size
         };
       }
@@ -148,23 +174,9 @@ export function ChatWindow({
 
     try {
       for (const file of Array.from(files)) {
-        if (file.type.startsWith('image/')) {
-          const attachment = await uploadImage(file);
-          if (attachment) {
-            setPendingAttachments(prev => [...prev, attachment]);
-          }
-        } else {
-          // 非图片文件，使用普通上传
-          const response = await api.uploadImage(file);
-          if (response.success && response.data) {
-            setPendingAttachments(prev => [...prev, {
-              id: Date.now(),
-              fileName: file.name,
-              fileUrl: response.data!.url,
-              fileType: 'file',
-              fileSize: file.size
-            }]);
-          }
+        const attachment = await uploadFile(file);
+        if (attachment) {
+          setPendingAttachments(prev => [...prev, attachment]);
         }
       }
     } catch (error) {
@@ -193,6 +205,27 @@ export function ChatWindow({
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
+
+  // 处理撤回
+  const handleRecall = useCallback((messageId: number) => {
+    if (confirm('确定要撤回这条消息吗？撤回后3分钟内可以编辑重新发送。')) {
+      onRecall(messageId);
+    }
+    setShowActions(null);
+  }, [onRecall]);
+
+  // 开始编辑
+  const handleStartEdit = useCallback((message: MessageWithStatus) => {
+    if (message.originalContent) {
+      onMessageInputChange(message.originalContent);
+    } else {
+      onMessageInputChange(message.content);
+    }
+    setPendingAttachments(message.attachments || []);
+    // 编辑状态由父组件管理
+    onEdit(message.id, message.content, message.attachments || []);
+    setShowActions(null);
+  }, [onMessageInputChange, onEdit]);
 
   return (
     <div className="flex flex-col h-full">
@@ -258,12 +291,14 @@ export function ChatWindow({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
             <p className="text-sm text-muted-foreground">开始发送消息吧</p>
-            <p className="text-xs text-muted-foreground/70 mt-1">支持粘贴图片和发送附件</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">支持粘贴图片和发送附件，3分钟内可撤回</p>
           </div>
         ) : (
           messages.map((message, index) => {
             const isMe = message.senderId === currentUserId;
             const showAvatar = index === 0 || messages[index - 1].senderId !== message.senderId;
+            const isRecalled = message.isRecalled;
+            const canRecall = message.canRecall && isMe && !isRecalled;
 
             return (
               <div
@@ -285,7 +320,7 @@ export function ChatWindow({
                   {/* 消息内容 */}
                   <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                     {/* 附件 */}
-                    {message.attachments && message.attachments.length > 0 && (
+                    {!isRecalled && message.attachments && message.attachments.length > 0 && (
                       <div className="flex flex-wrap gap-2 mb-2">
                         {message.attachments.map((att, attIndex) => (
                           <div key={attIndex} className="max-w-[200px]">
@@ -316,20 +351,50 @@ export function ChatWindow({
                     )}
                     
                     {/* 文本内容 */}
-                    {message.content && (
-                      <div
-                        className={`px-4 py-2 rounded-2xl ${
-                          isMe
-                            ? 'bg-primary text-primary-foreground rounded-tr-sm'
-                            : 'bg-muted text-foreground rounded-tl-sm'
-                        }`}
-                      >
-                        <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
-                      </div>
-                    )}
+                    <div
+                      className={`px-4 py-2 rounded-2xl ${
+                        isMe
+                          ? 'bg-primary text-primary-foreground rounded-tr-sm'
+                          : 'bg-muted text-foreground rounded-tl-sm'
+                      } ${isRecalled ? 'opacity-60 italic' : ''}`}
+                    >
+                      <p className="text-sm whitespace-pre-wrap break-words">
+                        {isRecalled ? '消息已撤回' : message.content}
+                      </p>
+                    </div>
                     
-                    <div className="flex items-center gap-1 mt-1">
+                    {/* 操作按钮和时间 */}
+                    <div className="flex items-center gap-2 mt-1">
                       <span className="text-xs text-muted-foreground">{message.createdAt}</span>
+                      
+                      {/* 发送者操作菜单 */}
+                      {isMe && !isRecalled && (
+                        <div className="relative">
+                          <button
+                            onClick={() => setShowActions(showActions === message.id ? null : message.id)}
+                            className="p-1 text-muted-foreground hover:text-foreground rounded"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                            </svg>
+                          </button>
+                          
+                          {showActions === message.id && (
+                            <div className="absolute bottom-full right-0 mb-1 bg-popover border border-border rounded-lg shadow-lg py-1 z-10 min-w-[80px]">
+                              {canRecall && (
+                                <button
+                                  onClick={() => handleRecall(message.id)}
+                                  className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent text-foreground"
+                                >
+                                  撤回
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* 状态图标 */}
                       {isMe && message.status && (
                         <span className="text-xs">
                           {message.status === 'sending' && (
@@ -348,9 +413,22 @@ export function ChatWindow({
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                           )}
+                          {message.status === 'recalled' && (
+                            <span className="text-muted-foreground">已撤回</span>
+                          )}
                         </span>
                       )}
                     </div>
+                    
+                    {/* 撤回后可编辑提示 */}
+                    {isRecalled && isMe && (
+                      <button
+                        onClick={() => handleStartEdit(message)}
+                        className="text-xs text-primary hover:underline mt-1"
+                      >
+                        编辑并重新发送
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -359,6 +437,24 @@ export function ChatWindow({
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* 编辑模式提示 */}
+      {editingMessage && (
+        <div className="px-4 py-2 bg-primary/10 border-t border-primary/20 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm">
+            <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            <span className="text-primary">编辑消息</span>
+          </div>
+          <button
+            onClick={onCancelEdit}
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            取消
+          </button>
+        </div>
+      )}
 
       {/* 待发送附件预览 */}
       {pendingAttachments.length > 0 && (
@@ -442,7 +538,7 @@ export function ChatWindow({
             onChange={(e) => onMessageInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            placeholder="输入消息...（支持粘贴图片）"
+            placeholder={editingMessage ? "编辑消息..." : "输入消息...（支持粘贴图片）"}
             rows={1}
             disabled={isUploading}
             className="flex-1 px-4 py-2.5 bg-background border border-border rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm max-h-[120px] disabled:opacity-50"
@@ -453,13 +549,19 @@ export function ChatWindow({
             disabled={(!messageInput.trim() && pendingAttachments.length === 0) || isUploading}
             className="flex-shrink-0 p-2.5 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-            </svg>
+            {editingMessage ? (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            )}
           </button>
         </div>
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          按 Enter 发送，Shift + Enter 换行，支持粘贴图片
+          {editingMessage ? '按 Enter 保存编辑，Shift + Enter 换行' : '按 Enter 发送，Shift + Enter 换行，支持粘贴图片，3分钟内可撤回'}
         </p>
       </div>
     </div>

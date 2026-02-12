@@ -150,39 +150,32 @@ export function RichTextEditor({
     // 获取当前光标位置
     const range = selection.getRangeAt(0);
     
-    // 创建mention文本
+    // 获取编辑器内容
+    const preCaretRange = range.cloneRange();
+    preCaretRange.selectNodeContents(editorRef.current);
+    preCaretRange.setEnd(range.endContainer, range.endOffset);
+    const textBeforeCursor = preCaretRange.toString();
+    
+    // 找到最后一个@符号的位置
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+    if (lastAtIndex === -1) return;
+    
+    // 计算需要删除的文本长度（@ + 已输入的查询文本）
+    const queryLength = mentionQuery.length;
+    const deleteLength = queryLength + 1; // +1 是@符号
+    
+    // 删除@和查询文本
+    for (let i = 0; i < deleteLength; i++) {
+      document.execCommand('delete', false);
+    }
+    
+    // 创建mention文本（包含空格）
     const mentionText = `@${user.displayName || user.username} `;
     
     // 插入mention文本
     document.execCommand('insertText', false, mentionText);
 
-    // 高亮mention
-    const newRange = selection.getRangeAt(0);
-    newRange.setStart(newRange.endContainer, newRange.endOffset - mentionText.length);
-    newRange.setEnd(newRange.endContainer, newRange.endOffset - 1); // 不包含最后的空格
-    
-    selection.removeAllRanges();
-    selection.addRange(newRange);
-    
-    // 应用样式
-    const span = document.createElement('span');
-    span.style.color = '#3b82f6';
-    span.style.fontWeight = '500';
-    span.style.background = 'rgba(59, 130, 246, 0.1)';
-    span.style.padding = '0 4px';
-    span.style.borderRadius = '4px';
-    span.dataset.userId = String(user.id);
-    span.dataset.mention = 'true';
-    
-    try {
-      newRange.surroundContents(span);
-    } catch (e) {
-      // 如果无法包围（跨多个节点），则跳过样式
-    }
-
-    // 移动光标到末尾
-    selection.collapseToEnd();
-
+    // 触发onChange
     setShowMentions(false);
     setMentionQuery('');
     
@@ -192,7 +185,7 @@ export function RichTextEditor({
     setTimeout(() => {
       isUpdatingRef.current = false;
     }, 0);
-  }, [onChange]);
+  }, [onChange, mentionQuery]);
 
   // 键盘处理
   const handleKeyDown = useCallback(

@@ -28,6 +28,8 @@ interface MessageState {
   setCurrentMessages: (messages: MessageWithStatus[]) => void;
   addMessage: (message: MessageWithStatus) => void;
   updateMessageStatus: (tempId: string, status: 'sent' | 'error', message?: Message) => void;
+  updateMessageRecalled: (messageId: number) => void;
+  updateMessageEdited: (messageId: number, message: Message) => void;
   prependMessages: (messages: MessageWithStatus[]) => void;
   setUnreadCount: (count: number) => void;
   incrementUnreadCount: () => void;
@@ -43,7 +45,6 @@ interface MessageState {
   incrementMessagesPage: () => void;
   resetMessages: () => void;
   markConversationAsRead: (partnerId: number) => void;
-  deleteMessage: (messageId: number) => void;
   clearError: () => void;
 }
 
@@ -99,6 +100,36 @@ export const useMessageStore = create<MessageState>((set) => ({
       ),
     })),
 
+  updateMessageRecalled: (messageId) =>
+    set((state) => ({
+      currentMessages: state.currentMessages.map((m) =>
+        m.id === messageId
+          ? {
+              ...m,
+              isRecalled: true,
+              status: 'recalled',
+              originalContent: m.content,
+              content: '消息已撤回',
+              attachments: [],
+            }
+          : m
+      ),
+    })),
+
+  updateMessageEdited: (messageId, message) =>
+    set((state) => ({
+      currentMessages: state.currentMessages.map((m) =>
+        m.id === messageId
+          ? {
+              ...m,
+              ...message,
+              isRecalled: false,
+              status: 'sent',
+            }
+          : m
+      ),
+    })),
+
   prependMessages: (messages) =>
     set((state) => ({
       currentMessages: [...messages, ...state.currentMessages],
@@ -146,11 +177,6 @@ export const useMessageStore = create<MessageState>((set) => ({
       currentMessages: state.currentMessages.map((m) =>
         m.senderId === partnerId ? { ...m, isRead: true } : m
       ),
-    })),
-
-  deleteMessage: (messageId) =>
-    set((state) => ({
-      currentMessages: state.currentMessages.filter((m) => m.id !== messageId),
     })),
 
   clearError: () => set({ error: null }),

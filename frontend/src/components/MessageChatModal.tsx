@@ -4,6 +4,8 @@
  * 功能：
  * - 显示会话列表或聊天界面
  * - 支持发送和接收消息
+ * - 支持撤回消息（3分钟内）
+ * - 支持编辑撤回的消息
  * - 消息分页加载
  * - 自动滚动到底部
  */
@@ -11,11 +13,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import { useMessageStore } from '../stores/messageStore';
-import { getConversations, getConversation, sendMessage } from '../utils/messageApi';
+import { getConversations, getConversation, sendMessage, recallMessage, editMessage } from '../utils/messageApi';
 import { ConversationList } from './ConversationList';
 import { ChatWindow } from './ChatWindow';
 import { NewConversationModal } from './NewConversationModal';
-import type { Conversation, MessageWithStatus } from '../types/messages';
+import type { Conversation, MessageWithStatus, EditingMessage, MessageAttachment } from '../types/messages';
 
 interface MessageChatModalProps {
   isOpen: boolean;
@@ -34,6 +36,8 @@ export function MessageChatModal({ isOpen, onClose }: MessageChatModalProps) {
     setCurrentMessages,
     addMessage,
     updateMessageStatus,
+    updateMessageRecalled,
+    updateMessageEdited,
     prependMessages,
     setLoading,
     setLoadingMore,
@@ -51,6 +55,7 @@ export function MessageChatModal({ isOpen, onClose }: MessageChatModalProps) {
   const [view, setView] = useState<'list' | 'chat'>('list');
   const [messageInput, setMessageInput] = useState('');
   const [isNewConversationOpen, setIsNewConversationOpen] = useState(false);
+  const [editingMessage, setEditingMessage] = useState<EditingMessage | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const isAdmin = user?.role === 'admin';
@@ -120,6 +125,8 @@ export function MessageChatModal({ isOpen, onClose }: MessageChatModalProps) {
     setView('list');
     setCurrentPartnerId(null);
     resetMessages();
+    setEditingMessage(null);
+    setMessageInput('');
     fetchConversations();
   }, [setCurrentPartnerId, resetMessages, fetchConversations]);
 
@@ -137,7 +144,7 @@ export function MessageChatModal({ isOpen, onClose }: MessageChatModalProps) {
   }, []);
 
   // 发送消息
-  const handleSendMessage = useCallback(async (attachments?: any[]) => {
+  const handleSendMessage = useCallback(async (attachments?: MessageAttachment[]) => {
     if ((!messageInput.trim() && (!attachments || attachments.length === 0)) || !currentPartnerId || !user) return;
 
     const content = messageInput.trim();
@@ -179,6 +186,48 @@ export function MessageChatModal({ isOpen, onClose }: MessageChatModalProps) {
       setError('发送消息失败');
     }
   }, [messageInput, currentPartnerId, user, addMessage, updateMessageStatus, setError]);
+
+  // 撤回消息
+  const handleRecallMessage = useCallback(async (messageId: number) => {
+    try {
+      await recallMessage(messageId);
+      updateMessageRecalled(messageId);
+    } catch (error) {
+      console.error('撤回消息失败:', error);
+      setError('撤回消息失败');
+    }
+  }, [updateMessageRecalled, setError]);
+
+  // 开始编辑消息
+  const handleStartEdit = useCallback((messageId: number, content: string, attachments: MessageAttachment[]) => {
+    setEditingMessage({ messageId, content, attachments });
+    setMessageInput(content);
+  }, []);
+
+  // 取消编辑
+  const handleCancelEdit = useCallback(() => {
+    setEditingMessage(null);
+    setMessageInput('');
+  }, []);
+
+  // 保存编辑
+  const handleSaveEdit = useCallback(async (messageId: number, content: string, attachments: MessageAttachment[]) => {
+    if ((!content.trim() && (!attachments || attachments.length === 0)) || !user) return;
+
+    try {
+      const updatedMessage = await editMessage(messageId, {
+        content,
+        attachments,
+      });
+
+      updateMessageEdited(messageId, updatedMessage);
+      setEditingMessage(null);
+      setMessageInput('');
+    } catch (error) {
+      console.error('编辑消息失败:', error);
+      setError('编辑消息失败');
+    }
+  }, [user, updateMessageEdited, setError]);
 
   // 滚动到底部
   const scrollToBottom = useCallback(() => {
@@ -251,8 +300,12 @@ export function MessageChatModal({ isOpen, onClose }: MessageChatModalProps) {
               isLoading={isLoading}
               isLoadingMore={isLoadingMore}
               hasMoreMessages={hasMoreMessages}
+              editingMessage={editingMessage}
               onMessageInputChange={setMessageInput}
               onSend={handleSendMessage}
+              onRecall={handleRecallMessage}
+              onEdit={handleStartEdit}
+              onCancelEdit={handleCancelEdit}
               onBack={backToList}
               onClose={onClose}
               onLoadMore={loadMoreMessages}

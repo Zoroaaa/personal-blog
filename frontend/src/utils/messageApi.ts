@@ -8,6 +8,7 @@ import type {
   ConversationsResponse,
   ConversationDetail,
   SendMessageRequest,
+  EditMessageRequest,
   AdminMessagesResponse,
 } from '../types/messages';
 
@@ -114,18 +115,39 @@ export async function markAllAsRead(): Promise<{ markedCount: number }> {
 }
 
 /**
- * 删除消息
+ * 撤回消息（3分钟内可撤回）
  */
-export async function deleteMessage(messageId: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/messages/${messageId}`, {
-    method: 'DELETE',
+export async function recallMessage(messageId: number): Promise<{ recalled: boolean }> {
+  const response = await fetch(`${API_BASE_URL}/messages/${messageId}/recall`, {
+    method: 'PUT',
     headers: getHeaders(),
   });
 
   const result = await response.json();
   if (!result.success) {
-    throw new Error(result.message || '删除失败');
+    throw new Error(result.message || '撤回失败');
   }
+  return result.data;
+}
+
+/**
+ * 编辑撤回的消息并重新发送
+ */
+export async function editMessage(
+  messageId: number,
+  data: EditMessageRequest
+): Promise<Message> {
+  const response = await fetch(`${API_BASE_URL}/messages/${messageId}/edit`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.message || '编辑失败');
+  }
+  return result.data.message;
 }
 
 /**
@@ -180,4 +202,13 @@ export async function adminDeleteMessage(messageId: number): Promise<void> {
   if (!result.success) {
     throw new Error(result.message || '删除失败');
   }
+}
+
+/**
+ * 删除消息（普通用户，已废弃，使用撤回替代）
+ * 保留此函数以兼容旧代码
+ */
+export async function deleteMessage(messageId: number): Promise<void> {
+  // 普通用户现在使用撤回功能
+  return recallMessage(messageId);
 }

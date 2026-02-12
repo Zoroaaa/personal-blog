@@ -754,6 +754,43 @@ export const api = {
   },
   
   /**
+   * 上传文件（通用，支持更多文件类型）
+   */
+  uploadFile: async (file: File): Promise<ApiResponse<UploadResponse>> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const token = getAuthToken();
+    const headers: Record<string, string> = {};
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/upload/file`, {
+        method: 'POST',
+        headers,
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || error.message || '上传失败');
+      }
+
+      return await response.json();
+
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('上传失败');
+    }
+  },
+
+  /**
    * 删除文件
    */
   deleteFile: (filename: string) =>
