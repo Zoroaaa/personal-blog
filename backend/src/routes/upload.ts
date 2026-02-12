@@ -326,3 +326,131 @@ function getExtensionFromMimeType(mimeType: string): string {
   
   return mimeMap[mimeType] || 'bin';
 }
+
+// ============= 通用文件上传（支持所有文件类型） =============
+
+const ALLOWED_FILE_TYPES = [
+  // 图片
+  'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+  // 文档
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+  'text/markdown',
+  // 压缩包
+  'application/zip',
+  'application/x-rar-compressed',
+  // 代码文件
+  'text/javascript',
+  'application/json',
+  'text/html',
+  'text/css',
+  'text/x-python',
+  'text/x-java-source',
+];
+
+const MAX_FILE_SIZE_GENERAL = 10 * 1024 * 1024; // 10MB
+
+/**
+ * POST /api/upload/file
+ * 通用文件上传（支持更多文件类型，用于私信附件等）
+ */
+uploadRoutes.post('/file', requireAuth, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const user = c.get('user') as any;
+    
+    // 获取上传的文件
+    const formData = await c.req.formData();
+    const file = formData.get('file') as File;
+    
+    if (!file) {
+      return c.json(errorResponse(
+        'No file provided',
+        '请选择要上传的文件'
+      ), 400);
+    }
+    
+    // 验证文件类型
+    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+      return c.json(errorResponse(
+        'Invalid file type',
+        `不支持的文件类型: ${file.type || 'unknown'}`
+      ), 400);
+    }
+    
+    // 验证文件大小
+    if (file.size > MAX_FILE_SIZE_GENERAL) {
+      return c.json(errorResponse(
+        'File too large',
+        `文件大小不能超过 ${MAX_FILE_SIZE_GENERAL / 1024 / 1024}MB`
+      ), 400);
+    }
+    
+    if (file.size === 0) {
+      return c.json(errorResponse(
+        'Empty file',
+        '上传的文件为空'
+      ), 400);
+    }
+    
+    // 读取文件内容
+    const arrayBuffer = await file.arrayBuffer();
+    
+    // 生成唯一文件名
+    const ext = getFileExtension(file.name);
+    const timestamp = Date.now();
+    const randomStr = generateRandomString(8);
+    const filename = `files/${timestamp}-${randomStr}.${ext}`;
+
+    // 上传到R2
+    try {
+      await c.env.STORAGE.put(filename, arrayBuffer, {
+        httpMetadata: {
+          contentType: file.type,
+        },
+        customMetadata: {
+          uploadedBy: user.userId.toString(),
+          originalName: file.name,
+          uploadedAt: new Date().toISOString(),
+        }
+      });
+    } catch (error) {
+      logger.error('R2 upload failed', error);
+      return c.json(errorResponse(
+        'Upload failed',
+        '文件上传失败'
+      ), 500);
+    }
+
+    // 生成公开访问URL
+    const storageUrl = c.env.STORAGE_PUBLIC_URL || 'https://storage.your-domain.com';
+    const url = `${storageUrl}/${filename}`;
+
+    logger.info('File uploaded successfully', {
+      filename,
+      size: file.size,
+      type: file.type,
+      userId: user.userId,
+    });
+
+    return c.json(successResponse({
+      url,
+      filename: file.name,
+      size: file.size,
+      type: file.type,
+      uploadedAt: new Date().toISOString(),
+    }, '文件上传成功'), 201);
+    
+  } catch (error) {
+    logger.error('Upload error', error);
+    return c.json(errorResponse(
+      'Upload failed',
+      '文件上传失败'
+    ), 500);
+  }
+});
