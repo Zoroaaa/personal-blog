@@ -25,10 +25,12 @@ import {
   editMessage,
 } from '../utils/messageApi';
 import { api } from '../utils/api';
+import { useToast } from '../components/Toast';
 import type { Conversation, MessageWithStatus, MessageAttachment, EditingMessage } from '../types/messages';
 
 export function MessagesPage() {
   const navigate = useNavigate();
+  const { showError, showSuccess, showInfo, showWarning } = useToast();
   const { user, isAuthenticated } = useAuthStore();
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<MessageWithStatus[]>([]);
@@ -141,9 +143,12 @@ export function MessagesPage() {
           fileSize: file.size,
         };
       }
+      showError('上传失败：服务器返回异常');
       return null;
     } catch (error) {
       console.error('上传失败:', error);
+      const errorMessage = error instanceof Error ? error.message : '上传失败，请稍后重试';
+      showError(`上传失败：${errorMessage}`);
       return null;
     }
   };
@@ -154,16 +159,27 @@ export function MessagesPage() {
     if (!files || files.length === 0) return;
 
     setIsUploading(true);
+    let uploadedCount = 0;
 
     try {
+      showInfo(`开始上传 ${files.length} 个文件...`);
+      
       for (const file of Array.from(files)) {
         const attachment = await uploadFile(file);
         if (attachment) {
+          uploadedCount++;
           setPendingAttachments((prev) => [...prev, attachment]);
         }
       }
+      
+      if (uploadedCount > 0) {
+        showSuccess(`成功上传 ${uploadedCount} 个文件`);
+      } else if (uploadedCount === 0 && files.length > 0) {
+        showWarning('所有文件上传失败，请检查文件大小和格式');
+      }
     } catch (error) {
       console.error('上传文件失败:', error);
+      showError('文件上传过程中发生错误，请稍后重试');
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -187,19 +203,30 @@ export function MessagesPage() {
 
     e.preventDefault();
     setIsUploading(true);
+    let uploadedCount = 0;
 
     try {
+      showInfo(`开始上传 ${imageItems.length} 张图片...`);
+      
       for (const item of imageItems) {
         const blob = item.getAsFile();
         if (blob) {
           const attachment = await uploadFile(blob);
           if (attachment) {
+            uploadedCount++;
             setPendingAttachments((prev) => [...prev, attachment]);
           }
         }
       }
+      
+      if (uploadedCount > 0) {
+        showSuccess(`成功上传 ${uploadedCount} 张图片`);
+      } else if (uploadedCount === 0 && imageItems.length > 0) {
+        showWarning('图片上传失败，请稍后重试');
+      }
     } catch (error) {
       console.error('上传图片失败:', error);
+      showError('图片上传过程中发生错误，请稍后重试');
     } finally {
       setIsUploading(false);
     }
