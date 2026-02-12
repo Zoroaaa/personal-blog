@@ -251,7 +251,7 @@ export function MessagesPage() {
         <h1 className="text-2xl font-bold text-foreground mb-6">私信管理</h1>
 
         <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
-          <div className="grid grid-cols-1 md:grid-cols-3 h-[calc(100vh-200px)] min-h-[500px]">
+          <div className="grid grid-cols-1 md:grid-cols-3 h-[80vh] min-h-[500px] max-h-[700px]">
             {/* 会话列表 */}
             <div className="border-r border-border flex flex-col">
               {/* 头部 */}

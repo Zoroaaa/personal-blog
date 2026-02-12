@@ -107,6 +107,11 @@ export function ChatWindow({
     }
   }, [editingMessage]);
 
+  // 自动滚动到底部
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
   // 滚动检测加载更多
   const handleScroll = useCallback(() => {
     const container = chatContainerRef.current;
