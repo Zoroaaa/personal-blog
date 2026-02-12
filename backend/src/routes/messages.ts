@@ -102,7 +102,7 @@ messageRoutes.post('/', requireAuth, async (c) => {
     
     // 验证接收者是否存在
     const receiver = await c.env.DB.prepare(
-      'SELECT id, username, display_name, avatar_url FROM users WHERE id = ? AND status = ?'
+      'SELECT id, username, display_name, avatar_url, role FROM users WHERE id = ? AND status = ?'
     ).bind(receiverId, 'active').first() as any;
     
     if (!receiver) {
@@ -110,6 +110,14 @@ messageRoutes.post('/', requireAuth, async (c) => {
         'Receiver not found',
         '接收者不存在或账号已被禁用'
       ), 404);
+    }
+    
+    // 权限检查：普通用户只能给admin发送私信
+    if (currentUser.role !== 'admin' && receiver.role !== 'admin') {
+      return c.json(errorResponse(
+        'Permission denied',
+        '只能向管理员发送私信'
+      ), 403);
     }
     
     // 清理消息内容
@@ -759,6 +767,116 @@ messageRoutes.delete('/admin/:id', requireAuth, requireAdmin, async (c) => {
     return c.json(errorResponse(
       'Failed to delete message',
       '删除消息失败'
+    ), 500);
+  }
+});
+
+// ============= 私信功能升级：获取可发送用户列表 =============
+
+/**
+ * GET /api/messages/admin-users
+ * 获取可发送私信的管理员列表（普通用户使用）
+ */
+messageRoutes.get('/admin-users', requireAuth, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const users = await c.env.DB.prepare(
+      `SELECT id, username, display_name, avatar_url 
+       FROM users 
+       WHERE role = ? AND status = ?
+       ORDER BY display_name ASC
+       LIMIT 50`
+    ).bind('admin', 'active').all() as any;
+    
+    const formattedUsers = (users.results || []).map((user: any) => ({
+      id: user.id,
+      username: user.username,
+      displayName: user.display_name,
+      avatarUrl: user.avatar_url,
+    }));
+    
+    logger.info('Admin users fetched', { count: formattedUsers.length });
+    
+    return c.json(successResponse({ users: formattedUsers }));
+    
+  } catch (error) {
+    logger.error('Get admin users error', error);
+    return c.json(errorResponse(
+      'Failed to get admin users',
+      '获取管理员列表失败'
+    ), 500);
+  }
+});
+
+/**
+ * GET /api/messages/all-users
+ * 获取所有用户列表（管理员使用）
+ * 
+ * 查询参数：
+ * - search: 搜索用户名或显示名
+ * - page: 页码（默认1）
+ * - limit: 每页数量（默认20，最大50）
+ */
+messageRoutes.get('/all-users', requireAuth, requireAdmin, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const search = c.req.query('search') || '';
+    const page = parseInt(c.req.query('page') || '1');
+    const limit = Math.min(parseInt(c.req.query('limit') || '20'), 50);
+    const offset = (page - 1) * limit;
+    
+    let whereClause = 'WHERE status = ?';
+    const params: any[] = ['active'];
+    
+    if (search) {
+      whereClause += ' AND (username LIKE ? OR display_name LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
+    }
+    
+    // 获取用户列表
+    const users = await c.env.DB.prepare(
+      `SELECT id, username, display_name, avatar_url 
+       FROM users 
+       ${whereClause}
+       ORDER BY display_name ASC
+       LIMIT ? OFFSET ?`
+    ).bind(...params, limit, offset).all() as any;
+    
+    // 获取总数
+    const countResult = await c.env.DB.prepare(
+      `SELECT COUNT(*) as count FROM users ${whereClause}`
+    ).bind(...params).first() as any;
+    
+    const formattedUsers = (users.results || []).map((user: any) => ({
+      id: user.id,
+      username: user.username,
+      displayName: user.display_name,
+      avatarUrl: user.avatar_url,
+    }));
+    
+    logger.info('All users fetched', { 
+      count: formattedUsers.length, 
+      search, 
+      page 
+    });
+    
+    return c.json(successResponse({
+      users: formattedUsers,
+      pagination: {
+        page,
+        limit,
+        total: countResult?.count || 0,
+        totalPages: Math.ceil((countResult?.count || 0) / limit),
+      },
+    }));
+    
+  } catch (error) {
+    logger.error('Get all users error', error);
+    return c.json(errorResponse(
+      'Failed to get users',
+      '获取用户列表失败'
     ), 500);
   }
 });

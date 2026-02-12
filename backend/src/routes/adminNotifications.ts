@@ -282,3 +282,338 @@ adminNotificationRoutes.get('/', requireAuth, requireAdmin, async (c) => {
     );
   }
 });
+
+// ============= 系统通知管理（首页轮播）=============
+
+/**
+ * GET /api/admin/system-notifications
+ * 获取系统通知列表（用于首页轮播）
+ * 
+ * 查询参数：
+ * - page: 页码（默认1）
+ * - limit: 每页数量（默认20）
+ * - isActive: 筛选状态
+ */
+adminNotificationRoutes.get('/system-notifications', requireAuth, requireAdmin, async (c) => {
+  const logger = createLogger(c);
+
+  try {
+    const page = parseInt(c.req.query('page') || '1');
+    const limit = Math.min(50, Math.max(1, parseInt(c.req.query('limit') || '20')));
+    const isActive = c.req.query('isActive');
+    const offset = (page - 1) * limit;
+
+    let whereClause = 'WHERE n.type = ? AND n.subtype = ?';
+    const params: any[] = ['system', 'announcement'];
+
+    if (isActive !== undefined) {
+      whereClause += ' AND n.is_active = ?';
+      params.push(isActive === 'true' ? 1 : 0);
+    }
+
+    // 获取系统通知列表
+    const notifications = await c.env.DB.prepare(
+      `SELECT 
+        n.id, n.title, n.content, n.related_data,
+        n.is_active, n.created_at, n.updated_at
+      FROM notifications n
+      ${whereClause}
+      ORDER BY n.created_at DESC
+      LIMIT ? OFFSET ?`
+    ).bind(...params, limit, offset).all() as any;
+
+    // 获取总数
+    const countResult = await c.env.DB.prepare(
+      `SELECT COUNT(*) as count FROM notifications n ${whereClause}`
+    ).bind(...params).first() as any;
+
+    const formattedNotifications = (notifications.results || []).map((n: any) => {
+      let relatedData = {};
+      try {
+        relatedData = JSON.parse(n.related_data || '{}');
+      } catch {
+        relatedData = {};
+      }
+      
+      return {
+        id: n.id,
+        title: n.title,
+        content: n.content,
+        link: relatedData.link,
+        isActive: n.is_active === 1,
+        createdAt: n.created_at,
+        updatedAt: n.updated_at,
+      };
+    });
+
+    logger.info('Admin get system notifications', { 
+      count: formattedNotifications.length,
+      page 
+    });
+
+    return c.json(successResponse({
+      notifications: formattedNotifications,
+      pagination: {
+        page,
+        limit,
+        total: countResult?.count || 0,
+        totalPages: Math.ceil((countResult?.count || 0) / limit),
+      },
+    }));
+
+  } catch (error) {
+    logger.error('Get system notifications error', error);
+    return c.json(errorResponse(
+      'Failed to get system notifications',
+      '获取系统通知列表失败'
+    ), 500);
+  }
+});
+
+/**
+ * POST /api/admin/system-notifications
+ * 创建系统通知
+ */
+adminNotificationRoutes.post('/system-notifications', requireAuth, requireAdmin, async (c) => {
+  const logger = createLogger(c);
+
+  try {
+    const body = await c.req.json();
+    const { title, content, link, isActive = true } = body;
+
+    // 验证必填字段
+    if (!title || typeof title !== 'string') {
+      return c.json(errorResponse('Title is required', '标题不能为空'), 400);
+    }
+
+    if (!content || typeof content !== 'string') {
+      return c.json(errorResponse('Content is required', '内容不能为空'), 400);
+    }
+
+    // 构建related_data
+    const relatedData = JSON.stringify({
+      link,
+      isCarousel: true,
+    });
+
+    // 插入系统通知
+    const result = await c.env.DB.prepare(
+      `INSERT INTO notifications (
+        user_id, type, subtype, title, content, related_data,
+        is_active, is_in_app_sent, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+    ).bind(
+      0, // user_id=0 表示系统广播
+      'system',
+      'announcement',
+      title,
+      content,
+      relatedData,
+      isActive ? 1 : 0,
+      1
+    ).run();
+
+    if (!result.success) {
+      throw new Error('Failed to create system notification');
+    }
+
+    const notificationId = result.meta.last_row_id;
+
+    logger.info('System notification created', { notificationId, title });
+
+    return c.json(successResponse({
+      id: notificationId,
+      title,
+      content,
+      link,
+      isActive,
+    }, '系统通知创建成功'), 201);
+
+  } catch (error) {
+    logger.error('Create system notification error', error);
+    return c.json(errorResponse(
+      'Failed to create system notification',
+      '创建系统通知失败'
+    ), 500);
+  }
+});
+
+/**
+ * PUT /api/admin/system-notifications/:id
+ * 更新系统通知
+ */
+adminNotificationRoutes.put('/system-notifications/:id', requireAuth, requireAdmin, async (c) => {
+  const logger = createLogger(c);
+
+  try {
+    const id = parseInt(c.req.param('id'));
+    if (isNaN(id)) {
+      return c.json(errorResponse('Invalid ID', '无效的通知ID'), 400);
+    }
+
+    const body = await c.req.json();
+    const { title, content, link, isActive } = body;
+
+    // 检查通知是否存在
+    const existing = await c.env.DB.prepare(
+      'SELECT id FROM notifications WHERE id = ? AND type = ? AND subtype = ?'
+    ).bind(id, 'system', 'announcement').first();
+
+    if (!existing) {
+      return c.json(errorResponse('Not found', '通知不存在'), 404);
+    }
+
+    // 构建更新字段
+    const updates: string[] = [];
+    const params: any[] = [];
+
+    if (title !== undefined) {
+      updates.push('title = ?');
+      params.push(title);
+    }
+
+    if (content !== undefined) {
+      updates.push('content = ?');
+      params.push(content);
+    }
+
+    if (isActive !== undefined) {
+      updates.push('is_active = ?');
+      params.push(isActive ? 1 : 0);
+    }
+
+    if (link !== undefined) {
+      // 需要更新related_data
+      const existingData = await c.env.DB.prepare(
+        'SELECT related_data FROM notifications WHERE id = ?'
+      ).bind(id).first() as any;
+      
+      let relatedData = {};
+      try {
+        relatedData = JSON.parse(existingData?.related_data || '{}');
+      } catch {
+        relatedData = {};
+      }
+      
+      relatedData = { ...relatedData, link };
+      updates.push('related_data = ?');
+      params.push(JSON.stringify(relatedData));
+    }
+
+    if (updates.length === 0) {
+      return c.json(errorResponse('No fields to update', '没有要更新的字段'), 400);
+    }
+
+    params.push(id);
+
+    // 执行更新
+    await c.env.DB.prepare(
+      `UPDATE notifications SET ${updates.join(', ')} WHERE id = ?`
+    ).bind(...params).run();
+
+    logger.info('System notification updated', { id });
+
+    return c.json(successResponse({ updated: true }, '更新成功'));
+
+  } catch (error) {
+    logger.error('Update system notification error', error);
+    return c.json(errorResponse(
+      'Failed to update system notification',
+      '更新系统通知失败'
+    ), 500);
+  }
+});
+
+/**
+ * DELETE /api/admin/system-notifications/:id
+ * 删除系统通知
+ */
+adminNotificationRoutes.delete('/system-notifications/:id', requireAuth, requireAdmin, async (c) => {
+  const logger = createLogger(c);
+
+  try {
+    const id = parseInt(c.req.param('id'));
+    if (isNaN(id)) {
+      return c.json(errorResponse('Invalid ID', '无效的通知ID'), 400);
+    }
+
+    // 检查通知是否存在
+    const existing = await c.env.DB.prepare(
+      'SELECT id FROM notifications WHERE id = ? AND type = ? AND subtype = ?'
+    ).bind(id, 'system', 'announcement').first();
+
+    if (!existing) {
+      return c.json(errorResponse('Not found', '通知不存在'), 404);
+    }
+
+    // 软删除
+    await c.env.DB.prepare(
+      'UPDATE notifications SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP WHERE id = ?'
+    ).bind(id).run();
+
+    logger.info('System notification deleted', { id });
+
+    return c.json(successResponse({ deleted: true }, '删除成功'));
+
+  } catch (error) {
+    logger.error('Delete system notification error', error);
+    return c.json(errorResponse(
+      'Failed to delete system notification',
+      '删除系统通知失败'
+    ), 500);
+  }
+});
+
+// ============= 公共接口：首页轮播通知 =============
+
+/**
+ * GET /api/notifications/carousel
+ * 获取首页轮播通知（公开接口）
+ */
+adminNotificationRoutes.get('/carousel', async (c) => {
+  const logger = createLogger(c);
+
+  try {
+    // 获取active的系统通知，按创建时间倒序
+    const notifications = await c.env.DB.prepare(
+      `SELECT 
+        n.id, n.title, n.content, n.related_data, n.created_at
+      FROM notifications n
+      WHERE n.type = ? AND n.subtype = ? AND n.is_active = 1 AND n.is_deleted = 0
+      ORDER BY n.created_at DESC
+      LIMIT 5`
+    ).bind('system', 'announcement').all() as any;
+
+    const formattedNotifications = (notifications.results || []).map((n: any) => {
+      let relatedData = {};
+      try {
+        relatedData = JSON.parse(n.related_data || '{}');
+      } catch {
+        relatedData = {};
+      }
+      
+      return {
+        id: n.id,
+        title: n.title,
+        content: n.content,
+        link: relatedData.link,
+        createdAt: n.created_at,
+      };
+    });
+
+    logger.info('Carousel notifications fetched', { 
+      count: formattedNotifications.length 
+    });
+
+    return c.json(successResponse({
+      notifications: formattedNotifications,
+    }));
+
+  } catch (error) {
+    logger.error('Get carousel notifications error', error);
+    return c.json(errorResponse(
+      'Failed to get carousel notifications',
+      '获取轮播通知失败'
+    ), 500);
+  }
+});

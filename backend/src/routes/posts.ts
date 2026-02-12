@@ -1749,5 +1749,73 @@ postRoutes.post('/:id/favorite', requireAuth, async (c) => {
   }
 });
 
+// ============= 评论@用户功能：获取可@用户列表 =============
+
+/**
+ * GET /api/posts/:id/mentionable-users
+ * 获取文章中可@的用户列表（文章作者 + 已评论用户）
+ */
+postRoutes.get('/:id/mentionable-users', async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const postId = parseInt(c.req.param('id'));
+    
+    if (isNaN(postId)) {
+      return c.json(errorResponse(
+        'Invalid post ID',
+        '无效的文章ID'
+      ), 400);
+    }
+    
+    // 验证文章是否存在
+    const post = await c.env.DB.prepare(
+      'SELECT id FROM posts WHERE id = ? AND status = ?'
+    ).bind(postId, 'published').first();
+    
+    if (!post) {
+      return c.json(errorResponse(
+        'Post not found',
+        '文章不存在'
+      ), 404);
+    }
+    
+    // 获取文章作者和已评论用户（去重）
+    const users = await c.env.DB.prepare(
+      `SELECT DISTINCT u.id, u.username, u.display_name, u.avatar_url
+       FROM users u
+       WHERE u.id IN (
+         SELECT author_id FROM posts WHERE id = ?
+         UNION
+         SELECT user_id FROM comments WHERE post_id = ? AND status = 'approved'
+       )
+       AND u.status = 'active'
+       ORDER BY u.display_name ASC
+       LIMIT 20`
+    ).bind(postId, postId).all() as any;
+    
+    const formattedUsers = (users.results || []).map((user: any) => ({
+      id: user.id,
+      username: user.username,
+      displayName: user.display_name,
+      avatarUrl: user.avatar_url,
+    }));
+    
+    logger.info('Mentionable users fetched', { 
+      postId, 
+      count: formattedUsers.length 
+    });
+    
+    return c.json(successResponse({ users: formattedUsers }));
+    
+  } catch (error) {
+    logger.error('Get mentionable users error', error);
+    return c.json(errorResponse(
+      'Failed to get mentionable users',
+      '获取可@用户列表失败'
+    ), 500);
+  }
+});
+
 // ============= 辅助函数 =============
 
