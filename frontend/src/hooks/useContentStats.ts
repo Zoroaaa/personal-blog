@@ -6,6 +6,10 @@
  * - 计算总字符数
  * - 计算行数
  * - 估算阅读时间
+ * 
+ * @version 1.0.0
+ * @author 博客系统
+ * @created 2024-01-01
  */
 
 import { useMemo } from 'react';

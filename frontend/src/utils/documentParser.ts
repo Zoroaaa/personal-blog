@@ -1,3 +1,16 @@
+/**
+ * 文档解析工具
+ * 功能：
+ * - 解析文本文件
+ * - 解析Markdown文件
+ * - 解析Word文档（.docx）
+ * - 支持提取文档中的图片
+ * 
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
+ */
+
 // @ts-ignore - mammoth 和 jszip 是可选依赖
 import mammoth from 'mammoth';
 // @ts-ignore
@@ -176,8 +189,9 @@ export async function parseWordDocument(file: File): Promise<ParsedDocument> {
   }
 
   // 5. 使用 mammoth 提取文本内容，同时转换图片为占位符
-  const result = await mammoth.convertToMarkdown({ arrayBuffer });
-  let content = result.value;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = await (mammoth as any).convertToMarkdown({ arrayBuffer });
+  let content = result.value as string;
 
   // 6. 处理 mammoth 生成的图片标记
   // mammoth 会将图片转换为 ![...](...) 格式，我们需要将其替换为占位符

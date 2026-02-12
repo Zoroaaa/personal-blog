@@ -4,6 +4,10 @@
  * - 自动识别 HTTP/HTTPS URL
  * - 链接预览数据获取
  * - 链接文本自定义
+ * 
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
  */
 
 export interface LinkInfo {

@@ -7,7 +7,9 @@
  * - 根据配置自动生成meta信息
  * - 支持自定义覆盖
  * 
+ * @author 博客系统
  * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import { useEffect } from 'react';

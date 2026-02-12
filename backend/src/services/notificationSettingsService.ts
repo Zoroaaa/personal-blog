@@ -5,7 +5,9 @@
  * - 用户通知设置的CRUD操作
  * - 设置验证和默认值处理
  * 
+ * @author 博客系统
  * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import type { D1Database } from '@cloudflare/workers-types';

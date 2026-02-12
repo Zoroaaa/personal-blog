@@ -12,8 +12,9 @@
  * 3. 添加创建/更新/删除功能
  * 4. 详细的错误处理和日志
  * 
- * @author 优化版本
  * @version 2.0.0
+ * @author 博客系统
+ * @created 2024-01-01
  */
 
 import { Hono } from 'hono';

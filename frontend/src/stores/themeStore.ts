@@ -10,6 +10,8 @@
  * - 与网站配置联动
  * 
  * @version 3.0.0 - 修复主色调功能
+ * @author 博客系统
+ * @created 2024-01-01
  */
 
 import { create } from 'zustand';

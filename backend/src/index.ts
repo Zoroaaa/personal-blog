@@ -6,7 +6,9 @@
  * 2. 健康检查端点跳过环境变量验证(可选)
  * 3. 优化环境变量检查逻辑
  * 
+ * @author 博客系统
  * @version 3.0.1
+ * @created 2024-01-01
  */
 
 import { Hono } from 'hono';

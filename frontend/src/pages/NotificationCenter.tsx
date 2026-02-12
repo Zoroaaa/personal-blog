@@ -1,7 +1,17 @@
 /**
  * 通知中心页面
  *
+ * 功能：
+ * - 显示所有通知列表
+ * - 支持通知分类筛选
+ * - 标记通知为已读
+ * - 删除通知
+ * - 全部已读功能
+ * - 通知详情查看
+ *
+ * @author 博客系统
  * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import { useEffect, useState } from 'react';
@@ -64,9 +74,9 @@ function NotificationItem({
     <div
       onClick={handleClick}
       className={`
-        p-4 border-b border-gray-100 cursor-pointer transition-colors
-        hover:bg-gray-50
-        ${!notification.isRead ? 'bg-blue-50' : ''}
+        p-4 border-b border-border cursor-pointer transition-colors
+        hover:bg-accent
+        ${!notification.isRead ? 'bg-primary/10' : ''}
       `}
     >
       <div className="flex items-start gap-3">
@@ -75,7 +85,7 @@ function NotificationItem({
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h4 className="font-medium text-gray-900 truncate">
+            <h4 className="font-medium text-foreground truncate">
               {notification.title}
             </h4>
             {!notification.isRead && (
@@ -83,25 +93,25 @@ function NotificationItem({
             )}
           </div>
           {notification.content && (
-            <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
               {notification.content}
             </p>
           )}
           {/* 评论回复通知：显示被回复的评论内容 */}
           {notification.subtype === 'reply' && notification.relatedData?.parentCommentContent && (
-            <div className="mt-2 p-2 bg-gray-100 rounded text-xs text-gray-500">
+            <div className="mt-2 p-2 bg-muted rounded text-xs text-muted-foreground">
               <span className="font-medium">{notification.relatedData.parentCommentAuthor}:</span>
               <span className="ml-1">{notification.relatedData.parentCommentContent}</span>
             </div>
           )}
           {/* 文章标题（如果存在） */}
           {notification.relatedData?.postTitle && notification.subtype !== 'reply' && (
-            <div className="mt-1 text-xs text-gray-500">
+            <div className="mt-1 text-xs text-muted-foreground">
               文章: {notification.relatedData.postTitle}
             </div>
           )}
           <div className="flex items-center justify-between mt-2">
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-muted-foreground">
               {formatTime(notification.createdAt)}
             </span>
             <button
@@ -109,7 +119,7 @@ function NotificationItem({
                 e.stopPropagation();
                 onDelete(notification.id);
               }}
-              className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+              className="text-xs text-muted-foreground hover:text-red-500 transition-colors"
             >
               删除
             </button>
@@ -139,8 +149,8 @@ function FilterButton({
         px-4 py-2 rounded-full text-sm font-medium transition-colors
         ${
           active
-            ? 'bg-blue-500 text-white'
-            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            ? 'bg-primary text-primary-foreground'
+            : 'bg-muted text-muted-foreground hover:bg-accent'
         }
       `}
     >
@@ -149,7 +159,7 @@ function FilterButton({
         <span
           className={`
           ml-1.5 px-1.5 py-0.5 rounded-full text-xs
-          ${active ? 'bg-white/20' : 'bg-red-500 text-white'}
+          ${active ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-destructive text-destructive-foreground'}
         `}
         >
           {count > 99 ? '99+' : count}
@@ -218,23 +228,23 @@ export default function NotificationCenter() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* 页面标题 */}
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">通知中心</h1>
+          <h1 className="text-2xl font-bold text-foreground">通知中心</h1>
           <div className="flex items-center gap-3">
             {unreadCount.total > 0 && (
               <button
                 onClick={handleMarkAllRead}
-                className="text-sm text-blue-500 hover:text-blue-600 font-medium"
+                className="text-sm text-primary hover:text-primary/80 font-medium"
               >
                 全部已读
               </button>
             )}
             <button
               onClick={() => navigate('/notification-settings')}
-              className="text-sm text-gray-500 hover:text-gray-700"
+              className="text-sm text-muted-foreground hover:text-foreground"
             >
               通知设置
             </button>
@@ -275,11 +285,11 @@ export default function NotificationCenter() {
 
         {/* 错误提示 */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-            <p className="text-red-600 text-sm">{error}</p>
+          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mb-4">
+            <p className="text-destructive text-sm">{error}</p>
             <button
               onClick={clearError}
-              className="text-red-500 text-sm mt-2 hover:underline"
+              className="text-destructive text-sm mt-2 hover:underline"
             >
               关闭
             </button>
@@ -287,17 +297,17 @@ export default function NotificationCenter() {
         )}
 
         {/* 通知列表 */}
-        <div className="bg-white rounded-lg shadow-sm">
+        <div className="bg-card rounded-lg shadow-sm">
           {isLoading ? (
             <div className="p-8 text-center">
-              <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-              <p className="text-gray-500 text-sm mt-3">加载中...</p>
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+              <p className="text-muted-foreground text-sm mt-3">加载中...</p>
             </div>
           ) : notifications.length === 0 ? (
             <div className="p-12 text-center">
               <span className="text-4xl">📭</span>
-              <p className="text-gray-500 mt-3">暂无通知</p>
-              <p className="text-gray-400 text-sm mt-1">
+              <p className="text-muted-foreground mt-3">暂无通知</p>
+              <p className="text-muted-foreground/70 text-sm mt-1">
                 当有人与你互动时，你会收到通知
               </p>
             </div>

@@ -1,5 +1,28 @@
+/**
+ * 页脚组件
+ * 
+ * 功能：
+ * - 显示网站品牌信息
+ * - 提供快速链接导航
+ * - 展示技术栈信息
+ * - 显示版权声明
+ * - 支持配置化内容
+ * 
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
+ */
+
 import { useMemo } from 'react';
 import { useSiteConfig } from '../hooks/useSiteConfig';
+
+/**
+ * 页脚组件
+ * 
+ * 功能：显示网站的页脚信息，包括品牌信息、快速链接、技术栈和版权声明
+ * 
+ * @returns 页脚组件
+ */
 
 export function Footer() {
   const { config } = useSiteConfig();

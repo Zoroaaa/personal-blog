@@ -16,8 +16,9 @@
  * 5. 添加输入清理和XSS防护
  * 6. 统一响应格式
  * 
- * @author 优化版本
+ * @author 博客系统
  * @version 2.0.0
+ * @created 2024-01-01
  */
 
 import { Hono } from 'hono';

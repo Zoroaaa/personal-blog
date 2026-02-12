@@ -1,12 +1,15 @@
 /**
  * 通知服务层
- * 
+ *
  * 功能：
  * - 通知的CRUD操作
  * - 通知发送逻辑
  * - 与数据库交互
- * 
- * @version 1.0.0
+ * - 免打扰检查
+ *
+ * @author 博客系统
+ * @version 1.1.0
+ * @created 2024-01-01
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
@@ -22,6 +25,9 @@ import type {
   NotificationRelatedData,
 } from '../types/notifications';
 import type { Env } from '../types';
+import { getNotificationSettings } from './notificationSettingsService';
+import { shouldSendNow } from './doNotDisturb';
+import { sendNotificationEmail } from '../utils/resend';
 
 // 默认分页配置
 const DEFAULT_PAGE = 1;
@@ -30,11 +36,13 @@ const MAX_LIMIT = 50;
 
 /**
  * 创建通知
+ * 会自动检查用户通知设置和免打扰状态
  */
 export async function createNotification(
   db: D1Database,
   data: CreateNotificationRequest,
-  options: SendNotificationOptions = {}
+  options: SendNotificationOptions = {},
+  env?: Env
 ): Promise<Notification | null> {
   try {
     const {
@@ -46,6 +54,31 @@ export async function createNotification(
       relatedData,
       messageId,
     } = data;
+
+    // 获取用户通知设置
+    const settings = await getNotificationSettings(db, userId);
+
+    // 检查通知类型是否启用
+    const typeSettings = settings[type === 'private_message' ? 'privateMessage' : type];
+    if (!typeSettings || typeSettings.frequency === 'off') {
+      return null;
+    }
+
+    // 检查免打扰状态（仅对email和push渠道）
+    const shouldSendEmail = !options.skipEmail &&
+      typeSettings.email &&
+      shouldSendNow(settings.doNotDisturb, 'email');
+
+    const shouldSendPush = !options.skipPush &&
+      typeSettings.push &&
+      shouldSendNow(settings.doNotDisturb, 'push');
+
+    const shouldSendInApp = !options.skipInApp && typeSettings.inApp;
+
+    // 如果所有渠道都不发送，则不创建通知
+    if (!shouldSendInApp && !shouldSendEmail && !shouldSendPush) {
+      return null;
+    }
 
     // 插入通知记录
     const result = await db.prepare(
@@ -61,9 +94,9 @@ export async function createNotification(
       content || null,
       relatedData ? JSON.stringify(relatedData) : null,
       messageId || null,
-      options.skipInApp ? 0 : 1,
-      options.skipEmail ? 0 : 0,
-      options.skipPush ? 0 : 0
+      shouldSendInApp ? 1 : 0,
+      shouldSendEmail ? 0 : 0, // 标记为待发送
+      shouldSendPush ? 0 : 0   // 标记为待发送
     ).run();
 
     if (!result.success) {
@@ -74,7 +107,32 @@ export async function createNotification(
     // 获取创建的通知
     const notificationId = result.meta.last_row_id;
     const notification = await getNotificationById(db, notificationId);
-    
+
+    // 发送邮件通知
+    if (shouldSendEmail && env && notification) {
+      try {
+        // 获取用户信息
+        const user = await db.prepare(
+          'SELECT display_name, email FROM users WHERE id = ?'
+        ).bind(userId).first() as { display_name: string, email: string };
+        
+        if (user && user.email) {
+          const sent = await sendNotificationEmail(env, notification, {
+            name: user.display_name || '用户',
+            email: user.email
+          });
+          
+          if (sent) {
+            await updateChannelStatus(db, notificationId, 'email', true);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to send notification email:', error);
+      }
+    }
+
+    // TODO: 实现推送通知功能
+
     return notification;
   } catch (error) {
     console.error('Create notification error:', error);
@@ -384,7 +442,8 @@ export async function createInteractionNotification(
     title: string;
     content?: string;
     relatedData: NotificationRelatedData;
-  }
+  },
+  env?: Env
 ): Promise<Notification | null> {
   return createNotification(db, {
     userId: params.userId,
@@ -393,7 +452,7 @@ export async function createInteractionNotification(
     title: params.title,
     content: params.content,
     relatedData: params.relatedData,
-  });
+  }, {}, env);
 }
 
 /**
@@ -407,7 +466,8 @@ export async function createSystemNotification(
     title: string;
     content?: string;
     relatedData?: NotificationRelatedData;
-  }
+  },
+  env?: Env
 ): Promise<Notification | null> {
   return createNotification(db, {
     userId: params.userId,
@@ -416,7 +476,7 @@ export async function createSystemNotification(
     title: params.title,
     content: params.content,
     relatedData: params.relatedData,
-  });
+  }, {}, env);
 }
 
 /**
@@ -430,7 +490,8 @@ export async function createPrivateMessageNotification(
     content?: string;
     messageId: number;
     relatedData: NotificationRelatedData;
-  }
+  },
+  env?: Env
 ): Promise<Notification | null> {
   return createNotification(db, {
     userId: params.userId,
@@ -440,5 +501,5 @@ export async function createPrivateMessageNotification(
     content: params.content,
     messageId: params.messageId,
     relatedData: params.relatedData,
-  });
+  }, {}, env);
 }

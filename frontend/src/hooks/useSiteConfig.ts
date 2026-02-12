@@ -13,6 +13,8 @@
  * 3. 优化缓存更新策略
  * 
  * @version 4.0.0
+ * @author 博客系统
+ * @created 2024-01-01
  */
 
 import { useState, useEffect } from 'react';

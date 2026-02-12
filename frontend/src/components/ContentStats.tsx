@@ -1,6 +1,16 @@
 /**
  * 内容统计信息组件
- * 显示：中文字符数、英文单词数、总字符数、行数、阅读时间
+ * 
+ * 功能：
+ * - 显示中文字符数
+ * - 显示英文单词数
+ * - 显示总字符数
+ * - 显示行数
+ * - 显示预计阅读时间
+ * 
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import { useContentStats } from '../hooks/useContentStats';

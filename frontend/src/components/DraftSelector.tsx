@@ -1,9 +1,16 @@
 /**
  * 草稿选择器组件
+ * 
  * 功能：
  * - 显示最新的 5 个草稿
  * - 选择恢复某个草稿
  * - 清除所有草稿
+ * - 支持草稿内容预览
+ * - 按时间排序显示
+ * 
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import { useState, useEffect } from 'react';

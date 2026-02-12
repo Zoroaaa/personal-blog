@@ -4,6 +4,10 @@
  * - 定时自动保存
  * - 本地存储备份
  * - 恢复草稿功能
+ * 
+ * @version 1.0.0
+ * @author 博客系统
+ * @created 2024-01-01
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';

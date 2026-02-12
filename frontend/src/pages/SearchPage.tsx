@@ -8,8 +8,9 @@
  * - 显示搜索关键词
  * - 处理无结果情况
  *
- * @author 优化版本
+ * @author 博客系统
  * @version 2.1.0
+ * @created 2024-01-01
  */
 
 import { useEffect, useState } from 'react';

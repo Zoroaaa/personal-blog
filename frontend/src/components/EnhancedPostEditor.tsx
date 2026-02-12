@@ -1,11 +1,19 @@
 /**
  * 增强型文章编辑组件
+ * 
  * 功能:
  * - 链接自动识别与编辑
  * - 实时 Markdown 预览
  * - 自动保存
  * - 键盘快捷键
  * - 分屏编辑模式
+ * - 文档导入（支持txt、md、docx）
+ * - 图片粘贴上传
+ * - SEO 优化助手
+ * 
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';

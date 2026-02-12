@@ -6,6 +6,10 @@
  * - 自动消失
  * - 支持多个 Toast 堆叠
  * - 平滑动画
+ *
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import { useState, useCallback, createContext, useContext, ReactNode } from 'react';

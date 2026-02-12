@@ -1,9 +1,16 @@
 /**
  * 链接编辑器组件
+ * 
  * 功能：
  * - 链接文本自定义
  * - 链接预览
  * - 快速插入链接
+ * - URL 有效性验证
+ * - 自动获取网站图标
+ * 
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import { useState, useEffect, useRef } from 'react';

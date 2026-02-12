@@ -7,6 +7,10 @@
  * - 检查关键词密度
  * - 提供优化建议
  * - 排版格式检查与优化
+ * 
+ * @version 1.0.0
+ * @author 博客系统
+ * @created 2024-01-01
  */
 
 import { useMemo } from 'react';

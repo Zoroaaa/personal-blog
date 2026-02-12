@@ -3,8 +3,9 @@
  *
  * 包含所有TypeScript类型定义
  *
- * @author 优化版本
+ * @author 博客系统
  * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import type { JWTPayload } from '../utils/jwt';

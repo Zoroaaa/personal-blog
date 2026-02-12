@@ -1,6 +1,9 @@
 /**
  * 标签管理组件
  * 功能: 创建、编辑、删除标签,支持颜色设置
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import { useState, useEffect } from 'react';

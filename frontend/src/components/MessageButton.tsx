@@ -6,6 +6,11 @@
  * - 显示未读消息数角标
  * - 点击打开私信聊天窗口
  * - 未登录时显示登录提示
+ * - 定期自动刷新未读计数
+ * 
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import { useState, useEffect, useCallback } from 'react';

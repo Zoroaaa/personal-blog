@@ -11,6 +11,8 @@
  * 3. 批量更新配置
  *
  * @version 2.2.0
+ * @author 博客系统
+ * @created 2024-01-01
  */
 
 import { Hono } from 'hono';

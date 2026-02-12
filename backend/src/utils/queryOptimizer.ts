@@ -5,6 +5,10 @@
  * - 查询结果缓存
  * - 批量查询优化
  * - 查询性能监控
+ * 
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import type { D1Database } from '@cloudflare/workers-types';

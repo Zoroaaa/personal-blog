@@ -15,8 +15,9 @@
  * 5. 统一API响应格式处理
  * 6. 添加githubLogin方法和getConfig方法
  * 
- * @author 优化版本
+ * @author 博客系统
  * @version 2.1.0
+ * @created 2024-01-01
  */
 
 import type {
@@ -41,8 +42,10 @@ import type {
 
 // ============= 配置 =============
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
-const isDevelopment = import.meta.env.DEV;
+// 支持Vite环境变量和Node.js环境变量
+const API_URL = (import.meta?.env?.VITE_API_URL || process.env.VITE_API_URL) || '/api';
+const isDevelopment = (import.meta?.env?.DEV || process.env.NODE_ENV === 'development');
+
 
 // ============= 核心请求函数 =============
 
@@ -166,8 +169,41 @@ function handleUnauthorized(): void {
 // ============= API方法集合 =============
 
 export const api = {
+  // ============= 通用请求方法 =============
+
+  /**
+   * 通用GET请求
+   */
+  get: <T = any>(endpoint: string) => apiRequest<T>(endpoint),
+
+  /**
+   * 通用POST请求
+   */
+  post: <T = any>(endpoint: string, data?: any) =>
+    apiRequest<T>(endpoint, {
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+    }),
+
+  /**
+   * 通用PUT请求
+   */
+  put: <T = any>(endpoint: string, data?: any) =>
+    apiRequest<T>(endpoint, {
+      method: 'PUT',
+      body: data ? JSON.stringify(data) : undefined,
+    }),
+
+  /**
+   * 通用DELETE请求
+   */
+  delete: <T = any>(endpoint: string) =>
+    apiRequest<T>(endpoint, {
+      method: 'DELETE',
+    }),
+
   // ============= 健康检查 =============
-  
+
   /**
    * 健康检查
    */
@@ -720,6 +756,43 @@ export const api = {
     }
   },
   
+  /**
+   * 上传文件（通用，支持更多文件类型）
+   */
+  uploadFile: async (file: File): Promise<ApiResponse<UploadResponse>> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const token = getAuthToken();
+    const headers: Record<string, string> = {};
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/upload/file`, {
+        method: 'POST',
+        headers,
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || error.message || '上传失败');
+      }
+
+      return await response.json();
+
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('上传失败');
+    }
+  },
+
   /**
    * 删除文件
    */

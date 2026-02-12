@@ -1,21 +1,30 @@
 {
   "name": "blog-backend",
-  "version": "1.0.0",
-  "description": "Blog system backend API",
+  "version": "3.0.1",
+  "description": "Blog system backend API - Refactored version",
   "main": "src/index.ts",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "tail": "wrangler tail"
+    "tail": "wrangler tail",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "hono": "^3.11.7",
-    "bcryptjs": "^2.4.3"
+    "bcryptjs": "^3.0.3",
+    "hono": "^3.11.7"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20231218.0",
     "@types/bcryptjs": "^2.4.6",
-    "wrangler": "^3.22.1",
-    "typescript": "^5.3.3"
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "eslint": "^8.56.0",
+    "prettier": "^3.1.1",
+    "typescript": "^5.3.3",
+    "wrangler": "^3.22.1"
   }
 }

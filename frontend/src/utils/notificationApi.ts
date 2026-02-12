@@ -1,7 +1,9 @@
 /**
  * 通知功能 API 封装
  *
+ * @author 博客系统
  * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import type {
@@ -174,7 +176,8 @@ export async function subscribePush(subscription: PushSubscription): Promise<voi
       body: JSON.stringify({
         subscription: {
           endpoint: subscription.endpoint,
-          keys: subscription.toJSON().keys,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          keys: (subscription as any).keys,
         },
         userAgent: navigator.userAgent,
       }),

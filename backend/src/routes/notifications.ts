@@ -8,6 +8,8 @@
  * - 删除通知
  *
  * @version 1.0.0
+ * @author 博客系统
+ * @created 2024-01-01
  */
 
 import { Hono } from 'hono';
@@ -246,5 +248,57 @@ notificationRoutes.delete('/:id', requireAuth, async (c) => {
       errorResponse('Failed to delete notification', '删除通知失败'),
       500
     );
+  }
+});
+
+/**
+ * GET /api/notifications/carousel
+ * 获取首页轮播通知（公开接口）
+ */
+notificationRoutes.get('/carousel', async (c) => {
+  const logger = createLogger(c);
+
+  try {
+    // 获取active的系统通知，按创建时间倒序
+    const notifications = await c.env.DB.prepare(
+      `SELECT 
+        n.id, n.title, n.content, n.related_data, n.created_at
+      FROM notifications n
+      WHERE n.type = ? AND n.subtype = ? AND n.is_active = 1 AND n.is_deleted = 0
+      ORDER BY n.created_at DESC
+      LIMIT 5`
+    ).bind('system', 'announcement').all() as any;
+
+    const formattedNotifications = (notifications.results || []).map((n: any) => {
+      let relatedData: { link?: string } = {};
+      try {
+        relatedData = JSON.parse(n.related_data || '{}');
+      } catch {
+        relatedData = {};
+      }
+
+      return {
+        id: n.id,
+        title: n.title,
+        content: n.content,
+        link: relatedData.link,
+        createdAt: n.created_at,
+      };
+    });
+
+    logger.info('Carousel notifications fetched', { 
+      count: formattedNotifications.length 
+    });
+
+    return c.json(successResponse({
+      notifications: formattedNotifications,
+    }));
+
+  } catch (error) {
+    logger.error('Get carousel notifications error', error);
+    return c.json(errorResponse(
+      'Failed to get carousel notifications',
+      '获取轮播通知失败'
+    ), 500);
   }
 });

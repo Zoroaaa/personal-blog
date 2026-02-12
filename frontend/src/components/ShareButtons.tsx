@@ -6,7 +6,9 @@
  * - 复制链接功能
  * - 根据 feature_share 配置控制显示
  * 
+ * @author 博客系统
  * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import { useState } from 'react';
