@@ -27,7 +27,7 @@ const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
 
 /**
- * POST /api/admin/notifications
+ * POST /api/admin/notifications/send
  * 发送系统通知（管理员）
  *
  * 请求体：
@@ -39,7 +39,7 @@ const MAX_LIMIT = 100;
  *   channels: ["in_app", "email", "push"]
  * }
  */
-adminNotificationRoutes.post('/', requireAuth, requireAdmin, async (c) => {
+adminNotificationRoutes.post('/send', requireAuth, requireAdmin, async (c) => {
   const logger = createLogger(c);
 
   try {
@@ -174,7 +174,7 @@ adminNotificationRoutes.post('/', requireAuth, requireAdmin, async (c) => {
 });
 
 /**
- * GET /api/admin/notifications
+ * GET /api/admin/notifications/list
  * 查看所有通知（管理员）
  *
  * 查询参数：
@@ -183,7 +183,7 @@ adminNotificationRoutes.post('/', requireAuth, requireAdmin, async (c) => {
  * - type: 筛选类型
  * - userId: 筛选用户ID
  */
-adminNotificationRoutes.get('/', requireAuth, requireAdmin, async (c) => {
+adminNotificationRoutes.get('/list', requireAuth, requireAdmin, async (c) => {
   const logger = createLogger(c);
 
   try {
