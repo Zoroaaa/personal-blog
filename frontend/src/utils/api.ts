@@ -166,8 +166,41 @@ function handleUnauthorized(): void {
 // ============= API方法集合 =============
 
 export const api = {
+  // ============= 通用请求方法 =============
+
+  /**
+   * 通用GET请求
+   */
+  get: <T = any>(endpoint: string) => apiRequest<T>(endpoint),
+
+  /**
+   * 通用POST请求
+   */
+  post: <T = any>(endpoint: string, data?: any) =>
+    apiRequest<T>(endpoint, {
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+    }),
+
+  /**
+   * 通用PUT请求
+   */
+  put: <T = any>(endpoint: string, data?: any) =>
+    apiRequest<T>(endpoint, {
+      method: 'PUT',
+      body: data ? JSON.stringify(data) : undefined,
+    }),
+
+  /**
+   * 通用DELETE请求
+   */
+  delete: <T = any>(endpoint: string) =>
+    apiRequest<T>(endpoint, {
+      method: 'DELETE',
+    }),
+
   // ============= 健康检查 =============
-  
+
   /**
    * 健康检查
    */
