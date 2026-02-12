@@ -46,6 +46,8 @@ export function MessageChatModal({ isOpen, onClose }: MessageChatModalProps) {
     setError,
   } = useMessageStore();
 
+  const { user } = useAuthStore();
+
   const [view, setView] = useState<'list' | 'chat'>('list');
   const [messageInput, setMessageInput] = useState('');
   const [isNewConversationOpen, setIsNewConversationOpen] = useState(false);
