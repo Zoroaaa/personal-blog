@@ -35,7 +35,7 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
   // 获取轮播通知
   const fetchNotifications = useCallback(async () => {
     try {
-      const response = await api.get('/admin/notifications/carousel');
+      const response = await api.get('/notifications/carousel');
       if (response.success && response.data) {
         setNotifications(response.data.notifications || []);
       }

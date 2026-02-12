@@ -2,6 +2,14 @@
  * 私信功能类型定义
  */
 
+export interface MessageAttachment {
+  id: number;
+  fileName: string;
+  fileUrl: string;
+  fileType: 'image' | 'file';
+  fileSize: number;
+}
+
 export interface Message {
   id: number;
   senderId: number;
@@ -15,6 +23,8 @@ export interface Message {
   content: string;
   parentId?: number;
   isRead: boolean;
+  hasAttachments?: boolean;
+  attachments?: MessageAttachment[];
   createdAt: string;
   readAt?: string;
 }
@@ -55,6 +65,12 @@ export interface SendMessageRequest {
   receiverId: number;
   content: string;
   parentId?: number;
+  attachments?: Array<{
+    fileName: string;
+    fileUrl: string;
+    fileType: 'image' | 'file';
+    fileSize?: number;
+  }>;
 }
 
 export interface MessageResponse {

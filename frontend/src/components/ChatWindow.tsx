@@ -6,10 +6,13 @@
  * - 发送消息
  * - 加载更多历史消息
  * - 显示消息状态
+ * - 支持粘贴图片
+ * - 支持附件上传
  */
 
-import { useEffect, useRef, useCallback } from 'react';
-import type { Conversation, MessageWithStatus } from '../types/messages';
+import { useEffect, useRef, useCallback, useState } from 'react';
+import type { Conversation, MessageWithStatus, MessageAttachment } from '../types/messages';
+import { api } from '../utils/api';
 
 interface ChatWindowProps {
   messages: MessageWithStatus[];
@@ -20,7 +23,7 @@ interface ChatWindowProps {
   isLoadingMore: boolean;
   hasMoreMessages: boolean;
   onMessageInputChange: (value: string) => void;
-  onSend: () => void;
+  onSend: (attachments?: MessageAttachment[]) => void;
   onBack: () => void;
   onClose: () => void;
   onLoadMore: () => void;
@@ -45,12 +48,16 @@ export function ChatWindow({
   chatContainerRef,
 }: ChatWindowProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   // 处理发送
   const handleSend = useCallback(() => {
-    if (!messageInput.trim()) return;
-    onSend();
-  }, [messageInput, onSend]);
+    if (!messageInput.trim() && pendingAttachments.length === 0) return;
+    onSend(pendingAttachments.length > 0 ? pendingAttachments : undefined);
+    setPendingAttachments([]);
+  }, [messageInput, pendingAttachments, onSend]);
 
   // 处理按键
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -78,6 +85,114 @@ export function ChatWindow({
       onLoadMore();
     }
   }, [chatContainerRef, isLoadingMore, hasMoreMessages, onLoadMore]);
+
+  // 处理粘贴事件（图片）
+  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    const imageItems: DataTransferItem[] = [];
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        imageItems.push(items[i]);
+      }
+    }
+
+    if (imageItems.length === 0) return;
+
+    e.preventDefault();
+    setIsUploading(true);
+
+    try {
+      for (const item of imageItems) {
+        const blob = item.getAsFile();
+        if (blob) {
+          const attachment = await uploadImage(blob);
+          if (attachment) {
+            setPendingAttachments(prev => [...prev, attachment]);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('上传图片失败:', error);
+    } finally {
+      setIsUploading(false);
+    }
+  }, []);
+
+  // 上传图片
+  const uploadImage = async (file: File): Promise<MessageAttachment | null> => {
+    try {
+      const response = await api.uploadImage(file);
+      if (response.success && response.data) {
+        return {
+          id: Date.now(), // 临时ID
+          fileName: file.name,
+          fileUrl: response.data.url,
+          fileType: 'image',
+          fileSize: file.size
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('上传失败:', error);
+      return null;
+    }
+  };
+
+  // 处理文件选择
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+
+    try {
+      for (const file of Array.from(files)) {
+        if (file.type.startsWith('image/')) {
+          const attachment = await uploadImage(file);
+          if (attachment) {
+            setPendingAttachments(prev => [...prev, attachment]);
+          }
+        } else {
+          // 非图片文件，使用普通上传
+          const response = await api.uploadImage(file);
+          if (response.success && response.data) {
+            setPendingAttachments(prev => [...prev, {
+              id: Date.now(),
+              fileName: file.name,
+              fileUrl: response.data!.url,
+              fileType: 'file',
+              fileSize: file.size
+            }]);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('上传文件失败:', error);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, []);
+
+  // 移除待发送附件
+  const removeAttachment = useCallback((index: number) => {
+    setPendingAttachments(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  // 打开文件选择
+  const openFilePicker = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  // 格式化文件大小
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -143,6 +258,7 @@ export function ChatWindow({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
             <p className="text-sm text-muted-foreground">开始发送消息吧</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">支持粘贴图片和发送附件</p>
           </div>
         ) : (
           messages.map((message, index) => {
@@ -158,7 +274,7 @@ export function ChatWindow({
                   {/* 头像 */}
                   {showAvatar ? (
                     <img
-                      src={isMe ? '/default-avatar.png' : (message.senderAvatarUrl || '/default-avatar.png')}
+                      src={isMe ? (message.senderAvatarUrl || '/default-avatar.png') : (message.senderAvatarUrl || '/default-avatar.png')}
                       alt={message.senderDisplayName}
                       className="w-8 h-8 rounded-full border border-border object-cover flex-shrink-0"
                     />
@@ -168,15 +284,50 @@ export function ChatWindow({
 
                   {/* 消息内容 */}
                   <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                    <div
-                      className={`px-4 py-2 rounded-2xl ${
-                        isMe
-                          ? 'bg-primary text-primary-foreground rounded-tr-sm'
-                          : 'bg-muted text-foreground rounded-tl-sm'
-                      }`}
-                    >
-                      <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
-                    </div>
+                    {/* 附件 */}
+                    {message.attachments && message.attachments.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {message.attachments.map((att, attIndex) => (
+                          <div key={attIndex} className="max-w-[200px]">
+                            {att.fileType === 'image' ? (
+                              <a href={att.fileUrl} target="_blank" rel="noopener noreferrer">
+                                <img
+                                  src={att.fileUrl}
+                                  alt={att.fileName}
+                                  className="rounded-lg max-w-[200px] max-h-[150px] object-cover hover:opacity-90 transition-opacity cursor-pointer"
+                                />
+                              </a>
+                            ) : (
+                              <a
+                                href={att.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg hover:bg-accent transition-colors"
+                              >
+                                <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                </svg>
+                                <span className="text-sm text-foreground truncate max-w-[120px]">{att.fileName}</span>
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* 文本内容 */}
+                    {message.content && (
+                      <div
+                        className={`px-4 py-2 rounded-2xl ${
+                          isMe
+                            ? 'bg-primary text-primary-foreground rounded-tr-sm'
+                            : 'bg-muted text-foreground rounded-tl-sm'
+                        }`}
+                      >
+                        <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                      </div>
+                    )}
+                    
                     <div className="flex items-center gap-1 mt-1">
                       <span className="text-xs text-muted-foreground">{message.createdAt}</span>
                       {isMe && message.status && (
@@ -209,22 +360,97 @@ export function ChatWindow({
         <div ref={messagesEndRef} />
       </div>
 
+      {/* 待发送附件预览 */}
+      {pendingAttachments.length > 0 && (
+        <div className="px-4 py-2 border-t border-border bg-muted/30">
+          <div className="flex flex-wrap gap-2">
+            {pendingAttachments.map((att, index) => (
+              <div key={index} className="relative group">
+                {att.fileType === 'image' ? (
+                  <div className="relative">
+                    <img
+                      src={att.fileUrl}
+                      alt={att.fileName}
+                      className="w-16 h-16 rounded-lg object-cover"
+                    />
+                    <button
+                      onClick={() => removeAttachment(index)}
+                      className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 px-2 py-1 bg-muted rounded text-sm">
+                    <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                    </svg>
+                    <span className="truncate max-w-[100px]">{att.fileName}</span>
+                    <button
+                      onClick={() => removeAttachment(index)}
+                      className="text-red-500 hover:text-red-600"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 输入区域 */}
       <div className="p-4 border-t border-border bg-muted/50">
+        {/* 上传中提示 */}
+        {isUploading && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+            <span>上传中...</span>
+          </div>
+        )}
+        
         <div className="flex items-end gap-2">
+          {/* 附件按钮 */}
+          <button
+            onClick={openFilePicker}
+            disabled={isUploading}
+            className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded-xl transition-colors disabled:opacity-50"
+            title="发送文件"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+            </svg>
+          </button>
+          
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,.pdf,.doc,.docx,.txt"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          
           <textarea
             ref={inputRef}
             value={messageInput}
             onChange={(e) => onMessageInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="输入消息..."
+            onPaste={handlePaste}
+            placeholder="输入消息...（支持粘贴图片）"
             rows={1}
-            className="flex-1 px-4 py-2.5 bg-background border border-border rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm max-h-[120px]"
+            disabled={isUploading}
+            className="flex-1 px-4 py-2.5 bg-background border border-border rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm max-h-[120px] disabled:opacity-50"
             style={{ minHeight: '42px' }}
           />
           <button
             onClick={handleSend}
-            disabled={!messageInput.trim()}
+            disabled={(!messageInput.trim() && pendingAttachments.length === 0) || isUploading}
             className="flex-shrink-0 p-2.5 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -233,7 +459,7 @@ export function ChatWindow({
           </button>
         </div>
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          按 Enter 发送，Shift + Enter 换行
+          按 Enter 发送，Shift + Enter 换行，支持粘贴图片
         </p>
       </div>
     </div>

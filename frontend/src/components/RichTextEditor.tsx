@@ -7,7 +7,7 @@
  * - 内容清理防止XSS
  * - 字数统计
  *
- * @version 1.0.0
+ * @version 2.0.0
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -19,7 +19,6 @@ interface RichTextEditorProps {
   placeholder?: string;
   maxLength?: number;
   mentionableUsers?: User[];
-  onMentionSearch?: (query: string) => Promise<User[]>;
 }
 
 export function RichTextEditor({
@@ -28,16 +27,15 @@ export function RichTextEditor({
   placeholder = '写下你的评论...',
   maxLength = 1000,
   mentionableUsers = [],
-  onMentionSearch,
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState(false);
-  const [mentionQuery, setMentionQuery] = useState('');
   const [showMentions, setShowMentions] = useState(false);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [textLength, setTextLength] = useState(0);
-  const mentionStartRef = useRef<number>(-1);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const isUpdatingRef = useRef(false);
 
   // 计算纯文本长度
   const calculateTextLength = useCallback((html: string): number => {
@@ -51,14 +49,23 @@ export function RichTextEditor({
     setTextLength(calculateTextLength(value));
   }, [value, calculateTextLength]);
 
+  // 同步外部value到编辑器
+  useEffect(() => {
+    if (editorRef.current && !isFocused && !isUpdatingRef.current) {
+      editorRef.current.innerHTML = value || '';
+    }
+  }, [value, isFocused]);
+
   // 处理@用户搜索
   useEffect(() => {
-    if (!showMentions || !mentionQuery) {
+    if (!showMentions) return;
+
+    const query = mentionQuery.toLowerCase();
+    if (!query) {
       setFilteredUsers(mentionableUsers.slice(0, 10));
       return;
     }
 
-    const query = mentionQuery.toLowerCase();
     const filtered = mentionableUsers.filter(
       (user) =>
         user.username?.toLowerCase().includes(query) ||
@@ -72,7 +79,11 @@ export function RichTextEditor({
   const execCommand = useCallback((command: string, value: string = '') => {
     document.execCommand(command, false, value);
     if (editorRef.current) {
+      isUpdatingRef.current = true;
       onChange(editorRef.current.innerHTML);
+      setTimeout(() => {
+        isUpdatingRef.current = false;
+      }, 0);
     }
   }, [onChange]);
 
@@ -84,79 +95,103 @@ export function RichTextEditor({
     }
   }, [execCommand]);
 
-  // 处理@用户
-  const handleMention = useCallback(() => {
+  // 检查是否需要显示@用户列表
+  const checkForMention = useCallback(() => {
     if (!editorRef.current) return;
 
     const selection = window.getSelection();
     if (!selection || !selection.rangeCount) return;
 
     const range = selection.getRangeAt(0);
-    const textContent = range.startContainer.textContent || '';
-    const cursorPosition = range.startOffset;
+    if (!range.collapsed) return;
 
-    // 检查是否在@后面
-    const beforeCursor = textContent.slice(0, cursorPosition);
-    const atIndex = beforeCursor.lastIndexOf('@');
+    // 获取光标前的文本
+    const preCaretRange = range.cloneRange();
+    preCaretRange.selectNodeContents(editorRef.current);
+    preCaretRange.setEnd(range.endContainer, range.endOffset);
+    const textBeforeCursor = preCaretRange.toString();
 
-    if (atIndex !== -1 && atIndex === cursorPosition - 1) {
-      mentionStartRef.current = atIndex;
-      setMentionQuery('');
-      setShowMentions(true);
-      setSelectedIndex(0);
-    } else if (showMentions) {
-      // 更新搜索词
-      const query = beforeCursor.slice(atIndex + 1);
-      if (query.includes(' ')) {
-        setShowMentions(false);
-      } else {
-        setMentionQuery(query);
-      }
+    // 查找最后一个@符号
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+    
+    if (lastAtIndex === -1) {
+      setShowMentions(false);
+      return;
     }
-  }, [showMentions]);
+
+    // 获取@后的文本（不包含@）
+    const afterAt = textBeforeCursor.slice(lastAtIndex + 1);
+    
+    // 检查@后是否有空格（如果有空格则关闭列表）
+    if (afterAt.includes(' ')) {
+      setShowMentions(false);
+      return;
+    }
+
+    // 检查@前是否是单词边界
+    const beforeAt = textBeforeCursor.slice(0, lastAtIndex);
+    if (beforeAt.length > 0 && !/\s$/.test(beforeAt) && !/@$/.test(beforeAt)) {
+      // @前面不是空白字符，可能是邮箱地址的一部分
+      setShowMentions(false);
+      return;
+    }
+
+    setMentionQuery(afterAt);
+    setShowMentions(true);
+  }, []);
 
   // 选择用户
   const selectUser = useCallback((user: User) => {
-    if (!editorRef.current || mentionStartRef.current === -1) return;
+    if (!editorRef.current) return;
 
     const selection = window.getSelection();
     if (!selection || !selection.rangeCount) return;
 
-    // 创建mention元素
-    const mentionSpan = document.createElement('span');
-    mentionSpan.className = 'mention';
-    mentionSpan.contentEditable = 'false';
-    mentionSpan.dataset.userId = String(user.id);
-    mentionSpan.textContent = `@${user.displayName || user.username}`;
-    mentionSpan.style.cssText = `
-      color: #3b82f6;
-      font-weight: 500;
-      background: rgba(59, 130, 246, 0.1);
-      padding: 0 4px;
-      border-radius: 4px;
-      cursor: pointer;
-    `;
-
-    // 插入空格
-    const space = document.createTextNode('\u00A0');
-
-    // 替换@和查询文本
+    // 获取当前光标位置
     const range = selection.getRangeAt(0);
-    range.setStart(range.startContainer, mentionStartRef.current);
-    range.setEnd(range.startContainer, range.startOffset);
-    range.deleteContents();
-    range.insertNode(mentionSpan);
-    range.collapse(false);
-    range.insertNode(space);
-    range.setStartAfter(space);
-    range.collapse(true);
+    
+    // 创建mention文本
+    const mentionText = `@${user.displayName || user.username} `;
+    
+    // 插入mention文本
+    document.execCommand('insertText', false, mentionText);
 
+    // 高亮mention
+    const newRange = selection.getRangeAt(0);
+    newRange.setStart(newRange.endContainer, newRange.endOffset - mentionText.length);
+    newRange.setEnd(newRange.endContainer, newRange.endOffset - 1); // 不包含最后的空格
+    
     selection.removeAllRanges();
-    selection.addRange(range);
+    selection.addRange(newRange);
+    
+    // 应用样式
+    const span = document.createElement('span');
+    span.style.color = '#3b82f6';
+    span.style.fontWeight = '500';
+    span.style.background = 'rgba(59, 130, 246, 0.1)';
+    span.style.padding = '0 4px';
+    span.style.borderRadius = '4px';
+    span.dataset.userId = String(user.id);
+    span.dataset.mention = 'true';
+    
+    try {
+      newRange.surroundContents(span);
+    } catch (e) {
+      // 如果无法包围（跨多个节点），则跳过样式
+    }
+
+    // 移动光标到末尾
+    selection.collapseToEnd();
 
     setShowMentions(false);
-    mentionStartRef.current = -1;
+    setMentionQuery('');
+    
+    // 触发onChange
+    isUpdatingRef.current = true;
     onChange(editorRef.current.innerHTML);
+    setTimeout(() => {
+      isUpdatingRef.current = false;
+    }, 0);
   }, [onChange]);
 
   // 键盘处理
@@ -175,6 +210,7 @@ export function RichTextEditor({
             setSelectedIndex((prev) => (prev > 0 ? prev - 1 : 0));
             return;
           case 'Enter':
+          case 'Tab':
             e.preventDefault();
             selectUser(filteredUsers[selectedIndex]);
             return;
@@ -198,12 +234,8 @@ export function RichTextEditor({
             return;
         }
       }
-
-      if (e.key === '@') {
-        setTimeout(handleMention, 0);
-      }
     },
-    [showMentions, filteredUsers, selectedIndex, selectUser, execCommand, handleMention]
+    [showMentions, filteredUsers, selectedIndex, selectUser, execCommand]
   );
 
   // 输入处理
@@ -214,18 +246,20 @@ export function RichTextEditor({
     const length = calculateTextLength(html);
 
     if (length > maxLength) {
-      // 截断内容
-      const text = editorRef.current.innerText;
-      editorRef.current.innerText = text.slice(0, maxLength);
-      onChange(editorRef.current.innerHTML);
-    } else {
-      onChange(html);
+      // 超出限制，恢复之前的内容
+      editorRef.current.innerHTML = value;
+      return;
     }
 
-    if (showMentions) {
-      handleMention();
-    }
-  }, [onChange, maxLength, calculateTextLength, showMentions, handleMention]);
+    isUpdatingRef.current = true;
+    onChange(html);
+    setTimeout(() => {
+      isUpdatingRef.current = false;
+    }, 0);
+
+    // 检查@用户
+    checkForMention();
+  }, [onChange, maxLength, value, calculateTextLength, checkForMention]);
 
   // 工具栏按钮
   const toolbarButtons = [
@@ -271,18 +305,18 @@ export function RichTextEditor({
   return (
     <div
       className={`border rounded-lg overflow-hidden transition-all ${
-        isFocused ? 'ring-2 ring-blue-500 border-blue-500' : 'border-gray-300'
+        isFocused ? 'ring-2 ring-blue-500 border-blue-500' : 'border-gray-300 dark:border-slate-600'
       }`}
     >
       {/* 工具栏 */}
-      <div className="flex items-center gap-1 px-3 py-2 bg-gray-50 border-b border-gray-200">
+      <div className="flex items-center gap-1 px-3 py-2 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700">
         {toolbarButtons.map((btn, index) => (
           <button
             key={index}
             type="button"
             onClick={btn.action}
             title={btn.title}
-            className="px-2 py-1 text-sm text-gray-600 hover:bg-gray-200 rounded transition-colors"
+            className="px-2 py-1 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700 rounded transition-colors"
             style={btn.style}
           >
             {btn.icon}
@@ -302,22 +336,23 @@ export function RichTextEditor({
             setIsFocused(false);
             setTimeout(() => setShowMentions(false), 200);
           }}
-          className="min-h-[120px] p-4 outline-none empty:before:content-[attr(placeholder)] empty:before:text-gray-400"
+          className="min-h-[120px] p-4 outline-none empty:before:content-[attr(placeholder)] empty:before:text-gray-400 dark:empty:before:text-gray-500 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100"
           placeholder={placeholder}
-          dangerouslySetInnerHTML={{ __html: value }}
           style={{ wordBreak: 'break-word' }}
+          suppressContentEditableWarning={true}
         />
 
         {/* @用户下拉列表 */}
         {showMentions && filteredUsers.length > 0 && (
-          <div className="absolute left-4 bottom-full mb-2 w-64 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+          <div className="absolute left-4 bottom-full mb-2 w-64 max-h-48 overflow-y-auto bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg z-50">
             {filteredUsers.map((user, index) => (
               <button
                 key={user.id}
                 type="button"
                 onClick={() => selectUser(user)}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100 transition-colors ${
-                  index === selectedIndex ? 'bg-blue-50' : ''
+                onMouseEnter={() => setSelectedIndex(index)}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors ${
+                  index === selectedIndex ? 'bg-blue-50 dark:bg-blue-900/30' : ''
                 }`}
               >
                 {user.avatarUrl ? (
@@ -327,11 +362,11 @@ export function RichTextEditor({
                     className="w-6 h-6 rounded-full"
                   />
                 ) : (
-                  <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-xs text-gray-600">
+                  <div className="w-6 h-6 rounded-full bg-gray-300 dark:bg-slate-600 flex items-center justify-center text-xs text-gray-600 dark:text-gray-300">
                     {(user.displayName || user.username)?.[0]?.toUpperCase()}
                   </div>
                 )}
-                <span className="text-sm text-gray-700">
+                <span className="text-sm text-gray-700 dark:text-gray-200">
                   {user.displayName || user.username}
                 </span>
               </button>
@@ -341,10 +376,10 @@ export function RichTextEditor({
       </div>
 
       {/* 字数统计 */}
-      <div className="flex justify-end px-3 py-1 bg-gray-50 border-t border-gray-200">
+      <div className="flex justify-end px-3 py-1 bg-gray-50 dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700">
         <span
           className={`text-xs ${
-            textLength > maxLength * 0.9 ? 'text-red-500' : 'text-gray-500'
+            textLength > maxLength * 0.9 ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'
           }`}
         >
           {textLength}/{maxLength}

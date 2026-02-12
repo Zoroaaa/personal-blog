@@ -137,8 +137,8 @@ export function MessageChatModal({ isOpen, onClose }: MessageChatModalProps) {
   }, []);
 
   // 发送消息
-  const handleSendMessage = useCallback(async () => {
-    if (!messageInput.trim() || !currentPartnerId || !user) return;
+  const handleSendMessage = useCallback(async (attachments?: any[]) => {
+    if ((!messageInput.trim() && (!attachments || attachments.length === 0)) || !currentPartnerId || !user) return;
 
     const content = messageInput.trim();
     const tempId = `temp-${Date.now()}`;
@@ -155,6 +155,8 @@ export function MessageChatModal({ isOpen, onClose }: MessageChatModalProps) {
       receiverDisplayName: '',
       content,
       isRead: false,
+      hasAttachments: attachments && attachments.length > 0,
+      attachments: attachments,
       createdAt: new Date().toLocaleString(),
       status: 'sending',
       tempId,
@@ -167,6 +169,7 @@ export function MessageChatModal({ isOpen, onClose }: MessageChatModalProps) {
       const sentMessage = await sendMessage({
         receiverId: currentPartnerId,
         content,
+        attachments,
       });
 
       updateMessageStatus(tempId, 'sent', sentMessage);
