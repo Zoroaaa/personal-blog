@@ -303,7 +303,7 @@ adminNotificationRoutes.get('/system-notifications', requireAuth, requireAdmin, 
     const isActive = c.req.query('isActive');
     const offset = (page - 1) * limit;
 
-    let whereClause = 'WHERE n.type = ? AND n.subtype = ?';
+    let whereClause = 'WHERE n.type = ? AND n.subtype = ? AND n.is_deleted = 0';
     const params: any[] = ['system', 'announcement'];
 
     if (isActive !== undefined) {
