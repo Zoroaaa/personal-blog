@@ -25,6 +25,7 @@ import type {
 import type { Env } from '../types';
 import { getNotificationSettings } from './notificationSettingsService';
 import { shouldSendNow } from './doNotDisturb';
+import { sendNotificationEmail } from '../utils/resend';
 
 // 默认分页配置
 const DEFAULT_PAGE = 1;
@@ -38,7 +39,8 @@ const MAX_LIMIT = 50;
 export async function createNotification(
   db: D1Database,
   data: CreateNotificationRequest,
-  options: SendNotificationOptions = {}
+  options: SendNotificationOptions = {},
+  env?: Env
 ): Promise<Notification | null> {
   try {
     const {
@@ -104,7 +106,30 @@ export async function createNotification(
     const notificationId = result.meta.last_row_id;
     const notification = await getNotificationById(db, notificationId);
 
-    // TODO: 如果shouldSendEmail或shouldSendPush为true，将通知加入发送队列
+    // 发送邮件通知
+    if (shouldSendEmail && env && notification) {
+      try {
+        // 获取用户信息
+        const user = await db.prepare(
+          'SELECT display_name, email FROM users WHERE id = ?'
+        ).bind(userId).first() as { display_name: string, email: string };
+        
+        if (user && user.email) {
+          const sent = await sendNotificationEmail(env, notification, {
+            name: user.display_name || '用户',
+            email: user.email
+          });
+          
+          if (sent) {
+            await updateChannelStatus(db, notificationId, 'email', true);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to send notification email:', error);
+      }
+    }
+
+    // TODO: 实现推送通知功能
 
     return notification;
   } catch (error) {
@@ -415,7 +440,8 @@ export async function createInteractionNotification(
     title: string;
     content?: string;
     relatedData: NotificationRelatedData;
-  }
+  },
+  env?: Env
 ): Promise<Notification | null> {
   return createNotification(db, {
     userId: params.userId,
@@ -424,7 +450,7 @@ export async function createInteractionNotification(
     title: params.title,
     content: params.content,
     relatedData: params.relatedData,
-  });
+  }, {}, env);
 }
 
 /**
@@ -438,7 +464,8 @@ export async function createSystemNotification(
     title: string;
     content?: string;
     relatedData?: NotificationRelatedData;
-  }
+  },
+  env?: Env
 ): Promise<Notification | null> {
   return createNotification(db, {
     userId: params.userId,
@@ -447,7 +474,7 @@ export async function createSystemNotification(
     title: params.title,
     content: params.content,
     relatedData: params.relatedData,
-  });
+  }, {}, env);
 }
 
 /**
@@ -461,7 +488,8 @@ export async function createPrivateMessageNotification(
     content?: string;
     messageId: number;
     relatedData: NotificationRelatedData;
-  }
+  },
+  env?: Env
 ): Promise<Notification | null> {
   return createNotification(db, {
     userId: params.userId,
@@ -471,5 +499,5 @@ export async function createPrivateMessageNotification(
     content: params.content,
     messageId: params.messageId,
     relatedData: params.relatedData,
-  });
+  }, {}, env);
 }

@@ -93,8 +93,9 @@ messageRoutes.post('/', requireAuth, async (c) => {
       return c.json(errorResponse('Receiver not found', '接收者不存在或账号已被禁用'), 404);
     }
     
-    if (currentUser.role !== 'admin' && receiver.role !== 'admin') {
-      return c.json(errorResponse('Permission denied', '只能向管理员发送私信'), 403);
+    // 允许所有活跃用户之间发送私信
+    if (currentUser.role === 'suspended' || receiver.status !== 'active') {
+      return c.json(errorResponse('Permission denied', '无法向非活跃用户发送私信'), 403);
     }
     
     const sanitizedContent = content ? sanitizeMessageContent(content) : '';
@@ -137,18 +138,18 @@ messageRoutes.post('/', requireAuth, async (c) => {
         : (sanitizedContent.length > 100 ? sanitizedContent.substring(0, 100) + '...' : sanitizedContent);
             
       await createPrivateMessageNotification(c.env.DB, {
-        userId: receiverId,
-        title: `${sender.display_name || sender.username} 发来一条私信`,
-        content: notifyContent,
-        messageId: messageId,
-        relatedData: {
-          senderId: currentUser.userId,
-          senderName: sender.display_name || sender.username,
-          senderAvatar: sender.avatar_url,
-          messageId: messageId,
-          hasAttachments: savedAttachments.length > 0
-        },
-      });
+            userId: receiverId,
+            title: `${sender.display_name || sender.username} 发来一条私信`,
+            content: notifyContent,
+            messageId: messageId,
+            relatedData: {
+              senderId: currentUser.userId,
+              senderName: sender.display_name || sender.username,
+              senderAvatar: sender.avatar_url,
+              messageId: messageId,
+              hasAttachments: savedAttachments.length > 0
+            },
+          }, c.env);
     } catch (notifyError) {
       logger.error('Send message notification error', notifyError);
     }

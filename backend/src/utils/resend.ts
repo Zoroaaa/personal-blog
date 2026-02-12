@@ -1,9 +1,10 @@
 /**
  * Resend 邮件发送工具
- * 用于发送邮箱验证码（注册、改密、删号）
+ * 用于发送邮箱验证码和通知邮件
  */
 
 import type { Env } from '../types';
+import type { Notification } from '../types/notifications';
 
 const RESEND_API = 'https://api.resend.com/emails';
 
@@ -66,6 +67,74 @@ function getVerificationEmailHtml(code: string, type: string): string {
 }
 
 /**
+ * 生成通知邮件 HTML 模板
+ */
+function getNotificationEmailHtml(notification: Notification, user: { name: string, email: string }): string {
+  const typeColors: Record<string, string> = {
+    system: '#ef4444',
+    interaction: '#3b82f6',
+    private_message: '#8b5cf6'
+  };
+  
+  const typeLabels: Record<string, string> = {
+    system: '系统通知',
+    interaction: '互动通知',
+    private_message: '私信通知'
+  };
+  
+  const typeColor = typeColors[notification.type] || '#64748b';
+  const typeLabel = typeLabels[notification.type] || '通知';
+  
+  return `
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${notification.title}</title>
+</head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#f1f5f9;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f1f5f9;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:16px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1),0 2px 4px -2px rgba(0,0,0,0.1);overflow:hidden;">
+          <tr>
+            <td style="background:${typeColor};padding:32px 24px;text-align:center;">
+              <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:600;">${notification.title}</h1>
+              <p style="margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:14px;">${typeLabel}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 24px;">
+              <p style="margin:0 0 16px;color:#475569;font-size:15px;line-height:1.6;">您好 ${user.name}，</p>
+              ${notification.content ? `<p style="margin:0 0 24px;color:#475569;font-size:15px;line-height:1.6;">${notification.content}</p>` : ''}
+              ${notification.relatedData ? `
+              <div style="background:#f1f5f9;border-radius:12px;padding:20px;margin-bottom:24px;">
+                ${Object.entries(notification.relatedData).map(([key, value]) => 
+                  `<p style="margin:0 0 8px;color:#64748b;font-size:14px;"><strong>${key}:</strong> ${String(value)}</p>`
+                ).join('')}
+              </div>
+              ` : ''}
+              <p style="margin:0 0 24px;color:#64748b;font-size:14px;">此通知发送时间：${notification.createdAt}</p>
+              <a href="${(notification.relatedData as any)?.link || 'https://blog.neutronx.uk'}" style="display:inline-block;background:${typeColor};color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:500;">查看详情</a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;">
+              <p style="margin:0 0 8px;color:#94a3b8;font-size:12px;">此邮件由系统自动发送，请勿直接回复</p>
+              <p style="margin:0;color:#94a3b8;font-size:12px;">您可以在个人中心的通知设置中调整通知偏好</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+
+/**
  * 通过 Resend 发送验证码邮件
  * @returns 成功返回 true，失败抛出或返回 false
  */
@@ -111,4 +180,50 @@ export async function sendVerificationEmail(
     throw new Error('发送验证码邮件失败，请稍后重试');
   }
   return true;
+}
+
+/**
+ * 通过 Resend 发送通知邮件
+ * @returns 成功返回 true，失败返回 false
+ */
+export async function sendNotificationEmail(
+  env: Env,
+  notification: Notification,
+  user: { name: string, email: string }
+): Promise<boolean> {
+  const apiKey = env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error('RESEND_API_KEY is not configured');
+    return false;
+  }
+
+  const from = (env as any).RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+  const subject = `【${notification.type === 'system' ? '系统' : notification.type === 'interaction' ? '互动' : '私信'}通知】${notification.title}`;
+  const html = getNotificationEmailHtml(notification, user);
+
+  try {
+    const res = await fetch(RESEND_API, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to: [user.email],
+        subject,
+        html,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error('Resend API error for notification:', res.status, err);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('Failed to send notification email:', error);
+    return false;
+  }
 }
