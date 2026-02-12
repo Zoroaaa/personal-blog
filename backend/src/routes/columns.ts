@@ -7,8 +7,9 @@
  * - 获取专栏下的文章列表（公开）
  * - 专栏的CRUD操作（管理员）
  * 
- * @author 优化版本
  * @version 1.0.0
+ * @author 博客系统
+ * @created 2024-01-01
  */
 
 import { Hono } from 'hono';

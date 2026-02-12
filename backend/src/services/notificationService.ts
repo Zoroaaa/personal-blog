@@ -7,7 +7,9 @@
  * - 与数据库交互
  * - 免打扰检查
  *
+ * @author 博客系统
  * @version 1.1.0
+ * @created 2024-01-01
  */
 
 import type { D1Database } from '@cloudflare/workers-types';

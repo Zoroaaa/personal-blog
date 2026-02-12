@@ -11,8 +11,9 @@
  * 2. 改进日志记录
  * 3. 添加角色检查辅助函数
  *
- * @author 优化版本
+ * @author 博客系统
  * @version 2.0.0
+ * @created 2024-01-01
  */
 
 import { Context, Next } from 'hono';

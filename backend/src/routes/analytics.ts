@@ -7,8 +7,9 @@
  * - 基础来源分析
  * - 简单的热门排行
  * 
- * @author 优化版本
  * @version 2.0.0
+ * @author 博客系统
+ * @created 2024-01-01
  */
 
 import { Hono } from 'hono';

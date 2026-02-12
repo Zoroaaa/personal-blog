@@ -1,6 +1,10 @@
 /**
  * Resend 邮件发送工具
  * 用于发送邮箱验证码和通知邮件
+ * 
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import type { Env } from '../types';

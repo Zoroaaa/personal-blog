@@ -15,8 +15,9 @@
  * 5. 添加搜索和排序功能
  * 6. 详细的错误处理和日志
  * 
- * @author 优化版本
+ * @author 博客系统
  * @version 2.0.0
+ * @created 2024-01-01
  */
 
 import { Hono } from 'hono';

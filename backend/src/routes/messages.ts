@@ -12,6 +12,8 @@
  * - 管理员：获取全站所有私信
  * 
  * @version 2.0.0
+ * @author 博客系统
+ * @created 2024-01-01
  */
 
 import { Hono } from 'hono';

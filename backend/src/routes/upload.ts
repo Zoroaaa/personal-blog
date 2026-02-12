@@ -12,8 +12,9 @@
  * 3. 统一API响应格式
  * 4. 详细的错误处理和日志
  *
- * @author 简化版本
+ * @author 博客系统
  * @version 2.1.0
+ * @created 2024-01-01
  */
 
 import { Hono } from 'hono';

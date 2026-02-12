@@ -5,7 +5,9 @@
  * - 订阅浏览器推送
  * - 取消订阅浏览器推送
  *
+ * @author 博客系统
  * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import { Hono } from 'hono';

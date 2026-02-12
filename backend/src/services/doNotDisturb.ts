@@ -5,7 +5,9 @@
  * - 检查当前是否在免打扰时段
  * - 计算下一个非免打扰时间
  * 
+ * @author 博客系统
  * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import type { NotificationSettings } from '../types/notifications';

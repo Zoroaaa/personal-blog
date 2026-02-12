@@ -8,8 +8,9 @@
  * - 记录用户信息（如果已认证）
  * - 支持结构化日志
  * 
- * @author 优化版本
  * @version 2.0.0
+ * @author 博客系统
+ * @created 2024-01-01
  */
 
 import { Context, Next } from 'hono';
