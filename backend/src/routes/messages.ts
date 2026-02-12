@@ -88,7 +88,11 @@ messageRoutes.post('/', requireAuth, async (c) => {
     }
     
     // 检查发送者状态
-    if (currentUser.status !== 'active') {
+    const senderStatus = await c.env.DB.prepare(
+      'SELECT status FROM users WHERE id = ?'
+    ).bind(currentUser.userId).first() as any;
+    
+    if (!senderStatus || senderStatus.status !== 'active') {
       return c.json(errorResponse('Sender not active', '您的账号状态异常，无法发送私信'), 403);
     }
     
