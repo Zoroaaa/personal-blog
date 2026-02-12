@@ -1,5 +1,9 @@
 /**
  * 私信状态管理 Store
+ * 
+ * @version 1.0.0
+ * @author 博客系统
+ * @created 2024-01-01
  */
 
 import { create } from 'zustand';

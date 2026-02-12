@@ -16,7 +16,9 @@
  * 4. UI美观度优化
  * 5. 添加实时预览功能
  * 
+ * @author 博客系统
  * @version 4.0.0
+ * @created 2024-01-01
  */
 
 import { useState, useEffect, useRef } from 'react';

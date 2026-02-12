@@ -4,6 +4,8 @@
  * 使用 Zustand 管理通知状态
  *
  * @version 1.0.0
+ * @author 博客系统
+ * @created 2024-01-01
  */
 
 import { create } from 'zustand';

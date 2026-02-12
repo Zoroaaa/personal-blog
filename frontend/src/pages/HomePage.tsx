@@ -9,7 +9,9 @@
  * - 平滑的动画效果
  * - 优化的布局结构 - 桌面端3列，平板2列，移动端1列
  *
+ * @author 博客系统
  * @version 4.0.0
+ * @created 2024-01-01
  */
 
 import { useEffect, useState } from 'react';

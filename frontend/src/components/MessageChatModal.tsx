@@ -8,6 +8,10 @@
  * - 支持编辑撤回的消息
  * - 消息分页加载
  * - 自动滚动到底部
+ * 
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -161,6 +165,7 @@ export function MessageChatModal({ isOpen, onClose }: MessageChatModalProps) {
       receiverDisplayName: '',
       content,
       isRead: false,
+      canRecall: true,
       hasAttachments: attachments && attachments.length > 0,
       attachments: attachments,
       createdAt: new Date().toLocaleString(),

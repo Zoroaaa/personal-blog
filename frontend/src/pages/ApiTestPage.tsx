@@ -1,10 +1,20 @@
-import { useState, useEffect } from 'react';
-import { testApiConnection, api } from '../utils/api';
-
 /**
  * API连接测试页面
- * 用于调试和验证前后端连接
+ * 
+ * 功能：
+ * - 测试前后端API连接
+ * - 验证API功能是否正常
+ * - 调试和排查连接问题
+ * - 显示当前配置信息
+ * - 提供故障排查指南
+ *
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
  */
+
+import { useState, useEffect } from 'react';
+import { testApiConnection, api } from '../utils/api';
 export default function ApiTestPage() {
   const [testResult, setTestResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);

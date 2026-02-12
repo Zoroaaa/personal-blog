@@ -1,5 +1,9 @@
 /**
  * 私信功能类型定义
+ * 
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
  */
 
 export interface MessageAttachment {

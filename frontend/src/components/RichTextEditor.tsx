@@ -7,7 +7,9 @@
  * - 内容清理防止XSS
  * - 字数统计
  *
+ * @author 博客系统
  * @version 2.0.0
+ * @created 2024-01-01
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';

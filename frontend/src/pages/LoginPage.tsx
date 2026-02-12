@@ -15,8 +15,9 @@
  * 5. 优化UI/UX
  * 6. 移除硬编码的GITHUB_CLIENT_ID,通过API获取
  * 
- * @author 优化版本
+ * @author 博客系统
  * @version 2.1.0
+ * @created 2024-01-01
  */
 
 import { useState, useEffect } from 'react';

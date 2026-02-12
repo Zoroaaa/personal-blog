@@ -9,7 +9,9 @@
  * - 完美暗色模式支持
  * - 动态主色调支持
  * 
+ * @author 博客系统
  * @version 3.0.0
+ * @created 2024-01-01
  */
 
 import { useState, useEffect } from 'react';

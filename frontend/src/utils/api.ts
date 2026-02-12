@@ -15,8 +15,9 @@
  * 5. 统一API响应格式处理
  * 6. 添加githubLogin方法和getConfig方法
  * 
- * @author 优化版本
+ * @author 博客系统
  * @version 2.1.0
+ * @created 2024-01-01
  */
 
 import type {

@@ -10,6 +10,10 @@
  * - 标记已读
  * - 粘贴图片发送
  * - 加载更多历史消息
+ *
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';

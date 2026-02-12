@@ -7,7 +7,9 @@
  * - 平滑的过渡动画效果
  * - 响应式设计适配多端
  *
+ * @author 博客系统
  * @version 2.0.0
+ * @created 2024-01-01
  */
 
 import { useState, useEffect, useCallback } from 'react';

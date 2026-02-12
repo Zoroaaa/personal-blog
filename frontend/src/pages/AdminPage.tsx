@@ -1,3 +1,20 @@
+/**
+ * 管理后台页面
+ * 
+ * 功能：
+ * - 文章管理（创建、编辑、删除文章）
+ * - 分类管理（添加、编辑、删除分类）
+ * - 标签管理（添加、编辑、删除标签）
+ * - 专栏管理（添加、编辑、删除专栏）
+ * - 评论管理（审核、删除评论）
+ * - 用户管理（修改用户角色、删除用户）
+ * - 数据分析（查看网站统计数据）
+ *
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
+ */
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';

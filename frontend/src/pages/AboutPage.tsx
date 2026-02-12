@@ -6,7 +6,9 @@
  * - 展示社交媒体链接
  * - 响应式设计
  *
+ * @author 博客系统
  * @version 4.0.0
+ * @created 2024-01-01
  */
 
 import { useSiteConfig } from '../hooks/useSiteConfig';

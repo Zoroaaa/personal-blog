@@ -1,6 +1,10 @@
 /**
  * API工具单元测试
  * 使用简化的测试方法，避免import.meta问题
+ * 
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
  */
 
 // 模拟fetch

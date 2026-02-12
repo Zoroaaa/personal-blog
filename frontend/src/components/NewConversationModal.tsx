@@ -5,8 +5,12 @@
  * - 显示可发送私信的用户列表
  * - 支持搜索过滤
  * - 根据用户角色显示不同列表
+ * - 管理员可查看所有用户
+ * - 普通用户仅可联系管理员
  *
+ * @author 博客系统
  * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import { useState, useEffect, useCallback } from 'react';

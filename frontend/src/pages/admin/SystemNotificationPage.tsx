@@ -6,7 +6,9 @@
  * - 管理通知状态（启用/禁用）
  * - 通知列表展示
  *
+ * @author 博客系统
  * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import { useState, useEffect, useCallback } from 'react';

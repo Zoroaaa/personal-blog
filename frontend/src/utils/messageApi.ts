@@ -1,6 +1,10 @@
 /**
  * 私信功能API工具
  * 重构：使用api.ts中的通用API调用方法，统一错误处理
+ * 
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import { api } from './api';

@@ -1,3 +1,16 @@
+/**
+ * 文档解析工具
+ * 功能：
+ * - 解析文本文件
+ * - 解析Markdown文件
+ * - 解析Word文档（.docx）
+ * - 支持提取文档中的图片
+ * 
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
+ */
+
 // @ts-ignore - mammoth 和 jszip 是可选依赖
 import mammoth from 'mammoth';
 // @ts-ignore

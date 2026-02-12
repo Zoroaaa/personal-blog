@@ -10,6 +10,10 @@
  * - 显示消息状态
  * - 支持粘贴图片
  * - 支持附件上传
+ * 
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
@@ -376,7 +380,7 @@ export function ChatWindow({
                       {isMe && !isRecalled && (
                         <div className="relative">
                           <button
-                            onClick={() => setShowActions(showActions === message.id ? null : message.id)}
+                            onClick={() => setShowActions(showActions === (message.id || message.tempId) ? null : (message.id || message.tempId))}
                             className="p-1 text-muted-foreground hover:text-foreground rounded"
                           >
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -384,7 +388,7 @@ export function ChatWindow({
                             </svg>
                           </button>
                           
-                          {showActions === message.id && (
+                          {showActions === (message.id || message.tempId) && (
                             <div className="absolute bottom-full right-0 mb-1 bg-popover border border-border rounded-lg shadow-lg py-1 z-10 min-w-[80px]">
                               {canRecall && (
                                 <button

@@ -4,6 +4,12 @@
  * 功能：
  * - 未登录用户点击私信按钮时显示
  * - 提供前往登录和取消选项
+ * - 优雅的动画效果
+ * - 响应式设计
+ * 
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import { useNavigate } from 'react-router-dom';

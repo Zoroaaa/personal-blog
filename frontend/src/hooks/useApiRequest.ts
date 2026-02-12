@@ -7,8 +7,9 @@
  * - 支持依赖项变化时重新请求
  * - 提供refetch功能
  * 
- * @author 优化版本
+ * @author 博客系统
  * @version 2.1.0
+ * @created 2024-01-01
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';

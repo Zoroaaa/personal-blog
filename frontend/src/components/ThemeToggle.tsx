@@ -7,8 +7,9 @@
  * - 字体大小调整
  * - 响应式设计
  * 
- * @author 优化版本
+ * @author 博客系统
  * @version 2.0.0
+ * @created 2024-01-01
  */
 
 import { useState } from 'react';

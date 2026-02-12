@@ -1,3 +1,16 @@
+/**
+ * 验证码倒计时 Hook
+ * 功能：
+ * - 管理验证码发送后的60秒倒计时
+ * - 使用 localStorage 持久化，页面刷新或关闭后再打开仍能继续倒计时
+ * - 发送成功后开始倒计时，1分钟内不允许重复发送
+ * - 发送失败不开始倒计时，允许立即重试
+ * 
+ * @version 1.0.0
+ * @author 博客系统
+ * @created 2024-01-01
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 
 interface CountdownState {

@@ -1,10 +1,16 @@
 /**
  * Markdown 实时预览组件
+ * 
  * 功能：
  * - 实时渲染 Markdown
  * - GitHub 风格样式
  * - 代码高亮
  * - 目录生成
+ * - 支持 GFM 语法
+ * 
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import { useMemo } from 'react';

@@ -4,6 +4,10 @@
  * - 链接在新标签页打开
  * - 增强的代码高亮
  * - 表格、任务列表等 GitHub 风格渲染
+ * 
+ * @author 博客系统
+ * @version 1.0.0
+ * @created 2024-01-01
  */
 
 import type { Components } from 'react-markdown';
