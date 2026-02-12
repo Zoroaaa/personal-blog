@@ -210,5 +210,5 @@ export async function adminDeleteMessage(messageId: number): Promise<void> {
  */
 export async function deleteMessage(messageId: number): Promise<void> {
   // 普通用户现在使用撤回功能
-  return recallMessage(messageId);
+  await recallMessage(messageId);
 }

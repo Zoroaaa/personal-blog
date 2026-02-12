@@ -13,7 +13,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import { useMessageStore } from '../stores/messageStore';
-import { getConversations, getConversation, sendMessage, recallMessage, editMessage } from '../utils/messageApi';
+import { getConversations, getConversation, sendMessage, recallMessage } from '../utils/messageApi';
 import { ConversationList } from './ConversationList';
 import { ChatWindow } from './ChatWindow';
 import { NewConversationModal } from './NewConversationModal';
@@ -37,7 +37,6 @@ export function MessageChatModal({ isOpen, onClose }: MessageChatModalProps) {
     addMessage,
     updateMessageStatus,
     updateMessageRecalled,
-    updateMessageEdited,
     prependMessages,
     setLoading,
     setLoadingMore,
@@ -209,25 +208,6 @@ export function MessageChatModal({ isOpen, onClose }: MessageChatModalProps) {
     setEditingMessage(null);
     setMessageInput('');
   }, []);
-
-  // 保存编辑
-  const handleSaveEdit = useCallback(async (messageId: number, content: string, attachments: MessageAttachment[]) => {
-    if ((!content.trim() && (!attachments || attachments.length === 0)) || !user) return;
-
-    try {
-      const updatedMessage = await editMessage(messageId, {
-        content,
-        attachments,
-      });
-
-      updateMessageEdited(messageId, updatedMessage);
-      setEditingMessage(null);
-      setMessageInput('');
-    } catch (error) {
-      console.error('编辑消息失败:', error);
-      setError('编辑消息失败');
-    }
-  }, [user, updateMessageEdited, setError]);
 
   // 滚动到底部
   const scrollToBottom = useCallback(() => {

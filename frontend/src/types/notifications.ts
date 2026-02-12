@@ -64,6 +64,21 @@ export interface InteractionSubtypes {
   reply: boolean;
 }
 
+// 免打扰设置
+export interface DoNotDisturbSettings {
+  enabled: boolean;
+  start?: string;
+  end?: string;
+  timezone?: string;
+}
+
+// 汇总时间设置
+export interface DigestTimeSettings {
+  daily: string;
+  weeklyDay: number;
+  weeklyTime: string;
+}
+
 // 通知类型设置
 export interface NotificationTypeSettings {
   inApp: boolean;
@@ -74,19 +89,15 @@ export interface NotificationTypeSettings {
 
 // 用户通知设置
 export interface NotificationSettings {
+  id?: number;
+  userId?: number;
   system: NotificationTypeSettings;
-  interaction: NotificationTypeSettings & { subtypes: Partial<InteractionSubtypes> };
+  interaction: NotificationTypeSettings & { subtypes: InteractionSubtypes };
   privateMessage: NotificationTypeSettings;
-  doNotDisturb: {
-    enabled: boolean;
-    start?: string;
-    end?: string;
-  };
-  digestTime: {
-    daily: string;
-    weeklyDay: number;
-    weeklyTime: string;
-  };
+  doNotDisturb: DoNotDisturbSettings;
+  digestTime: DigestTimeSettings;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // 部分通知设置（用于更新）
@@ -94,8 +105,8 @@ export type PartialNotificationSettings = {
   system?: Partial<NotificationTypeSettings>;
   interaction?: Partial<NotificationTypeSettings> & { subtypes?: Partial<InteractionSubtypes> };
   privateMessage?: Partial<NotificationTypeSettings>;
-  doNotDisturb?: Partial<NotificationSettings['doNotDisturb']>;
-  digestTime?: Partial<NotificationSettings['digestTime']>;
+  doNotDisturb?: Partial<DoNotDisturbSettings>;
+  digestTime?: Partial<DigestTimeSettings>;
 };
 
 // 通知筛选器
@@ -133,6 +144,7 @@ export interface PushSubscription {
     p256dh: string;
     auth: string;
   };
+  toJSON?: () => { keys: { p256dh: string; auth: string } };
 }
 
 // 通知状态

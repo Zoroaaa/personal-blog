@@ -174,7 +174,8 @@ export async function subscribePush(subscription: PushSubscription): Promise<voi
       body: JSON.stringify({
         subscription: {
           endpoint: subscription.endpoint,
-          keys: subscription.toJSON().keys,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          keys: (subscription as any).keys,
         },
         userAgent: navigator.userAgent,
       }),

@@ -176,8 +176,9 @@ export async function parseWordDocument(file: File): Promise<ParsedDocument> {
   }
 
   // 5. 使用 mammoth 提取文本内容，同时转换图片为占位符
-  const result = await mammoth.convertToMarkdown({ arrayBuffer });
-  let content = result.value;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = await (mammoth as any).convertToMarkdown({ arrayBuffer });
+  let content = result.value as string;
 
   // 6. 处理 mammoth 生成的图片标记
   // mammoth 会将图片转换为 ![...](...) 格式，我们需要将其替换为占位符

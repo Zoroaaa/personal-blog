@@ -329,8 +329,8 @@ export function RichTextEditor({
             setIsFocused(false);
             setTimeout(() => setShowMentions(false), 200);
           }}
-          className="min-h-[120px] p-4 outline-none empty:before:content-[attr(placeholder)] empty:before:text-gray-400 dark:empty:before:text-gray-500 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100"
-          placeholder={placeholder}
+          className="min-h-[120px] p-4 outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 dark:empty:before:text-gray-500 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100"
+          data-placeholder={placeholder}
           style={{ wordBreak: 'break-word' }}
           suppressContentEditableWarning={true}
         />
