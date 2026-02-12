@@ -36,7 +36,7 @@ function ToggleSwitch({
       disabled={disabled}
       className={`
         relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-        ${checked ? 'bg-blue-500' : 'bg-gray-200'}
+        ${checked ? 'bg-primary' : 'bg-accent'}
         ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
       `}
     >
@@ -61,11 +61,11 @@ function SettingItem({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between py-4 border-b border-gray-100 last:border-0">
+    <div className="flex items-center justify-between py-4 border-b border-border last:border-0">
       <div>
-        <h3 className="font-medium text-gray-900">{title}</h3>
+        <h3 className="font-medium text-foreground">{title}</h3>
         {description && (
-          <p className="text-sm text-gray-500 mt-1">{description}</p>
+          <p className="text-sm text-muted-foreground mt-1">{description}</p>
         )}
       </div>
       <div>{children}</div>
@@ -96,9 +96,9 @@ function FrequencySelect({
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
       className={`
-        px-3 py-2 border border-gray-300 rounded-lg text-sm
-        focus:outline-none focus:ring-2 focus:ring-blue-500
-        ${disabled ? 'bg-gray-100 opacity-50' : 'bg-white'}
+        px-3 py-2 border border-border rounded-lg text-sm text-foreground
+        focus:outline-none focus:ring-2 focus:ring-primary
+        ${disabled ? 'bg-accent opacity-50' : 'bg-background'}
       `}
     >
       {options.map((opt) => (
@@ -155,29 +155,29 @@ export default function NotificationSettings() {
 
   if (isSettingsLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-gray-500 text-sm mt-3">加载中...</p>
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-muted-foreground text-sm mt-3">加载中...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-4 py-8">
         {/* 页面标题 */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">通知设置</h1>
-            <p className="text-gray-500 text-sm mt-1">
+            <h1 className="text-2xl font-bold text-foreground">通知设置</h1>
+            <p className="text-muted-foreground text-sm mt-1">
               自定义你的通知偏好
             </p>
           </div>
           <button
             onClick={() => navigate('/notifications')}
-            className="text-sm text-gray-500 hover:text-gray-700"
+            className="text-sm text-muted-foreground hover:text-foreground"
           >
             返回通知中心
           </button>
@@ -188,7 +188,7 @@ export default function NotificationSettings() {
           <div
             className={`
               mb-4 p-3 rounded-lg text-sm
-              ${saveMessage.includes('失败') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}
+              ${saveMessage.includes('失败') ? 'bg-destructive/10 text-destructive' : 'bg-success/10 text-success'}
             `}
           >
             {saveMessage}
@@ -196,11 +196,11 @@ export default function NotificationSettings() {
         )}
 
         {/* 系统通知设置 */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="bg-card rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4">
             🔔 系统通知
           </h2>
-          <p className="text-sm text-gray-500 mb-4">
+          <p className="text-sm text-muted-foreground mb-4">
             接收系统维护、功能更新等重要公告
           </p>
 
@@ -245,11 +245,11 @@ export default function NotificationSettings() {
         </div>
 
         {/* 互动通知设置 */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="bg-card rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4">
             👋 互动通知
           </h2>
-          <p className="text-sm text-gray-500 mb-4">
+          <p className="text-sm text-muted-foreground mb-4">
             接收评论、点赞、收藏等互动消息
           </p>
 
@@ -330,9 +330,9 @@ export default function NotificationSettings() {
                         },
                       })
                     }
-                    className="w-4 h-4 text-blue-500 rounded border-gray-300 focus:ring-blue-500"
+                    className="w-4 h-4 text-primary rounded border-border focus:ring-primary"
                   />
-                  <span className="text-sm text-gray-700">{label}</span>
+                  <span className="text-sm text-foreground">{label}</span>
                 </label>
               ))}
             </div>
@@ -340,11 +340,11 @@ export default function NotificationSettings() {
         </div>
 
         {/* 私信通知设置 */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="bg-card rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4">
             ✉️ 私信通知
           </h2>
-          <p className="text-sm text-gray-500 mb-4">
+          <p className="text-sm text-muted-foreground mb-4">
             接收私信消息通知
           </p>
 
@@ -392,11 +392,11 @@ export default function NotificationSettings() {
         </div>
 
         {/* 免打扰设置 */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="bg-card rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4">
             🌙 免打扰
           </h2>
-          <p className="text-sm text-gray-500 mb-4">
+          <p className="text-sm text-muted-foreground mb-4">
             设置免打扰时段，在此期间不会收到邮件和推送通知
           </p>
 
@@ -415,10 +415,10 @@ export default function NotificationSettings() {
           </SettingItem>
 
           {settings?.doNotDisturb.enabled && (
-            <div className="mt-4 pt-4 border-t border-gray-100">
+            <div className="mt-4 pt-4 border-t border-border">
               <div className="flex items-center gap-4">
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">
+                  <label className="block text-sm text-muted-foreground mb-1">
                     开始时间
                   </label>
                   <input
@@ -432,11 +432,11 @@ export default function NotificationSettings() {
                         },
                       })
                     }
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-3 py-2 border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary bg-background"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">
+                  <label className="block text-sm text-muted-foreground mb-1">
                     结束时间
                   </label>
                   <input
@@ -450,7 +450,7 @@ export default function NotificationSettings() {
                         },
                       })
                     }
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-3 py-2 border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary bg-background"
                   />
                 </div>
               </div>
@@ -459,11 +459,11 @@ export default function NotificationSettings() {
         </div>
 
         {/* 汇总时间设置 */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="bg-card rounded-lg shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4">
             📅 汇总邮件时间
           </h2>
-          <p className="text-sm text-gray-500 mb-4">
+          <p className="text-sm text-muted-foreground mb-4">
             设置每日和每周汇总邮件的发送时间
           </p>
 
@@ -479,7 +479,7 @@ export default function NotificationSettings() {
                   },
                 })
               }
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary bg-background"
             />
           </SettingItem>
 
@@ -495,7 +495,7 @@ export default function NotificationSettings() {
                     },
                   })
                 }
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-2 border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary bg-background"
               >
                 <option value={1}>周一</option>
                 <option value={2}>周二</option>
@@ -516,7 +516,7 @@ export default function NotificationSettings() {
                     },
                   })
                 }
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-2 border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary bg-background"
               />
             </div>
           </SettingItem>
