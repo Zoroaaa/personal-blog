@@ -13,7 +13,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import { useMessageStore } from '../stores/messageStore';
-import { getConversations, getConversation, sendMessage, recallMessage } from '../utils/messageApi';
+import { getConversations, getConversation, sendMessage, recallMessage, editMessage } from '../utils/messageApi';
 import { ConversationList } from './ConversationList';
 import { ChatWindow } from './ChatWindow';
 import { NewConversationModal } from './NewConversationModal';
@@ -209,6 +209,29 @@ export function MessageChatModal({ isOpen, onClose }: MessageChatModalProps) {
     setMessageInput('');
   }, []);
 
+  // 编辑并重新发送消息
+  const handleEditMessage = useCallback(async (messageId: number, content: string, attachments?: MessageAttachment[]) => {
+    if (!content.trim() && (!attachments || attachments.length === 0)) return;
+
+    try {
+      const updatedMessage = await editMessage(messageId, {
+        content: content.trim(),
+        attachments,
+      });
+
+      // 更新消息状态
+      const { updateMessageEdited } = useMessageStore.getState();
+      updateMessageEdited(messageId, updatedMessage);
+
+      // 清除编辑状态
+      setEditingMessage(null);
+      setMessageInput('');
+    } catch (error) {
+      console.error('编辑消息失败:', error);
+      setError('编辑消息失败');
+    }
+  }, [setError]);
+
   // 滚动到底部
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -284,7 +307,8 @@ export function MessageChatModal({ isOpen, onClose }: MessageChatModalProps) {
               onMessageInputChange={setMessageInput}
               onSend={handleSendMessage}
               onRecall={handleRecallMessage}
-              onEdit={handleStartEdit}
+              onStartEdit={handleStartEdit}
+              onEdit={handleEditMessage}
               onCancelEdit={handleCancelEdit}
               onBack={backToList}
               onClose={onClose}

@@ -28,7 +28,8 @@ interface ChatWindowProps {
   onMessageInputChange: (value: string) => void;
   onSend: (attachments?: MessageAttachment[]) => void;
   onRecall: (messageId: number) => void;
-  onEdit: (messageId: number, content: string, attachments: MessageAttachment[]) => void;
+  onStartEdit: (messageId: number, content: string, attachments: MessageAttachment[]) => void;
+  onEdit: (messageId: number, content: string, attachments?: MessageAttachment[]) => void;
   onCancelEdit: () => void;
   onBack: () => void;
   onClose: () => void;
@@ -49,6 +50,7 @@ export function ChatWindow({
   onMessageInputChange,
   onSend,
   onRecall,
+  onStartEdit,
   onEdit,
   onCancelEdit,
   onBack,
@@ -66,10 +68,10 @@ export function ChatWindow({
   // 处理发送
   const handleSend = useCallback(() => {
     if (!messageInput.trim() && pendingAttachments.length === 0) return;
-    
+
     if (editingMessage) {
-      // 编辑模式：调用编辑接口
-      onEdit(editingMessage.messageId, messageInput, pendingAttachments);
+      // 编辑模式：调用编辑接口重新发送消息
+      onEdit(editingMessage.messageId, messageInput, pendingAttachments.length > 0 ? pendingAttachments : undefined);
     } else {
       // 正常发送
       onSend(pendingAttachments.length > 0 ? pendingAttachments : undefined);
@@ -216,16 +218,14 @@ export function ChatWindow({
 
   // 开始编辑
   const handleStartEdit = useCallback((message: MessageWithStatus) => {
-    if (message.originalContent) {
-      onMessageInputChange(message.originalContent);
-    } else {
-      onMessageInputChange(message.content);
-    }
+    // 使用撤回前的原始内容（如果存在）
+    const contentToEdit = message.originalContent || message.content;
+    onMessageInputChange(contentToEdit);
     setPendingAttachments(message.attachments || []);
-    // 编辑状态由父组件管理
-    onEdit(message.id, message.content, message.attachments || []);
+    // 通知父组件进入编辑状态
+    onStartEdit(message.id, contentToEdit, message.attachments || []);
     setShowActions(null);
-  }, [onMessageInputChange, onEdit]);
+  }, [onMessageInputChange, onStartEdit]);
 
   return (
     <div className="flex flex-col h-full">
