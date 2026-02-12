@@ -541,7 +541,7 @@ messageRoutes.get('/conversation/:userId', requireAuth, async (c) => {
         isRecalled: msg.is_recalled === 1,
         isRead: msg.is_read === 1,
         hasAttachments: msg.has_attachments === 1,
-        attachments: msg.is_recalled === 1 ? [] : messageAttachments,
+        attachments: messageAttachments,
         createdAt: formatDateTime(msg.created_at),
         readAt: msg.read_at ? formatDateTime(msg.read_at) : null,
         canRecall: msg.sender_id === currentUser.userId && 
