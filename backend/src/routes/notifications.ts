@@ -268,7 +268,7 @@ notificationRoutes.get('/carousel', async (c) => {
     ).bind('system', 'announcement').all() as any;
 
     const formattedNotifications = (notifications.results || []).map((n: any) => {
-      let relatedData = {};
+      let relatedData: { link?: string } = {};
       try {
         relatedData = JSON.parse(n.related_data || '{}');
       } catch {

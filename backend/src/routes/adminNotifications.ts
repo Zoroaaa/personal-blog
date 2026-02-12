@@ -328,13 +328,13 @@ adminNotificationRoutes.get('/system-notifications', requireAuth, requireAdmin, 
     ).bind(...params).first() as any;
 
     const formattedNotifications = (notifications.results || []).map((n: any) => {
-      let relatedData = {};
+      let relatedData: { link?: string } = {};
       try {
         relatedData = JSON.parse(n.related_data || '{}');
       } catch {
         relatedData = {};
       }
-      
+
       return {
         id: n.id,
         title: n.title,

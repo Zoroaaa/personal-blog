@@ -1,12 +1,13 @@
 /**
  * 通知服务层
- * 
+ *
  * 功能：
  * - 通知的CRUD操作
  * - 通知发送逻辑
  * - 与数据库交互
- * 
- * @version 1.0.0
+ * - 免打扰检查
+ *
+ * @version 1.1.0
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
@@ -22,6 +23,8 @@ import type {
   NotificationRelatedData,
 } from '../types/notifications';
 import type { Env } from '../types';
+import { getNotificationSettings } from './notificationSettingsService';
+import { shouldSendNow } from './doNotDisturb';
 
 // 默认分页配置
 const DEFAULT_PAGE = 1;
@@ -30,6 +33,7 @@ const MAX_LIMIT = 50;
 
 /**
  * 创建通知
+ * 会自动检查用户通知设置和免打扰状态
  */
 export async function createNotification(
   db: D1Database,
@@ -47,6 +51,31 @@ export async function createNotification(
       messageId,
     } = data;
 
+    // 获取用户通知设置
+    const settings = await getNotificationSettings(db, userId);
+
+    // 检查通知类型是否启用
+    const typeSettings = settings[type === 'private_message' ? 'privateMessage' : type];
+    if (!typeSettings || typeSettings.frequency === 'off') {
+      return null;
+    }
+
+    // 检查免打扰状态（仅对email和push渠道）
+    const shouldSendEmail = !options.skipEmail &&
+      typeSettings.email &&
+      shouldSendNow(settings.doNotDisturb, 'email');
+
+    const shouldSendPush = !options.skipPush &&
+      typeSettings.push &&
+      shouldSendNow(settings.doNotDisturb, 'push');
+
+    const shouldSendInApp = !options.skipInApp && typeSettings.inApp;
+
+    // 如果所有渠道都不发送，则不创建通知
+    if (!shouldSendInApp && !shouldSendEmail && !shouldSendPush) {
+      return null;
+    }
+
     // 插入通知记录
     const result = await db.prepare(
       `INSERT INTO notifications (
@@ -61,9 +90,9 @@ export async function createNotification(
       content || null,
       relatedData ? JSON.stringify(relatedData) : null,
       messageId || null,
-      options.skipInApp ? 0 : 1,
-      options.skipEmail ? 0 : 0,
-      options.skipPush ? 0 : 0
+      shouldSendInApp ? 1 : 0,
+      shouldSendEmail ? 0 : 0, // 标记为待发送
+      shouldSendPush ? 0 : 0   // 标记为待发送
     ).run();
 
     if (!result.success) {
@@ -74,7 +103,9 @@ export async function createNotification(
     // 获取创建的通知
     const notificationId = result.meta.last_row_id;
     const notification = await getNotificationById(db, notificationId);
-    
+
+    // TODO: 如果shouldSendEmail或shouldSendPush为true，将通知加入发送队列
+
     return notification;
   } catch (error) {
     console.error('Create notification error:', error);
