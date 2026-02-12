@@ -14,15 +14,34 @@ interface ConversationListProps {
   isLoading: boolean;
   onSelect: (conversation: Conversation) => void;
   onClose: () => void;
+  onNewConversation: () => void;
+  isAdmin: boolean;
 }
 
-export function ConversationList({ conversations, isLoading, onSelect, onClose }: ConversationListProps) {
+export function ConversationList({ 
+  conversations, 
+  isLoading, 
+  onSelect, 
+  onClose, 
+  onNewConversation,
+  isAdmin 
+}: ConversationListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* 头部 */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/50">
         <h3 className="font-semibold text-foreground">私信消息</h3>
         <div className="flex items-center gap-2">
+          {/* 新对话按钮 */}
+          <button
+            onClick={onNewConversation}
+            title={isAdmin ? "新对话" : "联系管理员"}
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
           <button
             onClick={onClose}
             className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"

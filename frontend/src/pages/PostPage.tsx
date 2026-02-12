@@ -25,6 +25,8 @@ import { ShareButtons } from '../components/ShareButtons';
 import { SEO } from '../components/SEO';
 import { getMarkdownComponents, generateToc } from '../utils/markdownRenderer';
 import { useToast } from '../components/Toast';
+import { RichTextEditor } from '../components/RichTextEditor';
+import type { User } from '../types';
 
 // 导入代码高亮样式
 import 'highlight.js/styles/github-dark.css';
@@ -299,6 +301,25 @@ export function PostPage() {
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyContent, setReplyContent] = useState('');
   const [commentLiking, setCommentLiking] = useState<number | null>(null);
+  const [mentionableUsers, setMentionableUsers] = useState<User[]>([]);
+
+  // 加载可@用户列表
+  useEffect(() => {
+    if (post?.id) {
+      loadMentionableUsers(post.id);
+    }
+  }, [post?.id]);
+
+  const loadMentionableUsers = async (postId: number) => {
+    try {
+      const response = await api.get(`/posts/${postId}/mentionable-users`);
+      if (response.success && response.data) {
+        setMentionableUsers(response.data.users || []);
+      }
+    } catch (error) {
+      console.error('Failed to load mentionable users:', error);
+    }
+  };
 
   // 处理评论点赞
   const handleLikeComment = async (commentId: number) => {
@@ -417,7 +438,12 @@ export function PostPage() {
               {formatDate(comment.createdAt)}
             </span>
           </div>
-          <p className="text-foreground whitespace-pre-wrap">{comment.content}</p>
+          <div 
+            className="text-foreground prose prose-sm dark:prose-invert max-w-none"
+            dangerouslySetInnerHTML={{ 
+              __html: comment.content 
+            }}
+          />
 
           <div className="mt-2 flex items-center space-x-4 text-sm text-muted-foreground">
             <button
@@ -447,17 +473,16 @@ export function PostPage() {
               onSubmit={(e) => handleSubmitReply(e, comment.id)}
               className="mt-4 p-4 bg-muted rounded-lg"
             >
-              <textarea
+              <RichTextEditor
                 value={replyContent}
-                onChange={(e) => setReplyContent(e.target.value)}
-                placeholder="写下你的回复..."
-                className="w-full border border-border bg-card rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                rows={2}
+                onChange={setReplyContent}
+                placeholder="写下你的回复...输入 @ 可提及用户"
                 maxLength={500}
+                mentionableUsers={mentionableUsers}
               />
-              <div className="mt-2 flex items-center justify-between">
+              <div className="mt-4 flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">
-                  {replyContent.length}/500
+                  支持富文本格式
                 </span>
                 <button
                   type="submit"
@@ -739,17 +764,16 @@ export function PostPage() {
           {/* 发表评论 */}
           {isAuthenticated ? (
             <form onSubmit={handleSubmitComment} className="mb-8">
-              <textarea
+              <RichTextEditor
                 value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="写下你的评论..."
-                className="w-full border border-border bg-card rounded-lg p-4 mb-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                rows={4}
+                onChange={setNewComment}
+                placeholder="写下你的评论...输入 @ 可提及用户"
                 maxLength={1000}
+                mentionableUsers={mentionableUsers}
               />
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mt-4">
                 <span className="text-sm text-muted-foreground">
-                  {newComment.length}/1000
+                  支持富文本格式，输入 @ 可提及用户
                 </span>
                 <button
                   type="submit"

@@ -16,6 +16,7 @@ import { TagPage } from './pages/TagPage';
 import { MessagesPage } from './pages/MessagesPage';
 import NotificationCenter from './pages/NotificationCenter';
 import NotificationSettings from './pages/NotificationSettings';
+import { SystemNotificationPage } from './pages/admin/SystemNotificationPage';
 import { useSiteConfig } from './hooks/useSiteConfig';
 import { ToastProvider } from './components/Toast';
 import { MessageButton } from './components/MessageButton';
@@ -49,6 +50,7 @@ function AppRoutes() {
       <Route path="/messages" element={<PageTransition><MessagesPage /></PageTransition>} />
       <Route path="/notifications" element={<PageTransition><NotificationCenter /></PageTransition>} />
       <Route path="/notification-settings" element={<PageTransition><NotificationSettings /></PageTransition>} />
+      <Route path="/admin/notifications" element={<PageTransition><SystemNotificationPage /></PageTransition>} />
     </Routes>
   );
 }

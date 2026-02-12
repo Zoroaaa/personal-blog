@@ -19,6 +19,7 @@ import type { PostListItem } from '../types';
 import { transformPostList, transformCategoryList, transformColumnList, transformTagList } from '../utils/apiTransformer';
 import { useSiteConfig } from '../hooks/useSiteConfig';
 import { SEO } from '../components/SEO';
+import { NotificationCarousel } from '../components/NotificationCarousel';
 import type { Category, Column, Tag } from '../types';
 
 export function HomePage() {
@@ -267,14 +268,9 @@ export function HomePage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         
-          {/* 页面标题 */}
-          <div className="text-center mb-12 animate-fade-in">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent mb-4">
-              探索精彩内容
-            </h1>
-            <p className="text-lg text-gray-600 dark:text-gray-400">
-              发现有价值的文章和见解
-            </p>
+          {/* 页面标题 - 通知轮播 */}
+          <div className="mb-12 animate-fade-in">
+            <NotificationCarousel />
           </div>
         
         {/* 分类和标签区域 */}

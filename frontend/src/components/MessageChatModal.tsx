@@ -14,6 +14,7 @@ import { useMessageStore } from '../stores/messageStore';
 import { getConversations, getConversation, sendMessage } from '../utils/messageApi';
 import { ConversationList } from './ConversationList';
 import { ChatWindow } from './ChatWindow';
+import { NewConversationModal } from './NewConversationModal';
 import type { Conversation, MessageWithStatus } from '../types/messages';
 
 interface MessageChatModalProps {
@@ -22,7 +23,6 @@ interface MessageChatModalProps {
 }
 
 export function MessageChatModal({ isOpen, onClose }: MessageChatModalProps) {
-  const { user } = useAuthStore();
   const {
     conversations,
     currentMessages,
@@ -48,8 +48,10 @@ export function MessageChatModal({ isOpen, onClose }: MessageChatModalProps) {
 
   const [view, setView] = useState<'list' | 'chat'>('list');
   const [messageInput, setMessageInput] = useState('');
+  const [isNewConversationOpen, setIsNewConversationOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const isAdmin = user?.role === 'admin';
 
   // 获取会话列表
   const fetchConversations = useCallback(async () => {
@@ -118,6 +120,19 @@ export function MessageChatModal({ isOpen, onClose }: MessageChatModalProps) {
     resetMessages();
     fetchConversations();
   }, [setCurrentPartnerId, resetMessages, fetchConversations]);
+
+  // 打开新对话
+  const handleNewConversation = useCallback((userId: number) => {
+    setCurrentPartnerId(userId);
+    resetMessages();
+    setView('chat');
+    fetchMessages(userId, 1);
+  }, [setCurrentPartnerId, resetMessages, fetchMessages]);
+
+  // 打开新对话弹窗
+  const openNewConversation = useCallback(() => {
+    setIsNewConversationOpen(true);
+  }, []);
 
   // 发送消息
   const handleSendMessage = useCallback(async () => {
@@ -200,44 +215,55 @@ export function MessageChatModal({ isOpen, onClose }: MessageChatModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div 
-      className="fixed inset-0 z-[55] flex items-end justify-end p-4 sm:p-6 pointer-events-none"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
-    >
+    <>
       <div 
-        className="w-full sm:w-[400px] h-[500px] sm:h-[600px] bg-card border border-border rounded-2xl shadow-2xl pointer-events-auto flex flex-col overflow-hidden animate-slide-up"
-        onClick={(e) => e.stopPropagation()}
+        className="fixed inset-0 z-[55] flex items-end justify-end p-4 sm:p-6 pointer-events-none"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            onClose();
+          }
+        }}
       >
-        {view === 'list' ? (
-          <ConversationList
-            conversations={conversations}
-            isLoading={isLoading}
-            onSelect={openConversation}
-            onClose={onClose}
-          />
-        ) : (
-          <ChatWindow
-            messages={currentMessages}
-            partner={conversations.find(c => c.partnerId === currentPartnerId)}
-            currentUserId={user?.id || 0}
-            messageInput={messageInput}
-            isLoading={isLoading}
-            isLoadingMore={isLoadingMore}
-            hasMoreMessages={hasMoreMessages}
-            onMessageInputChange={setMessageInput}
-            onSend={handleSendMessage}
-            onBack={backToList}
-            onClose={onClose}
-            onLoadMore={loadMoreMessages}
-            messagesEndRef={messagesEndRef}
-            chatContainerRef={chatContainerRef}
-          />
-        )}
+        <div 
+          className="w-full sm:w-[400px] h-[500px] sm:h-[600px] bg-card border border-border rounded-2xl shadow-2xl pointer-events-auto flex flex-col overflow-hidden animate-slide-up"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {view === 'list' ? (
+            <ConversationList
+              conversations={conversations}
+              isLoading={isLoading}
+              onSelect={openConversation}
+              onClose={onClose}
+              onNewConversation={openNewConversation}
+              isAdmin={isAdmin}
+            />
+          ) : (
+            <ChatWindow
+              messages={currentMessages}
+              partner={conversations.find(c => c.partnerId === currentPartnerId)}
+              currentUserId={user?.id || 0}
+              messageInput={messageInput}
+              isLoading={isLoading}
+              isLoadingMore={isLoadingMore}
+              hasMoreMessages={hasMoreMessages}
+              onMessageInputChange={setMessageInput}
+              onSend={handleSendMessage}
+              onBack={backToList}
+              onClose={onClose}
+              onLoadMore={loadMoreMessages}
+              messagesEndRef={messagesEndRef}
+              chatContainerRef={chatContainerRef}
+            />
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* 新对话弹窗 */}
+      <NewConversationModal
+        isOpen={isNewConversationOpen}
+        onClose={() => setIsNewConversationOpen(false)}
+        onSelect={handleNewConversation}
+      />
+    </>
   );
 }
