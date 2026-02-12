@@ -324,35 +324,67 @@ export function ChatWindow({
                   {/* 消息内容 */}
                   <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                     {/* 附件 */}
-                    {!isRecalled && message.attachments && message.attachments.length > 0 && (
+                    {message.attachments && message.attachments.length > 0 && (
                       <div className="flex flex-wrap gap-2 mb-2">
                         {message.attachments.map((att, attIndex) => (
                           <div key={attIndex} className="max-w-[200px]">
                             {att.fileType === 'image' ? (
-                              <a href={att.fileUrl} target="_blank" rel="noopener noreferrer">
-                                <img
-                                  src={att.fileUrl}
-                                  alt={att.fileName}
-                                  className="rounded-lg max-w-[200px] max-h-[150px] object-cover hover:opacity-90 transition-opacity cursor-pointer"
-                                />
-                              </a>
+                              <div className="relative group">
+                                <a href={att.fileUrl} target="_blank" rel="noopener noreferrer" className="block">
+                                  <img
+                                    src={att.fileUrl}
+                                    alt={att.fileName}
+                                    className="rounded-lg max-w-[200px] max-h-[150px] object-cover hover:opacity-90 transition-opacity cursor-pointer"
+                                  />
+                                </a>
+                                <button
+                                  onClick={() => {
+                                    const link = document.createElement('a');
+                                    link.href = att.fileUrl;
+                                    link.download = att.fileName;
+                                    link.click();
+                                  }}
+                                  className="absolute bottom-2 right-2 p-1.5 bg-black/60 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="下载图片"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                  </svg>
+                                </button>
+                              </div>
                             ) : (
-                              <a
-                                href={att.fileUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg hover:bg-accent transition-colors"
-                              >
-                                <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                                </svg>
-                                <div className="flex flex-col">
-                                  <span className="text-sm text-foreground truncate max-w-[120px]">{att.fileName}</span>
-                                  {att.fileSize > 0 && (
-                                    <span className="text-xs text-muted-foreground">{formatFileSize(att.fileSize)}</span>
-                                  )}
-                                </div>
-                              </a>
+                              <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg hover:bg-accent transition-colors">
+                                <a
+                                  href={att.fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 flex-1"
+                                >
+                                  <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                  </svg>
+                                  <div className="flex flex-col flex-1">
+                                    <span className="text-sm text-foreground truncate max-w-[120px]">{att.fileName}</span>
+                                    {att.fileSize > 0 && (
+                                      <span className="text-xs text-muted-foreground">{formatFileSize(att.fileSize)}</span>
+                                    )}
+                                  </div>
+                                </a>
+                                <button
+                                  onClick={() => {
+                                    const link = document.createElement('a');
+                                    link.href = att.fileUrl;
+                                    link.download = att.fileName;
+                                    link.click();
+                                  }}
+                                  className="p-1.5 text-muted-foreground hover:text-primary transition-colors"
+                                  title="下载文件"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                  </svg>
+                                </button>
+                              </div>
                             )}
                           </div>
                         ))}
