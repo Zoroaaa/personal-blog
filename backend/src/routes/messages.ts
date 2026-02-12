@@ -87,6 +87,11 @@ messageRoutes.post('/', requireAuth, async (c) => {
       return c.json(errorResponse('Message too long', `消息内容不能超过 ${MAX_MESSAGE_LENGTH} 个字符`), 400);
     }
     
+    // 检查发送者状态
+    if (currentUser.status !== 'active') {
+      return c.json(errorResponse('Sender not active', '您的账号状态异常，无法发送私信'), 403);
+    }
+    
     const receiver = await c.env.DB.prepare(
       'SELECT id, username, display_name, avatar_url, role FROM users WHERE id = ? AND status = ?'
     ).bind(receiverId, 'active').first() as any;
@@ -96,7 +101,7 @@ messageRoutes.post('/', requireAuth, async (c) => {
     }
     
     // 允许所有活跃用户之间发送私信
-    if (currentUser.role === 'suspended' || receiver.status !== 'active') {
+    if (currentUser.role === 'suspended') {
       return c.json(errorResponse('Permission denied', '无法向非活跃用户发送私信'), 403);
     }
     
