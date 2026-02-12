@@ -66,7 +66,13 @@ function sanitizeMessageContent(content: string): string {
  * {
  *   receiverId: number,    // 接收者ID
  *   content: string,       // 消息内容
- *   parentId?: number      // 回复的消息ID（可选）
+ *   parentId?: number,     // 回复的消息ID（可选）
+ *   attachments?: Array<{  // 附件列表（可选）
+ *     fileName: string,
+ *     fileUrl: string,
+ *     fileType: 'image' | 'file',
+ *     fileSize?: number
+ *   }>
  * }
  */
 messageRoutes.post('/', requireAuth, async (c) => {
@@ -74,13 +80,21 @@ messageRoutes.post('/', requireAuth, async (c) => {
   
   try {
     const currentUser = c.get('user') as any;
-    const { receiverId, content, parentId } = await c.req.json();
+    const { receiverId, content, parentId, attachments } = await c.req.json();
     
     // 验证必填字段
-    if (!receiverId || !content) {
+    if (!receiverId) {
       return c.json(errorResponse(
         'Missing required fields',
-        '请提供接收者ID和消息内容'
+        '请提供接收者ID'
+      ), 400);
+    }
+    
+    // 验证内容或附件至少有一项
+    if ((!content || content.trim() === '') && (!attachments || attachments.length === 0)) {
+      return c.json(errorResponse(
+        'Empty message',
+        '消息内容或附件不能为空'
       ), 400);
     }
     
@@ -93,7 +107,7 @@ messageRoutes.post('/', requireAuth, async (c) => {
     }
     
     // 验证消息长度
-    if (content.length > MAX_MESSAGE_LENGTH) {
+    if (content && content.length > MAX_MESSAGE_LENGTH) {
       return c.json(errorResponse(
         'Message too long',
         `消息内容不能超过 ${MAX_MESSAGE_LENGTH} 个字符`
@@ -121,14 +135,7 @@ messageRoutes.post('/', requireAuth, async (c) => {
     }
     
     // 清理消息内容
-    const sanitizedContent = sanitizeMessageContent(content);
-    
-    if (!sanitizedContent) {
-      return c.json(errorResponse(
-        'Empty message',
-        '消息内容不能为空'
-      ), 400);
-    }
+    const sanitizedContent = content ? sanitizeMessageContent(content) : '';
     
     // 验证parentId是否存在（如果是回复）
     if (parentId) {
@@ -144,15 +151,19 @@ messageRoutes.post('/', requireAuth, async (c) => {
       }
     }
     
+    // 检查是否有附件
+    const hasAttachments = attachments && attachments.length > 0;
+    
     // 插入消息
     const result = await c.env.DB.prepare(
-      `INSERT INTO messages (sender_id, receiver_id, content, parent_id, created_at)
-       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`
+      `INSERT INTO messages (sender_id, receiver_id, content, parent_id, has_attachments, created_at)
+       VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
     ).bind(
       currentUser.userId,
       receiverId,
       sanitizedContent,
-      parentId || null
+      parentId || null,
+      hasAttachments ? 1 : 0
     ).run();
     
     if (!result.success) {
@@ -160,6 +171,30 @@ messageRoutes.post('/', requireAuth, async (c) => {
     }
     
     const messageId = result.meta.last_row_id;
+    
+    // 如果有附件，保存附件信息
+    let savedAttachments: any[] = [];
+    if (hasAttachments) {
+      for (const attachment of attachments) {
+        const attachResult = await c.env.DB.prepare(
+          `INSERT INTO message_attachments (message_id, file_name, file_url, file_type, file_size)
+           VALUES (?, ?, ?, ?, ?)`
+        ).bind(
+          messageId,
+          attachment.fileName,
+          attachment.fileUrl,
+          attachment.fileType,
+          attachment.fileSize || 0
+        ).run();
+        
+        if (attachResult.success) {
+          savedAttachments.push({
+            id: attachResult.meta.last_row_id,
+            ...attachment
+          });
+        }
+      }
+    }
     
     // 获取发送者信息
     const sender = await c.env.DB.prepare(
@@ -169,23 +204,29 @@ messageRoutes.post('/', requireAuth, async (c) => {
     logger.info('Message sent', {
       messageId,
       senderId: currentUser.userId,
-      receiverId
+      receiverId,
+      hasAttachments: savedAttachments.length
     });
 
     // 发送私信通知
     try {
+      const notifyContent = savedAttachments.length > 0 
+        ? `[图片] ${sanitizedContent.substring(0, 50)}`
+        : (sanitizedContent.length > 100
+            ? sanitizedContent.substring(0, 100) + '...'
+            : sanitizedContent);
+            
       await createPrivateMessageNotification(c.env.DB, {
         userId: receiverId,
         title: `${sender.display_name || sender.username} 发来一条私信`,
-        content: sanitizedContent.length > 100
-          ? sanitizedContent.substring(0, 100) + '...'
-          : sanitizedContent,
+        content: notifyContent,
         messageId: messageId,
         relatedData: {
           senderId: currentUser.userId,
           senderName: sender.display_name || sender.username,
           senderAvatar: sender.avatar_url,
           messageId: messageId,
+          hasAttachments: savedAttachments.length > 0
         },
       });
     } catch (notifyError) {
@@ -207,6 +248,8 @@ messageRoutes.post('/', requireAuth, async (c) => {
         content: sanitizedContent,
         parentId: parentId || null,
         isRead: 0,
+        hasAttachments: savedAttachments.length > 0,
+        attachments: savedAttachments,
         createdAt: formatDateTime(new Date().toISOString())
       }
     }, '私信发送成功'), 201);
@@ -402,22 +445,52 @@ messageRoutes.get('/conversation/:userId', requireAuth, async (c) => {
               (sender_id = ? AND receiver_id = ? AND is_deleted_by_receiver = 0))`
     ).bind(currentUser.userId, partnerId, partnerId, currentUser.userId).first() as any;
     
+    // 获取所有消息的附件
+    const messageIds = (messages.results || []).map((msg: any) => msg.id);
+    let attachmentsMap: Map<number, any[]> = new Map();
+    
+    if (messageIds.length > 0) {
+      const placeholders = messageIds.map(() => '?').join(',');
+      const attachments = await c.env.DB.prepare(
+        `SELECT * FROM message_attachments WHERE message_id IN (${placeholders})`
+      ).bind(...messageIds).all() as any;
+      
+      (attachments.results || []).forEach((att: any) => {
+        if (!attachmentsMap.has(att.message_id)) {
+          attachmentsMap.set(att.message_id, []);
+        }
+        attachmentsMap.get(att.message_id)!.push({
+          id: att.id,
+          fileName: att.file_name,
+          fileUrl: att.file_url,
+          fileType: att.file_type,
+          fileSize: att.file_size
+        });
+      });
+    }
+    
     // 格式化消息
-    const formattedMessages = (messages.results || []).map((msg: any) => ({
-      id: msg.id,
-      senderId: msg.sender_id,
-      senderUsername: msg.sender_username,
-      senderDisplayName: msg.sender_display_name,
-      senderAvatarUrl: msg.sender_avatar_url,
-      receiverId: msg.receiver_id,
-      receiverUsername: msg.receiver_username,
-      receiverDisplayName: msg.receiver_display_name,
-      receiverAvatarUrl: msg.receiver_avatar_url,
-      content: msg.content,
-      parentId: msg.parent_id,
-      isRead: msg.is_read === 1,
-      createdAt: formatDateTime(msg.created_at),
-      readAt: msg.read_at ? formatDateTime(msg.read_at) : null
+    const formattedMessages = await Promise.all((messages.results || []).map(async (msg: any) => {
+      const messageAttachments = attachmentsMap.get(msg.id) || [];
+      
+      return {
+        id: msg.id,
+        senderId: msg.sender_id,
+        senderUsername: msg.sender_username,
+        senderDisplayName: msg.sender_display_name,
+        senderAvatarUrl: msg.sender_avatar_url,
+        receiverId: msg.receiver_id,
+        receiverUsername: msg.receiver_username,
+        receiverDisplayName: msg.receiver_display_name,
+        receiverAvatarUrl: msg.receiver_avatar_url,
+        content: msg.content,
+        parentId: msg.parent_id,
+        isRead: msg.is_read === 1,
+        hasAttachments: msg.has_attachments === 1,
+        attachments: messageAttachments,
+        createdAt: formatDateTime(msg.created_at),
+        readAt: msg.read_at ? formatDateTime(msg.read_at) : null
+      };
     }));
     
     // 标记对方发送的消息为已读
@@ -549,6 +622,7 @@ messageRoutes.put('/read-all', requireAuth, async (c) => {
 /**
  * DELETE /api/messages/:id
  * 删除私信（软删除，根据用户角色标记为发送者删除或接收者删除）
+ * 规则：如果消息已被回复，则不允许删除
  */
 messageRoutes.delete('/:id', requireAuth, async (c) => {
   const logger = createLogger(c);
@@ -587,6 +661,19 @@ messageRoutes.delete('/:id', requireAuth, async (c) => {
         'Forbidden',
         '无权删除此消息'
       ), 403);
+    }
+    
+    // 检查消息是否已被回复（有后续消息引用此消息作为parent_id）
+    const replyCount = await c.env.DB.prepare(
+      `SELECT COUNT(*) as count FROM messages 
+       WHERE parent_id = ? AND (is_deleted_by_sender = 0 OR is_deleted_by_receiver = 0)`
+    ).bind(messageId).first() as any;
+    
+    if (replyCount?.count > 0) {
+      return c.json(errorResponse(
+        'Message has replies',
+        '该消息已被回复，无法删除'
+      ), 400);
     }
     
     // 软删除
