@@ -31,6 +31,7 @@ import {
   deleteThread,
   getUnreadCount,
   generateThreadId,
+  getThreadMessages,
   type SendMessageRequest,
 } from '../services/messageService';
 
@@ -197,6 +198,41 @@ messageRoutes.get('/threads', requireAuth, async (c) => {
     return c.json(errorResponse(
       'Failed to fetch conversations',
       'An error occurred while fetching your conversations'
+    ), 500);
+  }
+});
+
+messageRoutes.get('/thread/:threadId', requireAuth, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const user = c.get('user') as any;
+    const threadId = c.req.param('threadId');
+    const page = safeParseInt(c.req.query('page'), 1);
+    const limit = safeParseInt(c.req.query('limit'), 20);
+
+    if (!threadId) {
+      return c.json(errorResponse('Invalid thread ID'), 400);
+    }
+
+    const result = await getThreadMessages(c.env.DB, user.userId, threadId, {
+      page,
+      limit,
+    });
+
+    logger.info('Thread messages fetched successfully', {
+      userId: user.userId,
+      threadId,
+      count: result.messages.length,
+    });
+
+    return c.json(successResponse(result));
+
+  } catch (error) {
+    logger.error('Get thread messages error', error);
+    return c.json(errorResponse(
+      'Failed to fetch thread messages',
+      'An error occurred while fetching the conversation messages'
     ), 500);
   }
 });
