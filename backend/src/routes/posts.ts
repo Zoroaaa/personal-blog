@@ -145,7 +145,7 @@ postRoutes.get('/', async (c) => {
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN columns col ON p.column_id = col.id
-      WHERE p.status = 'published' AND p.visibility = 'public'
+      WHERE p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
     `;
     
     const params: any[] = [];
@@ -187,10 +187,10 @@ postRoutes.get('/', async (c) => {
     const { results } = await c.env.DB.prepare(query).bind(...params).all();
     
     // ===== 5. 获取总数 =====
-    let countQuery = `SELECT COUNT(*) as total FROM posts p 
+    let countQuery = `SELECT COUNT(*) as total FROM posts p
                       LEFT JOIN categories c ON p.category_id = c.id
                       LEFT JOIN users u ON p.author_id = u.id
-                      WHERE p.status = 'published' AND p.visibility = 'public'`;
+                      WHERE p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL`;
     const countParams: any[] = [];
     
     if (category) {
@@ -313,12 +313,13 @@ postRoutes.get('/admin', requireAuth, async (c) => {
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN columns col ON p.column_id = col.id
+      WHERE p.deleted_at IS NULL AND u.deleted_at IS NULL
       ORDER BY p.created_at DESC
       LIMIT ? OFFSET ?
     `).bind(limit, offset).all();
-    
+
     // 获取总数
-    const countResult = await c.env.DB.prepare('SELECT COUNT(*) as total FROM posts').first() as any;
+    const countResult = await c.env.DB.prepare('SELECT COUNT(*) as total FROM posts WHERE deleted_at IS NULL').first() as any;
     const total = countResult?.total || 0;
     
     // 为每篇文章获取标签
@@ -548,7 +549,7 @@ postRoutes.get('/search', async (c) => {
         LEFT JOIN users u ON p.author_id = u.id
         LEFT JOIN categories c ON p.category_id = c.id
         LEFT JOIN columns col ON p.column_id = col.id
-        WHERE posts_fts MATCH ? AND p.status = 'published' AND p.visibility = 'public'
+        WHERE posts_fts MATCH ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
       `;
       params.push(escapedQuery);
     } else {
@@ -565,7 +566,7 @@ postRoutes.get('/search', async (c) => {
         LEFT JOIN users u ON p.author_id = u.id
         LEFT JOIN columns col ON p.column_id = col.id
         LEFT JOIN categories c ON p.category_id = c.id
-        WHERE p.status = 'published' AND p.visibility = 'public'
+        WHERE p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
       `;
       
       // 搜索关键词（LIKE方式）
@@ -632,13 +633,15 @@ postRoutes.get('/search', async (c) => {
         FROM posts_fts
         JOIN posts p ON posts_fts.rowid = p.id
         LEFT JOIN categories c ON p.category_id = c.id
-        WHERE posts_fts MATCH ? AND p.status = 'published' AND p.visibility = 'public'
+        LEFT JOIN users u ON p.author_id = u.id
+        WHERE posts_fts MATCH ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
       `;
       countParams.push(escapedQuery);
     } else {
-      countQuery = `SELECT COUNT(*) as total FROM posts p 
+      countQuery = `SELECT COUNT(*) as total FROM posts p
                     LEFT JOIN categories c ON p.category_id = c.id
-                    WHERE p.status = 'published' AND p.visibility = 'public'`;
+                    LEFT JOIN users u ON p.author_id = u.id
+                    WHERE p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL`;
       
       if (q) {
         const searchTerm = `%${q}%`;
@@ -761,7 +764,7 @@ postRoutes.get('/likes', requireAuth, async (c) => {
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN columns col ON p.column_id = col.id
-      WHERE l.user_id = ? AND p.status = 'published' AND p.visibility = 'public'
+      WHERE l.user_id = ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
       ORDER BY l.created_at DESC
       LIMIT ? OFFSET ?
     `).bind(user.userId, limit, offset).all();
@@ -791,7 +794,8 @@ postRoutes.get('/likes', requireAuth, async (c) => {
     const countResult = await c.env.DB.prepare(`
       SELECT COUNT(*) as total FROM posts p
       JOIN likes l ON p.id = l.post_id
-      WHERE l.user_id = ? AND p.status = 'published' AND p.visibility = 'public'
+      LEFT JOIN users u ON p.author_id = u.id
+      WHERE l.user_id = ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
     `).bind(user.userId).first() as any;
     
     const total = countResult?.total || 0;
@@ -882,13 +886,13 @@ postRoutes.get('/reading-history', requireAuth, async (c) => {
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN columns col ON p.column_id = col.id
-      WHERE rh.user_id = ? AND p.status = 'published' AND p.visibility = 'public'
+      WHERE rh.user_id = ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
       ORDER BY rh.last_read_at DESC
       LIMIT ? OFFSET ?
     `).bind(user.userId, limit, offset).all();
     
     const countResult = await c.env.DB.prepare(
-      'SELECT COUNT(*) as total FROM reading_history rh JOIN posts p ON p.id = rh.post_id WHERE rh.user_id = ? AND p.status = ? AND p.visibility = ?'
+      'SELECT COUNT(*) as total FROM reading_history rh JOIN posts p ON p.id = rh.post_id WHERE rh.user_id = ? AND p.status = ? AND p.visibility = ? AND p.deleted_at IS NULL'
     ).bind(user.userId, 'published', 'public').first() as any;
     const total = countResult?.total || 0;
     
@@ -973,13 +977,13 @@ postRoutes.get('/favorites', requireAuth, async (c) => {
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN columns col ON p.column_id = col.id
-      WHERE f.user_id = ? AND p.status = 'published' AND p.visibility = 'public'
+      WHERE f.user_id = ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
       ORDER BY f.created_at DESC
       LIMIT ? OFFSET ?
     `).bind(user.userId, limit, offset).all();
     
     const countResult = await c.env.DB.prepare(
-      'SELECT COUNT(*) as total FROM favorites f JOIN posts p ON p.id = f.post_id WHERE f.user_id = ? AND p.status = ? AND p.visibility = ?'
+      'SELECT COUNT(*) as total FROM favorites f JOIN posts p ON p.id = f.post_id WHERE f.user_id = ? AND p.status = ? AND p.visibility = ? AND p.deleted_at IS NULL'
     ).bind(user.userId, 'published', 'public').first() as any;
     const total = countResult?.total || 0;
     
@@ -1065,7 +1069,7 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN columns col ON p.column_id = col.id
-      WHERE p.slug = ? AND p.status = 'published' AND p.visibility = 'public'
+      WHERE p.slug = ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL
     `).bind(slug).first() as any;
     
     if (!post) {
@@ -1203,9 +1207,9 @@ postRoutes.post('/', requireAuth, async (c) => {
     // ===== 6. 验证专栏ID（如果提供）=====
     if (columnId) {
       const columnExists = await c.env.DB.prepare(
-        'SELECT id FROM columns WHERE id = ? AND status = ?'
+        'SELECT id FROM columns WHERE id = ? AND status = ? AND deleted_at IS NULL'
       ).bind(columnId, 'active').first();
-      
+
       if (!columnExists) {
         return c.json(errorResponse(
           'Invalid column',
@@ -1214,12 +1218,19 @@ postRoutes.post('/', requireAuth, async (c) => {
       }
     }
 
-    // ===== 7. 插入文章 =====
+    // ===== 7. 处理密码哈希 =====
+    let passwordHash = null;
+    if (finalVisibility === 'password' && password) {
+      // 使用bcrypt哈希密码
+      passwordHash = await bcrypt.hash(password, 10);
+    }
+
+    // ===== 8. 插入文章 =====
     const finalStatus = status || 'draft';
     const result = await c.env.DB.prepare(`
       INSERT INTO posts (
         title, slug, content, summary, author_id, category_id, column_id,
-        cover_image, status, visibility, password, reading_time, 
+        cover_image, status, visibility, password_hash, reading_time,
         published_at, created_at, updated_at
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -1234,7 +1245,7 @@ postRoutes.post('/', requireAuth, async (c) => {
       coverImage || null,
       finalStatus,
       finalVisibility,
-      finalVisibility === 'password' ? password : null,
+      passwordHash,
       readingTime,
       finalStatus === 'published' ? new Date().toISOString() : null
     ).run();
@@ -1292,7 +1303,7 @@ postRoutes.put('/:id', requireAuth, async (c) => {
     
     // ===== 1. 检查文章是否存在 =====
     const post = await c.env.DB.prepare(
-      'SELECT * FROM posts WHERE id = ?'
+      'SELECT * FROM posts WHERE id = ? AND deleted_at IS NULL'
     ).bind(id).first() as any;
     
     if (!post) {
@@ -1331,9 +1342,9 @@ postRoutes.put('/:id', requireAuth, async (c) => {
     // ===== 4. 验证专栏ID（如果提供）=====
     if (columnId !== undefined && columnId !== null) {
       const columnExists = await c.env.DB.prepare(
-        'SELECT id FROM columns WHERE id = ? AND status = ?'
+        'SELECT id FROM columns WHERE id = ? AND status = ? AND deleted_at IS NULL'
       ).bind(columnId, 'active').first();
-      
+
       if (!columnExists) {
         return c.json(errorResponse(
           'Invalid column',
@@ -1341,15 +1352,34 @@ postRoutes.put('/:id', requireAuth, async (c) => {
         ), 400);
       }
     }
-    
+
     // ===== 5. 计算阅读时间 =====
     const readingTime = content ? Math.ceil(content.length / READING_SPEED) : post.reading_time;
-    
+
+    // ===== 5.5. 处理密码哈希 =====
+    let passwordHash = post.password_hash;
+    if (visibility === 'password') {
+      if (password) {
+        // 如果提供了新密码，则哈希它
+        passwordHash = await bcrypt.hash(password, 10);
+      } else if (!post.password_hash) {
+        // 如果变更为密码保护但没有提供密码，返回错误
+        return c.json(errorResponse(
+          'Password required',
+          'Password is required for password-protected posts'
+        ), 400);
+      }
+      // 否则保持现有的密码哈希
+    } else {
+      // 如果不是密码保护，清除密码哈希
+      passwordHash = null;
+    }
+
     // ===== 6. 更新文章 =====
     await c.env.DB.prepare(`
-      UPDATE posts 
+      UPDATE posts
       SET title = ?, content = ?, summary = ?, category_id = ?, column_id = ?,
-          cover_image = ?, status = ?, visibility = ?, password = ?,
+          cover_image = ?, status = ?, visibility = ?, password_hash = ?,
           reading_time = ?, published_at = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).bind(
@@ -1361,7 +1391,7 @@ postRoutes.put('/:id', requireAuth, async (c) => {
       coverImage !== undefined ? coverImage : post.cover_image,
       status || post.status,
       visibility || post.visibility,
-      visibility === 'password' ? password : null,
+      passwordHash,
       readingTime,
       (status === 'published' && !post.published_at) ? new Date().toISOString() : post.published_at,
       id
@@ -1444,7 +1474,7 @@ postRoutes.delete('/:id', requireAuth, requireAdmin, async (c) => {
 
     // 获取文章信息（包括封面图片和内容）
     const post = await c.env.DB.prepare(
-      'SELECT slug, cover_image, content FROM posts WHERE id = ?'
+      'SELECT slug, cover_image, content FROM posts WHERE id = ? AND deleted_at IS NULL'
     ).bind(id).first() as any;
 
     if (!post) {
@@ -1536,7 +1566,7 @@ postRoutes.post('/:id/like', requireAuth, async (c) => {
     
     // 检查文章是否存在
     const post = await c.env.DB.prepare(
-      'SELECT id, slug FROM posts WHERE id = ?'
+      'SELECT id, slug FROM posts WHERE id = ? AND deleted_at IS NULL'
     ).bind(postId).first() as any;
     
     if (!post) {
@@ -1637,7 +1667,7 @@ postRoutes.post('/:id/reading-progress', requireAuth, async (c) => {
     const readDurationSeconds = Math.max(0, safeParseInt(body.readDurationSeconds, 0));
     const readPercentage = Math.min(100, Math.max(0, safeParseInt(body.readPercentage, 0)));
     
-    const post = await c.env.DB.prepare('SELECT id FROM posts WHERE id = ? AND status = ? AND visibility = ?')
+    const post = await c.env.DB.prepare('SELECT id FROM posts WHERE id = ? AND status = ? AND visibility = ? AND deleted_at IS NULL')
       .bind(postId, 'published', 'public').first() as any;
     
     if (!post) {
@@ -1686,7 +1716,7 @@ postRoutes.post('/:id/favorite', requireAuth, async (c) => {
     const user = c.get('user') as any;
     const postId = c.req.param('id');
     
-    const post = await c.env.DB.prepare('SELECT id FROM posts WHERE id = ?').bind(postId).first() as any;
+    const post = await c.env.DB.prepare('SELECT id FROM posts WHERE id = ? AND deleted_at IS NULL').bind(postId).first() as any;
     if (!post) {
       return c.json(errorResponse('Post not found'), 404);
     }
@@ -1772,7 +1802,7 @@ postRoutes.get('/:id/mentionable-users', async (c) => {
     
     // 验证文章是否存在
     const post = await c.env.DB.prepare(
-      'SELECT id FROM posts WHERE id = ? AND status = ?'
+      'SELECT id FROM posts WHERE id = ? AND status = ? AND deleted_at IS NULL'
     ).bind(postId, 'published').first();
     
     if (!post) {
@@ -1815,6 +1845,93 @@ postRoutes.get('/:id/mentionable-users', async (c) => {
     return c.json(errorResponse(
       'Failed to get mentionable users',
       '获取可@用户列表失败'
+    ), 500);
+  }
+});
+
+// ============= 密码验证 =============
+
+/**
+ * POST /api/posts/:id/verify-password
+ * 验证文章密码（用于访问受密码保护的文章）
+ *
+ * 请求体：
+ * {
+ *   password: string
+ * }
+ */
+postRoutes.post('/:id/verify-password', async (c) => {
+  const logger = createLogger(c);
+
+  try {
+    const postId = c.req.param('id');
+    const body = await c.req.json();
+    const { password } = body;
+
+    if (!password) {
+      return c.json(errorResponse(
+        'Missing password',
+        'Password is required'
+      ), 400);
+    }
+
+    // 获取文章的密码哈希
+    const post = await c.env.DB.prepare(
+      `SELECT id, visibility, password_hash, title, slug
+       FROM posts
+       WHERE id = ? AND visibility = 'password' AND status = 'published' AND deleted_at IS NULL`
+    ).bind(postId).first() as any;
+
+    if (!post) {
+      return c.json(errorResponse(
+        'Post not found',
+        'The requested post does not exist or is not password-protected'
+      ), 404);
+    }
+
+    if (!post.password_hash) {
+      return c.json(errorResponse(
+        'No password set',
+        'This post is marked as password-protected but no password is set'
+      ), 500);
+    }
+
+    // 验证密码
+    const isValid = await bcrypt.compare(password, post.password_hash);
+
+    if (!isValid) {
+      logger.warn('Password verification failed', { postId });
+      return c.json(errorResponse(
+        'Invalid password',
+        'The password you entered is incorrect'
+      ), 401);
+    }
+
+    // 生成临时访问令牌（可选）
+    // 这个令牌可以存储在客户端，以避免重复输入密码
+    const token = await generateToken(c.env.JWT_SECRET, {
+      postId: post.id,
+      type: 'post_password_access',
+      expiresIn: '24h'
+    });
+
+    logger.info('Password verification successful', { postId });
+
+    return c.json(successResponse({
+      verified: true,
+      token,
+      post: {
+        id: post.id,
+        title: post.title,
+        slug: post.slug
+      }
+    }, '密码正确'));
+
+  } catch (error) {
+    logger.error('Password verification error', error);
+    return c.json(errorResponse(
+      'Verification failed',
+      'An error occurred during password verification'
     ), 500);
   }
 });

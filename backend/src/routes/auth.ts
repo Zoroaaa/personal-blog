@@ -102,7 +102,7 @@ authRoutes.post('/send-verification-code', optionalAuth, async (c) => {
 
       if (rawType === 'register') {
         const existingUser = await c.env.DB.prepare(
-          'SELECT id FROM users WHERE email = ?'
+          'SELECT id FROM users WHERE email = ? AND deleted_at IS NULL'
         )
           .bind(email)
           .first();
@@ -119,7 +119,7 @@ authRoutes.post('/send-verification-code', optionalAuth, async (c) => {
 
       if (rawType === 'forgot_password') {
         const userRow = (await c.env.DB.prepare(
-          'SELECT id, oauth_provider FROM users WHERE email = ?'
+          'SELECT id, oauth_provider FROM users WHERE email = ? AND deleted_at IS NULL'
         )
           .bind(email)
           .first()) as any;
@@ -152,7 +152,7 @@ authRoutes.post('/send-verification-code', optionalAuth, async (c) => {
       }
 
       const row = (await c.env.DB.prepare(
-        'SELECT email FROM users WHERE id = ?'
+        'SELECT email FROM users WHERE id = ? AND deleted_at IS NULL'
       )
         .bind(user.userId)
         .first()) as any;
@@ -350,7 +350,7 @@ authRoutes.post('/register', async (c) => {
     
     // ===== 6. 检查用户是否已存在 =====
     const existing = await c.env.DB.prepare(
-      'SELECT id FROM users WHERE username = ? OR email = ?'
+      'SELECT id FROM users WHERE (username = ? OR email = ?) AND deleted_at IS NULL'
     ).bind(username, email).first();
     
     if (existing) {
@@ -451,7 +451,7 @@ authRoutes.post('/login', async (c) => {
 
     // ===== 2. 查找用户 =====
     const user = await c.env.DB.prepare(
-      'SELECT id, username, email, password_hash, display_name, avatar_url, bio, role FROM users WHERE username = ? OR email = ?'
+      'SELECT id, username, email, password_hash, display_name, avatar_url, bio, role FROM users WHERE (username = ? OR email = ?) AND deleted_at IS NULL'
     ).bind(username, username).first() as any;
 
     // ===== 3. 验证用户存在 =====
@@ -557,7 +557,7 @@ authRoutes.post('/reset-password', async (c) => {
     }
     
     const user = await c.env.DB.prepare(
-      'SELECT id, oauth_provider, password_hash FROM users WHERE email = ?'
+      'SELECT id, oauth_provider, password_hash FROM users WHERE email = ? AND deleted_at IS NULL'
     ).bind(email).first() as any;
     
     if (!user) {
@@ -767,7 +767,7 @@ authRoutes.post('/github', async (c) => {
     // ===== 3. 查找或创建用户 =====
     logger.info('Finding or creating user', { githubId: githubUser.id, login: githubUser.login });
     let user = await c.env.DB.prepare(
-      'SELECT * FROM users WHERE oauth_provider = ? AND oauth_id = ?'
+      'SELECT * FROM users WHERE oauth_provider = ? AND oauth_id = ? AND deleted_at IS NULL'
     ).bind('github', githubUser.id.toString()).first() as any;
     
     if (!user) {
@@ -777,7 +777,7 @@ authRoutes.post('/github', async (c) => {
       
       // 检查用户名是否已存在
       const existing = await c.env.DB.prepare(
-        'SELECT id FROM users WHERE username = ?'
+        'SELECT id FROM users WHERE username = ? AND deleted_at IS NULL'
       ).bind(username).first();
       
       const finalUsername = existing 
@@ -921,7 +921,7 @@ authRoutes.get('/me', requireAuth, async (c) => {
     
     // 获取用户基本信息
     const user = await c.env.DB.prepare(
-      'SELECT id, username, email, display_name, avatar_url, bio, role, created_at, updated_at FROM users WHERE id = ?'
+      'SELECT id, username, email, display_name, avatar_url, bio, role, created_at, updated_at FROM users WHERE id = ? AND deleted_at IS NULL'
     ).bind(currentUser.userId).first() as any;
     
     if (!user) {
@@ -931,11 +931,11 @@ authRoutes.get('/me', requireAuth, async (c) => {
     
     // 获取用户统计数据
     const postCount = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM posts WHERE author_id = ? AND status = ?'
+      'SELECT COUNT(*) as count FROM posts WHERE author_id = ? AND status = ? AND deleted_at IS NULL'
     ).bind(currentUser.userId, 'published').first() as any;
-    
+
     const commentCount = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM comments WHERE user_id = ? AND status = ?'
+      'SELECT COUNT(*) as count FROM comments WHERE user_id = ? AND status = ? AND deleted_at IS NULL'
     ).bind(currentUser.userId, 'approved').first() as any;
     
     // 构建完整的用户信息响应
@@ -1046,7 +1046,7 @@ authRoutes.put('/profile', requireAuth, async (c) => {
     
     // 获取更新后的用户信息
     const userData = await c.env.DB.prepare(
-      'SELECT id, username, email, display_name, avatar_url, bio, role, created_at, updated_at FROM users WHERE id = ?'
+      'SELECT id, username, email, display_name, avatar_url, bio, role, created_at, updated_at FROM users WHERE id = ? AND deleted_at IS NULL'
     ).bind(currentUser.userId).first() as any;
     
     // 转换为 camelCase 格式
@@ -1104,9 +1104,9 @@ authRoutes.put('/password', requireAuth, async (c) => {
         '请提供当前密码和新密码'
       ), 400);
     }
-    
+
     const user = await c.env.DB.prepare(
-      'SELECT password_hash, email FROM users WHERE id = ?'
+      'SELECT password_hash, email FROM users WHERE id = ? AND deleted_at IS NULL'
     ).bind(currentUser.userId).first() as any;
     
     if (!user) {
@@ -1205,13 +1205,13 @@ authRoutes.delete('/account', requireAuth, async (c) => {
     }
     
     const user = await c.env.DB.prepare(
-      'SELECT password_hash, email FROM users WHERE id = ?'
+      'SELECT password_hash, email FROM users WHERE id = ? AND deleted_at IS NULL'
     ).bind(currentUser.userId).first() as any;
-    
+
     if (!user) {
       return c.json(errorResponse('User not found'), 404);
     }
-    
+
     const emailVerificationRequired = !!c.env.RESEND_API_KEY;
     if (emailVerificationRequired) {
       if (!emailVerificationCode || String(emailVerificationCode).length !== 6) {
@@ -1278,23 +1278,23 @@ authRoutes.delete('/account', requireAuth, async (c) => {
  */
 authRoutes.delete('/delete', requireAuth, async (c) => {
   const logger = createLogger(c);
-  
+
   try {
     const currentUser = c.get('user') as any;
     const body = await c.req.json().catch(() => ({}));
     const { password, confirmation, emailVerificationCode } = body;
-    
+
     if (confirmation !== 'DELETE') {
       return c.json(errorResponse(
         'Confirmation required',
         '请输入 DELETE 确认删除账号'
       ), 400);
     }
-    
+
     const user = await c.env.DB.prepare(
-      'SELECT password_hash, email FROM users WHERE id = ?'
+      'SELECT password_hash, email FROM users WHERE id = ? AND deleted_at IS NULL'
     ).bind(currentUser.userId).first() as any;
-    
+
     if (!user) return c.json(errorResponse('User not found'), 404);
     
     if (c.env.RESEND_API_KEY) {
@@ -1351,23 +1351,23 @@ authRoutes.delete('/delete', requireAuth, async (c) => {
  */
 authRoutes.post('/delete', requireAuth, async (c) => {
   const logger = createLogger(c);
-  
+
   try {
     const currentUser = c.get('user') as any;
     const body = await c.req.json();
     const { password, confirmation, emailVerificationCode } = body;
-    
+
     if (confirmation !== 'DELETE') {
       return c.json(errorResponse(
         'Confirmation required',
         '请输入 DELETE 确认删除账号'
       ), 400);
     }
-    
+
     const user = await c.env.DB.prepare(
-      'SELECT password_hash, email FROM users WHERE id = ?'
+      'SELECT password_hash, email FROM users WHERE id = ? AND deleted_at IS NULL'
     ).bind(currentUser.userId).first() as any;
-    
+
     if (!user) return c.json(errorResponse('User not found'), 404);
     
     if (c.env.RESEND_API_KEY) {

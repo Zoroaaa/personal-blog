@@ -97,7 +97,7 @@ commentRoutes.get('/', optionalAuth, async (c) => {
         SELECT c.*, u.username, u.display_name, u.avatar_url
         FROM comments c
         JOIN users u ON c.user_id = u.id
-        WHERE c.post_id = ? AND c.status = 'approved' AND c.parent_id IS NULL
+        WHERE c.post_id = ? AND c.status = 'approved' AND c.parent_id IS NULL AND c.deleted_at IS NULL AND u.deleted_at IS NULL
         ORDER BY c.created_at DESC
         LIMIT ? OFFSET ?
       `;
@@ -108,7 +108,7 @@ commentRoutes.get('/', optionalAuth, async (c) => {
         SELECT c.*, u.username, u.display_name, u.avatar_url
         FROM comments c
         JOIN users u ON c.user_id = u.id
-        WHERE c.user_id = ? AND c.status = 'approved'
+        WHERE c.user_id = ? AND c.status = 'approved' AND c.deleted_at IS NULL AND u.deleted_at IS NULL
         ORDER BY c.created_at DESC
         LIMIT ? OFFSET ?
       `;
@@ -122,14 +122,14 @@ commentRoutes.get('/', optionalAuth, async (c) => {
     
     if (postId) {
       countQuery = `
-        SELECT COUNT(*) as total FROM comments 
-        WHERE post_id = ? AND status = 'approved' AND parent_id IS NULL
+        SELECT COUNT(*) as total FROM comments
+        WHERE post_id = ? AND status = 'approved' AND parent_id IS NULL AND deleted_at IS NULL
       `;
       countParams = [postId];
     } else {
       countQuery = `
-        SELECT COUNT(*) as total FROM comments 
-        WHERE user_id = ? AND status = 'approved'
+        SELECT COUNT(*) as total FROM comments
+        WHERE user_id = ? AND status = 'approved' AND deleted_at IS NULL
       `;
       countParams = [userId];
     }
@@ -153,16 +153,16 @@ commentRoutes.get('/', optionalAuth, async (c) => {
           FROM comments c
           JOIN users u ON c.user_id = u.id
           WHERE c.parent_id IN (${commentIds.map(() => '?').join(',')})
-            AND c.status = 'approved'
-          
+            AND c.status = 'approved' AND c.deleted_at IS NULL AND u.deleted_at IS NULL
+
           UNION ALL
-          
+
           -- 递归获取子回复
           SELECT c.*, u.username, u.display_name, u.avatar_url, ct.level + 1
           FROM comments c
           JOIN users u ON c.user_id = u.id
           JOIN comment_tree ct ON c.parent_id = ct.id
-          WHERE c.status = 'approved' AND ct.level < 5
+          WHERE c.status = 'approved' AND ct.level < 5 AND c.deleted_at IS NULL AND u.deleted_at IS NULL
         )
         SELECT * FROM comment_tree ORDER BY created_at ASC
       `).bind(...commentIds).all();
@@ -303,7 +303,7 @@ commentRoutes.post('/', requireAuth, async (c) => {
     // ===== 4. 如果是回复，检查父评论是否存在 =====
     if (parentId) {
       const parent = await c.env.DB.prepare(
-        'SELECT id, post_id FROM comments WHERE id = ?'
+        'SELECT id, post_id FROM comments WHERE id = ? AND deleted_at IS NULL'
       ).bind(parentId).first() as any;
       
       if (!parent) {
@@ -364,7 +364,7 @@ commentRoutes.post('/', requireAuth, async (c) => {
         // 回复评论 - 通知被回复者
         const parentComment = await c.env.DB.prepare(
           'SELECT c.user_id, c.content, u.display_name, u.username FROM comments c ' +
-          'LEFT JOIN users u ON c.user_id = u.id WHERE c.id = ?'
+          'LEFT JOIN users u ON c.user_id = u.id WHERE c.id = ? AND c.deleted_at IS NULL'
         ).bind(parentId).first() as any;
 
         if (parentComment && parentComment.user_id !== user.userId) {
@@ -496,7 +496,7 @@ commentRoutes.delete('/:id', requireAuth, async (c) => {
     
     // 获取评论信息
     const comment = await c.env.DB.prepare(
-      'SELECT * FROM comments WHERE id = ?'
+      'SELECT * FROM comments WHERE id = ? AND deleted_at IS NULL'
     ).bind(id).first() as any;
     
     if (!comment) {
@@ -563,7 +563,7 @@ commentRoutes.post('/:id/like', requireAuth, async (c) => {
 
     // 检查评论是否存在
     const comment = await c.env.DB.prepare(
-      'SELECT id FROM comments WHERE id = ?'
+      'SELECT id FROM comments WHERE id = ? AND deleted_at IS NULL'
     ).bind(commentId).first();
     
     if (!comment) {
@@ -599,10 +599,10 @@ commentRoutes.post('/:id/like', requireAuth, async (c) => {
       // 发送点赞通知
       try {
         const commentInfo = await c.env.DB.prepare(
-          `SELECT c.user_id, c.content, p.id as post_id, p.title, p.slug 
-           FROM comments c 
-           JOIN posts p ON c.post_id = p.id 
-           WHERE c.id = ?`
+          `SELECT c.user_id, c.content, p.id as post_id, p.title, p.slug
+           FROM comments c
+           JOIN posts p ON c.post_id = p.id
+           WHERE c.id = ? AND c.deleted_at IS NULL`
         ).bind(commentId).first() as any;
 
         if (commentInfo && commentInfo.user_id !== user.userId) {
