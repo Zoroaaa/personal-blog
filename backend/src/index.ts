@@ -25,12 +25,9 @@ import { uploadRoutes } from './routes/upload';
 import { analyticsRoutes } from './routes/analytics';
 import { adminRoutes } from './routes/admin';
 import { configRoutes } from './routes/config';
-import { messageRoutes } from './routes/messages';
 import { notificationRoutes } from './routes/notifications';
-import { notificationSettingsRoutes } from './routes/notificationSettings';
-import { pushRoutes } from './routes/push';
 import { adminNotificationRoutes } from './routes/adminNotifications';
-// 新的用户资源路由
+// 用户资源路由
 import { userNotificationSettingsRoutes } from './routes/users/notificationSettings';
 import { userNotificationSubscriptionsRoutes } from './routes/users/notificationSubscriptions';
 
@@ -319,24 +316,9 @@ app.route('/api/admin', adminRoutes);
 app.route('/api/config', configRoutes);
 
 /**
- * 私信路由
- */
-app.route('/api/messages', messageRoutes);
-
-/**
  * 通知路由
  */
 app.route('/api/notifications', notificationRoutes);
-
-/**
- * 通知设置路由
- */
-app.route('/api/notifications/settings', notificationSettingsRoutes);
-
-/**
- * 浏览器推送路由
- */
-app.route('/api/notifications/push', pushRoutes);
 
 /**
  * 管理员通知路由
@@ -344,16 +326,12 @@ app.route('/api/notifications/push', pushRoutes);
 app.route('/api/admin/notifications', adminNotificationRoutes);
 
 /**
- * 用户通知设置路由（新位置，更符合RESTful API设计）
- *
- * 旧路由 /api/notifications/settings 仍然可用以保持向后兼容
+ * 用户通知设置路由（标准RESTful API位置）
  */
 app.route('/api/users/notification-settings', userNotificationSettingsRoutes);
 
 /**
- * 用户通知订阅路由（浏览器推送订阅在新位置）
- *
- * 旧路由 /api/notifications/push 仍然可用以保持向后兼容
+ * 用户通知订阅路由（标准RESTful API位置，浏览器推送订阅）
  */
 app.route('/api/users/notification-subscriptions', userNotificationSubscriptionsRoutes);
 
