@@ -56,6 +56,8 @@ export function RichTextEditor({
   const [mentionPosition, setMentionPosition] = useState<{ start: number; end: number } | null>(null);
   const isUpdatingRef = useRef(false);
   const lastSelectionRef = useRef<Range | null>(null);
+  const isComposingRef = useRef(false);
+  const isSelectingMentionRef = useRef(false);
 
   const calculateTextLength = useCallback((html: string): number => {
     const temp = document.createElement('div');
@@ -220,24 +222,44 @@ export function RichTextEditor({
   }, []);
 
   const selectUser = useCallback((user: User) => {
-    if (!editorRef.current || !mentionPosition) return;
+    if (!editorRef.current) return;
+
+    isSelectingMentionRef.current = true;
 
     editorRef.current.focus();
-    
+
     const selection = window.getSelection();
-    if (!selection) return;
+    if (!selection) {
+      isSelectingMentionRef.current = false;
+      return;
+    }
 
-    const range = selection.getRangeAt(0);
-    const preCaretRange = range.cloneRange();
-    preCaretRange.selectNodeContents(editorRef.current);
-    preCaretRange.setEnd(range.endContainer, range.endOffset);
-    const textBeforeCursor = preCaretRange.toString();
+    let lastAtIndex = -1;
+    let deleteLength = 0;
 
-    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
-    if (lastAtIndex === -1) return;
+    if (selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const preCaretRange = range.cloneRange();
+      preCaretRange.selectNodeContents(editorRef.current);
+      preCaretRange.setEnd(range.endContainer, range.endOffset);
+      const textBeforeCursor = preCaretRange.toString();
+      lastAtIndex = textBeforeCursor.lastIndexOf('@');
+      if (lastAtIndex !== -1) {
+        deleteLength = textBeforeCursor.length - lastAtIndex;
+      }
+    }
 
-    const deleteLength = textBeforeCursor.length - lastAtIndex;
-    
+    if (lastAtIndex === -1 && mentionPosition) {
+      lastAtIndex = mentionPosition.start;
+      deleteLength = mentionPosition.end - mentionPosition.start;
+    }
+
+    if (lastAtIndex === -1) {
+      isSelectingMentionRef.current = false;
+      setShowMentions(false);
+      return;
+    }
+
     for (let i = 0; i < deleteLength; i++) {
       document.execCommand('delete', false);
     }
@@ -253,6 +275,7 @@ export function RichTextEditor({
     onChange(editorRef.current.innerHTML);
     setTimeout(() => {
       isUpdatingRef.current = false;
+      isSelectingMentionRef.current = false;
     }, 0);
   }, [onChange, mentionPosition]);
 
@@ -301,6 +324,36 @@ export function RichTextEditor({
   const handleInput = useCallback(() => {
     if (!editorRef.current) return;
 
+    if (isComposingRef.current) {
+      return;
+    }
+
+    const html = editorRef.current.innerHTML;
+    const length = calculateTextLength(html);
+
+    if (length > maxLength) {
+      editorRef.current.innerHTML = value;
+      return;
+    }
+
+    isUpdatingRef.current = true;
+    onChange(html);
+    setTimeout(() => {
+      isUpdatingRef.current = false;
+    }, 0);
+
+    checkForMention();
+  }, [onChange, maxLength, value, calculateTextLength, checkForMention]);
+
+  const handleCompositionStart = useCallback(() => {
+    isComposingRef.current = true;
+  }, []);
+
+  const handleCompositionEnd = useCallback(() => {
+    isComposingRef.current = false;
+    
+    if (!editorRef.current) return;
+
     const html = editorRef.current.innerHTML;
     const length = calculateTextLength(html);
 
@@ -323,6 +376,9 @@ export function RichTextEditor({
   }, [saveSelection]);
 
   const handleBlur = useCallback(() => {
+    if (isSelectingMentionRef.current) {
+      return;
+    }
     setIsFocused(false);
     setTimeout(() => {
       setShowMentions(false);
@@ -440,6 +496,8 @@ export function RichTextEditor({
           onMouseDown={handleMouseDown}
           onFocus={() => setIsFocused(true)}
           onBlur={handleBlur}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
           className="min-h-[120px] p-4 outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 dark:empty:before:text-gray-500 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100"
           data-placeholder={placeholder}
           style={{ wordBreak: 'break-word' }}
