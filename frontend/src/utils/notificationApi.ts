@@ -133,11 +133,14 @@ export async function deleteNotification(notificationId: number): Promise<void> 
 }
 
 /**
- * 获取通知设置
+ * 获取通知设置（新位置）
+ *
+ * 旧API：GET /notifications/settings
+ * 新API：GET /users/notification-settings
  */
 export async function getNotificationSettings(): Promise<NotificationSettings> {
   const response = await fetch(
-    `${API_BASE_URL}/notifications/settings`,
+    `${API_BASE_URL}/users/notification-settings`,
     getRequestConfig()
   );
 
@@ -146,13 +149,16 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
 }
 
 /**
- * 更新通知设置
+ * 更新通知设置（新位置）
+ *
+ * 旧API：PUT /notifications/settings
+ * 新API：PUT /users/notification-settings
  */
 export async function updateNotificationSettings(
   settings: PartialNotificationSettings
 ): Promise<NotificationSettings> {
   const response = await fetch(
-    `${API_BASE_URL}/notifications/settings`,
+    `${API_BASE_URL}/users/notification-settings`,
     {
       ...getRequestConfig(),
       method: 'PUT',
@@ -165,11 +171,14 @@ export async function updateNotificationSettings(
 }
 
 /**
- * 订阅浏览器推送
+ * 订阅浏览器推送（新位置）
+ *
+ * 旧API：POST /notifications/push/subscribe
+ * 新API：POST /users/notification-subscriptions
  */
 export async function subscribePush(subscription: PushSubscription): Promise<void> {
   const response = await fetch(
-    `${API_BASE_URL}/notifications/push/subscribe`,
+    `${API_BASE_URL}/users/notification-subscriptions`,
     {
       ...getRequestConfig(),
       method: 'POST',
@@ -188,15 +197,17 @@ export async function subscribePush(subscription: PushSubscription): Promise<voi
 }
 
 /**
- * 取消订阅浏览器推送
+ * 取消订阅浏览器推送（新位置）
+ *
+ * 旧API：POST /notifications/push/unsubscribe
+ * 新API：DELETE /users/notification-subscriptions/:subscriptionId
  */
-export async function unsubscribePush(endpoint: string): Promise<void> {
+export async function unsubscribePush(subscriptionId: number | string): Promise<void> {
   const response = await fetch(
-    `${API_BASE_URL}/notifications/push/unsubscribe`,
+    `${API_BASE_URL}/users/notification-subscriptions/${subscriptionId}`,
     {
       ...getRequestConfig(),
-      method: 'POST',
-      body: JSON.stringify({ endpoint }),
+      method: 'DELETE',
     }
   );
 
@@ -204,7 +215,10 @@ export async function unsubscribePush(endpoint: string): Promise<void> {
 }
 
 /**
- * 获取推送订阅状态
+ * 获取推送订阅状态（新位置）
+ *
+ * 旧API：GET /notifications/push/status
+ * 新API：GET /users/notification-subscriptions/status
  */
 export async function getPushStatus(): Promise<{
   isSubscribed: boolean;
@@ -217,7 +231,7 @@ export async function getPushStatus(): Promise<{
   }>;
 }> {
   const response = await fetch(
-    `${API_BASE_URL}/notifications/push/status`,
+    `${API_BASE_URL}/users/notification-subscriptions/status`,
     getRequestConfig()
   );
 

@@ -1,61 +1,50 @@
 /**
  * 通知系统类型定义
  * 
+ * 变更说明：
+ * - 移除 private_message 类型
+ * - 私信现在是完全独立的系统
+ * 
  * @author 博客系统
- * @version 1.0.0
- * @created 2024-01-01
+ * @version 2.0.0 - 方案A
+ * @created 2026-02-13
  */
 
-// 通知类型
-export type NotificationType = 'system' | 'interaction' | 'private_message';
+export type NotificationType = 'system' | 'interaction';
 
-// 通知子类型
 export type NotificationSubtype = 
-  // 系统子类型
   | 'maintenance' 
   | 'update' 
   | 'announcement'
-  // 互动子类型
   | 'comment' 
   | 'like' 
   | 'favorite' 
   | 'mention' 
   | 'follow' 
-  | 'reply'
-  // 私信
-  | 'private_message';
+  | 'reply';
 
-// 通知频率
 export type NotificationFrequency = 'realtime' | 'daily' | 'weekly' | 'off';
 
-// 通知渠道
 export type NotificationChannel = 'in_app' | 'email' | 'push';
 
-// 汇总类型
 export type DigestType = 'daily' | 'weekly';
 
-// 关联数据
 export interface NotificationRelatedData {
   postId?: number;
   postTitle?: string;
   postSlug?: string;
   commentId?: number;
   commentContent?: string;
-  // 被回复的评论信息
   parentCommentId?: number;
   parentCommentContent?: string;
   parentCommentAuthor?: string;
-  // 回复内容
   replyContent?: string;
   senderId?: number;
   senderName?: string;
   senderAvatar?: string;
-  messageId?: number;
-  messageContent?: string;
   [key: string]: any;
 }
 
-// 通知记录（数据库模型）
 export interface Notification {
   id: number;
   userId: number;
@@ -64,7 +53,6 @@ export interface Notification {
   title: string;
   content?: string;
   relatedData?: NotificationRelatedData;
-  messageId?: number;
   isInAppSent: boolean;
   isEmailSent: boolean;
   isPushSent: boolean;
@@ -75,7 +63,6 @@ export interface Notification {
   createdAt: string;
 }
 
-// 通知类型设置
 export interface NotificationTypeSettings {
   inApp: boolean;
   email: boolean;
@@ -83,7 +70,6 @@ export interface NotificationTypeSettings {
   frequency: NotificationFrequency;
 }
 
-// 互动通知子类型设置
 export interface InteractionSubtypes {
   comment: boolean;
   like: boolean;
@@ -93,35 +79,30 @@ export interface InteractionSubtypes {
   reply: boolean;
 }
 
-// 免打扰设置
 export interface DoNotDisturbSettings {
   enabled: boolean;
-  start?: string;  // HH:mm 格式
+  start?: string;
   end?: string;
   timezone: string;
 }
 
-// 汇总时间设置
 export interface DigestTimeSettings {
-  daily: string;  // HH:mm 格式
-  weeklyDay: number;  // 0=周日, 1=周一, ..., 6=周六
-  weeklyTime: string;  // HH:mm 格式
+  daily: string;
+  weeklyDay: number;
+  weeklyTime: string;
 }
 
-// 用户通知设置（数据库模型）
 export interface NotificationSettings {
   id?: number;
   userId: number;
   system: NotificationTypeSettings;
   interaction: NotificationTypeSettings & { subtypes: InteractionSubtypes };
-  privateMessage: NotificationTypeSettings;
   doNotDisturb: DoNotDisturbSettings;
   digestTime: DigestTimeSettings;
   createdAt?: string;
   updatedAt?: string;
 }
 
-// 推送订阅（数据库模型）
 export interface PushSubscription {
   id?: number;
   userId: number;
@@ -135,7 +116,6 @@ export interface PushSubscription {
   lastUsedAt?: string;
 }
 
-// 邮件汇总队列（数据库模型）
 export interface EmailDigestQueue {
   id?: number;
   userId: number;
@@ -146,7 +126,6 @@ export interface EmailDigestQueue {
   sentAt?: string;
 }
 
-// 创建通知请求
 export interface CreateNotificationRequest {
   userId: number;
   type: NotificationType;
@@ -154,17 +133,14 @@ export interface CreateNotificationRequest {
   title: string;
   content?: string;
   relatedData?: NotificationRelatedData;
-  messageId?: number;
 }
 
-// 发送通知选项
 export interface SendNotificationOptions {
   skipInApp?: boolean;
   skipEmail?: boolean;
   skipPush?: boolean;
 }
 
-// 通知列表查询参数
 export interface NotificationQueryParams {
   page?: number;
   limit?: number;
@@ -172,7 +148,6 @@ export interface NotificationQueryParams {
   isRead?: boolean;
 }
 
-// 通知列表响应
 export interface NotificationListResponse {
   notifications: Notification[];
   pagination: {
@@ -183,17 +158,14 @@ export interface NotificationListResponse {
   };
 }
 
-// 未读数响应
 export interface UnreadCountResponse {
   total: number;
   byType: {
     system: number;
     interaction: number;
-    private_message: number;
   };
 }
 
-// 推送订阅请求
 export interface PushSubscribeRequest {
   subscription: {
     endpoint: string;
@@ -205,7 +177,6 @@ export interface PushSubscribeRequest {
   userAgent?: string;
 }
 
-// 推送订阅响应
 export interface PushSubscriptionResponse {
   endpoint: string;
   expirationTime?: number | null;
@@ -215,7 +186,6 @@ export interface PushSubscriptionResponse {
   };
 }
 
-// 管理员发送系统通知请求
 export interface AdminSendNotificationRequest {
   title: string;
   content?: string;
@@ -224,18 +194,15 @@ export interface AdminSendNotificationRequest {
   channels: NotificationChannel[];
 }
 
-// 管理员发送通知响应
 export interface AdminSendNotificationResponse {
   sentCount: number;
   failedCount: number;
   errors?: string[];
 }
 
-// 通知设置更新请求
 export interface UpdateNotificationSettingsRequest {
   system?: Partial<NotificationTypeSettings>;
   interaction?: Partial<NotificationTypeSettings> & { subtypes?: Partial<InteractionSubtypes> };
-  privateMessage?: Partial<NotificationTypeSettings>;
   doNotDisturb?: Partial<DoNotDisturbSettings>;
   digestTime?: Partial<DigestTimeSettings>;
 }

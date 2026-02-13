@@ -119,6 +119,33 @@ notificationRoutes.get('/unread-count', requireAuth, async (c) => {
 });
 
 /**
+ * GET /api/notifications/unread
+ * 获取未读通知数 （别名：使用单数形式，更符合REST标准）
+ */
+notificationRoutes.get('/unread', requireAuth, async (c) => {
+  const logger = createLogger(c);
+
+  try {
+    const currentUser = c.get('user') as any;
+
+    const result = await getUnreadCount(c.env.DB, currentUser.userId);
+
+    logger.info('Get unread count (new endpoint)', {
+      userId: currentUser.userId,
+      total: result.total,
+    });
+
+    return c.json(successResponse(result));
+  } catch (error) {
+    logger.error('Get unread count error', error);
+    return c.json(
+      errorResponse('Failed to get unread count', '获取未读数失败'),
+      500
+    );
+  }
+});
+
+/**
  * PUT /api/notifications/:id/read
  * 标记单条通知为已读
  */

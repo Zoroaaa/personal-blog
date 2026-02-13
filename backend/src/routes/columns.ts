@@ -24,6 +24,7 @@ import {
   generateSlug,
   safeParseInt
 } from '../utils/validation';
+import { SoftDeleteHelper } from '../utils/softDeleteHelper';
 
 export const columnRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -512,8 +513,8 @@ columnRoutes.delete('/:id', requireAuth, requireAdmin, async (c) => {
       ), 400);
     }
 
-    // 删除专栏（将关联文章的column_id设为NULL）
-    await c.env.DB.prepare('DELETE FROM columns WHERE id = ?').bind(id).run();
+    // 软删除专栏（保留数据以支持审计和恢复）
+    await SoftDeleteHelper.softDelete(c.env.DB, 'columns', id);
 
     logger.info('Column deleted', { columnId: id });
 

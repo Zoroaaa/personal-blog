@@ -6,10 +6,15 @@
  * - 通知发送逻辑
  * - 与数据库交互
  * - 免打扰检查
+ * 
+ * 变更说明：
+ * - 移除了 private_message 类型的支持
+ * - 移除了 createPrivateMessageNotification 函数
+ * - 私信现在是完全独立的系统
  *
  * @author 博客系统
- * @version 1.1.0
- * @created 2024-01-01
+ * @version 2.0.0 - 方案A
+ * @created 2026-02-13
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
@@ -29,15 +34,10 @@ import { getNotificationSettings } from './notificationSettingsService';
 import { shouldSendNow } from './doNotDisturb';
 import { sendNotificationEmail } from '../utils/resend';
 
-// 默认分页配置
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
 
-/**
- * 创建通知
- * 会自动检查用户通知设置和免打扰状态
- */
 export async function createNotification(
   db: D1Database,
   data: CreateNotificationRequest,
@@ -52,19 +52,20 @@ export async function createNotification(
       title,
       content,
       relatedData,
-      messageId,
     } = data;
 
-    // 获取用户通知设置
+    if (type !== 'system' && type !== 'interaction') {
+      console.error('Invalid notification type:', type);
+      return null;
+    }
+
     const settings = await getNotificationSettings(db, userId);
 
-    // 检查通知类型是否启用
-    const typeSettings = settings[type === 'private_message' ? 'privateMessage' : type];
+    const typeSettings = settings[type];
     if (!typeSettings || typeSettings.frequency === 'off') {
       return null;
     }
 
-    // 检查免打扰状态（仅对email和push渠道）
     const shouldSendEmail = !options.skipEmail &&
       typeSettings.email &&
       shouldSendNow(settings.doNotDisturb, 'email');
@@ -75,17 +76,15 @@ export async function createNotification(
 
     const shouldSendInApp = !options.skipInApp && typeSettings.inApp;
 
-    // 如果所有渠道都不发送，则不创建通知
     if (!shouldSendInApp && !shouldSendEmail && !shouldSendPush) {
       return null;
     }
 
-    // 插入通知记录
     const result = await db.prepare(
       `INSERT INTO notifications (
-        user_id, type, subtype, title, content, related_data, message_id,
+        user_id, type, subtype, title, content, related_data,
         is_in_app_sent, is_email_sent, is_push_sent, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
     ).bind(
       userId,
       type,
@@ -93,10 +92,9 @@ export async function createNotification(
       title,
       content || null,
       relatedData ? JSON.stringify(relatedData) : null,
-      messageId || null,
       shouldSendInApp ? 1 : 0,
-      shouldSendEmail ? 0 : 0, // 标记为待发送
-      shouldSendPush ? 0 : 0   // 标记为待发送
+      shouldSendEmail ? 0 : 0,
+      shouldSendPush ? 0 : 0
     ).run();
 
     if (!result.success) {
@@ -104,14 +102,11 @@ export async function createNotification(
       return null;
     }
 
-    // 获取创建的通知
     const notificationId = result.meta.last_row_id;
     const notification = await getNotificationById(db, notificationId);
 
-    // 发送邮件通知
     if (shouldSendEmail && env && notification) {
       try {
-        // 获取用户信息
         const user = await db.prepare(
           'SELECT display_name, email FROM users WHERE id = ?'
         ).bind(userId).first() as { display_name: string, email: string };
@@ -131,8 +126,6 @@ export async function createNotification(
       }
     }
 
-    // TODO: 实现推送通知功能
-
     return notification;
   } catch (error) {
     console.error('Create notification error:', error);
@@ -140,9 +133,6 @@ export async function createNotification(
   }
 }
 
-/**
- * 根据ID获取通知
- */
 export async function getNotificationById(
   db: D1Database,
   id: number
@@ -150,7 +140,7 @@ export async function getNotificationById(
   try {
     const row = await db.prepare(
       `SELECT 
-        id, user_id, type, subtype, title, content, related_data, message_id,
+        id, user_id, type, subtype, title, content, related_data,
         is_in_app_sent, is_email_sent, is_push_sent,
         is_read, read_at, is_deleted, deleted_at, created_at
       FROM notifications
@@ -166,9 +156,6 @@ export async function getNotificationById(
   }
 }
 
-/**
- * 获取用户的通知列表
- */
 export async function getNotifications(
   db: D1Database,
   userId: number,
@@ -179,7 +166,6 @@ export async function getNotifications(
     const limit = Math.min(MAX_LIMIT, Math.max(1, params.limit || DEFAULT_LIMIT));
     const offset = (page - 1) * limit;
 
-    // 构建查询条件
     const conditions: string[] = ['user_id = ?', 'is_deleted = 0'];
     const bindings: any[] = [userId];
 
@@ -195,17 +181,15 @@ export async function getNotifications(
 
     const whereClause = conditions.join(' AND ');
 
-    // 获取总数
     const countResult = await db.prepare(
       `SELECT COUNT(*) as total FROM notifications WHERE ${whereClause}`
     ).bind(...bindings).first();
 
     const total = (countResult?.total as number) || 0;
 
-    // 获取通知列表
     const rows = await db.prepare(
       `SELECT 
-        id, user_id, type, subtype, title, content, related_data, message_id,
+        id, user_id, type, subtype, title, content, related_data,
         is_in_app_sent, is_email_sent, is_push_sent,
         is_read, read_at, is_deleted, deleted_at, created_at
       FROM notifications
@@ -239,9 +223,6 @@ export async function getNotifications(
   }
 }
 
-/**
- * 获取未读通知数
- */
 export async function getUnreadCount(
   db: D1Database,
   userId: number
@@ -259,7 +240,6 @@ export async function getUnreadCount(
     const byType = {
       system: 0,
       interaction: 0,
-      private_message: 0,
     };
 
     let total = 0;
@@ -280,15 +260,11 @@ export async function getUnreadCount(
       byType: {
         system: 0,
         interaction: 0,
-        private_message: 0,
       },
     };
   }
 }
 
-/**
- * 标记通知为已读
- */
 export async function markAsRead(
   db: D1Database,
   notificationId: number,
@@ -308,9 +284,6 @@ export async function markAsRead(
   }
 }
 
-/**
- * 标记所有通知为已读
- */
 export async function markAllAsRead(
   db: D1Database,
   userId: number,
@@ -335,9 +308,6 @@ export async function markAllAsRead(
   }
 }
 
-/**
- * 删除通知（软删除）
- */
 export async function deleteNotification(
   db: D1Database,
   notificationId: number,
@@ -357,9 +327,6 @@ export async function deleteNotification(
   }
 }
 
-/**
- * 更新通知的渠道发送状态
- */
 export async function updateChannelStatus(
   db: D1Database,
   notificationId: number,
@@ -387,9 +354,6 @@ export async function updateChannelStatus(
   }
 }
 
-/**
- * 清理过期通知（保留90天）
- */
 export async function cleanupOldNotifications(
   db: D1Database,
   days: number = 90
@@ -407,9 +371,6 @@ export async function cleanupOldNotifications(
   }
 }
 
-/**
- * 数据库行映射为Notification对象
- */
 function mapNotificationFromRow(row: any): Notification {
   return {
     id: row.id,
@@ -419,7 +380,6 @@ function mapNotificationFromRow(row: any): Notification {
     title: row.title,
     content: row.content,
     relatedData: row.related_data ? JSON.parse(row.related_data) : undefined,
-    messageId: row.message_id,
     isInAppSent: row.is_in_app_sent === 1,
     isEmailSent: row.is_email_sent === 1,
     isPushSent: row.is_push_sent === 1,
@@ -431,9 +391,6 @@ function mapNotificationFromRow(row: any): Notification {
   };
 }
 
-/**
- * 创建互动通知的快捷方法
- */
 export async function createInteractionNotification(
   db: D1Database,
   params: {
@@ -455,9 +412,6 @@ export async function createInteractionNotification(
   }, {}, env);
 }
 
-/**
- * 创建系统通知的快捷方法
- */
 export async function createSystemNotification(
   db: D1Database,
   params: {
@@ -475,31 +429,6 @@ export async function createSystemNotification(
     subtype: params.subtype,
     title: params.title,
     content: params.content,
-    relatedData: params.relatedData,
-  }, {}, env);
-}
-
-/**
- * 创建私信通知的快捷方法
- */
-export async function createPrivateMessageNotification(
-  db: D1Database,
-  params: {
-    userId: number;
-    title: string;
-    content?: string;
-    messageId: number;
-    relatedData: NotificationRelatedData;
-  },
-  env?: Env
-): Promise<Notification | null> {
-  return createNotification(db, {
-    userId: params.userId,
-    type: 'private_message',
-    subtype: 'private_message',
-    title: params.title,
-    content: params.content,
-    messageId: params.messageId,
     relatedData: params.relatedData,
   }, {}, env);
 }

@@ -73,22 +73,29 @@ function getVerificationEmailHtml(code: string, type: string): string {
 /**
  * 生成通知邮件 HTML 模板
  */
-function getNotificationEmailHtml(notification: Notification, user: { name: string, email: string }): string {
+function getNotificationEmailHtml(
+  notification: Notification,
+  user: { name: string, email: string },
+  baseUrl: string = 'https://blog.example.com'  // 从参数传入，支持动态配置
+): string {
   const typeColors: Record<string, string> = {
     system: '#ef4444',
     interaction: '#3b82f6',
     private_message: '#8b5cf6'
   };
-  
+
   const typeLabels: Record<string, string> = {
     system: '系统通知',
     interaction: '互动通知',
     private_message: '私信通知'
   };
-  
+
   const typeColor = typeColors[notification.type] || '#64748b';
   const typeLabel = typeLabels[notification.type] || '通知';
-  
+
+  // 构建详情链接：优先使用notification中的link，否则使用baseUrl
+  const detailLink = (notification.relatedData as any)?.link || baseUrl;
+
   return `
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -114,13 +121,13 @@ function getNotificationEmailHtml(notification: Notification, user: { name: stri
               ${notification.content ? `<p style="margin:0 0 24px;color:#475569;font-size:15px;line-height:1.6;">${notification.content}</p>` : ''}
               ${notification.relatedData ? `
               <div style="background:#f1f5f9;border-radius:12px;padding:20px;margin-bottom:24px;">
-                ${Object.entries(notification.relatedData).map(([key, value]) => 
+                ${Object.entries(notification.relatedData).map(([key, value]) =>
                   `<p style="margin:0 0 8px;color:#64748b;font-size:14px;"><strong>${key}:</strong> ${String(value)}</p>`
                 ).join('')}
               </div>
               ` : ''}
               <p style="margin:0 0 24px;color:#64748b;font-size:14px;">此通知发送时间：${notification.createdAt}</p>
-              <a href="${(notification.relatedData as any)?.link || 'https://blog.neutronx.uk'}" style="display:inline-block;background:${typeColor};color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:500;">查看详情</a>
+              <a href="${detailLink}" style="display:inline-block;background:${typeColor};color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:500;">查看详情</a>
             </td>
           </tr>
           <tr>
@@ -203,7 +210,11 @@ export async function sendNotificationEmail(
 
   const from = (env as any).RESEND_FROM_EMAIL || 'onboarding@resend.dev';
   const subject = `【${notification.type === 'system' ? '系统' : notification.type === 'interaction' ? '互动' : '私信'}通知】${notification.title}`;
-  const html = getNotificationEmailHtml(notification, user);
+
+  // 从 FRONTEND_URL 环境变量获取基础URL，支持灵活配置
+  // 这是用户访问博客的地址（前端域名）
+  const baseUrl = env.FRONTEND_URL || 'https://blog.example.com';
+  const html = getNotificationEmailHtml(notification, user, baseUrl);
 
   try {
     const res = await fetch(RESEND_API, {

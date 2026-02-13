@@ -33,6 +33,9 @@ import {
 import { isFeatureEnabled, getConfigValue } from './config';
 import { createInteractionNotification } from '../services/notificationService';
 import { isNotificationEnabled, isInteractionSubtypeEnabled } from '../services/notificationSettingsService';
+import { detectMentions, createMentionNotifications } from '../services/mentionService';
+import { SoftDeleteHelper } from '../utils/softDeleteHelper';
+import { rateLimit } from '../middleware/rateLimit';
 
 export const commentRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -95,7 +98,7 @@ commentRoutes.get('/', optionalAuth, async (c) => {
         SELECT c.*, u.username, u.display_name, u.avatar_url
         FROM comments c
         JOIN users u ON c.user_id = u.id
-        WHERE c.post_id = ? AND c.status = 'approved' AND c.parent_id IS NULL
+        WHERE c.post_id = ? AND c.status = 'approved' AND c.parent_id IS NULL AND c.deleted_at IS NULL AND u.deleted_at IS NULL
         ORDER BY c.created_at DESC
         LIMIT ? OFFSET ?
       `;
@@ -106,7 +109,7 @@ commentRoutes.get('/', optionalAuth, async (c) => {
         SELECT c.*, u.username, u.display_name, u.avatar_url
         FROM comments c
         JOIN users u ON c.user_id = u.id
-        WHERE c.user_id = ? AND c.status = 'approved'
+        WHERE c.user_id = ? AND c.status = 'approved' AND c.deleted_at IS NULL AND u.deleted_at IS NULL
         ORDER BY c.created_at DESC
         LIMIT ? OFFSET ?
       `;
@@ -120,14 +123,14 @@ commentRoutes.get('/', optionalAuth, async (c) => {
     
     if (postId) {
       countQuery = `
-        SELECT COUNT(*) as total FROM comments 
-        WHERE post_id = ? AND status = 'approved' AND parent_id IS NULL
+        SELECT COUNT(*) as total FROM comments
+        WHERE post_id = ? AND status = 'approved' AND parent_id IS NULL AND deleted_at IS NULL
       `;
       countParams = [postId];
     } else {
       countQuery = `
-        SELECT COUNT(*) as total FROM comments 
-        WHERE user_id = ? AND status = 'approved'
+        SELECT COUNT(*) as total FROM comments
+        WHERE user_id = ? AND status = 'approved' AND deleted_at IS NULL
       `;
       countParams = [userId];
     }
@@ -151,16 +154,16 @@ commentRoutes.get('/', optionalAuth, async (c) => {
           FROM comments c
           JOIN users u ON c.user_id = u.id
           WHERE c.parent_id IN (${commentIds.map(() => '?').join(',')})
-            AND c.status = 'approved'
-          
+            AND c.status = 'approved' AND c.deleted_at IS NULL AND u.deleted_at IS NULL
+
           UNION ALL
-          
+
           -- 递归获取子回复
           SELECT c.*, u.username, u.display_name, u.avatar_url, ct.level + 1
           FROM comments c
           JOIN users u ON c.user_id = u.id
           JOIN comment_tree ct ON c.parent_id = ct.id
-          WHERE c.status = 'approved' AND ct.level < 5
+          WHERE c.status = 'approved' AND ct.level < 5 AND c.deleted_at IS NULL AND u.deleted_at IS NULL
         )
         SELECT * FROM comment_tree ORDER BY created_at ASC
       `).bind(...commentIds).all();
@@ -245,7 +248,11 @@ commentRoutes.get('/', optionalAuth, async (c) => {
  *   parentId?: number
  * }
  */
-commentRoutes.post('/', requireAuth, async (c) => {
+commentRoutes.post('/', requireAuth, rateLimit({
+  windowMs: 60 * 1000, // 1 分钟
+  maxRequests: 5,
+  message: '1 分钟内最多发表 5 条评论'
+}), async (c) => {
   const logger = createLogger(c);
   
   try {
@@ -301,7 +308,7 @@ commentRoutes.post('/', requireAuth, async (c) => {
     // ===== 4. 如果是回复，检查父评论是否存在 =====
     if (parentId) {
       const parent = await c.env.DB.prepare(
-        'SELECT id, post_id FROM comments WHERE id = ?'
+        'SELECT id, post_id FROM comments WHERE id = ? AND deleted_at IS NULL'
       ).bind(parentId).first() as any;
       
       if (!parent) {
@@ -362,7 +369,7 @@ commentRoutes.post('/', requireAuth, async (c) => {
         // 回复评论 - 通知被回复者
         const parentComment = await c.env.DB.prepare(
           'SELECT c.user_id, c.content, u.display_name, u.username FROM comments c ' +
-          'LEFT JOIN users u ON c.user_id = u.id WHERE c.id = ?'
+          'LEFT JOIN users u ON c.user_id = u.id WHERE c.id = ? AND c.deleted_at IS NULL'
         ).bind(parentId).first() as any;
 
         if (parentComment && parentComment.user_id !== user.userId) {
@@ -397,7 +404,7 @@ commentRoutes.post('/', requireAuth, async (c) => {
                 senderName: user.displayName || user.username,
                 senderAvatar: user.avatarUrl,
               },
-            });
+            }, c.env);
           }
         }
       } else {
@@ -429,13 +436,41 @@ commentRoutes.post('/', requireAuth, async (c) => {
                 senderName: user.displayName || user.username,
                 senderAvatar: user.avatarUrl,
               },
-            });
+            }, c.env);
           }
         }
       }
     } catch (notifyError) {
       // 通知发送失败不影响评论创建
       logger.error('Send comment notification error', notifyError);
+    }
+
+    // ===== 9. 检测并处理@mentions =====
+    try {
+      const mentions = detectMentions(content);
+      if (mentions.length > 0) {
+        // 获取文章信息
+        const postInfo = await c.env.DB.prepare(
+          'SELECT title, slug FROM posts WHERE id = ?'
+        ).bind(postId).first() as any;
+
+        await createMentionNotifications(
+          c.env.DB,
+          mentions,
+          user.userId,
+          'comment',
+          commentId,
+          `/posts/${postInfo?.slug || postId}#comment-${commentId}`
+        );
+
+        logger.info('Mention notifications created', {
+          commentId,
+          mentions: mentions.length
+        });
+      }
+    } catch (mentionError) {
+      // @mentions处理失败不影响评论创建
+      logger.error('Mention detection error', mentionError);
     }
     
     return c.json(successResponse({
@@ -457,7 +492,11 @@ commentRoutes.post('/', requireAuth, async (c) => {
  * DELETE /api/comments/:id
  * 删除评论（需要认证，只能删除自己的评论或管理员可删除所有）
  */
-commentRoutes.delete('/:id', requireAuth, async (c) => {
+commentRoutes.delete('/:id', requireAuth, rateLimit({
+  windowMs: 30 * 1000, // 30 秒
+  maxRequests: 10,
+  message: '删除评论过于频繁，请稍后再试'
+}), async (c) => {
   const logger = createLogger(c);
   
   try {
@@ -466,7 +505,7 @@ commentRoutes.delete('/:id', requireAuth, async (c) => {
     
     // 获取评论信息
     const comment = await c.env.DB.prepare(
-      'SELECT * FROM comments WHERE id = ?'
+      'SELECT * FROM comments WHERE id = ? AND deleted_at IS NULL'
     ).bind(id).first() as any;
     
     if (!comment) {
@@ -481,8 +520,8 @@ commentRoutes.delete('/:id', requireAuth, async (c) => {
       ), 403);
     }
     
-    // 删除评论（级联删除会自动处理子评论）
-    await c.env.DB.prepare('DELETE FROM comments WHERE id = ?').bind(id).run();
+    // 软删除评论（保留数据以支持审计和恢复）
+    await SoftDeleteHelper.softDelete(c.env.DB, 'comments', id);
     
     // 计数更新由触发器自动处理
     
@@ -511,7 +550,11 @@ commentRoutes.delete('/:id', requireAuth, async (c) => {
  * POST /api/comments/:id/like
  * 点赞/取消点赞评论（需要认证）
  */
-commentRoutes.post('/:id/like', requireAuth, async (c) => {
+commentRoutes.post('/:id/like', requireAuth, rateLimit({
+  windowMs: 15 * 1000, // 15 秒
+  maxRequests: 20,
+  message: '点赞操作过于频繁，请稍后再试'
+}), async (c) => {
   const logger = createLogger(c);
   
   try {
@@ -533,7 +576,7 @@ commentRoutes.post('/:id/like', requireAuth, async (c) => {
 
     // 检查评论是否存在
     const comment = await c.env.DB.prepare(
-      'SELECT id FROM comments WHERE id = ?'
+      'SELECT id FROM comments WHERE id = ? AND deleted_at IS NULL'
     ).bind(commentId).first();
     
     if (!comment) {
@@ -569,10 +612,10 @@ commentRoutes.post('/:id/like', requireAuth, async (c) => {
       // 发送点赞通知
       try {
         const commentInfo = await c.env.DB.prepare(
-          `SELECT c.user_id, c.content, p.id as post_id, p.title, p.slug 
-           FROM comments c 
-           JOIN posts p ON c.post_id = p.id 
-           WHERE c.id = ?`
+          `SELECT c.user_id, c.content, p.id as post_id, p.title, p.slug
+           FROM comments c
+           JOIN posts p ON c.post_id = p.id
+           WHERE c.id = ? AND c.deleted_at IS NULL`
         ).bind(commentId).first() as any;
 
         if (commentInfo && commentInfo.user_id !== user.userId) {
@@ -600,7 +643,7 @@ commentRoutes.post('/:id/like', requireAuth, async (c) => {
                 senderName: user.displayName || user.username,
                 senderAvatar: user.avatarUrl,
               },
-            });
+            }, c.env);
           }
         }
       } catch (notifyError) {

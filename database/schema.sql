@@ -51,6 +51,28 @@ CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id);
 
+-- ============= OAuth令牌表 =============
+
+CREATE TABLE IF NOT EXISTS oauth_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    provider TEXT NOT NULL CHECK(provider IN ('github', 'google')),
+    access_token TEXT NOT NULL,
+    refresh_token TEXT,
+    token_type TEXT DEFAULT 'Bearer',
+    scopes TEXT,  -- 逗号分隔的权限列表
+    expires_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE (user_id, provider)
+);
+
+CREATE INDEX IF NOT EXISTS idx_oauth_tokens_user_id ON oauth_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_oauth_tokens_provider ON oauth_tokens(provider);
+CREATE INDEX IF NOT EXISTS idx_oauth_tokens_expires_at ON oauth_tokens(expires_at);
+
 -- ============= 分类表 =============
 
 CREATE TABLE IF NOT EXISTS categories (
@@ -416,6 +438,52 @@ CREATE TABLE IF NOT EXISTS site_config (
 -- 配置表索引
 CREATE INDEX IF NOT EXISTS idx_site_config_key ON site_config(key);
 CREATE INDEX IF NOT EXISTS idx_site_config_category ON site_config(category);
+
+-- ============= 通知表 =============
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    -- 接收者
+    user_id INTEGER NOT NULL,
+
+    -- 通知类型和子类型
+    type TEXT NOT NULL CHECK(type IN ('system', 'interaction', 'private_message')),
+    subtype TEXT CHECK(subtype IN (
+        'maintenance', 'update', 'announcement',  -- 系统子类型
+        'comment', 'like', 'favorite', 'mention', 'follow', 'reply', 'message',  -- 互动/私信子类型
+        'post_comment', 'comment_reply', '@mention'  -- 兼容旧名称
+    )),
+
+    -- 通知内容
+    title TEXT NOT NULL,
+    content TEXT,
+
+    -- 关联数据（JSON格式）
+    related_data TEXT,
+
+    -- 用户状态
+    is_read INTEGER DEFAULT 0,
+    read_at DATETIME,
+    deleted_at DATETIME,
+
+    -- 系统通知状态
+    is_active INTEGER DEFAULT 1,
+
+    -- 时间
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    -- 外键
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 通知表索引
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_type ON notifications(user_id, type);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, is_read, deleted_at) WHERE is_read = 0 AND deleted_at IS NULL;
 
 -- ============= 数据库触发器 =============
 

@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "jest",
-    "deploy": "npm run build && wrangler pages deploy dist"
+    "deploy": "npm ci && npm run build && wrangler pages deploy dist"
   },
   "dependencies": {
     "date-fns": "^3.0.6",
@@ -31,10 +31,10 @@
     "postcss": "^8.4.32",
     "tailwindcss": "^3.4.0",
     "typescript": "^5.2.2",
-    "vite": "^5.0.8",
-    "wrangler": "^3.22.1"
+    "vite": "^7.3.1",
+    "wrangler": "^4.65.0"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.0.0"
   }
 }

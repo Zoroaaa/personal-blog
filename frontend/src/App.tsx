@@ -10,7 +10,7 @@
  * 路由配置：
  * - 首页、文章详情页、登录页等基础页面
  * - 管理后台相关页面
- * - 搜索、消息、通知等功能页面
+ * - 搜索、通知等功能页面
  * 
  * @author 博客系统
  * @version 1.0.0
@@ -21,6 +21,7 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { HomePage } from './pages/HomePage';
 import { PostPage } from './pages/PostPage';
 import { LoginPage } from './pages/LoginPage';
@@ -32,13 +33,12 @@ import { AboutPage } from './pages/AboutPage';
 import { ColumnPage } from './pages/ColumnPage';
 import { CategoryPage } from './pages/CategoryPage';
 import { TagPage } from './pages/TagPage';
-import { MessagesPage } from './pages/MessagesPage';
+import { NotFoundPage } from './pages/NotFoundPage';
 import NotificationCenter from './pages/NotificationCenter';
 import NotificationSettings from './pages/NotificationSettings';
 import { SystemNotificationPage } from './pages/admin/SystemNotificationPage';
 import { useSiteConfig } from './hooks/useSiteConfig';
 import { ToastProvider } from './components/Toast';
-import { MessageButton } from './components/MessageButton';
 
 /**
  * 页面过渡包装组件
@@ -64,7 +64,7 @@ function PageTransition({ children }: { children: React.ReactNode }) {
  * 功能：定义应用的所有路由配置
  * 
  * 路由列表：
- * - 首页：/ 
+ * - 首页：/
  * - 关于页：/about
  * - 文章详情页：/posts/:slug
  * - 登录页：/login
@@ -74,7 +74,6 @@ function PageTransition({ children }: { children: React.ReactNode }) {
  * - 专栏页：/columns/:slug
  * - 分类页：/categories/:slug
  * - 标签页：/tags/:slug
- * - 消息页：/messages
  * - 通知中心：/notifications
  * - 通知设置：/notification-settings
  * - 系统通知管理：/admin/notifications
@@ -95,10 +94,12 @@ function AppRoutes() {
       <Route path="/columns/:slug" element={<PageTransition><ColumnPage /></PageTransition>} />
       <Route path="/categories/:slug" element={<PageTransition><CategoryPage /></PageTransition>} />
       <Route path="/tags/:slug" element={<PageTransition><TagPage /></PageTransition>} />
-      <Route path="/messages" element={<PageTransition><MessagesPage /></PageTransition>} />
       <Route path="/notifications" element={<PageTransition><NotificationCenter /></PageTransition>} />
       <Route path="/notification-settings" element={<PageTransition><NotificationSettings /></PageTransition>} />
       <Route path="/admin/notifications" element={<PageTransition><SystemNotificationPage /></PageTransition>} />
+      
+      {/* 404路由 - 捕获所有未匹配的路径 */}
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }
@@ -164,18 +165,19 @@ function App() {
   }, [config.site_favicon, currentFavicon]);
 
   return (
-    <ToastProvider>
-      <BrowserRouter>
-        <div className="min-h-screen flex flex-col">
-          <Header />
-          <main className="flex-1">
-            <AppRoutes />
-          </main>
-          <Footer />
-          <MessageButton />
-        </div>
-      </BrowserRouter>
-    </ToastProvider>
+    <ErrorBoundary>
+      <ToastProvider>
+        <BrowserRouter>
+          <div className="min-h-screen flex flex-col">
+            <Header />
+            <main className="flex-1">
+              <AppRoutes />
+            </main>
+            <Footer />
+          </div>
+        </BrowserRouter>
+      </ToastProvider>
+    </ErrorBoundary>
   );
 }
 

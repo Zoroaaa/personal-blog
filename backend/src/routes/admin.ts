@@ -17,6 +17,7 @@ import { successResponse, errorResponse } from '../utils/response';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { safeParseInt } from '../utils/validation';
+import { SoftDeleteHelper } from '../utils/softDeleteHelper';
 
 export const adminRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -201,8 +202,8 @@ adminRoutes.delete('/comments/:id', requireAdmin, async (c) => {
       return c.json(errorResponse('Comment not found'), 404);
     }
     
-    // 删除评论（级联删除会自动处理子评论）
-    await c.env.DB.prepare('DELETE FROM comments WHERE id = ?').bind(commentId).run();
+    // 软删除评论（保留数据以支持审计和恢复）
+    await SoftDeleteHelper.softDelete(c.env.DB, 'comments', commentId);
     
     logger.info('Comment deleted by admin', { commentId, postId: comment.post_id });
     
@@ -457,8 +458,8 @@ adminRoutes.delete('/users/:id', requireAdmin, async (c) => {
       ), 403);
     }
     
-    // 删除用户
-    await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId).run();
+    // 软删除用户（保留数据以支持审计和恢复）
+    await SoftDeleteHelper.softDelete(c.env.DB, 'users', userId);
     
     logger.info('User deleted by admin', { userId, username: user.username });
     
