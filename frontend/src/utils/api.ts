@@ -909,6 +909,12 @@ export const api = {
         ...(emailVerificationCode ? { emailVerificationCode } : {}),
       }),
     }),
+
+  searchUser: (username: string) =>
+    apiRequest<{ user: { id: number; username: string; displayName: string; avatarUrl?: string; bio?: string } | null }>(`/users/search?username=${encodeURIComponent(username)}`),
+
+  getUserProfile: (userId: number) =>
+    apiRequest<{ user: { id: number; username: string; displayName: string; avatarUrl?: string; bio?: string; createdAt: string; postCount: number; commentCount: number } }>(`/users/${userId}`),
 };
 
 // ============= 辅助函数 =============

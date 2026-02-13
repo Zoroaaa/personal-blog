@@ -525,6 +525,67 @@ export async function getUnreadCount(
   }
 }
 
+export async function getThreadMessages(
+  db: D1Database,
+  userId: number,
+  threadId: string,
+  params: MessageListParams = {}
+): Promise<MessageListResponse> {
+  try {
+    const page = Math.max(1, params.page || DEFAULT_PAGE);
+    const limit = Math.min(MAX_LIMIT, Math.max(1, params.limit || DEFAULT_LIMIT));
+    const offset = (page - 1) * limit;
+
+    const whereClause = `
+      m.thread_id = ? 
+      AND (m.sender_id = ? OR m.recipient_id = ?)
+      AND ((m.sender_id = ? AND m.sender_deleted = 0) OR (m.recipient_id = ? AND m.recipient_deleted = 0))
+    `;
+    const bindings: any[] = [threadId, userId, userId, userId, userId];
+
+    const countResult = await db.prepare(
+      `SELECT COUNT(*) as total FROM messages m WHERE ${whereClause}`
+    ).bind(...bindings).first();
+
+    const total = (countResult?.total as number) || 0;
+
+    const rows = await db.prepare(`
+      SELECT 
+        m.*,
+        sender.username as sender_username,
+        sender.display_name as sender_name,
+        sender.avatar_url as sender_avatar,
+        recipient.username as recipient_username,
+        recipient.display_name as recipient_name,
+        recipient.avatar_url as recipient_avatar
+      FROM messages m
+      LEFT JOIN users sender ON m.sender_id = sender.id
+      LEFT JOIN users recipient ON m.recipient_id = recipient.id
+      WHERE ${whereClause}
+      ORDER BY m.created_at DESC
+      LIMIT ? OFFSET ?
+    `).bind(...bindings, limit, offset).all();
+
+    const messages = (rows.results || []).map(mapMessageFromRow);
+
+    return {
+      messages,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  } catch (error) {
+    console.error('Get thread messages error:', error);
+    return {
+      messages: [],
+      pagination: { page: 1, limit: DEFAULT_LIMIT, total: 0, totalPages: 0 },
+    };
+  }
+}
+
 function mapMessageFromRow(row: any): Message {
   return {
     id: row.id,

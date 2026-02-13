@@ -40,16 +40,12 @@ function NotificationItem({
       onRead(notification.id);
     }
 
-    // 根据通知类型跳转
     if (notification.relatedData?.postSlug) {
-      // 如果有评论ID，跳转到文章详情并滚动到评论位置
       if (notification.relatedData?.commentId) {
         navigate(`/posts/${notification.relatedData.postSlug}?comment=${notification.relatedData.commentId}`);
       } else {
         navigate(`/posts/${notification.relatedData.postSlug}`);
       }
-    } else if (notification.type === 'private_message') {
-      navigate('/messages');
     }
   };
 
@@ -172,7 +168,7 @@ function FilterButton({
 export default function NotificationCenter() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'all' | 'system' | 'interaction' | 'private_message'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'system' | 'interaction'>('all');
 
   const {
     notifications,
@@ -273,13 +269,6 @@ export default function NotificationCenter() {
             count={unreadCount.byType.system}
           >
             系统
-          </FilterButton>
-          <FilterButton
-            active={activeTab === 'private_message'}
-            onClick={() => handleTabChange('private_message')}
-            count={unreadCount.byType.private_message}
-          >
-            私信
           </FilterButton>
         </div>
 

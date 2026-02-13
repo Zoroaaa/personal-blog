@@ -200,7 +200,7 @@ adminNotificationRoutes.get('/list', requireAuth, requireAdmin, async (c) => {
       : undefined;
 
     // 构建查询条件
-    const conditions: string[] = ['n.is_deleted = 0'];
+    const conditions: string[] = ['n.deleted_at IS NULL'];
     const bindings: any[] = [];
 
     if (type) {
@@ -305,7 +305,7 @@ adminNotificationRoutes.get('/system-notifications', requireAuth, requireAdmin, 
     const isActive = c.req.query('isActive');
     const offset = (page - 1) * limit;
 
-    let whereClause = 'WHERE n.type = ? AND n.subtype = ? AND n.is_deleted = 0';
+    let whereClause = 'WHERE n.type = ? AND n.subtype = ? AND n.deleted_at IS NULL';
     const params: any[] = ['system', 'announcement'];
 
     if (isActive !== undefined) {
@@ -550,7 +550,7 @@ adminNotificationRoutes.delete('/system-notifications/:id', requireAuth, require
 
     // 软删除
     await c.env.DB.prepare(
-      'UPDATE notifications SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP WHERE id = ?'
+      'UPDATE notifications SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?'
     ).bind(id).run();
 
     logger.info('System notification deleted', { id });

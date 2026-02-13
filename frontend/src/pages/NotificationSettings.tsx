@@ -339,58 +339,6 @@ export default function NotificationSettings() {
           </div>
         </div>
 
-        {/* 私信通知设置 */}
-        <div className="bg-card rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4">
-            ✉️ 私信通知
-          </h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            接收私信消息通知
-          </p>
-
-          <SettingItem
-            title="站内通知"
-            description="在网站内显示私信通知"
-          >
-            <ToggleSwitch
-              checked={settings?.privateMessage.inApp ?? true}
-              onChange={(checked) =>
-                handleUpdateSettings({
-                  privateMessage: { ...settings?.privateMessage, inApp: checked },
-                })
-              }
-            />
-          </SettingItem>
-
-          <SettingItem
-            title="浏览器推送"
-            description="通过浏览器推送接收私信"
-          >
-            <ToggleSwitch
-              checked={settings?.privateMessage.push ?? true}
-              onChange={(checked) =>
-                handleUpdateSettings({
-                  privateMessage: { ...settings?.privateMessage, push: checked },
-                })
-              }
-            />
-          </SettingItem>
-
-          <SettingItem title="通知频率">
-            <FrequencySelect
-              value={settings?.privateMessage.frequency ?? 'realtime'}
-              onChange={(value) =>
-                handleUpdateSettings({
-                  privateMessage: {
-                    ...settings?.privateMessage,
-                    frequency: value as any,
-                  },
-                })
-              }
-            />
-          </SettingItem>
-        </div>
-
         {/* 免打扰设置 */}
         <div className="bg-card rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-lg font-semibold text-foreground mb-4">

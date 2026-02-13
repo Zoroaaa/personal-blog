@@ -28,6 +28,7 @@ import { configRoutes } from './routes/config';
 import { notificationRoutes } from './routes/notifications';
 import { adminNotificationRoutes } from './routes/adminNotifications';
 import { messageRoutes } from './routes/messages';
+import { userRoutes } from './routes/users';
 // 用户资源路由
 import { userNotificationSettingsRoutes } from './routes/users/notificationSettings';
 import { userNotificationSubscriptionsRoutes } from './routes/users/notificationSubscriptions';
@@ -330,6 +331,8 @@ app.route('/api/admin/notifications', adminNotificationRoutes);
  * 私信路由
  */
 app.route('/api/messages', messageRoutes);
+
+app.route('/api/users', userRoutes);
 
 /**
  * 用户通知设置路由（标准RESTful API位置）

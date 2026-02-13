@@ -2,7 +2,7 @@
 
 本文档详细介绍个人博客系统的架构设计、技术选型和实现细节。
 
-**版本**: v1.3.0 | **更新日期**: 2026-02-12
+**版本**: v1.3.1 | **更新日期**: 2026-02-14
 
 ---
 
@@ -75,13 +75,13 @@
 |------|------|------|
 | React | 18.x | UI 框架 |
 | TypeScript | 5.x | 类型安全 |
-| Vite | 5.x | 构建工具 |
+| Vite | 6.x | 构建工具 |
 | Tailwind CSS | 3.x | 样式框架 |
 | Zustand | 4.x | 状态管理 |
 | React Router | 6.x | 路由管理 |
 | React Markdown | 9.x | Markdown 渲染 |
-| PrismJS | 1.x | 代码高亮 |
-| Framer Motion | 11.x | 动画效果 |
+| Framer Motion | 12.x | 动画效果 |
+| date-fns | 3.x | 日期处理 |
 
 ### 后端
 
@@ -89,7 +89,7 @@
 |------|------|------|
 | Hono | 4.x | Web 框架 |
 | Zod | 3.x | 数据验证 |
-| bcryptjs | 2.x | 密码哈希 |
+| bcryptjs | 3.x | 密码哈希 |
 | jose | 5.x | JWT 处理 |
 
 ### 基础设施
@@ -119,17 +119,19 @@
 │ password    │       │ title       │    │  │ description │
 │ avatar      │       │ content     │    │  │ status      │
 │ role        │       │ status      │    │  │ sort_order  │
-│ created_at  │       │ created_at  │    │  └─────────────┘
-└─────────────┘       └─────────────┘    │
-        │                       │        │
-        │                       ▼        │
-        │               ┌─────────────┐  │
-        │               │ categories  │  │
-        │               ├─────────────┤  │
-        │               │ id          │◄─┘
-        │               │ name        │
-        │               │ slug        │
-        │               └─────────────┘
+│ deleted_at  │       │ visibility  │    │  └─────────────┘
+│ created_at  │       │ password    │    │
+└─────────────┘       │ deleted_at  │    │
+        │             └─────────────┘    │
+        │                    │           │
+        │                    ▼           │
+        │            ┌─────────────┐     │
+        │            │ categories  │     │
+        │            ├─────────────┤     │
+        │            │ id          │◄────┘
+        │            │ name        │
+        │            │ slug        │
+        │            └─────────────┘
         │
         ▼
 ┌─────────────┐       ┌─────────────┐       ┌─────────────┐
@@ -140,20 +142,24 @@
 │ user_id     │       │ post_id     │       │ post_id     │
 │ parent_id   │       │ created_at  │       │ created_at  │
 │ content     │       └─────────────┘       └─────────────┘
+│ ip_address  │
+│ user_agent  │
 │ status      │
 └─────────────┘
 
-┌─────────────┐       ┌─────────────┐       ┌─────────────┐
-│notifications│       │  messages   │       │ message_    │
-├─────────────┤       ├─────────────┤       │attachments  │
-│ id          │       │ id          │       ├─────────────┤
-│ user_id     │       │ sender_id   │       │ id          │
-│ type        │       │ receiver_id │       │ message_id  │
-│ title       │       │ content     │       │ file_name   │
-│ content     │       │ status      │       │ file_type   │
-│ is_read     │       │ created_at  │       │ file_size   │
-│ created_at  │       └─────────────┘       │ file_url    │
-└─────────────┘                             └─────────────┘
+┌─────────────┐       ┌─────────────┐       ┌─────────────────┐
+│notifications│       │  messages   │       │notification_    │
+├─────────────┤       ├─────────────┤       │settings         │
+│ id          │       │ id          │       ├─────────────────┤
+│ user_id     │       │ sender_id   │       │ id              │
+│ type        │       │ receiver_id │       │ user_id         │
+│ title       │       │ content     │       │ notify_comments │
+│ content     │       │ status      │       │ notify_likes    │
+│ data        │       │ created_at  │       │ notify_system   │
+│ is_read     │       └─────────────┘       │ dnd_enabled     │
+│ is_announce │                             └─────────────────┘
+│ created_at  │
+└─────────────┘
 ```
 
 ### 数据库表结构
@@ -172,6 +178,7 @@ CREATE TABLE users (
   status TEXT DEFAULT 'active' CHECK(status IN ('active', 'banned')),
   github_id TEXT UNIQUE,
   email_verified BOOLEAN DEFAULT 0,
+  deleted_at DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -196,6 +203,7 @@ CREATE TABLE posts (
   view_count INTEGER DEFAULT 0,
   like_count INTEGER DEFAULT 0,
   comment_count INTEGER DEFAULT 0,
+  deleted_at DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   published_at DATETIME,
@@ -236,6 +244,8 @@ CREATE TABLE comments (
   status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'rejected')),
   is_author BOOLEAN DEFAULT 0,
   like_count INTEGER DEFAULT 0,
+  ip_address TEXT,
+  user_agent TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
@@ -250,12 +260,30 @@ CREATE TABLE comments (
 CREATE TABLE notifications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
-  type TEXT NOT NULL CHECK(type IN ('system', 'interaction', 'message')),
+  type TEXT NOT NULL CHECK(type IN ('system', 'interaction')),
   title TEXT NOT NULL,
   content TEXT,
   data TEXT,
   is_read BOOLEAN DEFAULT 0,
+  is_announcement BOOLEAN DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+```
+
+#### 通知设置表 (notification_settings)
+
+```sql
+CREATE TABLE notification_settings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL UNIQUE,
+  notify_comments BOOLEAN DEFAULT 1,
+  notify_likes BOOLEAN DEFAULT 1,
+  notify_favorites BOOLEAN DEFAULT 1,
+  notify_system BOOLEAN DEFAULT 1,
+  dnd_enabled BOOLEAN DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 ```
@@ -269,11 +297,22 @@ CREATE TABLE messages (
   receiver_id INTEGER NOT NULL,
   content TEXT NOT NULL,
   status TEXT DEFAULT 'sent' CHECK(status IN ('sent', 'delivered', 'read', 'recalled')),
-  is_edited BOOLEAN DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (sender_id) REFERENCES users(id),
   FOREIGN KEY (receiver_id) REFERENCES users(id)
+);
+```
+
+#### 全文搜索表 (posts_fts)
+
+```sql
+CREATE VIRTUAL TABLE posts_fts USING fts5(
+  title,
+  content,
+  excerpt,
+  content='posts',
+  content_rowid='id',
+  tokenize='porter unicode61'
 );
 ```
 
@@ -318,11 +357,13 @@ CREATE TABLE messages (
 │   ├── POST /logout
 │   ├── GET  /me
 │   ├── PUT  /me
+│   ├── DELETE /me
 │   ├── POST /change-password
 │   ├── POST /forgot-password
 │   ├── POST /reset-password
 │   ├── POST /verify-email
 │   ├── POST /resend-verification
+│   ├── POST /send-code
 │   ├── GET  /github
 │   └── GET  /github/callback
 ├── /posts             # 文章管理
@@ -337,6 +378,7 @@ CREATE TABLE messages (
 │   ├── DELETE /:id/like
 │   ├── POST   /:id/favorite
 │   ├── DELETE /:id/favorite
+│   ├── POST   /:id/verify-password
 │   ├── GET    /search
 │   └── GET    /by-slug/:slug
 ├── /columns           # 专栏管理
@@ -369,14 +411,21 @@ CREATE TABLE messages (
 │   ├── GET    /conversations
 │   ├── GET    /conversations/:userId
 │   ├── POST   /
-│   ├── PUT    /:id
-│   ├── DELETE /:id
-│   └── POST   /:id/recall
+│   ├── PUT    /:id/read
+│   └── DELETE /:id
+├── /users             # 用户相关
+│   ├── GET    /search
+│   ├── GET    /:id
+│   ├── GET    /:id/posts
+│   ├── GET    /:id/favorites
+│   ├── GET    /notification-settings
+│   └── PUT    /notification-settings
 ├── /admin             # 管理后台
 │   ├── GET    /dashboard
 │   ├── GET    /stats
 │   ├── GET    /users
 │   ├── PUT    /users/:id/status
+│   ├── PUT    /users/:id/role
 │   ├── GET    /posts
 │   ├── PUT    /posts/:id/status
 │   ├── GET    /comments
@@ -434,7 +483,6 @@ CREATE TABLE messages (
 2. **JWT 安全**
    - HS256 签名
    - 过期时间: access token 2小时, refresh token 7天
-   - Token 黑名单
 
 3. **API 安全**
    - 请求限流（Rate Limiting）
@@ -447,6 +495,16 @@ CREATE TABLE messages (
    - 敏感数据加密存储
    - 数据库访问控制
    - 定期备份
+
+5. **文件上传安全**
+   - 文件类型验证（魔数验证）
+   - 文件大小限制（5MB）
+   - 支持格式：JPEG、PNG、GIF、WebP
+
+6. **软删除机制**
+   - 用户删除使用软删除
+   - 文章删除使用软删除
+   - 保留数据完整性
 
 ---
 
@@ -480,7 +538,7 @@ CREATE TABLE messages (
 1. **数据库优化**
    - 索引优化
    - 查询优化
-   - 连接池
+   - FTS5 全文搜索
 
 2. **缓存优化**
    - 多级缓存

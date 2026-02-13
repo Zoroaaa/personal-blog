@@ -2,7 +2,7 @@
 
 本文档详细描述个人博客系统的所有 API 接口。
 
-**版本**: v1.3.0 | **更新日期**: 2026-02-12
+**版本**: v3.0.1 | **更新日期**: 2026-02-14
 
 ---
 
@@ -16,6 +16,7 @@
 - [分类模块](#分类模块)
 - [通知模块](#通知模块)
 - [私信模块](#私信模块)
+- [用户模块](#用户模块)
 - [管理模块](#管理模块)
 - [上传模块](#上传模块)
 - [配置模块](#配置模块)
@@ -94,8 +95,7 @@ Authorization: Bearer <token>
 {
   "username": "string",
   "email": "string",
-  "password": "string",
-  "captcha": "string"
+  "password": "string"
 }
 ```
 
@@ -108,7 +108,7 @@ Authorization: Bearer <token>
     "username": "john",
     "email": "john@example.com",
     "role": "user",
-    "createdAt": "2026-02-12T10:00:00Z"
+    "createdAt": "2026-02-14T10:00:00Z"
   }
 }
 ```
@@ -131,7 +131,6 @@ Authorization: Bearer <token>
   "success": true,
   "data": {
     "token": "eyJhbGciOiJIUzI1NiIs...",
-    "refreshToken": "eyJhbGciOiJIUzI1NiIs...",
     "user": {
       "id": 1,
       "username": "john",
@@ -142,9 +141,13 @@ Authorization: Bearer <token>
 }
 ```
 
+### POST /auth/logout
+
+用户登出（需要认证）
+
 ### GET /auth/me
 
-获取当前用户信息
+获取当前用户信息（需要认证）
 
 **响应:**
 ```json
@@ -158,14 +161,14 @@ Authorization: Bearer <token>
     "bio": "个人简介",
     "role": "user",
     "emailVerified": true,
-    "createdAt": "2026-02-12T10:00:00Z"
+    "createdAt": "2026-02-14T10:00:00Z"
   }
 }
 ```
 
 ### PUT /auth/me
 
-更新用户信息
+更新用户信息（需要认证）
 
 **请求参数:**
 ```json
@@ -177,9 +180,13 @@ Authorization: Bearer <token>
 }
 ```
 
+### DELETE /auth/me
+
+删除用户账号（需要认证，软删除）
+
 ### POST /auth/change-password
 
-修改密码
+修改密码（需要认证）
 
 **请求参数:**
 ```json
@@ -227,6 +234,17 @@ Authorization: Bearer <token>
 
 重新发送验证邮件
 
+### POST /auth/send-code
+
+发送邮箱验证码
+
+**请求参数:**
+```json
+{
+  "email": "string"
+}
+```
+
 ### GET /auth/github
 
 GitHub OAuth 登录
@@ -250,7 +268,8 @@ GitHub OAuth 回调
 | limit | number | 每页数量，默认 20 |
 | category | string | 分类 slug |
 | tag | string | 标签 slug |
-| status | string | 状态: draft/published |
+| column | number | 专栏 ID |
+| status | string | 状态: draft/published/archived |
 | search | string | 搜索关键词 |
 | sort | string | 排序: newest/oldest/popular |
 
@@ -274,11 +293,15 @@ GitHub OAuth 回调
         "id": 1,
         "name": "技术"
       },
+      "column": {
+        "id": 1,
+        "name": "专栏名称"
+      },
       "tags": [{"id": 1, "name": "React"}],
       "viewCount": 100,
       "likeCount": 20,
       "commentCount": 5,
-      "createdAt": "2026-02-12T10:00:00Z"
+      "createdAt": "2026-02-14T10:00:00Z"
     }
   ],
   "meta": {
@@ -304,7 +327,8 @@ GitHub OAuth 回调
   "columnId": 1,
   "tags": ["tag1", "tag2"],
   "status": "draft",
-  "visibility": "public"
+  "visibility": "public",
+  "password": "string"
 }
 ```
 
@@ -332,14 +356,19 @@ GitHub OAuth 回调
       "id": 1,
       "name": "技术"
     },
+    "column": {
+      "id": 1,
+      "name": "专栏名称"
+    },
     "tags": [{"id": 1, "name": "React"}],
     "viewCount": 100,
     "likeCount": 20,
     "commentCount": 5,
     "isLiked": false,
     "isFavorited": false,
-    "createdAt": "2026-02-12T10:00:00Z",
-    "updatedAt": "2026-02-12T10:00:00Z"
+    "visibility": "public",
+    "createdAt": "2026-02-14T10:00:00Z",
+    "updatedAt": "2026-02-14T10:00:00Z"
   }
 }
 ```
@@ -350,7 +379,7 @@ GitHub OAuth 回调
 
 ### DELETE /posts/:id
 
-删除文章（需要认证，作者或管理员）
+删除文章（需要认证，作者或管理员，软删除）
 
 ### GET /posts/by-slug/:slug
 
@@ -394,9 +423,20 @@ GitHub OAuth 回调
 
 取消收藏（需要认证）
 
+### POST /posts/:id/verify-password
+
+验证文章密码
+
+**请求参数:**
+```json
+{
+  "password": "string"
+}
+```
+
 ### GET /posts/search
 
-搜索文章
+搜索文章（FTS5全文搜索）
 
 **查询参数:**
 | 参数 | 类型 | 说明 |
@@ -437,7 +477,7 @@ GitHub OAuth 回调
       "postCount": 10,
       "viewCount": 1000,
       "likeCount": 50,
-      "createdAt": "2026-02-12T10:00:00Z"
+      "createdAt": "2026-02-14T10:00:00Z"
     }
   ],
   "meta": {
@@ -548,7 +588,7 @@ GitHub OAuth 回调
       "slug": "tech",
       "description": "技术文章",
       "postCount": 50,
-      "createdAt": "2026-02-12T10:00:00Z"
+      "createdAt": "2026-02-14T10:00:00Z"
     }
   ]
 }
@@ -589,7 +629,7 @@ GitHub OAuth 回调
 | page | number | 页码 |
 | limit | number | 每页数量 |
 | isRead | boolean | 是否已读 |
-| type | string | 类型: system/interaction/message |
+| type | string | 类型: system/interaction |
 
 **响应:**
 ```json
@@ -606,7 +646,8 @@ GitHub OAuth 回调
         "commentId": 5
       },
       "isRead": false,
-      "createdAt": "2026-02-12T10:00:00Z"
+      "isAnnouncement": false,
+      "createdAt": "2026-02-14T10:00:00Z"
     }
   ],
   "meta": {
@@ -652,7 +693,7 @@ GitHub OAuth 回调
       },
       "lastMessage": {
         "content": "你好！",
-        "createdAt": "2026-02-12T10:00:00Z"
+        "createdAt": "2026-02-14T10:00:00Z"
       },
       "unreadCount": 2
     }
@@ -681,8 +722,7 @@ GitHub OAuth 回调
       "receiverId": 1,
       "content": "你好！",
       "status": "read",
-      "isEdited": false,
-      "createdAt": "2026-02-12T10:00:00Z"
+      "createdAt": "2026-02-14T10:00:00Z"
     }
   ]
 }
@@ -700,24 +740,70 @@ GitHub OAuth 回调
 }
 ```
 
-### PUT /messages/:id
+### PUT /messages/:id/read
 
-编辑消息（需要认证，3分钟内）
-
-**请求参数:**
-```json
-{
-  "content": "string"
-}
-```
+标记消息已读（需要认证）
 
 ### DELETE /messages/:id
 
 删除消息（需要认证）
 
-### POST /messages/:id/recall
+---
 
-撤回消息（需要认证，3分钟内）
+## 用户模块
+
+### GET /users/search
+
+搜索用户
+
+**查询参数:**
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| q | string | 搜索关键词 |
+| limit | number | 返回数量 |
+
+### GET /users/:id
+
+获取用户公开信息
+
+### GET /users/:id/posts
+
+获取用户的文章
+
+**查询参数:**
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| page | number | 页码 |
+| limit | number | 每页数量 |
+
+### GET /users/:id/favorites
+
+获取用户的收藏
+
+**查询参数:**
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| page | number | 页码 |
+| limit | number | 每页数量 |
+
+### GET /users/notification-settings
+
+获取通知设置（需要认证）
+
+### PUT /users/notification-settings
+
+更新通知设置（需要认证）
+
+**请求参数:**
+```json
+{
+  "notifyComments": true,
+  "notifyLikes": true,
+  "notifyFavorites": true,
+  "notifySystem": true,
+  "dndEnabled": false
+}
+```
 
 ---
 
@@ -772,6 +858,17 @@ GitHub OAuth 回调
 }
 ```
 
+### PUT /admin/users/:id/role
+
+更新用户角色（需要管理员权限）
+
+**请求参数:**
+```json
+{
+  "role": "admin"
+}
+```
+
 ### GET /admin/posts
 
 获取文章列表（需要管理员权限）
@@ -811,7 +908,7 @@ GitHub OAuth 回调
 {
   "title": "string",
   "content": "string",
-  "target": "all"
+  "isAnnouncement": false
 }
 ```
 
@@ -841,6 +938,11 @@ file: <binary>
   }
 }
 ```
+
+**限制:**
+- 文件大小: 最大 5MB
+- 支持格式: JPEG, PNG, GIF, WebP
+- 安全验证: 魔数验证
 
 ---
 
@@ -934,6 +1036,31 @@ file: <binary>
 
 ---
 
+## 健康检查
+
+### GET /health
+
+检查服务健康状态
+
+**响应:**
+```json
+{
+  "success": true,
+  "data": {
+    "status": "healthy",
+    "version": "1.3.1",
+    "timestamp": "2026-02-14T10:00:00.000Z",
+    "services": {
+      "database": "healthy",
+      "cache": "healthy",
+      "storage": "healthy"
+    }
+  }
+}
+```
+
+---
+
 ## 错误代码
 
 | 代码 | 说明 |
@@ -945,6 +1072,9 @@ file: <binary>
 | `DUPLICATE_ENTRY` | 重复数据 |
 | `RATE_LIMITED` | 请求过于频繁 |
 | `INTERNAL_ERROR` | 服务器内部错误 |
+| `INVALID_PASSWORD` | 密码错误 |
+| `ACCOUNT_DELETED` | 账号已删除 |
+| `EMAIL_NOT_VERIFIED` | 邮箱未验证 |
 
 ---
 

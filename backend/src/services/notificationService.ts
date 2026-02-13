@@ -142,9 +142,9 @@ export async function getNotificationById(
       `SELECT 
         id, user_id, type, subtype, title, content, related_data,
         is_in_app_sent, is_email_sent, is_push_sent,
-        is_read, read_at, is_deleted, deleted_at, created_at
+        is_read, read_at, deleted_at, created_at
       FROM notifications
-      WHERE id = ? AND is_deleted = 0`
+      WHERE id = ? AND deleted_at IS NULL`
     ).bind(id).first();
 
     if (!row) return null;
@@ -166,7 +166,7 @@ export async function getNotifications(
     const limit = Math.min(MAX_LIMIT, Math.max(1, params.limit || DEFAULT_LIMIT));
     const offset = (page - 1) * limit;
 
-    const conditions: string[] = ['user_id = ?', 'is_deleted = 0'];
+    const conditions: string[] = ['user_id = ?', 'deleted_at IS NULL'];
     const bindings: any[] = [userId];
 
     if (params.type) {
@@ -191,7 +191,7 @@ export async function getNotifications(
       `SELECT 
         id, user_id, type, subtype, title, content, related_data,
         is_in_app_sent, is_email_sent, is_push_sent,
-        is_read, read_at, is_deleted, deleted_at, created_at
+        is_read, read_at, deleted_at, created_at
       FROM notifications
       WHERE ${whereClause}
       ORDER BY created_at DESC
@@ -233,7 +233,7 @@ export async function getUnreadCount(
         type,
         COUNT(*) as count
       FROM notifications
-      WHERE user_id = ? AND is_read = 0 AND is_deleted = 0
+      WHERE user_id = ? AND is_read = 0 AND deleted_at IS NULL
       GROUP BY type`
     ).bind(userId).all();
 
@@ -274,7 +274,7 @@ export async function markAsRead(
     const result = await db.prepare(
       `UPDATE notifications 
        SET is_read = 1, read_at = CURRENT_TIMESTAMP
-       WHERE id = ? AND user_id = ? AND is_deleted = 0`
+       WHERE id = ? AND user_id = ? AND deleted_at IS NULL`
     ).bind(notificationId, userId).run();
 
     return result.success && (result.meta?.changes || 0) > 0;
@@ -292,7 +292,7 @@ export async function markAllAsRead(
   try {
     let sql = `UPDATE notifications 
                SET is_read = 1, read_at = CURRENT_TIMESTAMP
-               WHERE user_id = ? AND is_read = 0 AND is_deleted = 0`;
+               WHERE user_id = ? AND is_read = 0 AND deleted_at IS NULL`;
     const bindings: any[] = [userId];
 
     if (type) {
@@ -316,8 +316,8 @@ export async function deleteNotification(
   try {
     const result = await db.prepare(
       `UPDATE notifications 
-       SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP
-       WHERE id = ? AND user_id = ? AND is_deleted = 0`
+       SET deleted_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND user_id = ? AND deleted_at IS NULL`
     ).bind(notificationId, userId).run();
 
     return result.success && (result.meta?.changes || 0) > 0;
@@ -385,7 +385,7 @@ function mapNotificationFromRow(row: any): Notification {
     isPushSent: row.is_push_sent === 1,
     isRead: row.is_read === 1,
     readAt: row.read_at,
-    isDeleted: row.is_deleted === 1,
+    isDeleted: row.deleted_at !== null && row.deleted_at !== undefined,
     deletedAt: row.deleted_at,
     createdAt: row.created_at,
   };

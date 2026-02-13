@@ -2,7 +2,7 @@
 
 本文档帮助您在 5 分钟内启动并运行个人博客系统。
 
-**版本**: v1.3.0 | **更新日期**: 2026-02-12
+**版本**: v3.0.1 | **更新日期**: 2026-02-14
 
 ---
 
@@ -21,7 +21,7 @@
 
 ### 必需软件
 
-- **Node.js**: v18.0.0 或更高版本
+- **Node.js**: v20.0.0 或更高版本
 - **包管理器**: pnpm (推荐) 或 npm v9+
 - **Git**: 用于克隆项目
 
@@ -30,7 +30,7 @@
 ```bash
 # 检查 Node.js 版本
 node --version
-# 应显示 v18.x.x 或更高
+# 应显示 v20.x.x 或更高
 
 # 检查 pnpm
 pnpm --version
@@ -56,7 +56,7 @@ npm install -g pnpm
 git clone https://github.com/yourusername/personal-blog.git
 
 # 或使用 SSH
-git clone git@github.com:yourusername/personal-blog.git
+git clone git@github.com:yourusername:personal-blog.git
 
 # 进入项目目录
 cd personal-blog
@@ -141,8 +141,9 @@ wrangler kv:namespace create "CACHE"
 #### 6. 初始化数据库
 
 ```bash
-# 执行数据库迁移
-wrangler d1 execute personal-blog-dev --file=./database/schema.sql
+# 执行数据库迁移（需按顺序执行）
+wrangler d1 execute personal-blog-dev --file=./database/schema-v1.1-base.sql
+wrangler d1 execute personal-blog-dev --file=./database/schema-v1.2-notification-messaging.sql
 
 # 验证表创建成功
 wrangler d1 execute personal-blog-dev --command="SELECT name FROM sqlite_master WHERE type='table';"
@@ -230,8 +231,8 @@ pnpm dev
   "success": true,
   "data": {
     "status": "healthy",
-    "version": "3.0.1",
-    "timestamp": "2026-02-12T10:00:00.000Z",
+    "version": "1.3.1",
+    "timestamp": "2026-02-14T10:00:00.000Z",
     "services": {
       "database": "healthy",
       "cache": "healthy",
@@ -303,13 +304,14 @@ personal-blog/
 │   │   │   ├── notificationSettings.ts # 通知设置
 │   │   │   ├── adminNotifications.ts # 管理员通知
 │   │   │   ├── messages.ts # 私信系统
-│   │   │   └── push.ts     # 浏览器推送
+│   │   │   └── users.ts    # 用户相关
 │   │   ├── middleware/     # 中间件
 │   │   ├── services/       # 业务服务
 │   │   ├── utils/          # 工具函数
 │   │   └── types/          # 类型定义
 │   ├── database/
-│   │   └── schema.sql      # 数据库架构
+│   │   ├── schema-v1.1-base.sql          # 基础数据库架构
+│   │   └── schema-v1.2-notification-messaging.sql # 通知私信架构
 │   ├── .env                # 环境变量
 │   └── wrangler.toml       # Workers 配置
 ├── frontend/               # 前端应用
@@ -317,6 +319,7 @@ personal-blog/
 │   │   ├── pages/          # 页面组件
 │   │   ├── components/     # 可复用组件
 │   │   ├── stores/         # 状态管理
+│   │   ├── hooks/          # 自定义 Hooks
 │   │   ├── utils/          # 工具函数
 │   │   └── types/          # 类型定义
 │   ├── .env                # 环境变量
@@ -344,6 +347,12 @@ pnpm logs
 
 # 数据库操作
 wrangler d1 execute personal-blog-dev --command="SELECT * FROM users;"
+
+# 类型检查
+pnpm typecheck
+
+# 代码格式化
+pnpm format
 ```
 
 ### 前端命令
@@ -362,6 +371,12 @@ pnpm preview
 
 # 部署到 Pages
 pnpm deploy
+
+# 类型检查
+pnpm typecheck
+
+# 运行测试
+pnpm test
 ```
 
 ---
@@ -392,11 +407,12 @@ wrangler d1 list
 **A**: 检查 SQL 文件路径：
 
 ```bash
-# 确认 schema.sql 文件存在
-ls backend/database/schema.sql
+# 确认 schema 文件存在
+ls backend/database/
 
-# 重新执行迁移
-wrangler d1 execute personal-blog-dev --file=./database/schema.sql
+# 重新执行迁移（按顺序）
+wrangler d1 execute personal-blog-dev --file=./database/schema-v1.1-base.sql
+wrangler d1 execute personal-blog-dev --file=./database/schema-v1.2-notification-messaging.sql
 ```
 
 ### Q: 登录提示 "Invalid credentials"
@@ -449,6 +465,24 @@ wrangler d1 execute personal-blog-dev --command="
 2. 创建/编辑文章时选择所属专栏
 3. 前台访问 `/columns/:slug` 查看专栏详情
 4. 专栏页面会展示该专栏下的所有文章
+
+### Q: 通知系统如何工作？
+
+**A**:
+
+1. 系统自动发送互动通知（评论、点赞、收藏、@提及）
+2. 管理员可发布系统公告
+3. 用户可在"通知设置"中配置通知偏好
+4. 首页轮播展示最新的系统公告
+
+### Q: 私信功能如何使用？
+
+**A**:
+
+1. 访问 `/messages` 查看私信列表
+2. 点击"新私信"发送消息
+3. 消息支持已读状态追踪
+4. 会话按时间倒序排列
 
 ---
 

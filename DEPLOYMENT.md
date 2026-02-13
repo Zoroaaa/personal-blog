@@ -2,7 +2,7 @@
 
 本文档详细介绍如何将个人博客系统部署到 Cloudflare 平台。
 
-**版本**: v1.3.0 | **更新日期**: 2026-02-12
+**版本**: v1.3.1 | **更新日期**: 2026-02-14
 
 ---
 
@@ -29,7 +29,7 @@
 
 2. **Node.js 环境**
    ```bash
-   node --version  # 需要 v18 或更高
+   node --version  # 需要 v20 或更高
    npm --version   # 需要 v9 或更高
    ```
 
@@ -85,7 +85,7 @@ wrangler kv:namespace create "CACHE"
 3. 填写信息：
    - Application name: Personal Blog
    - Homepage URL: `https://your-domain.pages.dev`
-   - Authorization callback URL: `https://your-domain.pages.dev/api/auth/github`
+   - Authorization callback URL: `https://your-domain.pages.dev/api/auth/github/callback`
 4. 记录 Client ID 和 Client Secret
 
 ### 5. 配置 Resend 邮箱服务（可选）
@@ -181,18 +181,19 @@ ENVIRONMENT = "production"
 ```bash
 cd backend
 
-# 执行数据库迁移
-wrangler d1 execute personal-blog-db --file=./database/schema.sql
+# 执行数据库迁移（需按顺序执行）
+wrangler d1 execute personal-blog-db --file=./database/schema-v1.1-base.sql
+wrangler d1 execute personal-blog-db --file=./database/schema-v1.2-notification-messaging.sql
 
 # 验证表创建成功
 wrangler d1 execute personal-blog-db --command="SELECT name FROM sqlite_master WHERE type='table';"
 ```
 
 数据库架构包含以下表：
-- `users` - 用户信息（支持OAuth、邮箱验证）
-- `posts` - 文章数据（支持专栏、SEO）
+- `users` - 用户信息（支持OAuth、邮箱验证、软删除）
+- `posts` - 文章数据（支持专栏、SEO、密码保护）
 - `columns` - 专栏数据
-- `comments` - 评论数据
+- `comments` - 评论数据（支持嵌套、@提及）
 - `categories` - 文章分类
 - `tags` - 文章标签
 - `post_tags` - 文章标签关联
@@ -200,8 +201,9 @@ wrangler d1 execute personal-blog-db --command="SELECT name FROM sqlite_master W
 - `reading_history` - 阅读历史
 - `favorites` - 收藏记录
 - `notifications` - 通知数据
+- `notification_settings` - 通知设置
+- `notification_subscriptions` - 推送订阅
 - `messages` - 私信数据
-- `message_attachments` - 私信附件
 - `site_config` - 站点配置
 - `posts_fts` - 全文搜索虚拟表
 
@@ -304,8 +306,8 @@ curl https://your-worker.workers.dev/health
   "success": true,
   "data": {
     "status": "healthy",
-    "version": "3.0.1",
-    "timestamp": "2026-02-12T10:00:00.000Z",
+    "version": "1.3.1",
+    "timestamp": "2026-02-14T10:00:00.000Z",
     "services": {
       "database": "healthy",
       "cache": "healthy",
@@ -328,6 +330,8 @@ wrangler d1 execute personal-blog-db --command="SELECT COUNT(*) FROM users;"
 - 文章列表显示
 - 分类/标签正常
 - 专栏页面正常
+- 通知中心正常
+- 私信功能正常
 
 ### 4. 测试管理员登录
 
@@ -354,7 +358,7 @@ wrangler d1 execute personal-blog-db --command="SELECT COUNT(*) FROM users;"
 1. 检查 `wrangler.toml` 中的 `database_id` 是否正确
 2. 确认数据库已创建：`wrangler d1 list`
 3. 检查数据库绑定名称是否为 `DB`
-4. 确认数据库迁移已执行
+4. 确认数据库迁移已执行（两个 SQL 文件都需执行）
 
 ### CORS 错误
 
@@ -374,6 +378,7 @@ wrangler d1 execute personal-blog-db --command="SELECT COUNT(*) FROM users;"
 2. 确认存储桶名称与 `wrangler.toml` 一致
 3. 检查文件大小限制（默认 5MB）
 4. 确认 `STORAGE_PUBLIC_URL` 已正确设置
+5. 检查文件类型验证（支持 JPEG、PNG、GIF、WebP）
 
 ### 认证失败
 
@@ -403,6 +408,26 @@ wrangler d1 execute personal-blog-db --command="SELECT COUNT(*) FROM users;"
 2. 确认文章已关联到专栏
 3. 检查专栏统计触发器是否正常工作
 4. 手动刷新专栏统计：`POST /api/columns/:id/refresh-stats`
+
+### 通知不显示
+
+**症状**: 通知中心无通知或首页无轮播
+
+**解决**:
+1. 检查 `notifications` 表是否有数据
+2. 确认通知类型正确（system/interaction）
+3. 检查用户通知设置是否开启
+4. 确认首页轮播通知是否标记为公告
+
+### 私信功能异常
+
+**症状**: 私信无法发送或接收
+
+**解决**:
+1. 检查 `messages` 表是否存在
+2. 确认数据库迁移已完整执行
+3. 检查会话查询是否正确
+4. 确认用户 ID 有效
 
 ---
 
@@ -478,6 +503,7 @@ routes = [
 4. **监控日志**: 启用 Workers 日志记录
 5. **限制访问**: 使用 Cloudflare Access 保护管理后台
 6. **密钥管理**: 使用 wrangler secret 管理敏感信息
+7. **文件上传安全**: 已实现魔数验证，防止恶意文件上传
 
 ---
 
