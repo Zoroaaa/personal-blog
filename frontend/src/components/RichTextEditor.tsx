@@ -16,6 +16,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { User } from '../types';
 
 interface RichTextEditorProps {
@@ -71,6 +72,7 @@ export function RichTextEditor({
   const [textLength, setTextLength] = useState(0);
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentionPosition, setMentionPosition] = useState<{ start: number; end: number } | null>(null);
+  const [popupPosition, setPopupPosition] = useState<{ top: number; left: number } | null>(null);
   const isUpdatingRef = useRef(false);
   const lastSelectionRef = useRef<Range | null>(null);
   const isComposingRef = useRef(false);
@@ -137,6 +139,22 @@ export function RichTextEditor({
       }
     }
   }, []);
+
+  const updatePopupPosition = useCallback(() => {
+    if (!editorRef.current) return;
+    
+    const rect = editorRef.current.getBoundingClientRect();
+    setPopupPosition({
+      top: rect.top - 8,
+      left: rect.left + 16
+    });
+  }, []);
+
+  useEffect(() => {
+    if (showMentions || showEmojis) {
+      updatePopupPosition();
+    }
+  }, [showMentions, showEmojis, updatePopupPosition]);
 
   const execCommand = useCallback((command: string, value: string = '') => {
     if (!editorRef.current) return;
@@ -542,8 +560,14 @@ export function RichTextEditor({
           suppressContentEditableWarning={true}
         />
 
-        {showMentions && filteredUsers.length > 0 && (
-          <div className="absolute left-4 bottom-full mb-2 w-64 max-h-48 overflow-y-auto bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg z-50">
+        {showMentions && filteredUsers.length > 0 && popupPosition && createPortal(
+          <div 
+            className="fixed w-64 max-h-48 overflow-y-auto bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg z-[9999]"
+            style={{ 
+              top: popupPosition.top - 200,
+              left: popupPosition.left 
+            }}
+          >
             {filteredUsers.map((user, index) => (
               <button
                 key={user.id}
@@ -583,11 +607,18 @@ export function RichTextEditor({
                 </div>
               </button>
             ))}
-          </div>
+          </div>,
+          document.body
         )}
 
-        {showEmojis && (
-          <div className="absolute left-4 bottom-full mb-2 w-80 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg z-50 p-2">
+        {showEmojis && popupPosition && createPortal(
+          <div 
+            className="fixed w-80 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg z-[9999] p-2"
+            style={{ 
+              top: popupPosition.top - 200,
+              left: popupPosition.left 
+            }}
+          >
             <div className="grid grid-cols-10 gap-1 max-h-48 overflow-y-auto">
               {EMOJI_LIST.map((emoji, index) => (
                 <button
@@ -603,7 +634,8 @@ export function RichTextEditor({
                 </button>
               ))}
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
 
