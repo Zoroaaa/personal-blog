@@ -303,6 +303,7 @@ export function PostPage() {
   const [replyContent, setReplyContent] = useState('');
   const [commentLiking, setCommentLiking] = useState<number | null>(null);
   const [mentionableUsers, setMentionableUsers] = useState<User[]>([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // 加载可@用户列表
   useEffect(() => {
@@ -319,6 +320,33 @@ export function PostPage() {
       }
     } catch (error) {
       console.error('Failed to load mentionable users:', error);
+    }
+  };
+
+  // 处理评论图片上传
+  const handleCommentImageUpload = async (file: File): Promise<string | null> => {
+    if (!isAuthenticated) {
+      showError('请先登录');
+      return null;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showError('图片大小不能超过 5MB');
+      return null;
+    }
+
+    try {
+      setUploadingImage(true);
+      const response = await api.uploadImage(file);
+      if (response.success && response.data) {
+        return response.data.url;
+      }
+      throw new Error(response.error || '上传失败');
+    } catch (error) {
+      showError(error instanceof Error ? error.message : '图片上传失败');
+      return null;
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -480,14 +508,15 @@ export function PostPage() {
                 placeholder="写下你的回复...输入 @ 可提及用户"
                 maxLength={500}
                 mentionableUsers={mentionableUsers}
+                onImageUpload={handleCommentImageUpload}
               />
               <div className="mt-4 flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">
-                  支持富文本格式
+                  {uploadingImage ? '图片上传中...' : '支持富文本格式'}
                 </span>
                 <button
                   type="submit"
-                  disabled={commentLoading || !replyContent.trim()}
+                  disabled={commentLoading || !replyContent.trim() || uploadingImage}
                   className="px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   {commentLoading ? '发表中...' : '发表回复'}
@@ -783,14 +812,15 @@ export function PostPage() {
                 placeholder="写下你的评论...输入 @ 可提及用户"
                 maxLength={1000}
                 mentionableUsers={mentionableUsers}
+                onImageUpload={handleCommentImageUpload}
               />
               <div className="flex items-center justify-between mt-4">
                 <span className="text-sm text-muted-foreground">
-                  支持富文本格式，输入 @ 可提及用户
+                  {uploadingImage ? '图片上传中...' : '支持富文本格式，输入 @ 可提及用户'}
                 </span>
                 <button
                   type="submit"
-                  disabled={commentLoading || !newComment.trim()}
+                  disabled={commentLoading || !newComment.trim() || uploadingImage}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {commentLoading ? '发表中...' : '发表评论'}
