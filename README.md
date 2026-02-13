@@ -3,7 +3,7 @@
 一个基于 Cloudflare 全栈技术构建的现代化个人博客系统。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.3.0-green.svg)](https://github.com/yourusername/personal-blog)
+[![Version](https://img.shields.io/badge/version-1.3.1-green.svg)](https://github.com/yourusername/personal-blog)
 [![Cloudflare](https://img.shields.io/badge/Cloudflare-Workers-orange.svg)](https://workers.cloudflare.com/)
 
 **体验地址**: [blog.neutronx.uk](https://blog.neutronx.uk)
@@ -28,16 +28,19 @@
 
 ### 核心特性
 
-- **现代化技术栈**: React 18 + TypeScript + Tailwind CSS + Hono
+- **现代化技术栈**: React 18 + TypeScript + Tailwind CSS + Hono 4
 - **边缘计算架构**: 基于 Cloudflare Workers/Pages，全球低延迟访问
 - **完整内容管理**: 文章、专栏、分类、标签、评论的全生命周期管理
-- **用户系统**: 支持邮箱注册、GitHub OAuth 登录、邮箱验证码
-- **互动功能**: 点赞、收藏、阅读历史、嵌套评论（最多5层）
-- **全文搜索**: 支持 FTS5 全文搜索引擎
-- **管理后台**: 用户管理、内容审核、系统配置、数据分析
+- **用户系统**: 支持邮箱注册、GitHub OAuth 登录、邮箱验证码、密码重置
+- **互动功能**: 点赞、收藏、阅读历史、嵌套评论（最多5层）、@提及
+- **全文搜索**: 支持 FTS5 全文搜索引擎，支持中英文混合搜索
+- **通知系统**: 站内通知中心、通知设置、免打扰模式、首页轮播公告
+- **私信系统**: 用户间私信、会话管理、消息已读状态
+- **管理后台**: 用户管理、内容审核、系统配置、数据分析、系统通知发布
 - **SEO 优化**: 动态 meta 标签、结构化数据、搜索引擎友好
 - **响应式设计**: 完美适配桌面端、平板和移动设备
 - **暗色模式**: 支持亮色/暗色主题切换
+- **安全增强**: 密码保护文章、文件魔数验证、软删除机制
 
 ---
 
@@ -53,8 +56,8 @@
 | Zustand | 4.x | 状态管理 |
 | React Router | 6.x | 路由管理 |
 | React Markdown | 9.x | Markdown 渲染 |
-| PrismJS | 1.x | 代码高亮 |
-| Framer Motion | 11.x | 动画效果 |
+| Framer Motion | 12.x | 动画效果 |
+| date-fns | 3.x | 日期处理 |
 
 ### 后端技术栈
 
@@ -65,7 +68,7 @@
 | Cloudflare D1 | - | SQLite 数据库 |
 | Cloudflare KV | - | 键值存储 |
 | Cloudflare R2 | - | 对象存储 |
-| bcryptjs | 2.x | 密码哈希 |
+| bcryptjs | 3.x | 密码哈希 |
 | zod | 3.x | 数据验证 |
 
 ---
@@ -74,7 +77,7 @@
 
 ### 环境要求
 
-- Node.js 18+
+- Node.js 20+
 - pnpm 8+ 或 npm 9+
 - Cloudflare 账号
 
@@ -106,10 +109,18 @@
    ```bash
    cd backend
    wrangler d1 create personal-blog-dev
-   wrangler d1 execute personal-blog-dev --file=./database/schema.sql
+   
+   # 执行数据库迁移（需按顺序执行）
+   wrangler d1 execute personal-blog-dev --file=./database/schema-v1.1-base.sql
+   wrangler d1 execute personal-blog-dev --file=./database/schema-v1.2-notification-messaging.sql
    ```
 
-5. **启动开发服务器**
+5. **创建 R2 存储桶**
+   ```bash
+   wrangler r2 bucket create personal-blog-images-dev
+   ```
+
+6. **启动开发服务器**
    ```bash
    # 启动后端（端口 8787）
    cd backend && pnpm dev
@@ -130,35 +141,55 @@ personal-blog/
 │   ├── src/
 │   │   ├── index.ts        # 应用入口
 │   │   ├── routes/         # API 路由
-│   │   │   ├── auth.ts     # 认证相关
-│   │   │   ├── posts.ts    # 文章管理
+│   │   │   ├── auth.ts     # 认证相关（注册/登录/OAuth/邮箱验证）
+│   │   │   ├── posts.ts    # 文章管理（CRUD/搜索/点赞/收藏）
 │   │   │   ├── columns.ts  # 专栏管理
-│   │   │   ├── comments.ts # 评论系统
+│   │   │   ├── comments.ts # 评论系统（嵌套回复/@提及）
 │   │   │   ├── admin.ts    # 后台管理
 │   │   │   ├── categories.ts # 分类标签
 │   │   │   ├── config.ts   # 站点配置
 │   │   │   ├── upload.ts   # 文件上传
 │   │   │   ├── analytics.ts # 数据分析
 │   │   │   ├── notifications.ts # 通知系统
-│   │   │   ├── notificationSettings.ts # 通知设置
 │   │   │   ├── adminNotifications.ts # 管理员通知
 │   │   │   ├── messages.ts # 私信系统
-│   │   │   └── push.ts     # 浏览器推送
+│   │   │   └── users.ts    # 用户相关
+│   │   │   └── users/      # 用户子路由
+│   │   │       ├── notificationSettings.ts # 通知设置
+│   │   │       └── notificationSubscriptions.ts # 推送订阅
 │   │   ├── middleware/     # 中间件
 │   │   ├── services/       # 业务服务
 │   │   ├── utils/          # 工具函数
 │   │   └── types/          # 类型定义
 │   ├── database/
-│   │   └── schema.sql      # 数据库架构
+│   │   ├── schema-v1.1-base.sql          # 基础数据库架构
+│   │   └── schema-v1.2-notification-messaging.sql # 通知私信架构
 │   └── wrangler.toml       # Workers 配置
 ├── frontend/               # 前端应用
 │   ├── src/
 │   │   ├── pages/          # 页面组件
+│   │   │   ├── HomePage.tsx      # 首页
+│   │   │   ├── PostPage.tsx      # 文章详情
+│   │   │   ├── LoginPage.tsx     # 登录页
+│   │   │   ├── AdminPage.tsx     # 管理后台
+│   │   │   ├── SearchPage.tsx    # 搜索页
+│   │   │   ├── ProfilePage.tsx   # 个人资料
+│   │   │   ├── ColumnPage.tsx    # 专栏详情
+│   │   │   ├── CategoryPage.tsx  # 分类页
+│   │   │   ├── TagPage.tsx       # 标签页
+│   │   │   ├── NotificationCenter.tsx # 通知中心
+│   │   │   ├── NotificationSettings.tsx # 通知设置
+│   │   │   ├── MessagesPage.tsx  # 私信列表
+│   │   │   ├── ThreadPage.tsx    # 私信会话
+│   │   │   └── admin/            # 管理页面
+│   │   │       └── SystemNotificationPage.tsx # 系统通知
 │   │   ├── components/     # 可复用组件
 │   │   ├── stores/         # 状态管理
+│   │   ├── hooks/          # 自定义 Hooks
 │   │   ├── utils/          # 工具函数
 │   │   └── types/          # 类型定义
 │   └── index.html
+├── docs/                   # 修复文档
 ├── DEPLOYMENT.md           # 部署指南
 ├── API.md                  # API 文档
 ├── ARCHITECTURE.md         # 架构文档
@@ -176,10 +207,11 @@ personal-blog/
 - ✅ 文章分类和标签
 - ✅ 文章专栏归类
 - ✅ 浏览量统计
-- ✅ 文章搜索（FTS5全文搜索）
+- ✅ 文章搜索（FTS5全文搜索，支持中英文）
 - ✅ SEO 元数据配置
 - ✅ 文章密码保护
 - ✅ 阅读进度追踪
+- ✅ 软删除机制
 
 ### 专栏系统
 
@@ -198,6 +230,7 @@ personal-blog/
 - ✅ 评论点赞
 - ✅ 管理员回复标识
 - ✅ 评论@用户功能
+- ✅ IP和User Agent记录
 
 ### 用户系统
 
@@ -208,22 +241,23 @@ personal-blog/
 - ✅ 用户资料管理
 - ✅ 阅读历史
 - ✅ 收藏文章
+- ✅ 账号删除（软删除）
 
 ### 通知系统
 
 - ✅ 站内通知中心
-- ✅ 通知类型：系统通知、互动通知、私信通知
+- ✅ 通知类型：系统通知、互动通知
 - ✅ 首页通知轮播
 - ✅ 通知设置管理
 - ✅ 免打扰模式
+- ✅ 推送订阅支持
 
 ### 私信系统
 
 - ✅ 用户间私信发送
-- ✅ 消息撤回（3分钟内）
-- ✅ 消息编辑重发
 - ✅ 会话列表管理
 - ✅ 未读消息计数
+- ✅ 消息已读状态
 
 ### 管理后台
 
@@ -231,7 +265,7 @@ personal-blog/
 - ✅ 文章管理（CRUD）
 - ✅ 专栏管理
 - ✅ 评论审核
-- ✅ 用户管理
+- ✅ 用户管理（状态/角色）
 - ✅ 分类/标签管理
 - ✅ 系统配置
 - ✅ 数据分析
@@ -244,10 +278,10 @@ personal-blog/
 完整的 API 文档请参考 [API.md](./API.md)。
 
 主要 API 模块：
-- **认证模块**: `/api/auth/*` - 登录、注册、OAuth、邮箱验证码
-- **文章模块**: `/api/posts/*` - 文章 CRUD、搜索、阅读历史
+- **认证模块**: `/api/auth/*` - 登录、注册、OAuth、邮箱验证码、密码重置
+- **文章模块**: `/api/posts/*` - 文章 CRUD、搜索、阅读历史、密码验证
 - **专栏模块**: `/api/columns/*` - 专栏管理、统计刷新
-- **评论模块**: `/api/comments/*` - 评论管理
+- **评论模块**: `/api/comments/*` - 评论管理、点赞
 - **分类模块**: `/api/categories/*` - 分类标签
 - **管理模块**: `/api/admin/*` - 后台管理
 - **配置模块**: `/api/config/*` - 站点配置
@@ -255,6 +289,7 @@ personal-blog/
 - **统计模块**: `/api/analytics/*` - 数据分析
 - **通知模块**: `/api/notifications/*` - 通知管理
 - **私信模块**: `/api/messages/*` - 私信系统
+- **用户模块**: `/api/users/*` - 用户搜索、资料
 
 ---
 
@@ -342,4 +377,4 @@ wrangler pages deploy dist
 
 ---
 
-**版本**: v1.3.0 | **更新日期**: 2026-02-12
+**版本**: v1.3.1 | **更新日期**: 2026-02-14
