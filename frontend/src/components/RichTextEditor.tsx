@@ -35,6 +35,23 @@ const EMOJI_LIST = [
   '😱', '🥵', '🥶', '😰', '😥', '😢', '😭', '😤', '😡', '🤬',
   '👍', '👎', '👏', '🙌', '🤝', '💪', '🎉', '🔥', '❤️', '💔',
   '✨', '⭐', '🌟', '💯', '✅', '❌', '❓', '💡', '📌', '📝',
+  '😢', '😭', '😤', '😳', '🥺', '😱', '😨', '😰', '😥', '😓',
+  '🤢', '🤮', '🤧', '🥴', '😵', '🤯', '🤠', '🥳', '😎', '🤓',
+  '🧐', '😕', '😟', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺',
+  '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣',
+  '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈',
+  '👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞',
+  '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍',
+  '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝',
+  '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦿', '🦵', '🦶', '👂',
+  '🐱', '🐶', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯',
+  '🦁', '🐮', '🐷', '🐸', '🐵', '🐔', '🐧', '🐦', '🐤', '🦆',
+  '🦅', '🦉', '🦇', '🐺', '🐗', '🐴', '🦄', '🐝', '🐛', '🦋',
+  '🐌', '🐞', '🐜', '🦟', '🦗', '🕷️', '🦂', '🐢', '🐍', '🦎',
+  '🌸', '🌺', '🌻', '🌼', '🌷', '🌱', '🌲', '🌳', '🌴', '🌵',
+  '🌾', '🌿', '☘️', '🍀', '🍁', '🍂', '🍃', '🍄', '🌰', '🦀',
+  '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🍈', '🍒',
+  '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬',
 ];
 
 export function RichTextEditor({
@@ -122,8 +139,22 @@ export function RichTextEditor({
   }, []);
 
   const execCommand = useCallback((command: string, value: string = '') => {
-    editorRef.current?.focus();
-    restoreSelection();
+    if (!editorRef.current) return;
+    
+    editorRef.current.focus();
+    
+    if (!lastSelectionRef.current && editorRef.current.childNodes.length === 0) {
+      const range = document.createRange();
+      range.setStart(editorRef.current, 0);
+      range.collapse(true);
+      const selection = window.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    } else {
+      restoreSelection();
+    }
     
     try {
       document.execCommand(command, false, value);
@@ -220,8 +251,7 @@ export function RichTextEditor({
       return;
     }
 
-    const beforeAt = textBeforeCursor.slice(0, lastAtIndex);
-    if (beforeAt.length > 0 && !/\s$/.test(beforeAt) && !/@$/.test(beforeAt)) {
+    if (afterAt.length > 15) {
       setShowMentions(false);
       setMentionPosition(null);
       return;
@@ -288,7 +318,7 @@ export function RichTextEditor({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (showMentions && filteredUsers.length > 0) {
+      if (showMentions && filteredUsers.length > 0 && !isComposingRef.current) {
         switch (e.key) {
           case 'ArrowDown':
             e.preventDefault();
@@ -303,6 +333,7 @@ export function RichTextEditor({
           case 'Enter':
           case 'Tab':
             e.preventDefault();
+            e.stopPropagation();
             selectUser(filteredUsers[selectedIndex]);
             return;
           case 'Escape':
@@ -556,8 +587,8 @@ export function RichTextEditor({
         )}
 
         {showEmojis && (
-          <div className="absolute left-4 bottom-full mb-2 w-72 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg z-50 p-2">
-            <div className="grid grid-cols-10 gap-1">
+          <div className="absolute left-4 bottom-full mb-2 w-80 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg z-50 p-2">
+            <div className="grid grid-cols-10 gap-1 max-h-48 overflow-y-auto">
               {EMOJI_LIST.map((emoji, index) => (
                 <button
                   key={index}
