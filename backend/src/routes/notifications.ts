@@ -291,7 +291,7 @@ notificationRoutes.get('/carousel', async (c) => {
       `SELECT 
         n.id, n.title, n.content, n.related_data, n.created_at
       FROM notifications n
-      WHERE n.type = ? AND n.subtype = ? AND n.is_active = 1 AND n.is_deleted = 0
+      WHERE n.type = ? AND n.subtype = ? AND n.is_active = 1 AND n.deleted_at IS NULL
       ORDER BY n.created_at DESC
       LIMIT 5`
     ).bind('system', 'announcement').all() as any;
