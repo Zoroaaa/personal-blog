@@ -5,43 +5,52 @@
  * - 检测评论或私信中的@提及
  * - 为被提及用户创建通知
  * - 高亮显示@提及
+ * - 支持 displayName 和 username 两种格式
  *
  * @author 博客系统
- * @version 1.0.0
+ * @version 2.0.0
  * @created 2026-02-13
  */
 
+import { createInteractionNotification } from './notificationService';
+import { isInteractionSubtypeEnabled } from './notificationSettingsService';
+import type { Env } from '../types';
+
 /**
- * 从文本中检测所有被@的用户名
+ * 从文本中检测所有被@的用户名或显示名称
  *
  * 支持的格式：
  * - @username （用户名后跟空格或标点）
- * - @username#123 （不常见，可忽略）
+ * - @显示名称 （支持中文和空格，直到遇到特定结束符）
  *
  * @param content 文本内容
- * @returns 被@的用户名列表（去重）
+ * @returns 被@的用户名/显示名称列表（去重）
  */
 export function detectMentions(content: string): string[] {
   if (!content || typeof content !== 'string') {
     return [];
   }
 
-  // 匹配 @username 的正则表达式
-  // 用户名规则：字母、数字、下划线，长度3-20
-  // \b@ 单词边界后跟@符号
-  // ([a-zA-Z0-9_]{3,20}) 匹配用户名
-  // (?=\s|\.|,|！|？|:|：|;|；|\)|）|$) 正向前瞻，确保后面是空格、标点或结尾
-  const mentionRegex = /\B@([a-zA-Z0-9_]{3,20})(?=\s|[.!?,;:）)）]|$)/g;
-
   const mentions: string[] = [];
+  
+  // 匹配 @username 格式（字母、数字、下划线，长度3-20）
+  const usernameRegex = /\B@([a-zA-Z0-9_]{3,20})(?=\s|[.!?,;:）)）]|$)/g;
   let match;
-
-  // eslint-disable-next-line no-cond-assign
-  while ((match = mentionRegex.exec(content)) !== null) {
+  while ((match = usernameRegex.exec(content)) !== null) {
     const username = match[1];
-    // 去重
     if (!mentions.includes(username)) {
       mentions.push(username);
+    }
+  }
+
+  // 匹配 @显示名称 格式（支持中文、字母、数字、空格，长度1-30）
+  // 格式：@名称 后跟空格、标点或结尾
+  const displayNameRegex = /\B@([\u4e00-\u9fa5a-zA-Z0-9_\s]{1,30}?)(?=\s*[.!?,;:）)）]|$|\s{2})/g;
+  while ((match = displayNameRegex.exec(content)) !== null) {
+    const displayName = match[1].trim();
+    // 排除已经匹配到的纯 username
+    if (displayName && !mentions.includes(displayName) && !/^[a-zA-Z0-9_]{3,20}$/.test(displayName)) {
+      mentions.push(displayName);
     }
   }
 
@@ -49,25 +58,83 @@ export function detectMentions(content: string): string[] {
 }
 
 /**
- * 从数据库获取用户ID（通过用户名）
+ * 从数据库获取用户ID（通过用户名或显示名称）
  *
  * @param db Cloudflare D1 数据库
- * @param username 用户名
+ * @param name 用户名或显示名称
  * @returns 用户ID，如果不存在返回null
  */
-export async function getUserIdByUsername(
+export async function getUserIdByName(
   db: any,
-  username: string
+  name: string
 ): Promise<number | null> {
   try {
-    const user = await db
-      .prepare('SELECT id FROM users WHERE username = ? AND status = ?')
-      .bind(username.toLowerCase(), 'active')
+    // 先尝试按用户名查找
+    let user = await db
+      .prepare('SELECT id FROM users WHERE username = ? AND status = ? AND deleted_at IS NULL')
+      .bind(name.toLowerCase(), 'active')
+      .first() as { id: number } | undefined;
+
+    if (user) {
+      return user.id;
+    }
+
+    // 再尝试按显示名称查找
+    user = await db
+      .prepare('SELECT id FROM users WHERE display_name = ? AND status = ? AND deleted_at IS NULL')
+      .bind(name, 'active')
       .first() as { id: number } | undefined;
 
     return user?.id || null;
   } catch (error) {
-    console.error(`Failed to get user ID for username ${username}:`, error);
+    console.error(`Failed to get user ID for name ${name}:`, error);
+    return null;
+  }
+}
+
+/**
+ * 从数据库获取用户信息（通过用户名或显示名称）
+ *
+ * @param db Cloudflare D1 数据库
+ * @param name 用户名或显示名称
+ * @returns 用户信息，如果不存在返回null
+ */
+export async function getUserByName(
+  db: any,
+  name: string
+): Promise<{ id: number; username: string; displayName: string } | null> {
+  try {
+    // 先尝试按用户名查找
+    let user = await db
+      .prepare('SELECT id, username, display_name FROM users WHERE username = ? AND status = ? AND deleted_at IS NULL')
+      .bind(name.toLowerCase(), 'active')
+      .first() as { id: number; username: string; display_name: string } | undefined;
+
+    if (user) {
+      return {
+        id: user.id,
+        username: user.username,
+        displayName: user.display_name,
+      };
+    }
+
+    // 再尝试按显示名称查找
+    user = await db
+      .prepare('SELECT id, username, display_name FROM users WHERE display_name = ? AND status = ? AND deleted_at IS NULL')
+      .bind(name, 'active')
+      .first() as { id: number; username: string; display_name: string } | undefined;
+
+    if (user) {
+      return {
+        id: user.id,
+        username: user.username,
+        displayName: user.display_name,
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error(`Failed to get user for name ${name}:`, error);
     return null;
   }
 }
@@ -93,12 +160,11 @@ export function highlightMentions(content: string): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#x27;');
 
-  // 然后替换@提及为链接
-  // \B@ 表示非单词边界后跟@（避免匹配@@）
-  // 注意：由于已经转义，不需要再转义
+  // 替换@提及为链接
+  // 匹配 @username 或 @显示名称
   escaped = escaped.replace(
-    /\B@([a-zA-Z0-9_]{3,20})(?=\s|[.!?,;:）)）]|$)/g,
-    '<a href="#/profile/$1" class="mention" data-username="$1">@$1</a>'
+    /\B@([a-zA-Z0-9_]{3,20}|[\u4e00-\u9fa5a-zA-Z0-9_\s]{1,30}?)(?=\s|[.!?,;:）)）]|$)/g,
+    '<a href="#/profile/$1" class="mention" data-name="$1">@$1</a>'
   );
 
   return escaped;
@@ -108,83 +174,110 @@ export function highlightMentions(content: string): string {
  * 为每个被@的用户创建提及通知
  *
  * @param db Cloudflare D1 数据库
- * @param mentionedUsernames 被@的用户名列表
+ * @param mentionedNames 被@的用户名/显示名称列表
  * @param mentionerUserId 发起@的用户ID
  * @param contentType 内容类型（'comment' | 'message'）
  * @param contentId 内容ID（评论ID或私信ID）
  * @param relatedLink 相关内容链接
+ * @param env 环境变量（用于邮件通知）
  */
 export async function createMentionNotifications(
   db: any,
-  mentionedUsernames: string[],
+  mentionedNames: string[],
   mentionerUserId: number,
   contentType: 'comment' | 'message' = 'comment',
   contentId: number,
-  relatedLink?: string
+  relatedLink?: string,
+  env?: Env
 ): Promise<void> {
-  if (!mentionedUsernames || mentionedUsernames.length === 0) {
+  if (!mentionedNames || mentionedNames.length === 0) {
     return;
   }
 
   try {
     // 获取提及者的用户信息
-    const mentioner = (await db
-      .prepare('SELECT username, display_name FROM users WHERE id = ?')
+    const mentioner = await db
+      .prepare('SELECT id, username, display_name, avatar_url FROM users WHERE id = ? AND deleted_at IS NULL')
       .bind(mentionerUserId)
-      .first()) as { username: string; display_name: string } | undefined;
+      .first() as { id: number; username: string; display_name: string; avatar_url: string } | undefined;
 
     if (!mentioner) {
       console.error(`Mentioner user ${mentionerUserId} not found`);
       return;
     }
 
-    // 为每个被提及的用户创建通知
-    for (const username of mentionedUsernames) {
-      const userId = await getUserIdByUsername(db, username);
+    // 获取内容相关信息
+    let contentInfo: { postId?: number; postTitle?: string; postSlug?: string; content?: string } = {};
+    
+    if (contentType === 'comment') {
+      const comment = await db
+        .prepare(`
+          SELECT c.content, c.post_id, p.title, p.slug 
+          FROM comments c 
+          JOIN posts p ON c.post_id = p.id 
+          WHERE c.id = ? AND c.deleted_at IS NULL
+        `)
+        .bind(contentId)
+        .first() as any;
 
-      if (!userId || userId === mentionerUserId) {
-        // 用户不存在或不能@自己
+      if (comment) {
+        contentInfo = {
+          postId: comment.post_id,
+          postTitle: comment.title,
+          postSlug: comment.slug,
+          content: comment.content,
+        };
+      }
+    }
+
+    // 为每个被提及的用户创建通知
+    for (const name of mentionedNames) {
+      const targetUser = await getUserByName(db, name);
+
+      if (!targetUser || targetUser.id === mentionerUserId) {
         continue;
       }
 
-      // 获取当前时间
-      const now = new Date().toISOString();
+      // 检查用户是否开启了提及通知
+      const isEnabled = await isInteractionSubtypeEnabled(
+        db,
+        targetUser.id,
+        'mention'
+      );
 
-      // 构建链接
-      const link = relatedLink || `#/posts/${contentId}`;
+      if (!isEnabled) {
+        continue;
+      }
 
-      // 获取操作类型的中文名称
+      // 构建通知标题
       const actionText = contentType === 'comment' ? '评论中提及了你' : '私信中提及了你';
+      const title = `${mentioner.display_name || mentioner.username} 在${actionText}`;
 
-      // 创建通知记录
-      await db
-        .prepare(
-          `
-        INSERT INTO notifications (
-          user_id,
-          type,
-          title,
-          content,
-          is_read,
-          related_id,
-          created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-        `
-        )
-        .bind(
-          userId,
-          'interaction',
-          `${mentioner.display_name || mentioner.username}提及了你`,
-          `${mentioner.display_name || mentioner.username}在${actionText}`,
-          false,
+      // 创建通知
+      await createInteractionNotification(db, {
+        userId: targetUser.id,
+        subtype: 'mention',
+        title,
+        content: contentInfo.content ? 
+          (contentInfo.content.length > 100 ? contentInfo.content.substring(0, 100) + '...' : contentInfo.content) 
+          : undefined,
+        relatedData: {
+          mentionerId: mentionerUserId,
+          mentionerName: mentioner.display_name || mentioner.username,
+          mentionerAvatar: mentioner.avatar_url,
+          contentType,
           contentId,
-          now
-        )
-        .run();
+          postId: contentInfo.postId,
+          postTitle: contentInfo.postTitle,
+          postSlug: contentInfo.postSlug,
+          link: relatedLink,
+        },
+      }, env);
+
+      console.log(`Mention notification created for user ${targetUser.id} (${targetUser.username})`);
     }
   } catch (error) {
     console.error('Failed to create mention notifications:', error);
-    // 不中断主流程
   }
 }
 
@@ -193,12 +286,17 @@ export async function createMentionNotifications(
  * 用于检查用户是否需要被通知
  *
  * @param username 用户名
+ * @param displayName 显示名称
  * @param content 内容
  * @returns 是否被@
  */
-export function isUserMentioned(username: string, content: string): boolean {
+export function isUserMentioned(username: string, displayName: string | undefined, content: string): boolean {
   const mentions = detectMentions(content);
-  return mentions.some(mention => mention.toLowerCase() === username.toLowerCase());
+  return mentions.some(mention => {
+    const lowerMention = mention.toLowerCase();
+    return lowerMention === username.toLowerCase() || 
+           (displayName && mention === displayName);
+  });
 }
 
 /**
@@ -213,7 +311,7 @@ export function removeMentions(content: string): string {
   }
 
   return content.replace(
-    /\B@([a-zA-Z0-9_]{3,20})(?=\s|[.!?,;:）)）]|$)/g,
+    /\B@([a-zA-Z0-9_]{3,20}|[\u4e00-\u9fa5a-zA-Z0-9_\s]{1,30}?)(?=\s|[.!?,;:）)）]|$)/g,
     '$1'
   );
 }

@@ -460,7 +460,8 @@ commentRoutes.post('/', requireAuth, rateLimit({
           user.userId,
           'comment',
           commentId,
-          `/posts/${postInfo?.slug || postId}#comment-${commentId}`
+          `/posts/${postInfo?.slug || postId}#comment-${commentId}`,
+          c.env
         );
 
         logger.info('Mention notifications created', {
