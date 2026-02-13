@@ -1,360 +1,231 @@
 /**
  * 通知设置服务层
- * 
+ *
  * 功能：
- * - 用户通知设置的CRUD操作
- * - 设置验证和默认值处理
+ * - 获取用户通知设置（从数据库读取）
+ * - 更新用户通知设置（持久化存储）
+ * - 检查通知类型是否启用
+ * - 初始化新用户默认设置
  * 
+ * 变更说明：
+ * - 移除了 privateMessage 字段
+ * - 私信设置现在是独立的系统
+ *
  * @author 博客系统
- * @version 1.0.0
- * @created 2024-01-01
+ * @version 2.0.0 - 方案A
+ * @created 2026-02-13
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
 import type {
   NotificationSettings,
+  UpdateNotificationSettingsRequest,
   NotificationTypeSettings,
   InteractionSubtypes,
-  UpdateNotificationSettingsRequest,
+  DoNotDisturbSettings,
+  DigestTimeSettings,
 } from '../types/notifications';
 
-// 默认设置
-const DEFAULT_SETTINGS: NotificationSettings = {
-  userId: 0,
-  system: {
-    inApp: true,
-    email: true,
-    push: false,
-    frequency: 'realtime',
-  },
-  interaction: {
-    inApp: true,
-    email: false,
-    push: true,
-    frequency: 'realtime',
-    subtypes: {
-      comment: true,
-      like: true,
-      favorite: true,
-      mention: true,
-      follow: true,
-      reply: true,
-    },
-  },
-  privateMessage: {
-    inApp: true,
-    email: false,
-    push: true,
-    frequency: 'realtime',
-  },
-  doNotDisturb: {
-    enabled: false,
-    start: '22:00',
-    end: '08:00',
-    timezone: 'Asia/Shanghai',
-  },
-  digestTime: {
-    daily: '09:00',
-    weeklyDay: 1,
-    weeklyTime: '09:00',
-  },
+const DEFAULT_TYPE_SETTINGS: NotificationTypeSettings = {
+  inApp: true,
+  email: true,
+  push: true,
+  frequency: 'realtime',
 };
 
-/**
- * 获取用户的通知设置
- * 如果不存在则创建默认设置
- */
+const DEFAULT_INTERACTION_SUBTYPES: InteractionSubtypes = {
+  comment: true,
+  like: true,
+  favorite: true,
+  mention: true,
+  follow: true,
+  reply: true,
+};
+
+const DEFAULT_DND_SETTINGS: DoNotDisturbSettings = {
+  enabled: false,
+  start: '22:00',
+  end: '08:00',
+  timezone: 'Asia/Shanghai',
+};
+
+const DEFAULT_DIGEST_TIME: DigestTimeSettings = {
+  daily: '08:00',
+  weeklyDay: 1,
+  weeklyTime: '09:00',
+};
+
 export async function getNotificationSettings(
   db: D1Database,
   userId: number
 ): Promise<NotificationSettings> {
   try {
-    const row = await db.prepare(
-      `SELECT 
-        user_id,
-        system_in_app, system_email, system_push, system_frequency,
-        interaction_in_app, interaction_email, interaction_push, interaction_frequency,
-        interaction_subtypes,
-        private_message_in_app, private_message_email, private_message_push, private_message_frequency,
-        do_not_disturb_enabled, do_not_disturb_start, do_not_disturb_end, do_not_disturb_timezone,
-        daily_digest_time, weekly_digest_day, weekly_digest_time,
-        created_at, updated_at
-      FROM notification_settings
-      WHERE user_id = ?`
-    ).bind(userId).first();
+    const row = await db.prepare(`
+      SELECT * FROM notification_settings WHERE user_id = ?
+    `).bind(userId).first();
 
     if (!row) {
-      // 创建设置记录
-      await createDefaultSettings(db, userId);
-      return { ...DEFAULT_SETTINGS, userId };
+      await initializeSettings(db, userId);
+      return getDefaultSettings(userId);
     }
 
-    return mapSettingsFromRow(row);
+    return mapSettingsFromRow(row, userId);
   } catch (error) {
     console.error('Get notification settings error:', error);
-    return { ...DEFAULT_SETTINGS, userId };
+    return getDefaultSettings(userId);
   }
 }
 
-/**
- * 创建默认设置
- */
-export async function createDefaultSettings(
-  db: D1Database,
-  userId: number
-): Promise<boolean> {
-  try {
-    const result = await db.prepare(
-      `INSERT INTO notification_settings (user_id) VALUES (?)`
-    ).bind(userId).run();
-
-    return result.success;
-  } catch (error) {
-    console.error('Create default settings error:', error);
-    return false;
-  }
-}
-
-/**
- * 更新通知设置
- */
 export async function updateNotificationSettings(
   db: D1Database,
   userId: number,
   updates: UpdateNotificationSettingsRequest
 ): Promise<NotificationSettings | null> {
   try {
-    // 获取当前设置
-    const currentSettings = await getNotificationSettings(db, userId);
+    const current = await getNotificationSettings(db, userId);
 
-    // 合并更新
-    const newSettings = mergeSettings(currentSettings, updates);
+    const newSettings = mergeSettings(current, updates);
 
-    // 验证设置
-    if (!validateSettings(newSettings)) {
-      console.error('Invalid notification settings');
-      return null;
-    }
-
-    // 构建更新SQL
-    const updateFields: string[] = [];
-    const bindings: any[] = [];
-
-    if (updates.system) {
-      if (updates.system.inApp !== undefined) {
-        updateFields.push('system_in_app = ?');
-        bindings.push(updates.system.inApp ? 1 : 0);
-      }
-      if (updates.system.email !== undefined) {
-        updateFields.push('system_email = ?');
-        bindings.push(updates.system.email ? 1 : 0);
-      }
-      if (updates.system.push !== undefined) {
-        updateFields.push('system_push = ?');
-        bindings.push(updates.system.push ? 1 : 0);
-      }
-      if (updates.system.frequency !== undefined) {
-        updateFields.push('system_frequency = ?');
-        bindings.push(updates.system.frequency);
-      }
-    }
-
-    if (updates.interaction) {
-      if (updates.interaction.inApp !== undefined) {
-        updateFields.push('interaction_in_app = ?');
-        bindings.push(updates.interaction.inApp ? 1 : 0);
-      }
-      if (updates.interaction.email !== undefined) {
-        updateFields.push('interaction_email = ?');
-        bindings.push(updates.interaction.email ? 1 : 0);
-      }
-      if (updates.interaction.push !== undefined) {
-        updateFields.push('interaction_push = ?');
-        bindings.push(updates.interaction.push ? 1 : 0);
-      }
-      if (updates.interaction.frequency !== undefined) {
-        updateFields.push('interaction_frequency = ?');
-        bindings.push(updates.interaction.frequency);
-      }
-      if (updates.interaction.subtypes !== undefined) {
-        const currentSubtypes = currentSettings.interaction.subtypes;
-        const newSubtypes = { ...currentSubtypes, ...updates.interaction.subtypes };
-        updateFields.push('interaction_subtypes = ?');
-        bindings.push(JSON.stringify(newSubtypes));
-      }
-    }
-
-    if (updates.privateMessage) {
-      if (updates.privateMessage.inApp !== undefined) {
-        updateFields.push('private_message_in_app = ?');
-        bindings.push(updates.privateMessage.inApp ? 1 : 0);
-      }
-      if (updates.privateMessage.email !== undefined) {
-        updateFields.push('private_message_email = ?');
-        bindings.push(updates.privateMessage.email ? 1 : 0);
-      }
-      if (updates.privateMessage.push !== undefined) {
-        updateFields.push('private_message_push = ?');
-        bindings.push(updates.privateMessage.push ? 1 : 0);
-      }
-      if (updates.privateMessage.frequency !== undefined) {
-        updateFields.push('private_message_frequency = ?');
-        bindings.push(updates.privateMessage.frequency);
-      }
-    }
-
-    if (updates.doNotDisturb) {
-      if (updates.doNotDisturb.enabled !== undefined) {
-        updateFields.push('do_not_disturb_enabled = ?');
-        bindings.push(updates.doNotDisturb.enabled ? 1 : 0);
-      }
-      if (updates.doNotDisturb.start !== undefined) {
-        updateFields.push('do_not_disturb_start = ?');
-        bindings.push(updates.doNotDisturb.start);
-      }
-      if (updates.doNotDisturb.end !== undefined) {
-        updateFields.push('do_not_disturb_end = ?');
-        bindings.push(updates.doNotDisturb.end);
-      }
-      if (updates.doNotDisturb.timezone !== undefined) {
-        updateFields.push('do_not_disturb_timezone = ?');
-        bindings.push(updates.doNotDisturb.timezone);
-      }
-    }
-
-    if (updates.digestTime) {
-      if (updates.digestTime.daily !== undefined) {
-        updateFields.push('daily_digest_time = ?');
-        bindings.push(updates.digestTime.daily);
-      }
-      if (updates.digestTime.weeklyDay !== undefined) {
-        updateFields.push('weekly_digest_day = ?');
-        bindings.push(updates.digestTime.weeklyDay);
-      }
-      if (updates.digestTime.weeklyTime !== undefined) {
-        updateFields.push('weekly_digest_time = ?');
-        bindings.push(updates.digestTime.weeklyTime);
-      }
-    }
-
-    if (updateFields.length === 0) {
-      return currentSettings;
-    }
-
-    // 执行更新
-    const sql = `UPDATE notification_settings SET ${updateFields.join(', ')} WHERE user_id = ?`;
-    bindings.push(userId);
-
-    const result = await db.prepare(sql).bind(...bindings).run();
+    const result = await db.prepare(`
+      UPDATE notification_settings
+      SET
+        system_in_app = ?,
+        system_email = ?,
+        system_push = ?,
+        system_frequency = ?,
+        interaction_in_app = ?,
+        interaction_email = ?,
+        interaction_push = ?,
+        interaction_frequency = ?,
+        interaction_comment = ?,
+        interaction_like = ?,
+        interaction_favorite = ?,
+        interaction_mention = ?,
+        interaction_follow = ?,
+        interaction_reply = ?,
+        dnd_enabled = ?,
+        dnd_start = ?,
+        dnd_end = ?,
+        dnd_timezone = ?,
+        digest_daily_time = ?,
+        digest_weekly_day = ?,
+        digest_weekly_time = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = ?
+    `).bind(
+      newSettings.system.inApp ? 1 : 0,
+      newSettings.system.email ? 1 : 0,
+      newSettings.system.push ? 1 : 0,
+      newSettings.system.frequency,
+      newSettings.interaction.inApp ? 1 : 0,
+      newSettings.interaction.email ? 1 : 0,
+      newSettings.interaction.push ? 1 : 0,
+      newSettings.interaction.frequency,
+      newSettings.interaction.subtypes.comment ? 1 : 0,
+      newSettings.interaction.subtypes.like ? 1 : 0,
+      newSettings.interaction.subtypes.favorite ? 1 : 0,
+      newSettings.interaction.subtypes.mention ? 1 : 0,
+      newSettings.interaction.subtypes.follow ? 1 : 0,
+      newSettings.interaction.subtypes.reply ? 1 : 0,
+      newSettings.doNotDisturb.enabled ? 1 : 0,
+      newSettings.doNotDisturb.start,
+      newSettings.doNotDisturb.end,
+      newSettings.doNotDisturb.timezone,
+      newSettings.digestTime.daily,
+      newSettings.digestTime.weeklyDay,
+      newSettings.digestTime.weeklyTime,
+      userId
+    ).run();
 
     if (!result.success) {
-      console.error('Update notification settings failed:', result.error);
+      console.error('Failed to update notification settings');
       return null;
     }
 
-    // 返回更新后的设置
-    return getNotificationSettings(db, userId);
+    return newSettings;
   } catch (error) {
     console.error('Update notification settings error:', error);
     return null;
   }
 }
 
-/**
- * 检查通知类型是否启用
- */
-export async function isNotificationEnabled(
+export async function initializeSettings(
   db: D1Database,
-  userId: number,
-  type: 'system' | 'interaction' | 'private_message',
-  channel: 'in_app' | 'email' | 'push'
+  userId: number
 ): Promise<boolean> {
   try {
-    const settings = await getNotificationSettings(db, userId);
+    const defaultSettings = getDefaultSettings(userId);
 
-    const typeSettings = settings[type === 'private_message' ? 'privateMessage' : type];
-    if (!typeSettings) return false;
+    const result = await db.prepare(`
+      INSERT INTO notification_settings (
+        user_id,
+        system_in_app, system_email, system_push, system_frequency,
+        interaction_in_app, interaction_email, interaction_push, interaction_frequency,
+        interaction_comment, interaction_like, interaction_favorite,
+        interaction_mention, interaction_follow, interaction_reply,
+        dnd_enabled, dnd_start, dnd_end, dnd_timezone,
+        digest_daily_time, digest_weekly_day, digest_weekly_time
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      userId,
+      defaultSettings.system.inApp ? 1 : 0,
+      defaultSettings.system.email ? 1 : 0,
+      defaultSettings.system.push ? 1 : 0,
+      defaultSettings.system.frequency,
+      defaultSettings.interaction.inApp ? 1 : 0,
+      defaultSettings.interaction.email ? 1 : 0,
+      defaultSettings.interaction.push ? 1 : 0,
+      defaultSettings.interaction.frequency,
+      defaultSettings.interaction.subtypes.comment ? 1 : 0,
+      defaultSettings.interaction.subtypes.like ? 1 : 0,
+      defaultSettings.interaction.subtypes.favorite ? 1 : 0,
+      defaultSettings.interaction.subtypes.mention ? 1 : 0,
+      defaultSettings.interaction.subtypes.follow ? 1 : 0,
+      defaultSettings.interaction.subtypes.reply ? 1 : 0,
+      defaultSettings.doNotDisturb.enabled ? 1 : 0,
+      defaultSettings.doNotDisturb.start,
+      defaultSettings.doNotDisturb.end,
+      defaultSettings.doNotDisturb.timezone,
+      defaultSettings.digestTime.daily,
+      defaultSettings.digestTime.weeklyDay,
+      defaultSettings.digestTime.weeklyTime
+    ).run();
 
-    // 检查频率是否为关闭
-    if (typeSettings.frequency === 'off') return false;
-
-    // 检查渠道开关
-    return typeSettings[channel === 'in_app' ? 'inApp' : channel];
+    return result.success;
   } catch (error) {
-    console.error('Check notification enabled error:', error);
+    console.error('Initialize notification settings error:', error);
     return false;
   }
 }
 
-/**
- * 检查互动子类型是否启用
- */
+export async function isNotificationEnabled(
+  db: D1Database,
+  userId: number,
+  type: 'system' | 'interaction'
+): Promise<boolean> {
+  const settings = await getNotificationSettings(db, userId);
+  const typeSettings = settings[type];
+  return typeSettings.frequency !== 'off';
+}
+
 export async function isInteractionSubtypeEnabled(
   db: D1Database,
   userId: number,
   subtype: keyof InteractionSubtypes
 ): Promise<boolean> {
-  try {
-    const settings = await getNotificationSettings(db, userId);
-    return settings.interaction.subtypes[subtype] ?? true;
-  } catch (error) {
-    console.error('Check interaction subtype enabled error:', error);
-    return true;
+  const settings = await getNotificationSettings(db, userId);
+  
+  if (settings.interaction.frequency === 'off') {
+    return false;
   }
+  
+  return settings.interaction.subtypes[subtype] === true;
 }
 
-/**
- * 合并设置
- */
-function mergeSettings(
-  current: NotificationSettings,
-  updates: UpdateNotificationSettingsRequest
-): NotificationSettings {
+function mapSettingsFromRow(row: any, userId: number): NotificationSettings {
   return {
-    ...current,
-    system: { ...current.system, ...updates.system },
-    interaction: {
-      ...current.interaction,
-      ...updates.interaction,
-      subtypes: updates.interaction?.subtypes
-        ? { ...current.interaction.subtypes, ...updates.interaction.subtypes }
-        : current.interaction.subtypes,
-    },
-    privateMessage: { ...current.privateMessage, ...updates.privateMessage },
-    doNotDisturb: { ...current.doNotDisturb, ...updates.doNotDisturb },
-    digestTime: { ...current.digestTime, ...updates.digestTime },
-  };
-}
-
-/**
- * 验证设置
- */
-function validateSettings(settings: NotificationSettings): boolean {
-  // 验证频率值
-  const validFrequencies = ['realtime', 'daily', 'weekly', 'off'];
-  if (!validFrequencies.includes(settings.system.frequency)) return false;
-  if (!validFrequencies.includes(settings.interaction.frequency)) return false;
-  if (!validFrequencies.includes(settings.privateMessage.frequency)) return false;
-
-  // 验证时间格式
-  const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
-  if (settings.doNotDisturb.start && !timeRegex.test(settings.doNotDisturb.start)) return false;
-  if (settings.doNotDisturb.end && !timeRegex.test(settings.doNotDisturb.end)) return false;
-  if (!timeRegex.test(settings.digestTime.daily)) return false;
-  if (!timeRegex.test(settings.digestTime.weeklyTime)) return false;
-
-  // 验证星期几
-  if (settings.digestTime.weeklyDay < 0 || settings.digestTime.weeklyDay > 6) return false;
-
-  return true;
-}
-
-/**
- * 数据库行映射为NotificationSettings对象
- */
-function mapSettingsFromRow(row: any): NotificationSettings {
-  return {
-    userId: row.user_id,
+    id: row.id,
+    userId,
     system: {
       inApp: row.system_in_app === 1,
       email: row.system_email === 1,
@@ -366,28 +237,67 @@ function mapSettingsFromRow(row: any): NotificationSettings {
       email: row.interaction_email === 1,
       push: row.interaction_push === 1,
       frequency: row.interaction_frequency,
-      subtypes: row.interaction_subtypes
-        ? JSON.parse(row.interaction_subtypes)
-        : DEFAULT_SETTINGS.interaction.subtypes,
-    },
-    privateMessage: {
-      inApp: row.private_message_in_app === 1,
-      email: row.private_message_email === 1,
-      push: row.private_message_push === 1,
-      frequency: row.private_message_frequency,
+      subtypes: {
+        comment: row.interaction_comment === 1,
+        like: row.interaction_like === 1,
+        favorite: row.interaction_favorite === 1,
+        mention: row.interaction_mention === 1,
+        follow: row.interaction_follow === 1,
+        reply: row.interaction_reply === 1,
+      },
     },
     doNotDisturb: {
-      enabled: row.do_not_disturb_enabled === 1,
-      start: row.do_not_disturb_start,
-      end: row.do_not_disturb_end,
-      timezone: row.do_not_disturb_timezone || 'Asia/Shanghai',
+      enabled: row.dnd_enabled === 1,
+      start: row.dnd_start,
+      end: row.dnd_end,
+      timezone: row.dnd_timezone,
     },
     digestTime: {
-      daily: row.daily_digest_time || '09:00',
-      weeklyDay: row.weekly_digest_day ?? 1,
-      weeklyTime: row.weekly_digest_time || '09:00',
+      daily: row.digest_daily_time,
+      weeklyDay: row.digest_weekly_day,
+      weeklyTime: row.digest_weekly_time,
     },
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function getDefaultSettings(userId: number): NotificationSettings {
+  return {
+    userId,
+    system: { ...DEFAULT_TYPE_SETTINGS },
+    interaction: {
+      ...DEFAULT_TYPE_SETTINGS,
+      subtypes: { ...DEFAULT_INTERACTION_SUBTYPES },
+    },
+    doNotDisturb: { ...DEFAULT_DND_SETTINGS },
+    digestTime: { ...DEFAULT_DIGEST_TIME },
+  };
+}
+
+function mergeSettings(
+  current: NotificationSettings,
+  updates: UpdateNotificationSettingsRequest
+): NotificationSettings {
+  return {
+    ...current,
+    system: updates.system
+      ? { ...current.system, ...updates.system }
+      : current.system,
+    interaction: updates.interaction
+      ? {
+          ...current.interaction,
+          ...updates.interaction,
+          subtypes: updates.interaction.subtypes
+            ? { ...current.interaction.subtypes, ...updates.interaction.subtypes }
+            : current.interaction.subtypes,
+        }
+      : current.interaction,
+    doNotDisturb: updates.doNotDisturb
+      ? { ...current.doNotDisturb, ...updates.doNotDisturb }
+      : current.doNotDisturb,
+    digestTime: updates.digestTime
+      ? { ...current.digestTime, ...updates.digestTime }
+      : current.digestTime,
   };
 }

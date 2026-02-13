@@ -404,7 +404,7 @@ commentRoutes.post('/', requireAuth, rateLimit({
                 senderName: user.displayName || user.username,
                 senderAvatar: user.avatarUrl,
               },
-            });
+            }, c.env);
           }
         }
       } else {
@@ -436,7 +436,7 @@ commentRoutes.post('/', requireAuth, rateLimit({
                 senderName: user.displayName || user.username,
                 senderAvatar: user.avatarUrl,
               },
-            });
+            }, c.env);
           }
         }
       }
@@ -643,7 +643,7 @@ commentRoutes.post('/:id/like', requireAuth, rateLimit({
                 senderName: user.displayName || user.username,
                 senderAvatar: user.avatarUrl,
               },
-            });
+            }, c.env);
           }
         }
       } catch (notifyError) {

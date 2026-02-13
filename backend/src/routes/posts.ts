@@ -1626,7 +1626,7 @@ postRoutes.post('/:id/like', requireAuth, async (c) => {
                 senderName: user.displayName || user.username,
                 senderAvatar: user.avatarUrl,
               },
-            });
+            }, c.env);
           }
         }
       } catch (notifyError) {
@@ -1762,7 +1762,7 @@ postRoutes.post('/:id/favorite', requireAuth, async (c) => {
                 senderName: user.displayName || user.username,
                 senderAvatar: user.avatarUrl,
               },
-            });
+            }, c.env);
           }
         }
       } catch (notifyError) {
