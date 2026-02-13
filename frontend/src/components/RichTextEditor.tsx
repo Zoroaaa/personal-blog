@@ -58,6 +58,7 @@ export function RichTextEditor({
   const lastSelectionRef = useRef<Range | null>(null);
   const isComposingRef = useRef(false);
   const isSelectingMentionRef = useRef(false);
+  const initialValueRef = useRef<string | null>(null);
 
   const calculateTextLength = useCallback((html: string): number => {
     const temp = document.createElement('div');
@@ -70,8 +71,18 @@ export function RichTextEditor({
   }, [value, calculateTextLength]);
 
   useEffect(() => {
+    if (initialValueRef.current === null && editorRef.current) {
+      initialValueRef.current = value || '';
+      editorRef.current.innerHTML = initialValueRef.current;
+    }
+  }, []);
+
+  useEffect(() => {
     if (editorRef.current && !isFocused && !isUpdatingRef.current) {
-      editorRef.current.innerHTML = value || '';
+      const currentContent = editorRef.current.innerHTML;
+      if (currentContent !== value) {
+        editorRef.current.innerHTML = value || '';
+      }
     }
   }, [value, isFocused]);
 
@@ -228,13 +239,14 @@ export function RichTextEditor({
 
     editorRef.current.focus();
 
+    restoreSelection();
+
     const selection = window.getSelection();
     if (!selection) {
       isSelectingMentionRef.current = false;
       return;
     }
 
-    let lastAtIndex = -1;
     let deleteLength = 0;
 
     if (selection.rangeCount > 0) {
@@ -243,18 +255,13 @@ export function RichTextEditor({
       preCaretRange.selectNodeContents(editorRef.current);
       preCaretRange.setEnd(range.endContainer, range.endOffset);
       const textBeforeCursor = preCaretRange.toString();
-      lastAtIndex = textBeforeCursor.lastIndexOf('@');
+      const lastAtIndex = textBeforeCursor.lastIndexOf('@');
       if (lastAtIndex !== -1) {
         deleteLength = textBeforeCursor.length - lastAtIndex;
       }
     }
 
-    if (lastAtIndex === -1 && mentionPosition) {
-      lastAtIndex = mentionPosition.start;
-      deleteLength = mentionPosition.end - mentionPosition.start;
-    }
-
-    if (lastAtIndex === -1) {
+    if (deleteLength === 0) {
       isSelectingMentionRef.current = false;
       setShowMentions(false);
       return;
@@ -277,7 +284,7 @@ export function RichTextEditor({
       isUpdatingRef.current = false;
       isSelectingMentionRef.current = false;
     }, 0);
-  }, [onChange, mentionPosition]);
+  }, [onChange, restoreSelection]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -502,7 +509,6 @@ export function RichTextEditor({
           data-placeholder={placeholder}
           style={{ wordBreak: 'break-word' }}
           suppressContentEditableWarning={true}
-          dangerouslySetInnerHTML={{ __html: value || '' }}
         />
 
         {showMentions && filteredUsers.length > 0 && (
@@ -513,6 +519,7 @@ export function RichTextEditor({
                 type="button"
                 onMouseDown={(e) => {
                   e.preventDefault();
+                  saveSelection();
                   selectUser(user);
                 }}
                 onMouseEnter={() => setSelectedIndex(index)}
