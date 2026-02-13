@@ -29,6 +29,7 @@ import {
   generateSlug,
   safeParseInt
 } from '../utils/validation';
+import { SoftDeleteHelper } from '../utils/softDeleteHelper';
 
 export const categoryRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -374,8 +375,8 @@ categoryRoutes.delete('/:id', requireAuth, requireAdmin, async (c) => {
       ), 400);
     }
     
-    // 删除分类
-    await c.env.DB.prepare('DELETE FROM categories WHERE id = ?').bind(id).run();
+    // 软删除分类（保留数据以支持审计和恢复）
+    await SoftDeleteHelper.softDelete(c.env.DB, 'categories', id);
 
     logger.info('Category deleted', { categoryId: id });
     
@@ -408,8 +409,8 @@ categoryRoutes.delete('/tags/:id', requireAuth, requireAdmin, async (c) => {
       return c.json(errorResponse('Tag not found'), 404);
     }
 
-    // 删除标签（会自动删除post_tags中的关联）
-    await c.env.DB.prepare('DELETE FROM tags WHERE id = ?').bind(id).run();
+    // 软删除标签（保留数据以支持审计和恢复）
+    await SoftDeleteHelper.softDelete(c.env.DB, 'tags', id);
 
     logger.info('Tag deleted', { tagId: id });
 

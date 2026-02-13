@@ -33,6 +33,8 @@ import {
 import { isFeatureEnabled, getConfigValue } from './config';
 import { createInteractionNotification } from '../services/notificationService';
 import { isNotificationEnabled, isInteractionSubtypeEnabled } from '../services/notificationSettingsService';
+import { detectMentions, createMentionNotifications } from '../services/mentionService';
+import { SoftDeleteHelper } from '../utils/softDeleteHelper';
 
 export const commentRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -437,6 +439,34 @@ commentRoutes.post('/', requireAuth, async (c) => {
       // 通知发送失败不影响评论创建
       logger.error('Send comment notification error', notifyError);
     }
+
+    // ===== 9. 检测并处理@mentions =====
+    try {
+      const mentions = detectMentions(content);
+      if (mentions.length > 0) {
+        // 获取文章信息
+        const postInfo = await c.env.DB.prepare(
+          'SELECT title, slug FROM posts WHERE id = ?'
+        ).bind(postId).first() as any;
+
+        await createMentionNotifications(
+          c.env.DB,
+          mentions,
+          user.userId,
+          'comment',
+          commentId,
+          `/posts/${postInfo?.slug || postId}#comment-${commentId}`
+        );
+
+        logger.info('Mention notifications created', {
+          commentId,
+          mentions: mentions.length
+        });
+      }
+    } catch (mentionError) {
+      // @mentions处理失败不影响评论创建
+      logger.error('Mention detection error', mentionError);
+    }
     
     return c.json(successResponse({
       id: commentId
@@ -481,8 +511,8 @@ commentRoutes.delete('/:id', requireAuth, async (c) => {
       ), 403);
     }
     
-    // 删除评论（级联删除会自动处理子评论）
-    await c.env.DB.prepare('DELETE FROM comments WHERE id = ?').bind(id).run();
+    // 软删除评论（保留数据以支持审计和恢复）
+    await SoftDeleteHelper.softDelete(c.env.DB, 'comments', id);
     
     // 计数更新由触发器自动处理
     

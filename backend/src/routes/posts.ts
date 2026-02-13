@@ -36,6 +36,7 @@ import {
 } from '../utils/validation';
 import { createInteractionNotification } from '../services/notificationService';
 import { isInteractionSubtypeEnabled } from '../services/notificationSettingsService';
+import { SoftDeleteHelper } from '../utils/softDeleteHelper';
 
 // 定义应用路由类型
 export const postRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -1472,8 +1473,8 @@ postRoutes.delete('/:id', requireAuth, requireAdmin, async (c) => {
       }
     }
 
-    // 删除文章（级联删除会自动处理评论、点赞等）
-    await c.env.DB.prepare('DELETE FROM posts WHERE id = ?').bind(id).run();
+    // 软删除文章（保留数据以支持审计和恢复）
+    await SoftDeleteHelper.softDelete(c.env.DB, 'posts', id);
 
     // 异步删除图片（不阻塞响应）
     if (imagesToDelete.length > 0) {

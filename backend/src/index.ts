@@ -37,6 +37,9 @@ import { requestLogger } from './middleware/requestLogger';
 // 导入类型定义
 import type { Env, ApiResponse } from './types';
 
+// 导入配置
+import { getAllowedOrigins, getBaseUrl } from './config/constants';
+
 // 导出类型供其他模块使用
 export type { Env, ApiResponse } from './types';
 
@@ -85,53 +88,54 @@ app.use('*', async (c, next) => {
 app.use('*', logger());
 app.use('*', requestLogger);
 
-// 2. CORS配置 (修复: 移除对c.env的错误引用)
-app.use('*', cors({
-  origin: (origin) => {
-    // 允许的来源列表
-    const allowedOrigins = [
-      'http://localhost:5173',
-      'http://localhost:3000',
-      'http://localhost:4173',
-      'https://blog.neutronx.uk',
-      'https://www.blog.neutronx.uk'
-    ];
+// 2. CORS配置 (修复: 使用环境变量替代硬编码)
+app.use('*', (c, next) => {
+  // 获取允许的源
+  const allowedOriginsList = getAllowedOrigins(c.env);
+  const baseUrl = getBaseUrl(c.env);
 
-    // 如果没有origin（服务器端请求或直接访问），使用默认
-    // 修复: 不能在这里使用c.env,因为CORS配置在初始化时执行
-    if (!origin) {
-      return 'https://blog.neutronx.uk';
-    }
+  // 应用CORS中间件
+  const corsMiddleware = cors({
+    origin: (origin) => {
+      // 如果没有origin（服务器端请求或直接访问），使用基础URL
+      if (!origin) {
+        return baseUrl;
+      }
 
-    // 检查是否在白名单中
-    if (allowedOrigins.includes(origin)) {
-      return origin;
-    }
-
-    // 开发环境允许localhost的任意端口
-    if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
-      return origin;
-    }
-
-    // 生产环境检查域名
-    try {
-      const url = new URL(origin);
-      if (url.hostname.endsWith('.neutronx.uk')) {
+      // 检查是否在白名单中
+      if (allowedOriginsList.includes(origin)) {
         return origin;
       }
-    } catch (error) {
-      console.error('Invalid origin URL:', origin);
-    }
 
-    // 默认返回前端URL
-    return 'https://blog.neutronx.uk';
-  },
-  credentials: true,
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Request-ID'],
-  exposeHeaders: ['X-Total-Count', 'X-Page', 'X-Per-Page', 'Content-Length'],
-  maxAge: 86400, // 24小时
-}));
+      // 开发环境允许localhost的任意端口
+      if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+        return origin;
+      }
+
+      // 生产环境检查域名是否匹配基域名
+      try {
+        const url = new URL(origin);
+        const baseUrlObj = new URL(baseUrl);
+        // 检查是否为同一个域名或其子域名
+        if (url.hostname === baseUrlObj.hostname || url.hostname.endsWith('.' + baseUrlObj.hostname)) {
+          return origin;
+        }
+      } catch (error) {
+        console.error('Invalid origin URL:', origin);
+      }
+
+      // 默认返回基础URL（拒绝跨域）
+      return baseUrl;
+    },
+    credentials: true,
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Request-ID'],
+    exposeHeaders: ['X-Total-Count', 'X-Page', 'X-Per-Page', 'Content-Length'],
+    maxAge: 86400, // 24小时
+  });
+
+  return corsMiddleware(c, next);
+});
 
 
 
@@ -371,49 +375,71 @@ app.notFound((c) => {
 
 /**
  * 全局错误处理
+ * 修复: 生产环境不暴露错误堆栈和详细信息
  */
 app.onError((err, c) => {
-  // 记录错误详情
+  // 记录错误详情(仅在服务器端)
   console.error('=== Global Error Handler ===');
   console.error('Path:', c.req.path);
   console.error('Method:', c.req.method);
   console.error('Error:', err);
   console.error('Stack:', err.stack);
-  
-  // 判断是否为开发环境
-  const isDevelopment = c.env?.ENVIRONMENT === 'development';
-  
+
+  // 判断是否为开发环境（默认为生产环境以提高安全性）
+  const isDevelopment = c.env?.ENVIRONMENT === 'development' || false;
+
   // 确定HTTP状态码
   let statusCode = 500;
   let errorMessage = 'Internal server error';
-  
+  let userFacingMessage = 'An unexpected error occurred. Please try again later.';
+
   // 根据错误类型返回不同的状态码
   if (err.message.includes('Unauthorized') || err.message.includes('Invalid token')) {
     statusCode = 401;
     errorMessage = 'Unauthorized';
+    userFacingMessage = 'Authentication failed. Please log in again.';
   } else if (err.message.includes('Forbidden')) {
     statusCode = 403;
     errorMessage = 'Forbidden';
+    userFacingMessage = 'You do not have permission to access this resource.';
   } else if (err.message.includes('Not found')) {
     statusCode = 404;
     errorMessage = 'Not found';
+    userFacingMessage = 'The requested resource was not found.';
   } else if (err.message.includes('Validation') || err.message.includes('Invalid')) {
     statusCode = 400;
     errorMessage = 'Bad request';
+    userFacingMessage = 'The request contains invalid data. Please check your input.';
+  } else if (err.message.includes('Conflict')) {
+    statusCode = 409;
+    errorMessage = 'Conflict';
+    userFacingMessage = 'The requested operation conflicts with existing data.';
+  } else if (err.message.includes('Rate limit')) {
+    statusCode = 429;
+    errorMessage = 'Too many requests';
+    userFacingMessage = 'Too many requests. Please try again later.';
   }
-  
-  // 返回错误响应
-  return c.json<ApiResponse>({
+
+  // 构建响应数据
+  const responseData: any = {
     success: false,
     error: errorMessage,
-    message: isDevelopment ? err.message : 'An unexpected error occurred. Please try again later.',
-    data: isDevelopment ? {
-      stack: err.stack,
-      name: err.name,
-      cause: err.cause
-    } : undefined,
+    message: userFacingMessage,
     timestamp: new Date().toISOString()
-  }, statusCode);
+  };
+
+  // 仅在开发环境才暴露错误详情
+  if (isDevelopment) {
+    responseData.data = {
+      name: err.name,
+      message: err.message,
+      stack: err.stack,
+      cause: err.cause
+    };
+  }
+
+  // 返回错误响应
+  return c.json<ApiResponse>(responseData, statusCode);
 });
 
 // ============= 导出 =============

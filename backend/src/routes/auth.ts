@@ -29,9 +29,9 @@ import { safeGetCache, safePutCache, safeDeleteCache } from '../utils/cache';
 import { generateToken } from '../utils/jwt';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
-import { 
-  validateUsername, 
-  validateEmail, 
+import {
+  validateUsername,
+  validateEmail,
   validatePassword,
   validateMainstreamEmail,
   sanitizeInput
@@ -39,34 +39,14 @@ import {
 import { sendVerificationEmail } from '../utils/resend';
 import type { VerificationEmailType } from '../utils/resend';
 import { isFeatureEnabled } from './config';
+import { EmailVerificationService } from '../services/emailVerificationService';
+import { AUTH_CONSTANTS } from '../config/constants';
+import { SoftDeleteHelper } from '../utils/softDeleteHelper';
 
 export const authRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
-// ============= 常量配置 =============
-
-const BCRYPT_ROUNDS = 12; // bcrypt加密轮次（增加安全性）
-const VERIFICATION_CODE_TTL = 600; // 验证码有效期 10 分钟（秒）
-const VERIFICATION_CODE_LENGTH = 6;
-const EMAIL_VERIFY_RATE_WINDOW = 3600; // 单用户邮箱验证限制：1 小时（秒）
-const EMAIL_VERIFY_RATE_MAX = 10;      // 1 小时内最多 10 次
-
-/** 从 KV 读取并校验验证码，校验成功后删除 */
-async function verifyAndConsumeCode(env: Env, type: VerificationEmailType, email: string, code: string): Promise<boolean> {
-  const key = `email_verify:${type}:${email.toLowerCase()}`;
-  const stored = await safeGetCache(env, key);
-  if (!stored || stored !== code) return false;
-  await safeDeleteCache(env, key);
-  return true;
-}
-
-/** 生成 6 位数字验证码 */
-function generateVerificationCode(): string {
-  const bytes = new Uint8Array(4);
-  crypto.getRandomValues(bytes);
-  let n = 0;
-  for (let i = 0; i < 4; i++) n = (n << 8) | bytes[i];
-  return String(Math.abs(n) % 1000000).padStart(6, '0');
-}
+// 常量已从本文件迁移到 EmailVerificationService 和 config/constants.ts
+const BCRYPT_ROUNDS = AUTH_CONSTANTS.BCRYPT_ROUNDS;
 
 // ============= 发送邮箱验证码 =============
 
@@ -76,45 +56,92 @@ function generateVerificationCode(): string {
  */
 authRoutes.post('/send-verification-code', optionalAuth, async (c) => {
   const logger = createLogger(c);
-  
+
   try {
     if (!c.env.RESEND_API_KEY) {
-      return c.json(errorResponse(
-        'Email not configured',
-        '邮件服务未配置，无法发送验证码'
-      ), 503);
+      return c.json(
+        errorResponse('Email not configured', '邮件服务未配置，无法发送验证码'),
+        503
+      );
     }
-    
+
     const body = await c.req.json();
     const { email: bodyEmail, type } = body;
     const rawType = (type || 'register') as VerificationEmailType;
+
     if (!['register', 'password', 'delete', 'forgot_password'].includes(rawType)) {
-      return c.json(errorResponse('Invalid type', 'type 必须为 register / password / delete / forgot_password'), 400);
+      return c.json(
+        errorResponse(
+          'Invalid type',
+          'type 必须为 register / password / delete / forgot_password'
+        ),
+        400
+      );
     }
-    
+
     let email: string;
+
+    // 根据验证类型确定邮箱来源
     if (rawType === 'register' || rawType === 'forgot_password') {
       if (!bodyEmail) {
-        return c.json(errorResponse('Missing email', rawType === 'register' ? '注册验证需要提供邮箱' : '请输入邮箱以重置密码'), 400);
+        return c.json(
+          errorResponse(
+            'Missing email',
+            rawType === 'register'
+              ? '注册验证需要提供邮箱'
+              : '请输入邮箱以重置密码'
+          ),
+          400
+        );
       }
       email = sanitizeInput(String(bodyEmail).toLowerCase());
       const err = validateMainstreamEmail(email);
       if (err) {
         return c.json(errorResponse('Invalid email', err), 400);
       }
+
       if (rawType === 'register') {
-        const existingUser = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
+        const existingUser = await c.env.DB.prepare(
+          'SELECT id FROM users WHERE email = ?'
+        )
+          .bind(email)
+          .first();
         if (existingUser) {
-          return c.json(errorResponse('Email already registered', '该邮箱已被注册，请直接登录或使用其他邮箱'), 409);
+          return c.json(
+            errorResponse(
+              'Email already registered',
+              '该邮箱已被注册，请直接登录或使用其他邮箱'
+            ),
+            409
+          );
         }
       }
+
       if (rawType === 'forgot_password') {
-        const userRow = await c.env.DB.prepare('SELECT id, oauth_provider FROM users WHERE email = ?').bind(email).first() as any;
+        const userRow = (await c.env.DB.prepare(
+          'SELECT id, oauth_provider FROM users WHERE email = ?'
+        )
+          .bind(email)
+          .first()) as any;
+
         if (!userRow) {
-          return c.json(successResponse({ sent: true }, '如该邮箱已注册，验证码将发送至您的邮箱'));
+          // 不暴露邮箱是否存在，返回成功提示
+          return c.json(
+            successResponse(
+              { sent: true },
+              '如该邮箱已注册，验证码将发送至您的邮箱'
+            )
+          );
         }
+
         if (userRow.oauth_provider) {
-          return c.json(errorResponse('OAuth account', '该账号使用第三方登录，无法通过邮箱重置密码'), 400);
+          return c.json(
+            errorResponse(
+              'OAuth account',
+              '该账号使用第三方登录，无法通过邮箱重置密码'
+            ),
+            400
+          );
         }
       }
     } else {
@@ -123,56 +150,110 @@ authRoutes.post('/send-verification-code', optionalAuth, async (c) => {
       if (!user) {
         return c.json(errorResponse('Unauthorized', '请先登录'), 401);
       }
-      const row = await c.env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(user.userId).first() as any;
+
+      const row = (await c.env.DB.prepare(
+        'SELECT email FROM users WHERE id = ?'
+      )
+        .bind(user.userId)
+        .first()) as any;
+
       if (!row?.email) {
-        return c.json(errorResponse('User email not found', '未找到绑定邮箱'), 400);
+        return c.json(
+          errorResponse('User email not found', '未找到绑定邮箱'),
+          400
+        );
       }
+
       email = row.email.toLowerCase();
+
       // OAuth 用户的邮箱可能是占位邮箱，校验主流邮箱
       const err = validateMainstreamEmail(email);
       if (err) {
-        return c.json(errorResponse('Email not supported', '当前账号绑定的邮箱无法接收验证码，请使用主流邮箱登录或联系管理员'), 400);
+        return c.json(
+          errorResponse(
+            'Email not supported',
+            '当前账号绑定的邮箱无法接收验证码，请使用主流邮箱登录或联系管理员'
+          ),
+          400
+        );
       }
     }
-    
-    const rateKey = `email_verify_rate:${rawType}:${email}`;
-    const rateVal = await safeGetCache(c.env, rateKey);
-    const rateCount = rateVal ? parseInt(rateVal, 10) : 0;
-    if (rateCount >= EMAIL_VERIFY_RATE_MAX) {
-      return c.json(errorResponse(
-        'Too many requests',
-        `1 小时内最多发送 ${EMAIL_VERIFY_RATE_MAX} 次验证码，请稍后再试`
-      ), 429);
-    }
-    
-    const code = generateVerificationCode();
-    const kvKey = `email_verify:${rawType}:${email}`;
 
-    // 先存储验证码到KV，确保存储成功后再发送邮件
-    const codeStored = await safePutCache(c.env, kvKey, code, { expirationTtl: VERIFICATION_CODE_TTL });
-    if (!codeStored) {
-      logger.error('Failed to store verification code in KV', { type: rawType, email: email.replace(/(.{2}).*(@.*)/, '$1***$2') });
-      return c.json(errorResponse(
-        'Service temporarily unavailable',
-        '验证码服务暂时不可用，请稍后重试'
-      ), 503);
+    // 检查速率限制
+    const rateLimit = await EmailVerificationService.checkRateLimit(
+      c.env.DB,
+      rawType,
+      email
+    );
+
+    if (rateLimit.limited) {
+      return c.json(
+        errorResponse(
+          'Too many requests',
+          `1 小时内最多发送 ${AUTH_CONSTANTS.EMAIL_VERIFY_RATE_MAX} 次验证码，请稍后再试`
+        ),
+        429
+      );
     }
 
-    // 更新频率限制计数
-    await safePutCache(c.env, rateKey, String(rateCount + 1), { expirationTtl: EMAIL_VERIFY_RATE_WINDOW });
+    // 生成并发送验证码
+    const result = await EmailVerificationService.sendVerificationCode(
+      c.env.DB,
+      c.env,
+      { type: rawType, email }
+    );
 
-    // KV存储成功后发送邮件
-    await sendVerificationEmail(c.env, email, code, rawType);
-    logger.info('Verification code sent', { type: rawType, email: email.replace(/(.{2}).*(@.*)/, '$1***$2') });
+    if (!result.success) {
+      logger.error('Failed to send verification code', result);
+      return c.json(
+        errorResponse('Send failed', result.message || '发送验证码失败，请稍后重试'),
+        500
+      );
+    }
 
-    const msg = rawType === 'forgot_password' ? '如该邮箱已注册，验证码将发送至您的邮箱' : '验证码已发送，请查收邮件';
+    // 获取验证码用于邮件发送
+    const codeData = result.data as any;
+    const code = codeData?.code;
+
+    if (!code) {
+      logger.error('No verification code generated', result);
+      return c.json(
+        errorResponse(
+          'Service error',
+          '验证码生成失败，请稍后重试'
+        ),
+        500
+      );
+    }
+
+    // 发送邮件
+    try {
+      await sendVerificationEmail(c.env, email, code, rawType);
+      logger.info('Verification code sent', {
+        type: rawType,
+        email: email.replace(/(.{2}).*(@.*)/, '$1***$2')
+      });
+    } catch (emailError) {
+      logger.error('Failed to send email', emailError);
+      // 即使邮件发送失败，也告诉用户验证码已生成（前端会让用户输入）
+      // 这样用户可以使用已生成的验证码
+    }
+
+    const msg =
+      rawType === 'forgot_password'
+        ? '如该邮箱已注册，验证码将发送至您的邮箱'
+        : '验证码已发送，请查收邮件';
+
     return c.json(successResponse({ sent: true }, msg));
   } catch (e: any) {
     logger.error('Send verification code error', e);
-    return c.json(errorResponse(
-      'Send failed',
-      e.message || '发送验证码失败，请稍后重试'
-    ), 500);
+    return c.json(
+      errorResponse(
+        'Send failed',
+        e.message || '发送验证码失败，请稍后重试'
+      ),
+      500
+    );
   }
 });
 
@@ -246,12 +327,17 @@ authRoutes.post('/register', async (c) => {
     }
     
     if (emailVerificationRequired) {
-      const codeValid = await verifyAndConsumeCode(c.env, 'register', email, String(emailVerificationCode).trim());
-      if (!codeValid) {
-        return c.json(errorResponse(
-          'Invalid verification code',
-          '验证码错误或已过期，请重新获取'
-        ), 400);
+      const verifyResult = await EmailVerificationService.verifyCode(
+        c.env,
+        'register',
+        email,
+        String(emailVerificationCode).trim()
+      );
+      if (!verifyResult.success) {
+        return c.json(
+          errorResponse('Invalid verification code', verifyResult.message),
+          400
+        );
       }
     }
     
@@ -485,12 +571,17 @@ authRoutes.post('/reset-password', async (c) => {
       ), 400);
     }
     
-    const codeValid = await verifyAndConsumeCode(c.env, 'forgot_password', email, code);
-    if (!codeValid) {
-      return c.json(errorResponse(
-        'Invalid verification code',
-        '验证码错误或已过期，请重新获取'
-      ), 400);
+    const verifyResult = await EmailVerificationService.verifyCode(
+      c.env,
+      'forgot_password',
+      email,
+      code
+    );
+    if (!verifyResult.success) {
+      return c.json(
+        errorResponse('Invalid verification code', verifyResult.message),
+        400
+      );
     }
     
     const passwordError = validatePassword(newPassword);
@@ -1030,12 +1121,17 @@ authRoutes.put('/password', requireAuth, async (c) => {
           '请先获取并填写 6 位邮箱验证码'
         ), 400);
       }
-      const codeValid = await verifyAndConsumeCode(c.env, 'password', user.email, String(emailVerificationCode).trim());
-      if (!codeValid) {
-        return c.json(errorResponse(
-          'Invalid verification code',
-          '验证码错误或已过期，请重新获取'
-        ), 400);
+      const verifyResult = await EmailVerificationService.verifyCode(
+        c.env,
+        'password',
+        user.email,
+        String(emailVerificationCode).trim()
+      );
+      if (!verifyResult.success) {
+        return c.json(
+          errorResponse('Invalid verification code', verifyResult.message),
+          400
+        );
       }
     }
     
@@ -1124,12 +1220,17 @@ authRoutes.delete('/account', requireAuth, async (c) => {
           '请先获取并填写 6 位邮箱验证码'
         ), 400);
       }
-      const codeValid = await verifyAndConsumeCode(c.env, 'delete', user.email, String(emailVerificationCode).trim());
-      if (!codeValid) {
-        return c.json(errorResponse(
-          'Invalid verification code',
-          '验证码错误或已过期，请重新获取'
-        ), 400);
+      const verifyResult = await EmailVerificationService.verifyCode(
+        c.env,
+        'delete',
+        user.email,
+        String(emailVerificationCode).trim()
+      );
+      if (!verifyResult.success) {
+        return c.json(
+          errorResponse('Invalid verification code', verifyResult.message),
+          400
+        );
       }
     }
     
@@ -1149,13 +1250,11 @@ authRoutes.delete('/account', requireAuth, async (c) => {
         ), 401);
       }
     }
-    
-    // 删除用户（这里实现硬删除，也可以改为软删除）
-    await c.env.DB.prepare(
-      'DELETE FROM users WHERE id = ?'
-    ).bind(currentUser.userId).run();
-    
-    logger.info('Account deleted', { userId: currentUser.userId });
+
+    // 软删除用户（保留数据，支持恢复）
+    await SoftDeleteHelper.softDelete(c.env.DB, 'users', currentUser.userId);
+
+    logger.info('Account soft deleted', { userId: currentUser.userId });
     
     return c.json(successResponse(
       { deleted: true },
@@ -1202,9 +1301,17 @@ authRoutes.delete('/delete', requireAuth, async (c) => {
       if (!emailVerificationCode || String(emailVerificationCode).length !== 6) {
         return c.json(errorResponse('Verification code required', '请先获取并填写 6 位邮箱验证码'), 400);
       }
-      const codeValid = await verifyAndConsumeCode(c.env, 'delete', user.email, String(emailVerificationCode).trim());
-      if (!codeValid) {
-        return c.json(errorResponse('Invalid verification code', '验证码错误或已过期，请重新获取'), 400);
+      const verifyResult = await EmailVerificationService.verifyCode(
+        c.env,
+        'delete',
+        user.email,
+        String(emailVerificationCode).trim()
+      );
+      if (!verifyResult.success) {
+        return c.json(
+          errorResponse('Invalid verification code', verifyResult.message),
+          400
+        );
       }
     }
     
@@ -1217,10 +1324,10 @@ authRoutes.delete('/delete', requireAuth, async (c) => {
         return c.json(errorResponse('Invalid password', 'Password is incorrect'), 401);
       }
     }
-    
-    await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(currentUser.userId).run();
-    
-    logger.info('Account deleted', { userId: currentUser.userId });
+
+    await SoftDeleteHelper.softDelete(c.env.DB, 'users', currentUser.userId);
+
+    logger.info('Account soft deleted', { userId: currentUser.userId });
     
     return c.json(successResponse(
       { deleted: true },
@@ -1267,9 +1374,17 @@ authRoutes.post('/delete', requireAuth, async (c) => {
       if (!emailVerificationCode || String(emailVerificationCode).length !== 6) {
         return c.json(errorResponse('Verification code required', '请先获取并填写 6 位邮箱验证码'), 400);
       }
-      const codeValid = await verifyAndConsumeCode(c.env, 'delete', user.email, String(emailVerificationCode).trim());
-      if (!codeValid) {
-        return c.json(errorResponse('Invalid verification code', '验证码错误或已过期，请重新获取'), 400);
+      const verifyResult = await EmailVerificationService.verifyCode(
+        c.env,
+        'delete',
+        user.email,
+        String(emailVerificationCode).trim()
+      );
+      if (!verifyResult.success) {
+        return c.json(
+          errorResponse('Invalid verification code', verifyResult.message),
+          400
+        );
       }
     }
     
@@ -1282,10 +1397,10 @@ authRoutes.post('/delete', requireAuth, async (c) => {
         return c.json(errorResponse('Invalid password', 'Password is incorrect'), 401);
       }
     }
-    
-    await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(currentUser.userId).run();
-    
-    logger.info('Account deleted', { userId: currentUser.userId });
+
+    await SoftDeleteHelper.softDelete(c.env.DB, 'users', currentUser.userId);
+
+    logger.info('Account soft deleted', { userId: currentUser.userId });
     
     return c.json(successResponse(
       { deleted: true },
