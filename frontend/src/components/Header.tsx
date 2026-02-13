@@ -20,12 +20,14 @@ import { useAuthStore } from '../stores/authStore';
 import { useSiteConfig } from '../hooks/useSiteConfig';
 import { ThemeToggle } from './ThemeToggle';
 import NotificationBadge from './NotificationBadge';
+import { useMessageUnread } from '../hooks/useMessageUnread';
 
 export function Header() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
   const { config } = useSiteConfig();
+  const { unreadCount: messageUnreadCount } = useMessageUnread();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [scrolled, setScrolled] = useState(false);
@@ -149,6 +151,24 @@ export function Header() {
             {/* 通知角标 */}
             <NotificationBadge />
 
+            {/* 私信图标（独立） */}
+            {user && (
+              <Link
+                to="/messages"
+                className="relative p-2 rounded-md hover:bg-accent transition-colors"
+                aria-label={`私信 ${messageUnreadCount > 0 ? `(${messageUnreadCount}条未读)` : ''}`}
+              >
+                <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                {messageUnreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 font-medium">
+                    {messageUnreadCount > 99 ? '99+' : messageUnreadCount}
+                  </span>
+                )}
+              </Link>
+            )}
+
             {/* 用户菜单 */}
             {user ? (
               <div className="relative group">
@@ -180,6 +200,18 @@ export function Header() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                         </svg>
                         <span>个人资料</span>
+                      </div>
+                    </Link>
+
+                    <Link
+                      to="/messages"
+                      className="block px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        <span>私信</span>
                       </div>
                     </Link>
 

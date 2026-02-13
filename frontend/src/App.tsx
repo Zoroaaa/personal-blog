@@ -36,6 +36,7 @@ import { TagPage } from './pages/TagPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import NotificationCenter from './pages/NotificationCenter';
 import NotificationSettings from './pages/NotificationSettings';
+import MessagesPage from './pages/MessagesPage';
 import { SystemNotificationPage } from './pages/admin/SystemNotificationPage';
 import { useSiteConfig } from './hooks/useSiteConfig';
 import { ToastProvider } from './components/Toast';
@@ -96,6 +97,7 @@ function AppRoutes() {
       <Route path="/tags/:slug" element={<PageTransition><TagPage /></PageTransition>} />
       <Route path="/notifications" element={<PageTransition><NotificationCenter /></PageTransition>} />
       <Route path="/notification-settings" element={<PageTransition><NotificationSettings /></PageTransition>} />
+      <Route path="/messages" element={<PageTransition><MessagesPage /></PageTransition>} />
       <Route path="/admin/notifications" element={<PageTransition><SystemNotificationPage /></PageTransition>} />
       
       {/* 404路由 - 捕获所有未匹配的路径 */}

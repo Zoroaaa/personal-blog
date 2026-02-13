@@ -75,12 +75,6 @@ const defaultSettings: NotificationSettings = {
       reply: true,
     },
   },
-  privateMessage: {
-    inApp: true,
-    email: false,
-    push: true,
-    frequency: 'realtime',
-  },
   doNotDisturb: {
     enabled: false,
     start: '22:00',
@@ -98,7 +92,6 @@ const defaultUnreadCount: UnreadCountResponse = {
   byType: {
     system: 0,
     interaction: 0,
-    private_message: 0,
   },
 };
 

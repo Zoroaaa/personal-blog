@@ -275,8 +275,6 @@ export function getNotificationIcon(type: string, subtype?: string): string {
         default:
           return '👋';
       }
-    case 'private_message':
-      return '✉️';
     default:
       return '📌';
   }
@@ -291,8 +289,6 @@ export function getNotificationTypeText(type: string): string {
       return '系统通知';
     case 'interaction':
       return '互动通知';
-    case 'private_message':
-      return '私信';
     default:
       return '通知';
   }
@@ -321,8 +317,6 @@ export function getNotificationSubtypeText(subtype?: string): string {
       return '功能更新';
     case 'announcement':
       return '公告';
-    case 'private_message':
-      return '私信';
     default:
       return '';
   }
