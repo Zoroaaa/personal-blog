@@ -1,45 +1,40 @@
 /**
- * 通知设置路由
- *
- * ⚠️ 已弃用：此路由已移至 /api/users/notification-settings
- * 本路由将在 2026年8月31日 后被移除
+ * 用户通知设置路由 (新位置: /api/users/notification-settings)
  *
  * 功能：
  * - 获取用户通知设置
  * - 更新用户通知设置
  *
- * 迁移指南：
- * 旧: GET /api/notifications/settings  →  新: GET /api/users/notification-settings
- * 旧: PUT /api/notifications/settings  →  新: PUT /api/users/notification-settings
+ * 说明：此路由是 /api/notifications/settings 的新位置
+ * 旧路由将被保留用于向后兼容
  *
  * @version 1.0.0
  * @author 博客系统
- * @created 2024-01-01
- * @deprecated 请使用 /api/users/notification-settings
+ * @created 2026-02-13
  */
 
 import { Hono } from 'hono';
-import type { Env, Variables } from '../types';
-import { successResponse, errorResponse } from '../utils/response';
-import { requireAuth } from '../middleware/auth';
-import { createLogger } from '../middleware/requestLogger';
+import type { Env, Variables } from '../../types';
+import { successResponse, errorResponse } from '../../utils/response';
+import { requireAuth } from '../../middleware/auth';
+import { createLogger } from '../../middleware/requestLogger';
 import {
   getNotificationSettings,
   updateNotificationSettings,
-} from '../services/notificationSettingsService';
-import { isValidTimeFormat } from '../services/doNotDisturb';
-import type { UpdateNotificationSettingsRequest } from '../types/notifications';
+} from '../../services/notificationSettingsService';
+import { isValidTimeFormat } from '../../services/doNotDisturb';
+import type { UpdateNotificationSettingsRequest } from '../../types/notifications';
 
-export const notificationSettingsRoutes = new Hono<{
+export const userNotificationSettingsRoutes = new Hono<{
   Bindings: Env;
   Variables: Variables;
 }>();
 
 /**
- * GET /api/notifications/settings
+ * GET /api/users/notification-settings
  * 获取当前用户的通知设置
  */
-notificationSettingsRoutes.get('/', requireAuth, async (c) => {
+userNotificationSettingsRoutes.get('/', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
@@ -47,7 +42,7 @@ notificationSettingsRoutes.get('/', requireAuth, async (c) => {
 
     const settings = await getNotificationSettings(c.env.DB, currentUser.userId);
 
-    logger.info('Get notification settings', {
+    logger.info('Get user notification settings', {
       userId: currentUser.userId,
     });
 
@@ -62,7 +57,7 @@ notificationSettingsRoutes.get('/', requireAuth, async (c) => {
 
     return c.json(successResponse(response));
   } catch (error) {
-    logger.error('Get notification settings error', error);
+    logger.error('Get user notification settings error', error);
     return c.json(
       errorResponse('Failed to get settings', '获取通知设置失败'),
       500
@@ -71,7 +66,7 @@ notificationSettingsRoutes.get('/', requireAuth, async (c) => {
 });
 
 /**
- * PUT /api/notifications/settings
+ * PUT /api/users/notification-settings
  * 更新通知设置
  *
  * 请求体示例：
@@ -111,7 +106,7 @@ notificationSettingsRoutes.get('/', requireAuth, async (c) => {
  *   }
  * }
  */
-notificationSettingsRoutes.put('/', requireAuth, async (c) => {
+userNotificationSettingsRoutes.put('/', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
@@ -189,7 +184,7 @@ notificationSettingsRoutes.put('/', requireAuth, async (c) => {
       );
     }
 
-    logger.info('Update notification settings', {
+    logger.info('Update user notification settings', {
       userId: currentUser.userId,
       updates: Object.keys(updates),
     });
@@ -205,7 +200,7 @@ notificationSettingsRoutes.put('/', requireAuth, async (c) => {
 
     return c.json(successResponse(response, '设置已更新'));
   } catch (error) {
-    logger.error('Update notification settings error', error);
+    logger.error('Update user notification settings error', error);
     return c.json(
       errorResponse('Failed to update settings', '更新设置失败'),
       500

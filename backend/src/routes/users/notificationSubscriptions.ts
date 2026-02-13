@@ -1,34 +1,32 @@
 /**
- * 浏览器推送路由
- *
- * ⚠️ 已弃用：此路由已移至 /api/users/notification-subscriptions
- * 本路由将在 2026年8月31日 后被移除
+ * 用户通知订阅路由 (新位置: /api/users/notification-subscriptions)
  *
  * 功能：
  * - 订阅浏览器推送
  * - 取消订阅浏览器推送
+ * - 获取订阅列表和状态
  *
- * 迁移指南：
- * 旧: POST /api/notifications/push/subscribe      →  新: POST /api/users/notification-subscriptions
- * 旧: POST /api/notifications/push/unsubscribe    →  新: DELETE /api/users/notification-subscriptions/:subscriptionId
- * 旧: GET /api/notifications/push/status          →  新: GET /api/users/notification-subscriptions/status
+ * 说明：此路由是 /api/notifications/push 的新位置
+ * 旧路由将被保留用于向后兼容
  *
  * @author 博客系统
  * @version 1.0.0
- * @created 2024-01-01
- * @deprecated 请使用 /api/users/notification-subscriptions
+ * @created 2026-02-13
  */
 
 import { Hono } from 'hono';
-import type { Env, Variables } from '../types';
-import { successResponse, errorResponse } from '../utils/response';
-import { requireAuth } from '../middleware/auth';
-import { createLogger } from '../middleware/requestLogger';
+import type { Env, Variables } from '../../types';
+import { successResponse, errorResponse } from '../../utils/response';
+import { requireAuth } from '../../middleware/auth';
+import { createLogger } from '../../middleware/requestLogger';
 
-export const pushRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+export const userNotificationSubscriptionsRoutes = new Hono<{
+  Bindings: Env;
+  Variables: Variables;
+}>();
 
 /**
- * POST /api/notifications/push/subscribe
+ * POST /api/users/notification-subscriptions
  * 订阅浏览器推送
  *
  * 请求体：
@@ -43,7 +41,7 @@ export const pushRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
  *   userAgent: "Mozilla/5.0..."
  * }
  */
-pushRoutes.post('/subscribe', requireAuth, async (c) => {
+userNotificationSubscriptionsRoutes.post('/', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
@@ -76,7 +74,7 @@ pushRoutes.post('/subscribe', requireAuth, async (c) => {
     if (existingSubscription) {
       // 更新现有订阅
       await c.env.DB.prepare(
-        `UPDATE push_subscriptions 
+        `UPDATE push_subscriptions
          SET user_id = ?, p256dh = ?, auth = ?, user_agent = ?, is_active = 1, last_used_at = CURRENT_TIMESTAMP
          WHERE endpoint = ?`
       ).bind(
@@ -121,50 +119,98 @@ pushRoutes.post('/subscribe', requireAuth, async (c) => {
 });
 
 /**
- * POST /api/notifications/push/unsubscribe
- * 取消订阅浏览器推送
- *
- * 请求体：
- * {
- *   endpoint: "https://fcm.googleapis.com/fcm/send/..."
- * }
+ * GET /api/users/notification-subscriptions
+ * 获取当前用户的推送订阅列表
  */
-pushRoutes.post('/unsubscribe', requireAuth, async (c) => {
+userNotificationSubscriptionsRoutes.get('/', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
     const currentUser = c.get('user') as any;
-    const body = await c.req.json();
 
-    if (!body.endpoint) {
+    const subscriptions = await c.env.DB.prepare(
+      `SELECT id, endpoint, user_agent, created_at, last_used_at
+       FROM push_subscriptions
+       WHERE user_id = ? AND is_active = 1`
+    ).bind(currentUser.userId).all();
+
+    logger.info('Get user push subscription list', {
+      userId: currentUser.userId,
+      count: subscriptions.results?.length || 0,
+    });
+
+    return c.json(
+      successResponse({
+        subscriptions: (subscriptions.results || []).map((sub: any) => ({
+          id: sub.id,
+          endpoint: sub.endpoint.substring(0, 50) + '...',
+          userAgent: sub.user_agent,
+          createdAt: sub.created_at,
+          lastUsedAt: sub.last_used_at,
+        })),
+      })
+    );
+  } catch (error) {
+    logger.error('Get user subscriptions error', error);
+    return c.json(
+      errorResponse('Failed to get subscriptions', '获取订阅列表失败'),
+      500
+    );
+  }
+});
+
+/**
+ * DELETE /api/users/notification-subscriptions/:subscriptionId
+ * 取消推送订阅
+ */
+userNotificationSubscriptionsRoutes.delete('/:subscriptionId', requireAuth, async (c) => {
+  const logger = createLogger(c);
+
+  try {
+    const currentUser = c.get('user') as any;
+    const subscriptionId = parseInt(c.req.param('subscriptionId'));
+
+    if (isNaN(subscriptionId)) {
       return c.json(
-        errorResponse('Missing endpoint', '缺少端点信息'),
+        errorResponse('Invalid subscription ID', '无效的订阅ID'),
         400
       );
     }
 
-    // 软删除订阅（标记为无效）
-    const result = await c.env.DB.prepare(
-      `UPDATE push_subscriptions 
-       SET is_active = 0
-       WHERE endpoint = ? AND user_id = ?`
-    ).bind(body.endpoint, currentUser.userId).run();
+    // 验证订阅属于当前用户
+    const subscription = await c.env.DB.prepare(
+      'SELECT user_id FROM push_subscriptions WHERE id = ?'
+    ).bind(subscriptionId).first() as any;
 
-    if (result.meta?.changes === 0) {
+    if (!subscription) {
       return c.json(
         errorResponse('Subscription not found', '订阅不存在'),
         404
       );
     }
 
-    logger.info('Unsubscribe push notification', {
+    if (subscription.user_id !== currentUser.userId) {
+      return c.json(
+        errorResponse('Forbidden', '无权操作此订阅'),
+        403
+      );
+    }
+
+    // 软删除订阅（标记为无效）
+    await c.env.DB.prepare(
+      `UPDATE push_subscriptions
+       SET is_active = 0
+       WHERE id = ?`
+    ).bind(subscriptionId).run();
+
+    logger.info('Cancel push subscription', {
       userId: currentUser.userId,
-      endpoint: body.endpoint.substring(0, 50) + '...',
+      subscriptionId,
     });
 
     return c.json(successResponse({ unsubscribed: true }, '已取消订阅'));
   } catch (error) {
-    logger.error('Push unsubscribe error', error);
+    logger.error('Cancel subscription error', error);
     return c.json(
       errorResponse('Failed to unsubscribe', '取消订阅失败'),
       500
@@ -173,10 +219,10 @@ pushRoutes.post('/unsubscribe', requireAuth, async (c) => {
 });
 
 /**
- * GET /api/notifications/push/status
+ * GET /api/users/notification-subscriptions/status
  * 获取当前用户的推送订阅状态
  */
-pushRoutes.get('/status', requireAuth, async (c) => {
+userNotificationSubscriptionsRoutes.get('/status', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
