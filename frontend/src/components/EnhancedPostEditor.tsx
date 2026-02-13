@@ -1,19 +1,11 @@
 /**
  * 增强型文章编辑组件
- * 
  * 功能:
  * - 链接自动识别与编辑
  * - 实时 Markdown 预览
  * - 自动保存
  * - 键盘快捷键
  * - 分屏编辑模式
- * - 文档导入（支持txt、md、docx）
- * - 图片粘贴上传
- * - SEO 优化助手
- * 
- * @author 博客系统
- * @version 1.0.0
- * @created 2024-01-01
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -28,12 +20,11 @@ import {
 } from '../utils/linkDetector';
 import { useAutoSave, useKeyboardShortcuts } from '../hooks/useAutoSave';
 import { LinkEditor } from './LinkEditor';
+import { SplitPreview } from './MarkdownPreview';
+import { ContentStats } from './ContentStats';
+import { AutoSaveStatus } from './AutoSaveStatus';
+import { SEOAssistant } from './SEOAssistant';
 import { DraftSelector } from './DraftSelector';
-import { EditorToolbar } from './EditorToolbar';
-import { EditorMarkdownPanel } from './EditorMarkdownPanel';
-import { EditorPreviewPanel } from './EditorPreviewPanel';
-import { EditorAutoSave } from './EditorAutoSave';
-import { EditorSEOPanel } from './EditorSEOPanel';
 
 interface Category {
   id: number;
@@ -414,7 +405,50 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     }
   };
   
+  // 处理内容区域粘贴图片
+  const handleContentPaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
 
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') === 0) {
+        e.preventDefault();
+        const file = items[i].getAsFile();
+        if (file) {
+          try {
+            setUploading(true);
+            const response = await api.uploadImage(file);
+            if (response.success && response.data) {
+              const imageUrl = response.data.url;
+              const markdownImage = `![图片](${imageUrl})`;
+
+              // 在光标位置插入图片，而不是追加到末尾
+              const cursorPosition = textarea.selectionStart;
+              const selectionEnd = textarea.selectionEnd;
+              const beforeCursor = content.substring(0, cursorPosition);
+              const afterCursor = content.substring(selectionEnd);
+              const newContent = beforeCursor + markdownImage + afterCursor;
+              setContent(newContent);
+
+              // 恢复光标位置到插入的图片之后
+              setTimeout(() => {
+                textarea.focus();
+                const newPosition = cursorPosition + markdownImage.length;
+                textarea.setSelectionRange(newPosition, newPosition);
+              }, 0);
+
+              alert('图片粘贴成功');
+            }
+          } catch (error) {
+            setError('图片粘贴失败: ' + (error instanceof Error ? error.message : '未知错误'));
+          } finally {
+            setUploading(false);
+          }
+        }
+      }
+    }
+  };
 
   // 拖拽计数器，解决拖拽子元素时频繁触发 dragleave 的问题
   const dragCounterRef = useRef(0);
@@ -635,7 +669,17 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     return result;
   };
 
-
+  // 编辑器工具栏按钮
+  const ToolbarButton = ({ onClick, title, children }: { onClick: () => void; title: string; children: React.ReactNode }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded transition-colors"
+    >
+      {children}
+    </button>
+  );
 
   // 插入 Markdown 语法
   const insertMarkdown = (before: string, after: string = '') => {
@@ -656,7 +700,48 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     }, 0);
   };
 
+  // 处理 Tab 键缩进
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const textarea = e.currentTarget;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const value = textarea.value;
 
+      if (e.shiftKey) {
+        // Shift+Tab: 反缩进
+        const beforeCursor = value.substring(0, start);
+        const afterCursor = value.substring(end);
+        const lines = beforeCursor.split('\n');
+        const currentLine = lines[lines.length - 1];
+        
+        // 检查当前行是否有缩进
+        if (currentLine.startsWith('  ')) {
+          const newBeforeCursor = beforeCursor.slice(0, -2);
+          const newValue = newBeforeCursor + afterCursor;
+          setContent(newValue);
+          setTimeout(() => {
+            textarea.setSelectionRange(start - 2, end - 2);
+          }, 0);
+        } else if (currentLine.startsWith('\t')) {
+          const newBeforeCursor = beforeCursor.slice(0, -1);
+          const newValue = newBeforeCursor + afterCursor;
+          setContent(newValue);
+          setTimeout(() => {
+            textarea.setSelectionRange(start - 1, end - 1);
+          }, 0);
+        }
+      } else {
+        // Tab: 缩进（插入两个空格）
+        const newValue = value.substring(0, start) + '  ' + value.substring(end);
+        setContent(newValue);
+        setTimeout(() => {
+          textarea.setSelectionRange(start + 2, start + 2);
+        }, 0);
+      }
+    }
+  };
 
   return (
     <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-white dark:bg-slate-900 overflow-auto' : 'max-w-7xl mx-auto p-6'}`}>
@@ -684,11 +769,10 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
         </h1>
         
         {/* 自动保存状态 */}
-        <EditorAutoSave 
+        <AutoSaveStatus 
           isSaving={isSaving} 
           lastSaved={lastSaved} 
           hasDraft={hasDraft} 
-          onSaveDraft={handleSaveDraft}
         />
       </div>
       
@@ -938,7 +1022,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
         </div>
         
         {/* SEO 优化助手 */}
-        <EditorSEOPanel
+        <SEOAssistant
           title={title}
           summary={summary}
           content={content}
@@ -1051,40 +1135,204 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
           )}
         </div>
 
-        {/* 编辑器工具栏 */}
-        <EditorToolbar
-          activeTab={activeTab}
-          isFullscreen={isFullscreen}
-          onActiveTabChange={setActiveTab}
-          onFullscreenToggle={() => setIsFullscreen(!isFullscreen)}
-          onInsertMarkdown={insertMarkdown}
-          onOpenLinkEditor={openLinkEditor}
-        />
+        {/* 编辑器标签页 */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              内容 (支持Markdown) *
+            </label>
+            
+            {/* 编辑器模式切换 */}
+            <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg p-1">
+              <button
+                type="button"
+                onClick={() => setActiveTab('edit')}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  activeTab === 'edit'
+                    ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                编辑
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('split')}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  activeTab === 'split'
+                    ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                分屏
+              </button>
+              <button
+              type="button"
+              onClick={() => setActiveTab('preview')}
+              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                activeTab === 'preview'
+                  ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              预览
+            </button>
+            <div className="w-px h-5 bg-gray-300 dark:bg-slate-600 mx-1" />
+            <button
+              type="button"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              title={isFullscreen ? '退出全屏 (F11/Esc)' : '全屏模式 (F11)'}
+              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                isFullscreen
+                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              {isFullscreen ? (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                </svg>
+              )}
+            </button>
+          </div>
+          </div>
+
+          {/* 工具栏 */}
+          {activeTab !== 'preview' && (
+            <div className="flex items-center gap-1 mb-2 p-2 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 flex-wrap">
+              <ToolbarButton onClick={() => insertMarkdown('**', '**')} title="粗体 (Ctrl+B)">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6V4zm0 8h9a4 4 0 014 4 4 4 0 01-4 4H6v-8z" />
+                </svg>
+              </ToolbarButton>
+              <ToolbarButton onClick={() => insertMarkdown('*', '*')} title="斜体 (Ctrl+I)">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
+              </ToolbarButton>
+              <div className="w-px h-5 bg-gray-300 dark:bg-slate-600 mx-1" />
+              <ToolbarButton onClick={() => insertMarkdown('# ')} title="标题 1">
+                H1
+              </ToolbarButton>
+              <ToolbarButton onClick={() => insertMarkdown('## ')} title="标题 2">
+                H2
+              </ToolbarButton>
+              <ToolbarButton onClick={() => insertMarkdown('### ')} title="标题 3">
+                H3
+              </ToolbarButton>
+              <div className="w-px h-5 bg-gray-300 dark:bg-slate-600 mx-1" />
+              <ToolbarButton onClick={() => insertMarkdown('- ')} title="无序列表">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </ToolbarButton>
+              <ToolbarButton onClick={() => insertMarkdown('1. ')} title="有序列表">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h12M7 12h12M7 17h12M3 7h.01M3 12h.01M3 17h.01" />
+                </svg>
+              </ToolbarButton>
+              <ToolbarButton onClick={() => insertMarkdown('- [ ] ')} title="任务列表">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+              </ToolbarButton>
+              <div className="w-px h-5 bg-gray-300 dark:bg-slate-600 mx-1" />
+              <ToolbarButton onClick={() => insertMarkdown('> ')} title="引用">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                </svg>
+              </ToolbarButton>
+              <ToolbarButton onClick={() => insertMarkdown('```\n', '\n```')} title="代码块">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
+              </ToolbarButton>
+              <ToolbarButton onClick={() => insertMarkdown('`', '`')} title="行内代码">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </ToolbarButton>
+              <div className="w-px h-5 bg-gray-300 dark:bg-slate-600 mx-1" />
+              <ToolbarButton onClick={openLinkEditor} title="插入链接 (Ctrl+K)">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+              </ToolbarButton>
+              <ToolbarButton onClick={() => insertMarkdown('![', '](url)')} title="插入图片">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </ToolbarButton>
+              <ToolbarButton onClick={() => insertMarkdown('| 列1 | 列2 |\n| --- | --- |\n| 内容 | 内容 |')} title="插入表格">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </ToolbarButton>
+            </div>
+          )}
 
           {/* 编辑器内容区域 */}
           <div className={`grid gap-4 ${activeTab === 'split' ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
             {/* 编辑区域 */}
             {activeTab !== 'preview' && (
-              <EditorMarkdownPanel
-                content={content}
-                setContent={setContent}
-                disabled={importing}
-                uploading={uploading}
-                setUploading={setUploading}
-                setError={setError}
-                detectedLinks={detectedLinks}
-                onConvertLink={convertDetectedLink}
-                activeTab={activeTab}
-              />
+              <div className="relative">
+                <textarea
+                  ref={textareaRef}
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  onPaste={handleContentPaste}
+                  onKeyDown={handleKeyDown}
+                  disabled={importing}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm dark:bg-slate-700 dark:text-white disabled:opacity-50 resize-y"
+                  rows={activeTab === 'split' ? 30 : 20}
+                  required
+                  placeholder="在此输入 Markdown 内容...\n\n支持：\n- 标题、列表、引用\n- 代码块、表格\n- 图片、链接\n- 任务列表\n- Tab 键缩进"
+                />
+                
+                {/* 内容统计信息 */}
+                <div className="mt-2 flex items-center justify-between">
+                  <ContentStats content={content} />
+                </div>
+                
+                {/* 检测到的链接提示 */}
+                {detectedLinks.length > 0 && activeTab === 'edit' && (
+                  <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                      检测到 {detectedLinks.length} 个链接，点击转换为 Markdown 格式：
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {detectedLinks.slice(0, 5).map((url, index) => (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={() => convertDetectedLink(url)}
+                          className="text-xs px-2 py-1 bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 rounded border border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors truncate max-w-xs"
+                          title={url}
+                        >
+                          {url.length > 40 ? url.substring(0, 40) + '...' : url}
+                        </button>
+                      ))}
+                      {detectedLinks.length > 5 && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400 py-1">
+                          还有 {detectedLinks.length - 5} 个...
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* 预览区域 */}
             {(activeTab === 'preview' || activeTab === 'split') && (
-              <EditorPreviewPanel
-                content={content}
-              />
+              <SplitPreview content={content} isVisible={true} />
             )}
           </div>
+        </div>
         
         {/* 发布状态 */}
         <div>
