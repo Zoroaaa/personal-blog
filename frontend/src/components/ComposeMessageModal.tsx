@@ -28,7 +28,7 @@ export default function ComposeMessageModal({
 
     setSending(true);
     try {
-      await api.post('/api/messages', {
+      await api.post('/messages', {
         recipientId,
         subject: subject.trim() || undefined,
         content: content.trim(),

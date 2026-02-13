@@ -25,7 +25,7 @@ export default function MessagesPage() {
 
   const loadThreads = async () => {
     try {
-      const response = await api.get('/api/messages/threads');
+      const response = await api.get('/messages/threads');
       setThreads(response.data.threads);
     } catch (error) {
       console.error('Failed to load threads:', error);
