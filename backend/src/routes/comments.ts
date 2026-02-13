@@ -35,6 +35,7 @@ import { createInteractionNotification } from '../services/notificationService';
 import { isNotificationEnabled, isInteractionSubtypeEnabled } from '../services/notificationSettingsService';
 import { detectMentions, createMentionNotifications } from '../services/mentionService';
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
+import { rateLimit } from '../middleware/rateLimit';
 
 export const commentRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -247,7 +248,11 @@ commentRoutes.get('/', optionalAuth, async (c) => {
  *   parentId?: number
  * }
  */
-commentRoutes.post('/', requireAuth, async (c) => {
+commentRoutes.post('/', requireAuth, rateLimit({
+  windowMs: 60 * 1000, // 1 分钟
+  maxRequests: 5,
+  message: '1 分钟内最多发表 5 条评论'
+}), async (c) => {
   const logger = createLogger(c);
   
   try {
@@ -487,7 +492,11 @@ commentRoutes.post('/', requireAuth, async (c) => {
  * DELETE /api/comments/:id
  * 删除评论（需要认证，只能删除自己的评论或管理员可删除所有）
  */
-commentRoutes.delete('/:id', requireAuth, async (c) => {
+commentRoutes.delete('/:id', requireAuth, rateLimit({
+  windowMs: 30 * 1000, // 30 秒
+  maxRequests: 10,
+  message: '删除评论过于频繁，请稍后再试'
+}), async (c) => {
   const logger = createLogger(c);
   
   try {
@@ -541,7 +550,11 @@ commentRoutes.delete('/:id', requireAuth, async (c) => {
  * POST /api/comments/:id/like
  * 点赞/取消点赞评论（需要认证）
  */
-commentRoutes.post('/:id/like', requireAuth, async (c) => {
+commentRoutes.post('/:id/like', requireAuth, rateLimit({
+  windowMs: 15 * 1000, // 15 秒
+  maxRequests: 20,
+  message: '点赞操作过于频繁，请稍后再试'
+}), async (c) => {
   const logger = createLogger(c);
   
   try {

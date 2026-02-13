@@ -29,6 +29,7 @@ import { safeGetCache, safePutCache, safeDeleteCache } from '../utils/cache';
 import { generateToken } from '../utils/jwt';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
+import { rateLimit } from '../middleware/rateLimit';
 import {
   validateUsername,
   validateEmail,
@@ -43,6 +44,56 @@ import { EmailVerificationService } from '../services/emailVerificationService';
 import { AUTH_CONSTANTS } from '../config/constants';
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
 
+/**
+ * 刷新OAuth令牌
+ * 
+ * 功能：检查令牌是否过期，如果过期则尝试刷新
+ * 
+ * @param c Hono上下文
+ * @param userId 用户ID
+ * @param provider 认证提供商
+ * @returns 有效的访问令牌
+ */
+async function refreshOAuthToken(
+  c: any,
+  userId: number,
+  provider: string
+): Promise<string> {
+  const logger = createLogger(c);
+  
+  try {
+    // 获取存储的令牌信息
+    const tokenData = await c.env.DB.prepare(
+      'SELECT * FROM oauth_tokens WHERE user_id = ? AND provider = ?'
+    ).bind(userId, provider).first() as any;
+
+    if (!tokenData) {
+      throw new Error('未找到OAuth令牌');
+    }
+
+    // 检查令牌是否已过期
+    const now = new Date();
+    const expiresAt = tokenData.expires_at ? new Date(tokenData.expires_at) : null;
+
+    // 如果令牌未过期（或没有过期时间），直接返回
+    if (!expiresAt || expiresAt.getTime() - now.getTime() > 5 * 60 * 1000) {
+      return tokenData.access_token;
+    }
+
+    // GitHub不支持刷新令牌，需要重新授权
+    if (provider === 'github') {
+      throw new Error('GitHub令牌已过期，需要重新授权');
+    }
+
+    // 对于支持刷新令牌的提供商（如Google），实现刷新逻辑
+    // 这里可以扩展其他OAuth提供商的支持
+    throw new Error('该认证提供商不支持令牌刷新');
+  } catch (error) {
+    logger.error('OAuth令牌刷新失败:', error);
+    throw error;
+  }
+}
+
 export const authRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // 常量已从本文件迁移到 EmailVerificationService 和 config/constants.ts
@@ -54,7 +105,15 @@ const BCRYPT_ROUNDS = AUTH_CONSTANTS.BCRYPT_ROUNDS;
  * POST /api/auth/send-verification-code
  * 发送邮箱验证码（注册时传 email+type=register；改密/删号需登录，type=password 或 delete，使用当前用户邮箱）
  */
-authRoutes.post('/send-verification-code', optionalAuth, async (c) => {
+authRoutes.post(
+  '/send-verification-code',
+  rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 小时
+    maxRequests: 5,
+    message: '1 小时内最多发送 5 次验证码'
+  }),
+  optionalAuth,
+  async (c) => {
   const logger = createLogger(c);
 
   try {
@@ -181,7 +240,7 @@ authRoutes.post('/send-verification-code', optionalAuth, async (c) => {
 
     // 检查速率限制
     const rateLimit = await EmailVerificationService.checkRateLimit(
-      c.env.DB,
+      c.env.CACHE,
       rawType,
       email
     );
@@ -262,7 +321,7 @@ authRoutes.post('/send-verification-code', optionalAuth, async (c) => {
 /**
  * POST /api/auth/register
  * 用户注册
- * 
+ *
  * 请求体：
  * {
  *   username: string,    // 3-20字符，只允许字母数字下划线连字符
@@ -271,7 +330,14 @@ authRoutes.post('/send-verification-code', optionalAuth, async (c) => {
  *   displayName?: string // 可选，显示名称
  * }
  */
-authRoutes.post('/register', async (c) => {
+authRoutes.post(
+  '/register',
+  rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 小时
+    maxRequests: 5,
+    message: '1 小时内最多只能注册 5 个账号'
+  }),
+  async (c) => {
   const logger = createLogger(c);
   
   try {
@@ -433,7 +499,14 @@ authRoutes.post('/register', async (c) => {
  *   password: string
  * }
  */
-authRoutes.post('/login', async (c) => {
+authRoutes.post(
+  '/login',
+  rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 分钟
+    maxRequests: 10,
+    message: '15 分钟内最多尝试登录 10 次'
+  }),
+  async (c) => {
   const logger = createLogger(c);
   
   try {
@@ -617,7 +690,14 @@ authRoutes.post('/reset-password', async (c) => {
  *   code: string  // GitHub授权码
  * }
  */
-authRoutes.post('/github', async (c) => {
+authRoutes.post(
+  '/github',
+  rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 分钟
+    maxRequests: 10,
+    message: '5 分钟内最多尝试 10 次 GitHub 登录'
+  }),
+  async (c) => {
   const logger = createLogger(c);
   
   try {
@@ -825,8 +905,43 @@ authRoutes.post('/github', async (c) => {
     } else {
       logger.info('GitHub user found in database', { userId: user.id, username: user.username });
     }
-    
-    // ===== 4. 生成JWT Token =====
+
+    // ===== 4. 存储或更新 OAuth 令牌 =====
+    logger.info('Storing OAuth token', { userId: user.id, provider: 'github' });
+
+    try {
+      const expiresAt = tokenData.expires_in
+        ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
+        : null;
+
+      await c.env.DB.prepare(
+        `INSERT INTO oauth_tokens (user_id, provider, access_token, refresh_token, scopes, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (user_id, provider) DO UPDATE SET
+           access_token = excluded.access_token,
+           refresh_token = excluded.refresh_token,
+           scopes = excluded.scopes,
+           expires_at = excluded.expires_at,
+           updated_at = CURRENT_TIMESTAMP`
+      ).bind(
+        user.id,
+        'github',
+        tokenData.access_token,
+        tokenData.refresh_token || null,
+        tokenData.scope || null,
+        expiresAt
+      ).run();
+
+      logger.info('OAuth token stored', { userId: user.id, provider: 'github' });
+    } catch (tokenError) {
+      logger.error('Failed to store OAuth token', {
+        error: tokenError,
+        userId: user.id
+      });
+      // 不中断流程，如果令牌存储失败，仍然允许登录
+    }
+
+    // ===== 5. 生成JWT Token =====
     logger.info('Generating JWT token', { userId: user.id });
     const token = await generateToken(c.env.JWT_SECRET, {
       userId: user.id,

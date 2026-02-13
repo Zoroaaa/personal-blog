@@ -58,18 +58,18 @@ export class EmailVerificationService {
 
   /**
    * 检查速率限制
-   * @param db Cloudflare D1 数据库
+   * @param cache Cloudflare KV 缓存
    * @param type 验证类型
    * @param email 邮箱地址
    * @returns 是否超过限制
    */
   static async checkRateLimit(
-    db: any,
+    cache: any,
     type: VerificationEmailType,
     email: string
   ): Promise<{ limited: boolean; remaining: number }> {
     const rateKey = `email_verify_rate:${type}:${email.toLowerCase()}`;
-    const rateVal = await safeGetCache(db.getEnv || {}, rateKey);
+    const rateVal = await safeGetCache(cache, rateKey);
     const rateCount = rateVal ? parseInt(rateVal, 10) : 0;
 
     const limited = rateCount >= AUTH_CONSTANTS.EMAIL_VERIFY_RATE_MAX;
