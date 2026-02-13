@@ -37,6 +37,8 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import NotificationCenter from './pages/NotificationCenter';
 import NotificationSettings from './pages/NotificationSettings';
 import MessagesPage from './pages/MessagesPage';
+import ThreadPage from './pages/ThreadPage';
+import NewMessagePage from './pages/NewMessagePage';
 import { SystemNotificationPage } from './pages/admin/SystemNotificationPage';
 import { useSiteConfig } from './hooks/useSiteConfig';
 import { ToastProvider } from './components/Toast';
@@ -98,6 +100,8 @@ function AppRoutes() {
       <Route path="/notifications" element={<PageTransition><NotificationCenter /></PageTransition>} />
       <Route path="/notification-settings" element={<PageTransition><NotificationSettings /></PageTransition>} />
       <Route path="/messages" element={<PageTransition><MessagesPage /></PageTransition>} />
+      <Route path="/messages/new" element={<PageTransition><NewMessagePage /></PageTransition>} />
+      <Route path="/messages/:threadId" element={<PageTransition><ThreadPage /></PageTransition>} />
       <Route path="/admin/notifications" element={<PageTransition><SystemNotificationPage /></PageTransition>} />
       
       {/* 404路由 - 捕获所有未匹配的路径 */}
