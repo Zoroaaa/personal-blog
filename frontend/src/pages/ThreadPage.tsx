@@ -17,6 +17,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
 import { useAuthStore } from '../stores/authStore';
 import { useToast } from '../components/Toast';
+import { useMessageUnread } from '../hooks/useMessageUnread';
 
 interface Message {
   id: number;
@@ -49,6 +50,7 @@ export default function ThreadPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { showSuccess, showError } = useToast();
+  const { refresh: refreshUnreadCount } = useMessageUnread();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [threadInfo, setThreadInfo] = useState<ThreadInfo | null>(null);
@@ -82,7 +84,7 @@ export default function ThreadPage() {
         setLoadingMore(true);
       }
 
-      const response = await api.get(`/messages/inbox?threadId=${threadId}&page=${pageNum}&limit=20`);
+      const response = await api.get(`/messages/thread/${threadId}?page=${pageNum}&limit=20`);
 
       if (response.success && response.data) {
         const newMessages = response.data.messages || [];
@@ -99,6 +101,8 @@ export default function ThreadPage() {
               otherName: isCurrentUserSender ? firstMsg.recipientName : firstMsg.senderName,
               otherAvatar: isCurrentUserSender ? firstMsg.recipientAvatar : firstMsg.senderAvatar,
             });
+            
+            markThreadAsRead();
           }
         } else {
           setMessages(prev => [...newMessages.reverse(), ...prev]);
@@ -113,6 +117,17 @@ export default function ThreadPage() {
     } finally {
       setLoading(false);
       setLoadingMore(false);
+    }
+  };
+
+  const markThreadAsRead = async () => {
+    if (!threadId) return;
+    
+    try {
+      await api.patch(`/messages/threads/${threadId}/read`);
+      refreshUnreadCount();
+    } catch (error) {
+      console.error('Failed to mark thread as read:', error);
     }
   };
 

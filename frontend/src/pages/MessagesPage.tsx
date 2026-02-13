@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
 import { useAuthStore } from '../stores/authStore';
 import { useToast } from '../components/Toast';
+import { useMessageUnread } from '../hooks/useMessageUnread';
 
 interface MessageThread {
   threadId: string;
@@ -42,6 +43,7 @@ export default function MessagesPage() {
   const navigate = useNavigate();
   const { showSuccess, showError } = useToast();
   const { user } = useAuthStore();
+  const { refresh: refreshUnreadCount } = useMessageUnread();
 
   useEffect(() => {
     loadThreads();
@@ -104,13 +106,15 @@ export default function MessagesPage() {
         content: newMessageContent.trim(),
       });
 
-      if (response.success) {
+      if (response.success && response.data) {
         showSuccess('消息发送成功');
         setShowNewMessageModal(false);
         setRecipientUsername('');
         setNewMessageContent('');
         setFoundUser(null);
-        loadThreads();
+        
+        const threadId = response.data.threadId || `${Math.min(user!.id, foundUser.id)}-${Math.max(user!.id, foundUser.id)}`;
+        navigate(`/messages/${threadId}`);
       }
     } catch (error) {
       console.error('Send message error:', error);
@@ -149,6 +153,7 @@ export default function MessagesPage() {
       if (response.success) {
         showSuccess('会话已删除');
         setThreads(prev => prev.filter(t => t.threadId !== threadId));
+        refreshUnreadCount();
       }
     } catch (error) {
       console.error('Delete thread error:', error);
