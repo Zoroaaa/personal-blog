@@ -21,6 +21,7 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { HomePage } from './pages/HomePage';
 import { PostPage } from './pages/PostPage';
 import { LoginPage } from './pages/LoginPage';
@@ -32,6 +33,7 @@ import { AboutPage } from './pages/AboutPage';
 import { ColumnPage } from './pages/ColumnPage';
 import { CategoryPage } from './pages/CategoryPage';
 import { TagPage } from './pages/TagPage';
+import { NotFoundPage } from './pages/NotFoundPage';
 import NotificationCenter from './pages/NotificationCenter';
 import NotificationSettings from './pages/NotificationSettings';
 import { SystemNotificationPage } from './pages/admin/SystemNotificationPage';
@@ -95,6 +97,9 @@ function AppRoutes() {
       <Route path="/notifications" element={<PageTransition><NotificationCenter /></PageTransition>} />
       <Route path="/notification-settings" element={<PageTransition><NotificationSettings /></PageTransition>} />
       <Route path="/admin/notifications" element={<PageTransition><SystemNotificationPage /></PageTransition>} />
+      
+      {/* 404路由 - 捕获所有未匹配的路径 */}
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }
@@ -160,17 +165,19 @@ function App() {
   }, [config.site_favicon, currentFavicon]);
 
   return (
-    <ToastProvider>
-      <BrowserRouter>
-        <div className="min-h-screen flex flex-col">
-          <Header />
-          <main className="flex-1">
-            <AppRoutes />
-          </main>
-          <Footer />
-        </div>
-      </BrowserRouter>
-    </ToastProvider>
+    <ErrorBoundary>
+      <ToastProvider>
+        <BrowserRouter>
+          <div className="min-h-screen flex flex-col">
+            <Header />
+            <main className="flex-1">
+              <AppRoutes />
+            </main>
+            <Footer />
+          </div>
+        </BrowserRouter>
+      </ToastProvider>
+    </ErrorBoundary>
   );
 }
 
