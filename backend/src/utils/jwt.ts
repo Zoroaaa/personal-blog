@@ -96,12 +96,18 @@ export async function verifyToken(
   token: string,
   secret: string
 ): Promise<TokenPayload> {
+  console.log('verifyToken called, token type:', typeof token, 'length:', token?.length);
   const parts = token.split('.');
+  console.log('verifyToken parts count:', parts.length);
   if (parts.length !== 3) {
+    console.log('verifyToken invalid format, parts:', parts);
     throw new Error('Invalid token format');
   }
   
   const [encodedHeader, encodedPayload, signature] = parts;
+  console.log('verifyToken encodedHeader length:', encodedHeader.length);
+  console.log('verifyToken encodedPayload length:', encodedPayload.length);
+  console.log('verifyToken signature length:', signature.length);
   
   const expectedSignature = await sign(
     `${encodedHeader}.${encodedPayload}`,
