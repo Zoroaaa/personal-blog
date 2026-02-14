@@ -138,7 +138,7 @@ postRoutes.get('/', async (c) => {
     let query = `
       SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
              p.view_count, p.like_count, p.comment_count, p.reading_time,
-             p.published_at, p.created_at,
+             p.published_at, p.created_at, p.visibility,
              u.username as author_name, u.display_name as author_display_name,
              u.avatar_url as author_avatar,
              c.name as category_name, c.slug as category_slug, c.color as category_color,
@@ -147,7 +147,7 @@ postRoutes.get('/', async (c) => {
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN columns col ON p.column_id = col.id
-      WHERE p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
+      WHERE p.status = 'published' AND p.visibility IN ('public', 'password') AND p.deleted_at IS NULL AND u.deleted_at IS NULL
     `;
     
     const params: any[] = [];
@@ -192,7 +192,7 @@ postRoutes.get('/', async (c) => {
     let countQuery = `SELECT COUNT(*) as total FROM posts p
                       LEFT JOIN categories c ON p.category_id = c.id
                       LEFT JOIN users u ON p.author_id = u.id
-                      WHERE p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL`;
+                      WHERE p.status = 'published' AND p.visibility IN ('public', 'password') AND p.deleted_at IS NULL AND u.deleted_at IS NULL`;
     const countParams: any[] = [];
     
     if (category) {
