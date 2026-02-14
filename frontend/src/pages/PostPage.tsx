@@ -182,12 +182,7 @@ export function PostPage() {
       setRequiresPassword(false);
       setPasswordError(null);
 
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await api.getPost(slug!);
+      const response = await api.getPost(slug!, token);
 
       console.log('Post response:', response);
 

@@ -340,8 +340,13 @@ export const api = {
   /**
    * 获取文章详情
    */
-  getPost: (slug: string) => 
-    apiRequest<Post>(`/posts/${slug}`),
+  getPost: (slug: string, token?: string) => {
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return apiRequest<Post>(`/posts/${slug}`, { headers });
+  },
   
   /**
  * 通过ID获取文章详情(用于编辑)
