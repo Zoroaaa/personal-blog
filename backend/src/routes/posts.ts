@@ -1108,6 +1108,8 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
       const tokenToVerify = postToken || (authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null);
 
       console.log('Token to verify:', tokenToVerify ? 'present' : 'none');
+      console.log('Token length:', tokenToVerify ? tokenToVerify.length : 0);
+      console.log('Token parts:', tokenToVerify ? tokenToVerify.split('.').length : 0);
 
       if (tokenToVerify) {
         try {
