@@ -331,12 +331,13 @@ app.route('/api/admin/notifications', adminNotificationRoutes);
  */
 app.route('/api/messages', messageRoutes);
 
-app.route('/api/users', userRoutes);
-
 /**
  * 用户通知设置路由（标准RESTful API位置）
+ * 注意：必须在 userRoutes 之前注册，否则 /:id 会匹配 /notification-settings
  */
 app.route('/api/users/notification-settings', userNotificationSettingsRoutes);
+
+app.route('/api/users', userRoutes);
 
 // ============= 错误处理 =============
 
