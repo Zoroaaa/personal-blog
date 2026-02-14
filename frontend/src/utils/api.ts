@@ -340,12 +340,11 @@ export const api = {
   /**
    * 获取文章详情
    */
-  getPost: (slug: string, token?: string) => {
-    const headers: Record<string, string> = {};
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    return apiRequest<Post>(`/posts/${slug}`, { headers });
+  getPost: (slug: string, postToken?: string) => {
+    console.log('getPost called with postToken:', postToken ? 'present' : 'none');
+    return apiRequest<Post>(`/posts/${slug}`, {
+      headers: postToken ? { 'X-Post-Token': postToken } : undefined
+    });
   },
   
   /**
