@@ -203,6 +203,7 @@ export interface PostListItem {
   slug: string;
   summary?: string;
   coverImage?: string;
+  visibility?: PostVisibility;
   authorName: string;
   authorAvatar?: string;
   categoryName?: string;

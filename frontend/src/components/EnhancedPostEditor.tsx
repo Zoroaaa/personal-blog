@@ -333,7 +333,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
         setSummary(post.summary || '');
         setCoverImage(post.coverImage || '');
         setStatus(post.status as 'draft' | 'published');
-        setVisibility((post as any).visibility || 'public');
+        setVisibility(post.visibility || 'public');
         setSelectedCategoryId(post.categoryId || null);
         setSelectedColumnId(post.columnId || null);
         setSelectedTagIds(post.tags?.map((t: any) => t.id) || []);
@@ -597,7 +597,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   
   // 过滤标签
   const filteredTags = tags.filter(tag =>
-    tag.name.toLowerCase().includes(tagSearchTerm.toLowerCase())
+    tag.name?.toLowerCase().includes(tagSearchTerm.toLowerCase())
   );
   
   // 获取选中的标签对象
