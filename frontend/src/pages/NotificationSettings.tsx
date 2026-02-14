@@ -5,12 +5,11 @@
  * - 自定义通知偏好
  * - 系统通知设置
  * - 互动通知设置
- * - 私信通知设置
  * - 免打扰设置
  * - 汇总邮件时间设置
  *
  * @author 博客系统
- * @version 1.0.0
+ * @version 2.1.0
  * @created 2024-01-01
  */
 
@@ -20,7 +19,6 @@ import { useNotificationStore } from '../stores/notificationStore';
 import { useAuthStore } from '../stores/authStore';
 import type { PartialNotificationSettings } from '../types/notifications';
 
-// 开关组件
 function ToggleSwitch({
   checked,
   onChange,
@@ -50,7 +48,6 @@ function ToggleSwitch({
   );
 }
 
-// 设置项组件
 function SettingItem({
   title,
   description,
@@ -73,7 +70,6 @@ function SettingItem({
   );
 }
 
-// 频率选择组件
 function FrequencySelect({
   value,
   onChange,
@@ -118,21 +114,18 @@ export default function NotificationSettings() {
   const [, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-  // 检查登录状态
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login');
     }
   }, [isAuthenticated, navigate]);
 
-  // 加载设置
   useEffect(() => {
     if (isAuthenticated) {
       fetchSettings();
     }
   }, [isAuthenticated]);
 
-  // 保存设置
   const handleUpdateSettings = async (
     newSettings: PartialNotificationSettings
   ) => {
@@ -167,7 +160,6 @@ export default function NotificationSettings() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-4 py-8">
-        {/* 页面标题 */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-foreground">通知设置</h1>
@@ -183,7 +175,6 @@ export default function NotificationSettings() {
           </button>
         </div>
 
-        {/* 保存状态提示 */}
         {saveMessage && (
           <div
             className={`
@@ -195,10 +186,9 @@ export default function NotificationSettings() {
           </div>
         )}
 
-        {/* 系统通知设置 */}
         <div className="bg-card rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-lg font-semibold text-foreground mb-4">
-            🔔 系统通知
+            系统通知
           </h2>
           <p className="text-sm text-muted-foreground mb-4">
             接收系统维护、功能更新等重要公告
@@ -244,10 +234,9 @@ export default function NotificationSettings() {
           </SettingItem>
         </div>
 
-        {/* 互动通知设置 */}
         <div className="bg-card rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-lg font-semibold text-foreground mb-4">
-            👋 互动通知
+            互动通知
           </h2>
           <p className="text-sm text-muted-foreground mb-4">
             接收评论、点赞、收藏等互动消息
@@ -268,14 +257,14 @@ export default function NotificationSettings() {
           </SettingItem>
 
           <SettingItem
-            title="浏览器推送"
-            description="通过浏览器推送接收通知"
+            title="邮件通知"
+            description="通过邮件接收互动通知"
           >
             <ToggleSwitch
-              checked={settings?.interaction.push ?? true}
+              checked={settings?.interaction.email ?? false}
               onChange={(checked) =>
                 handleUpdateSettings({
-                  interaction: { ...settings?.interaction, push: checked },
+                  interaction: { ...settings?.interaction, email: checked },
                 })
               }
             />
@@ -295,7 +284,6 @@ export default function NotificationSettings() {
             />
           </SettingItem>
 
-          {/* 子类型设置 */}
           <div className="mt-4 pt-4 border-t border-gray-100">
             <h3 className="text-sm font-medium text-gray-700 mb-3">
               接收以下类型的互动通知
@@ -307,7 +295,6 @@ export default function NotificationSettings() {
                 { key: 'like', label: '点赞' },
                 { key: 'favorite', label: '收藏' },
                 { key: 'mention', label: '@提及' },
-                { key: 'follow', label: '关注' },
               ].map(({ key, label }) => (
                 <label
                   key={key}
@@ -339,18 +326,17 @@ export default function NotificationSettings() {
           </div>
         </div>
 
-        {/* 免打扰设置 */}
         <div className="bg-card rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-lg font-semibold text-foreground mb-4">
-            🌙 免打扰
+            免打扰
           </h2>
           <p className="text-sm text-muted-foreground mb-4">
-            设置免打扰时段，在此期间不会收到邮件和推送通知
+            设置免打扰时段，在此期间不会收到邮件通知
           </p>
 
           <SettingItem
             title="开启免打扰"
-            description="在指定时间段内暂停通知"
+            description="在指定时间段内暂停邮件通知"
           >
             <ToggleSwitch
               checked={settings?.doNotDisturb.enabled ?? false}
@@ -406,10 +392,9 @@ export default function NotificationSettings() {
           )}
         </div>
 
-        {/* 汇总时间设置 */}
         <div className="bg-card rounded-lg shadow-sm p-6">
           <h2 className="text-lg font-semibold text-foreground mb-4">
-            📅 汇总邮件时间
+            汇总邮件时间
           </h2>
           <p className="text-sm text-muted-foreground mb-4">
             设置每日和每周汇总邮件的发送时间
