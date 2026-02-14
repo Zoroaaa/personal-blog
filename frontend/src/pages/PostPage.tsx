@@ -80,6 +80,14 @@ export function PostPage() {
   const [passwordVerifying, setPasswordVerifying] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
+  const getPasswordToken = useCallback((postId: number) => {
+    return sessionStorage.getItem(`post_token_${postId}`);
+  }, []);
+
+  const setPasswordToken = useCallback((postId: number, token: string) => {
+    sessionStorage.setItem(`post_token_${postId}`, token);
+  }, []);
+
   // 获取 Markdown 组件和目录
   const markdownComponents = useMemo(() => getMarkdownComponents(), []);
   const toc = useMemo(() => post ? generateToc(post.content) : [], [post]);
@@ -175,19 +183,35 @@ export function PostPage() {
     };
   }, [post?.id, isAuthenticated, sendReadingProgress]);
 
-  const loadPost = async (token?: string) => {
+  const loadPost = async (explicitToken?: string) => {
     try {
       setLoading(true);
       setError(null);
       setRequiresPassword(false);
       setPasswordError(null);
 
-      const response = await api.getPost(slug!, token);
+      const response = await api.getPost(slug!, explicitToken);
 
       console.log('Post response:', response);
 
       if (response.success && response.data) {
         if ((response.data as any).requires_password) {
+          const postId = (response.data as any).id;
+          const savedToken = getPasswordToken(postId);
+          
+          if (savedToken && !explicitToken) {
+            const retryResponse = await api.getPost(slug!, savedToken);
+            if (retryResponse.success && retryResponse.data && !(retryResponse.data as any).requires_password) {
+              const transformedPost = transformPost(retryResponse.data);
+              setPost(transformedPost);
+              if (transformedPost.id) {
+                loadComments(transformedPost.id);
+              }
+              setLoading(false);
+              return;
+            }
+          }
+          
           setRequiresPassword(true);
           const transformedPost = transformPost(response.data);
           setPost(transformedPost);
@@ -224,9 +248,11 @@ export function PostPage() {
       const response = await api.verifyPostPassword(post.id, passwordInput);
 
       if (response.success && response.data?.verified) {
+        const token = response.data.token!;
+        setPasswordToken(post.id, token);
         setRequiresPassword(false);
         setPasswordInput('');
-        loadPost(response.data.token);
+        loadPost(token);
         showSuccess('密码验证成功');
       } else {
         setPasswordError(response.error || '密码错误');
