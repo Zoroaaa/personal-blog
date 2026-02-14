@@ -468,7 +468,7 @@ export function PostPage() {
             </span>
           </div>
           <div 
-            className="text-foreground prose prose-sm dark:prose-invert max-w-none"
+            className="text-foreground comment-content"
             dangerouslySetInnerHTML={{ 
               __html: comment.content 
             }}

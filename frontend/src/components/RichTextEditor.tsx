@@ -1,8 +1,8 @@
 /**
- * 富文本编辑器组件（增强版）
+ * 富文本编辑器组件
  *
  * 功能：
- * - 支持加粗、斜体、列表、链接、代码块、引用
+ * - 支持加粗、斜体、链接、图片
  * - 支持@用户功能（任意位置触发）
  * - 表情选择器
  * - 图片上传
@@ -11,7 +11,7 @@
  * - 字数统计
  *
  * @author 博客系统
- * @version 3.0.0
+ * @version 4.0.0
  * @created 2024-01-01
  */
 
@@ -460,41 +460,9 @@ export function RichTextEditor({
       },
     },
     {
-      icon: <span>• 列表</span>,
-      title: '无序列表',
-      action: () => {
-        saveSelection();
-        execCommand('insertUnorderedList');
-      },
-    },
-    {
-      icon: <span>1. 列表</span>,
-      title: '有序列表',
-      action: () => {
-        saveSelection();
-        execCommand('insertOrderedList');
-      },
-    },
-    {
       icon: <span>🔗</span>,
       title: '插入链接',
       action: insertLink,
-    },
-    {
-      icon: <span>{'</>'}</span>,
-      title: '代码块',
-      action: () => {
-        saveSelection();
-        execCommand('formatBlock', 'pre');
-      },
-    },
-    {
-      icon: <span>❝</span>,
-      title: '引用',
-      action: () => {
-        saveSelection();
-        execCommand('formatBlock', 'blockquote');
-      },
     },
     {
       icon: <span>😀</span>,
