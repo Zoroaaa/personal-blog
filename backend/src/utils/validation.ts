@@ -278,6 +278,95 @@ export function sanitizeInput(input: string): string {
 }
 
 /**
+ * 清理评论富文本内容（保留安全的HTML标签）
+ * 允许的标签：b, strong, i, em, a, img, br, p, span
+ * @param input 输入HTML字符串
+ * @returns 清理后的安全HTML字符串
+ */
+export function sanitizeCommentContent(input: string): string {
+  if (typeof input !== 'string') {
+    return '';
+  }
+
+  const allowedTags = ['b', 'strong', 'i', 'em', 'a', 'img', 'br', 'p', 'span'];
+  
+  let result = input
+    // 移除所有script标签及其内容
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    // 移除所有style标签及其内容
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+    // 移除所有事件处理器属性 (onclick, onload, onerror等)
+    .replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '')
+    .replace(/\s*on\w+\s*=\s*[^\s>]*/gi, '')
+    // 移除javascript:伪协议
+    .replace(/javascript\s*:/gi, '')
+    // 移除data:伪协议（除了图片）
+    .replace(/data\s*:(?!image\/)/gi, 'blocked:')
+    // 移除vbscript伪协议
+    .replace(/vbscript\s*:/gi, '')
+    // 移除控制字符
+    .replace(/[\x00-\x1F\x7F]/g, '');
+
+  // 处理HTML标签：只保留允许的标签
+  result = result.replace(/<\/?([a-z][a-z0-9]*)\b[^>]*>/gi, (match, tagName) => {
+    const tag = tagName.toLowerCase();
+    
+    if (!allowedTags.includes(tag)) {
+      return '';
+    }
+
+    // 对于a标签，只保留href属性并验证URL
+    if (tag === 'a') {
+      const hrefMatch = match.match(/href\s*=\s*["']([^"']*)["']/i);
+      const href = hrefMatch ? hrefMatch[1] : '';
+      
+      // 验证URL安全性
+      if (href && !href.match(/^(https?:\/\/|mailto:|\/|#)/i)) {
+        return match.replace(href, '#');
+      }
+      
+      // 返回干净的a标签
+      if (match.startsWith('</')) {
+        return '</a>';
+      }
+      return href ? `<a href="${href}" target="_blank" rel="noopener noreferrer">` : '<a>';
+    }
+
+    // 对于img标签，只保留src和alt属性
+    if (tag === 'img') {
+      if (match.startsWith('</')) {
+        return '';
+      }
+      const srcMatch = match.match(/src\s*=\s*["']([^"']*)["']/i);
+      const altMatch = match.match(/alt\s*=\s*["']([^"']*)["']/i);
+      const src = srcMatch ? srcMatch[1] : '';
+      const alt = altMatch ? altMatch[1] : '';
+      
+      // 验证图片URL安全性
+      if (src && !src.match(/^(https?:\/\/|\/|data:image\/)/i)) {
+        return '';
+      }
+      
+      return src ? `<img src="${src}" alt="${alt}" style="max-width:100%;height:auto;">` : '';
+    }
+
+    // 对于其他允许的标签，移除所有属性
+    if (match.startsWith('</')) {
+      return `</${tag}>`;
+    }
+    
+    // br标签自闭合
+    if (tag === 'br') {
+      return '<br>';
+    }
+    
+    return `<${tag}>`;
+  });
+
+  return result.trim();
+}
+
+/**
  * 清理Markdown内容（保留Markdown语法，移除危险内容）
  * @param markdown Markdown内容
  * @returns 清理后的内容
@@ -452,6 +541,7 @@ export default {
   
   // 清理
   sanitizeInput,
+  sanitizeCommentContent,
   sanitizeMarkdown,
   sanitizeSearchQuery,
   
@@ -469,7 +559,7 @@ export default {
 /**
  * 使用示例：
  * 
- * import { validateUsername, validateEmail, sanitizeInput } from './validation';
+ * import { validateUsername, validateEmail, sanitizeInput, sanitizeCommentContent } from './validation';
  * 
  * // 验证用户名
  * const usernameError = validateUsername('john_doe');
@@ -479,6 +569,9 @@ export default {
  * 
  * // 清理用户输入
  * const cleanTitle = sanitizeInput(userInput);
+ * 
+ * // 清理评论富文本内容（保留安全的HTML标签）
+ * const cleanComment = sanitizeCommentContent(commentHtml);
  * 
  * // 批量验证
  * const error = validate(

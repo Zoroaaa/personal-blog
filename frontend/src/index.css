@@ -431,3 +431,67 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* 评论内容富文本样式 */
+.comment-content {
+  line-height: 1.6;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.comment-content strong,
+.comment-content b {
+  font-weight: 700 !important;
+}
+
+.comment-content em,
+.comment-content i {
+  font-style: italic !important;
+}
+
+.comment-content a {
+  color: #3B82F6 !important;
+  text-decoration: underline !important;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.comment-content a:hover {
+  color: #2563EB !important;
+}
+
+.comment-content a:visited {
+  color: #7C3AED !important;
+}
+
+.dark .comment-content a {
+  color: #60A5FA !important;
+}
+
+.dark .comment-content a:hover {
+  color: #93C5FD !important;
+}
+
+.dark .comment-content a:visited {
+  color: #A78BFA !important;
+}
+
+.comment-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin: 0.5rem 0;
+  display: block;
+}
+
+.comment-content p {
+  margin: 0.5rem 0;
+}
+
+.comment-content p:first-child {
+  margin-top: 0;
+}
+
+.comment-content p:last-child {
+  margin-bottom: 0;
+}

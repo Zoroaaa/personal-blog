@@ -2,17 +2,21 @@
  * 富文本编辑器组件
  *
  * 功能：
- * - 支持加粗、斜体、列表、链接、代码块、引用
- * - 支持@用户功能
+ * - 支持加粗、斜体、链接、图片
+ * - 支持@用户功能（任意位置触发）
+ * - 表情选择器
+ * - 图片上传
+ * - 链接插入
  * - 内容清理防止XSS
  * - 字数统计
  *
  * @author 博客系统
- * @version 2.0.0
+ * @version 4.0.0
  * @created 2024-01-01
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { User } from '../types';
 
 interface RichTextEditorProps {
@@ -21,7 +25,35 @@ interface RichTextEditorProps {
   placeholder?: string;
   maxLength?: number;
   mentionableUsers?: User[];
+  onImageUpload?: (file: File) => Promise<string | null>;
 }
+
+const EMOJI_LIST = [
+  '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '😊',
+  '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '🥲', '😋',
+  '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐',
+  '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '😮', '🤯',
+  '😱', '🥵', '🥶', '😰', '😥', '😢', '😭', '😤', '😡', '🤬',
+  '👍', '👎', '👏', '🙌', '🤝', '💪', '🎉', '🔥', '❤️', '💔',
+  '✨', '⭐', '🌟', '💯', '✅', '❌', '❓', '💡', '📌', '📝',
+  '😢', '😭', '😤', '😳', '🥺', '😱', '😨', '😰', '😥', '😓',
+  '🤢', '🤮', '🤧', '🥴', '😵', '🤯', '🤠', '🥳', '😎', '🤓',
+  '🧐', '😕', '😟', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺',
+  '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣',
+  '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈',
+  '👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞',
+  '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍',
+  '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝',
+  '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦿', '🦵', '🦶', '👂',
+  '🐱', '🐶', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯',
+  '🦁', '🐮', '🐷', '🐸', '🐵', '🐔', '🐧', '🐦', '🐤', '🦆',
+  '🦅', '🦉', '🦇', '🐺', '🐗', '🐴', '🦄', '🐝', '🐛', '🦋',
+  '🐌', '🐞', '🐜', '🦟', '🦗', '🕷️', '🦂', '🐢', '🐍', '🦎',
+  '🌸', '🌺', '🌻', '🌼', '🌷', '🌱', '🌲', '🌳', '🌴', '🌵',
+  '🌾', '🌿', '☘️', '🍀', '🍁', '🍂', '🍃', '🍄', '🌰', '🦀',
+  '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🍈', '🍒',
+  '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬',
+];
 
 export function RichTextEditor({
   value,
@@ -29,36 +61,50 @@ export function RichTextEditor({
   placeholder = '写下你的评论...',
   maxLength = 1000,
   mentionableUsers = [],
+  onImageUpload,
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [showMentions, setShowMentions] = useState(false);
+  const [showEmojis, setShowEmojis] = useState(false);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [textLength, setTextLength] = useState(0);
   const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionPosition, setMentionPosition] = useState<{ start: number; end: number } | null>(null);
+  const [popupPosition, setPopupPosition] = useState<{ top: number; left: number } | null>(null);
   const isUpdatingRef = useRef(false);
+  const lastSelectionRef = useRef<Range | null>(null);
+  const isComposingRef = useRef(false);
+  const isSelectingMentionRef = useRef(false);
+  const initialValueRef = useRef<string | null>(null);
 
-  // 计算纯文本长度
   const calculateTextLength = useCallback((html: string): number => {
     const temp = document.createElement('div');
     temp.innerHTML = html;
     return temp.textContent?.length || 0;
   }, []);
 
-  // 更新字数统计
   useEffect(() => {
     setTextLength(calculateTextLength(value));
   }, [value, calculateTextLength]);
 
-  // 同步外部value到编辑器
+  useEffect(() => {
+    if (initialValueRef.current === null && editorRef.current) {
+      initialValueRef.current = value || '';
+      editorRef.current.innerHTML = initialValueRef.current;
+    }
+  }, []);
+
   useEffect(() => {
     if (editorRef.current && !isFocused && !isUpdatingRef.current) {
-      editorRef.current.innerHTML = value || '';
+      const currentContent = editorRef.current.innerHTML;
+      if (currentContent !== value) {
+        editorRef.current.innerHTML = value || '';
+      }
     }
   }, [value, isFocused]);
 
-  // 处理@用户搜索
   useEffect(() => {
     if (!showMentions) return;
 
@@ -77,9 +123,63 @@ export function RichTextEditor({
     setSelectedIndex(0);
   }, [mentionQuery, mentionableUsers, showMentions]);
 
-  // 执行命令
+  const saveSelection = useCallback(() => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      lastSelectionRef.current = selection.getRangeAt(0).cloneRange();
+    }
+  }, []);
+
+  const restoreSelection = useCallback(() => {
+    if (lastSelectionRef.current) {
+      const selection = window.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(lastSelectionRef.current);
+      }
+    }
+  }, []);
+
+  const updatePopupPosition = useCallback(() => {
+    if (!editorRef.current) return;
+    
+    const rect = editorRef.current.getBoundingClientRect();
+    setPopupPosition({
+      top: rect.top - 8,
+      left: rect.left + 16
+    });
+  }, []);
+
+  useEffect(() => {
+    if (showMentions || showEmojis) {
+      updatePopupPosition();
+    }
+  }, [showMentions, showEmojis, updatePopupPosition]);
+
   const execCommand = useCallback((command: string, value: string = '') => {
-    document.execCommand(command, false, value);
+    if (!editorRef.current) return;
+    
+    editorRef.current.focus();
+    
+    if (!lastSelectionRef.current && editorRef.current.childNodes.length === 0) {
+      const range = document.createRange();
+      range.setStart(editorRef.current, 0);
+      range.collapse(true);
+      const selection = window.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    } else {
+      restoreSelection();
+    }
+    
+    try {
+      document.execCommand(command, false, value);
+    } catch (e) {
+      console.warn('execCommand failed:', e);
+    }
+    
     if (editorRef.current) {
       isUpdatingRef.current = true;
       onChange(editorRef.current.innerHTML);
@@ -87,17 +187,55 @@ export function RichTextEditor({
         isUpdatingRef.current = false;
       }, 0);
     }
-  }, [onChange]);
+  }, [onChange, restoreSelection]);
 
-  // 插入链接
   const insertLink = useCallback(() => {
+    saveSelection();
     const url = prompt('请输入链接地址:', 'https://');
     if (url && url !== 'https://') {
+      restoreSelection();
       execCommand('createLink', url);
     }
-  }, [execCommand]);
+  }, [execCommand, saveSelection, restoreSelection]);
 
-  // 检查是否需要显示@用户列表
+  const insertEmoji = useCallback((emoji: string) => {
+    editorRef.current?.focus();
+    restoreSelection();
+    execCommand('insertText', emoji);
+    setShowEmojis(false);
+  }, [execCommand, restoreSelection]);
+
+  const handleImageUpload = useCallback(async () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      if (onImageUpload) {
+        const url = await onImageUpload(file);
+        if (url) {
+          editorRef.current?.focus();
+          restoreSelection();
+          execCommand('insertImage', url);
+        }
+      } else {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const dataUrl = event.target?.result as string;
+          editorRef.current?.focus();
+          restoreSelection();
+          execCommand('insertImage', dataUrl);
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+
+    input.click();
+  }, [execCommand, onImageUpload, restoreSelection]);
+
   const checkForMention = useCallback(() => {
     if (!editorRef.current) return;
 
@@ -105,94 +243,100 @@ export function RichTextEditor({
     if (!selection || !selection.rangeCount) return;
 
     const range = selection.getRangeAt(0);
-    if (!range.collapsed) return;
+    if (!range.collapsed) {
+      setShowMentions(false);
+      return;
+    }
 
-    // 获取光标前的文本
     const preCaretRange = range.cloneRange();
     preCaretRange.selectNodeContents(editorRef.current);
     preCaretRange.setEnd(range.endContainer, range.endOffset);
     const textBeforeCursor = preCaretRange.toString();
 
-    // 查找最后一个@符号
     const lastAtIndex = textBeforeCursor.lastIndexOf('@');
     
     if (lastAtIndex === -1) {
       setShowMentions(false);
+      setMentionPosition(null);
       return;
     }
 
-    // 获取@后的文本（不包含@）
     const afterAt = textBeforeCursor.slice(lastAtIndex + 1);
     
-    // 检查@后是否有空格（如果有空格则关闭列表）
-    if (afterAt.includes(' ')) {
+    if (afterAt.includes(' ') || afterAt.includes('\n')) {
       setShowMentions(false);
+      setMentionPosition(null);
       return;
     }
 
-    // 检查@前是否是单词边界
-    const beforeAt = textBeforeCursor.slice(0, lastAtIndex);
-    if (beforeAt.length > 0 && !/\s$/.test(beforeAt) && !/@$/.test(beforeAt)) {
-      // @前面不是空白字符，可能是邮箱地址的一部分
+    if (afterAt.length > 15) {
       setShowMentions(false);
+      setMentionPosition(null);
       return;
     }
 
     setMentionQuery(afterAt);
+    setMentionPosition({ start: lastAtIndex, end: textBeforeCursor.length });
     setShowMentions(true);
   }, []);
 
-  // 选择用户
   const selectUser = useCallback((user: User) => {
     if (!editorRef.current) return;
 
-    const selection = window.getSelection();
-    if (!selection || !selection.rangeCount) return;
+    isSelectingMentionRef.current = true;
 
-    // 获取当前光标位置
-    const range = selection.getRangeAt(0);
-    
-    // 获取编辑器内容
-    const preCaretRange = range.cloneRange();
-    preCaretRange.selectNodeContents(editorRef.current);
-    preCaretRange.setEnd(range.endContainer, range.endOffset);
-    const textBeforeCursor = preCaretRange.toString();
-    
-    // 找到最后一个@符号的位置
-    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
-    if (lastAtIndex === -1) return;
-    
-    // 计算需要删除的文本长度（@ + 已输入的查询文本）
-    const queryLength = mentionQuery.length;
-    const deleteLength = queryLength + 1; // +1 是@符号
-    
-    // 删除@和查询文本
+    editorRef.current.focus();
+
+    restoreSelection();
+
+    const selection = window.getSelection();
+    if (!selection) {
+      isSelectingMentionRef.current = false;
+      return;
+    }
+
+    let deleteLength = 0;
+
+    if (selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const preCaretRange = range.cloneRange();
+      preCaretRange.selectNodeContents(editorRef.current);
+      preCaretRange.setEnd(range.endContainer, range.endOffset);
+      const textBeforeCursor = preCaretRange.toString();
+      const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+      if (lastAtIndex !== -1) {
+        deleteLength = textBeforeCursor.length - lastAtIndex;
+      }
+    }
+
+    if (deleteLength === 0) {
+      isSelectingMentionRef.current = false;
+      setShowMentions(false);
+      return;
+    }
+
     for (let i = 0; i < deleteLength; i++) {
       document.execCommand('delete', false);
     }
-    
-    // 创建mention文本（包含空格）
+
     const mentionText = `@${user.displayName || user.username} `;
-    
-    // 插入mention文本
     document.execCommand('insertText', false, mentionText);
 
-    // 触发onChange
     setShowMentions(false);
     setMentionQuery('');
-    
-    // 触发onChange
+    setMentionPosition(null);
+
     isUpdatingRef.current = true;
     onChange(editorRef.current.innerHTML);
     setTimeout(() => {
       isUpdatingRef.current = false;
+      isSelectingMentionRef.current = false;
     }, 0);
-  }, [onChange, mentionQuery]);
+  }, [onChange, restoreSelection]);
 
-  // 键盘处理
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (showMentions && filteredUsers.length > 0) {
+      if (showMentions && filteredUsers.length > 0 && !isComposingRef.current) {
         switch (e.key) {
           case 'ArrowDown':
             e.preventDefault();
@@ -207,6 +351,7 @@ export function RichTextEditor({
           case 'Enter':
           case 'Tab':
             e.preventDefault();
+            e.stopPropagation();
             selectUser(filteredUsers[selectedIndex]);
             return;
           case 'Escape':
@@ -216,7 +361,6 @@ export function RichTextEditor({
         }
       }
 
-      // 快捷键
       if (e.ctrlKey || e.metaKey) {
         switch (e.key.toLowerCase()) {
           case 'b':
@@ -233,15 +377,17 @@ export function RichTextEditor({
     [showMentions, filteredUsers, selectedIndex, selectUser, execCommand]
   );
 
-  // 输入处理
   const handleInput = useCallback(() => {
     if (!editorRef.current) return;
+
+    if (isComposingRef.current) {
+      return;
+    }
 
     const html = editorRef.current.innerHTML;
     const length = calculateTextLength(html);
 
     if (length > maxLength) {
-      // 超出限制，恢复之前的内容
       editorRef.current.innerHTML = value;
       return;
     }
@@ -252,48 +398,89 @@ export function RichTextEditor({
       isUpdatingRef.current = false;
     }, 0);
 
-    // 检查@用户
     checkForMention();
   }, [onChange, maxLength, value, calculateTextLength, checkForMention]);
 
-  // 工具栏按钮
+  const handleCompositionStart = useCallback(() => {
+    isComposingRef.current = true;
+  }, []);
+
+  const handleCompositionEnd = useCallback(() => {
+    isComposingRef.current = false;
+    
+    if (!editorRef.current) return;
+
+    const html = editorRef.current.innerHTML;
+    const length = calculateTextLength(html);
+
+    if (length > maxLength) {
+      editorRef.current.innerHTML = value;
+      return;
+    }
+
+    isUpdatingRef.current = true;
+    onChange(html);
+    setTimeout(() => {
+      isUpdatingRef.current = false;
+    }, 0);
+
+    checkForMention();
+  }, [onChange, maxLength, value, calculateTextLength, checkForMention]);
+
+  const handleMouseDown = useCallback(() => {
+    saveSelection();
+  }, [saveSelection]);
+
+  const handleBlur = useCallback(() => {
+    if (isSelectingMentionRef.current) {
+      return;
+    }
+    setIsFocused(false);
+    setTimeout(() => {
+      setShowMentions(false);
+      setShowEmojis(false);
+    }, 200);
+  }, []);
+
   const toolbarButtons = [
     {
-      icon: 'B',
+      icon: <span className="font-bold">B</span>,
       title: '加粗 (Ctrl+B)',
-      action: () => execCommand('bold'),
-      style: { fontWeight: 'bold' },
+      action: () => {
+        saveSelection();
+        execCommand('bold');
+      },
     },
     {
-      icon: 'I',
+      icon: <span className="italic">I</span>,
       title: '斜体 (Ctrl+I)',
-      action: () => execCommand('italic'),
-      style: { fontStyle: 'italic' },
+      action: () => {
+        saveSelection();
+        execCommand('italic');
+      },
     },
     {
-      icon: '• 列表',
-      title: '无序列表',
-      action: () => execCommand('insertUnorderedList'),
-    },
-    {
-      icon: '1. 列表',
-      title: '有序列表',
-      action: () => execCommand('insertOrderedList'),
-    },
-    {
-      icon: '🔗',
+      icon: <span>🔗</span>,
       title: '插入链接',
       action: insertLink,
     },
     {
-      icon: '</>',
-      title: '代码块',
-      action: () => execCommand('formatBlock', 'pre'),
+      icon: <span>😀</span>,
+      title: '表情',
+      action: () => {
+        saveSelection();
+        setShowEmojis(!showEmojis);
+        setShowMentions(false);
+      },
+      active: showEmojis,
     },
     {
-      icon: '❝',
-      title: '引用',
-      action: () => execCommand('formatBlock', 'blockquote'),
+      icon: <span>🖼️</span>,
+      title: '上传图片',
+      action: () => {
+        saveSelection();
+        handleImageUpload();
+      },
     },
   ];
 
@@ -303,51 +490,66 @@ export function RichTextEditor({
         isFocused ? 'ring-2 ring-blue-500 border-blue-500' : 'border-gray-300 dark:border-slate-600'
       }`}
     >
-      {/* 工具栏 */}
-      <div className="flex items-center gap-1 px-3 py-2 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700">
+      <div className="flex items-center gap-1 px-3 py-2 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex-wrap">
         {toolbarButtons.map((btn, index) => (
           <button
             key={index}
             type="button"
-            onClick={btn.action}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              btn.action();
+            }}
             title={btn.title}
-            className="px-2 py-1 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700 rounded transition-colors"
-            style={btn.style}
+            className={`px-2 py-1 text-sm rounded transition-colors ${
+              btn.active
+                ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700'
+            }`}
           >
             {btn.icon}
           </button>
         ))}
       </div>
 
-      {/* 编辑器 */}
       <div className="relative">
         <div
           ref={editorRef}
           contentEditable
           onInput={handleInput}
           onKeyDown={handleKeyDown}
+          onMouseDown={handleMouseDown}
           onFocus={() => setIsFocused(true)}
-          onBlur={() => {
-            setIsFocused(false);
-            setTimeout(() => setShowMentions(false), 200);
-          }}
+          onBlur={handleBlur}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
           className="min-h-[120px] p-4 outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 dark:empty:before:text-gray-500 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100"
           data-placeholder={placeholder}
           style={{ wordBreak: 'break-word' }}
           suppressContentEditableWarning={true}
         />
 
-        {/* @用户下拉列表 */}
-        {showMentions && filteredUsers.length > 0 && (
-          <div className="absolute left-4 bottom-full mb-2 w-64 max-h-48 overflow-y-auto bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg z-50">
+        {showMentions && filteredUsers.length > 0 && popupPosition && createPortal(
+          <div 
+            className="fixed w-64 max-h-48 overflow-y-auto bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg z-[9999]"
+            style={{ 
+              top: popupPosition.top - 200,
+              left: popupPosition.left 
+            }}
+          >
             {filteredUsers.map((user, index) => (
               <button
                 key={user.id}
                 type="button"
-                onClick={() => selectUser(user)}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  saveSelection();
+                  selectUser(user);
+                }}
                 onMouseEnter={() => setSelectedIndex(index)}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors ${
-                  index === selectedIndex ? 'bg-blue-50 dark:bg-blue-900/30' : ''
+                className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors ${
+                  index === selectedIndex
+                    ? 'bg-blue-50 dark:bg-blue-900/30'
+                    : 'hover:bg-gray-100 dark:hover:bg-slate-700'
                 }`}
               >
                 {user.avatarUrl ? (
@@ -361,17 +563,54 @@ export function RichTextEditor({
                     {(user.displayName || user.username)?.[0]?.toUpperCase()}
                   </div>
                 )}
-                <span className="text-sm text-gray-700 dark:text-gray-200">
-                  {user.displayName || user.username}
-                </span>
+                <div className="flex flex-col">
+                  <span className="text-sm text-gray-700 dark:text-gray-200">
+                    {user.displayName || user.username}
+                  </span>
+                  {user.displayName && (
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      @{user.username}
+                    </span>
+                  )}
+                </div>
               </button>
             ))}
-          </div>
+          </div>,
+          document.body
+        )}
+
+        {showEmojis && popupPosition && createPortal(
+          <div 
+            className="fixed w-80 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg z-[9999] p-2"
+            style={{ 
+              top: popupPosition.top - 200,
+              left: popupPosition.left 
+            }}
+          >
+            <div className="grid grid-cols-10 gap-1 max-h-48 overflow-y-auto">
+              {EMOJI_LIST.map((emoji, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    insertEmoji(emoji);
+                  }}
+                  className="w-7 h-7 flex items-center justify-center text-lg hover:bg-gray-100 dark:hover:bg-slate-700 rounded transition-colors"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>,
+          document.body
         )}
       </div>
 
-      {/* 字数统计 */}
-      <div className="flex justify-end px-3 py-1 bg-gray-50 dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700">
+      <div className="flex justify-between items-center px-3 py-1 bg-gray-50 dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700">
+        <span className="text-xs text-gray-500 dark:text-gray-400">
+          输入 @ 提及用户
+        </span>
         <span
           className={`text-xs ${
             textLength > maxLength * 0.9 ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'

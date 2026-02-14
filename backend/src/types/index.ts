@@ -8,7 +8,7 @@
  * @created 2024-01-01
  */
 
-import type { JWTPayload } from '../utils/jwt';
+import type { JWTPayload, TokenPayload } from '../utils/jwt';
 
 /**
  * Cloudflare Workers环境绑定

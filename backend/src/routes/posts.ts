@@ -37,6 +37,8 @@ import {
 import { createInteractionNotification } from '../services/notificationService';
 import { isInteractionSubtypeEnabled } from '../services/notificationSettingsService';
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
+import { verifyToken, generateToken } from '../utils/jwt';
+import bcrypt from 'bcryptjs';
 
 // 定义应用路由类型
 export const postRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -1040,6 +1042,7 @@ postRoutes.get('/favorites', requireAuth, async (c) => {
 /**
  * GET /api/posts/:slug
  * 获取文章详情（公开）
+ * 支持 public/private/password 三种可见性
  */
 postRoutes.get('/:slug', optionalAuth, async (c) => {
   const logger = createLogger(c);
@@ -1051,7 +1054,6 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
       return c.json(errorResponse('Invalid slug'), 400);
     }
     
-    // ===== 1. 先查询文章基本信息(包括浏览量) =====
     const post = await c.env.DB.prepare(`
       SELECT p.*,
              u.username as author_username,
@@ -1069,7 +1071,7 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN columns col ON p.column_id = col.id
-      WHERE p.slug = ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL
+      WHERE p.slug = ? AND p.status = 'published' AND p.deleted_at IS NULL
     `).bind(slug).first() as any;
     
     if (!post) {
@@ -1079,8 +1081,63 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
         'The requested post does not exist or is not published'
       ), 404);
     }
+
+    const currentUser = c.get('user') as any;
+    const isAuthor = currentUser && currentUser.userId === post.author_id;
+    const isAdmin = currentUser && currentUser.role === 'admin';
+
+    if (post.visibility === 'private' && !isAuthor && !isAdmin) {
+      return c.json(errorResponse(
+        'Private post',
+        'This post is private and only accessible by the author'
+      ), 403);
+    }
+
+    if (post.visibility === 'password') {
+      const authHeader = c.req.header('Authorization');
+      let hasPasswordAccess = false;
+
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        try {
+          const token = authHeader.slice(7);
+          const decoded = await verifyToken(c.env.JWT_SECRET, token);
+          if (decoded && 'postId' in decoded && decoded.postId === post.id && decoded.type === 'post_password_access') {
+            hasPasswordAccess = true;
+          }
+        } catch (e) {
+          // Token invalid, continue without access
+        }
+      }
+
+      if (!hasPasswordAccess && !isAuthor && !isAdmin) {
+        const { results: tags } = await c.env.DB.prepare(`
+          SELECT t.id, t.name, t.slug, t.post_count
+          FROM tags t
+          JOIN post_tags pt ON t.id = pt.tag_id
+          WHERE pt.post_id = ?
+        `).bind(post.id).all();
+
+        return c.json(successResponse({
+          id: post.id,
+          title: post.title,
+          slug: post.slug,
+          summary: post.summary,
+          cover_image: post.cover_image,
+          visibility: post.visibility,
+          requires_password: true,
+          author_username: post.author_username,
+          author_name: post.author_name,
+          author_avatar: post.author_avatar,
+          category_name: post.category_name,
+          category_slug: post.category_slug,
+          category_color: post.category_color,
+          published_at: post.published_at,
+          created_at: post.created_at,
+          tags
+        }));
+      }
+    }
     
-    // ===== 2. 获取标签 =====
     const { results: tags } = await c.env.DB.prepare(`
       SELECT t.id, t.name, t.slug, t.post_count
       FROM tags t
@@ -1088,8 +1145,6 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
       WHERE pt.post_id = ?
     `).bind(post.id).all();
     
-    // ===== 3. 检查当前用户是否点赞、是否收藏 =====
-    const currentUser = c.get('user') as any;
     let isLiked = false;
     let isFavorited = false;
     
@@ -1102,8 +1157,6 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
       isFavorited = !!fav;
     }
     
-    // ===== 5. 构建响应 =====
-    // 保持 snake_case 格式，让前端转换层统一处理
     const result = {
       ...post,
       tags,
@@ -1113,7 +1166,6 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
     
     const response = successResponse(result);
     
-    // ===== 5. 异步增加浏览量 =====
     c.executionCtx.waitUntil(
       incrementViewCount(c, slug, post.id)
     );

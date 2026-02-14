@@ -19,15 +19,14 @@
 import { Context, Next } from 'hono';
 import { Env, Variables } from '../types';
 import { errorResponse } from '../utils/response';
-import { verifyToken, JWTPayload } from '../utils/jwt';
+import { verifyToken, JWTPayload, TokenPayload } from '../utils/jwt';
 
-// 定义应用上下文类型
 type AppContext = Context<{ Bindings: Env; Variables: Variables }>;
 
-/**
- * 必须认证中间件
- * 验证Authorization header中的JWT token
- */
+function isUserPayload(payload: TokenPayload): payload is JWTPayload {
+  return 'userId' in payload && 'username' in payload && 'role' in payload;
+}
+
 export async function requireAuth(c: AppContext, next: Next) {
   const authHeader = c.req.header('Authorization');
 
@@ -38,10 +37,9 @@ export async function requireAuth(c: AppContext, next: Next) {
     ), 401);
   }
 
-  const token = authHeader.substring(7); // 移除 "Bearer " 前缀
+  const token = authHeader.substring(7);
 
   try {
-    // 检查token是否在黑名单中（已登出）
     const blacklisted = c.env.CACHE ? await c.env.CACHE.get(`blacklist:${token}`) : null;
     if (blacklisted) {
       return c.json(errorResponse(
@@ -50,16 +48,20 @@ export async function requireAuth(c: AppContext, next: Next) {
       ), 401);
     }
 
-    // 验证token
     const payload = await verifyToken(token, c.env.JWT_SECRET);
 
-    // 将用户信息存储到context中
+    if (!isUserPayload(payload)) {
+      return c.json(errorResponse(
+        'Invalid token type',
+        'This token is not a valid user authentication token.'
+      ), 401);
+    }
+
     c.set('user', payload);
 
     await next();
 
   } catch (error) {
-    // Token验证失败
     const errorMessage = error instanceof Error ? error.message : 'Invalid token';
 
     if (errorMessage.includes('expired')) {
@@ -76,11 +78,6 @@ export async function requireAuth(c: AppContext, next: Next) {
   }
 }
 
-/**
- * 可选认证中间件
- * 如果提供了token则验证，否则继续执行
- * 用于公开端点，但需要知道用户身份（如果已登录）
- */
 export async function optionalAuth(c: AppContext, next: Next) {
   const authHeader = c.req.header('Authorization');
 
@@ -88,19 +85,17 @@ export async function optionalAuth(c: AppContext, next: Next) {
     const token = authHeader.substring(7);
 
     try {
-      // 检查token黑名单
       const blacklisted = c.env.CACHE ? await c.env.CACHE.get(`blacklist:${token}`) : null;
 
       if (!blacklisted) {
-        // 验证token
         const payload = await verifyToken(token, c.env.JWT_SECRET);
 
-        // 将用户信息存储到context
-        c.set('user', payload);
+        if (isUserPayload(payload)) {
+          c.set('user', payload);
+        }
       }
     } catch (error) {
       // 忽略错误，继续执行
-      // 可选认证失败不应阻止请求
     }
   }
 

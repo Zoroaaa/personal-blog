@@ -21,21 +21,53 @@ export interface JWTPayload {
   exp: number;
 }
 
+export interface PostPasswordPayload {
+  postId: number;
+  type: string;
+  exp: number;
+}
+
+export type TokenPayload = JWTPayload | PostPasswordPayload | Record<string, any>;
+
 /**
  * 生成JWT token
  * 
  * 功能：使用HMAC-SHA256算法生成JWT token，有效期为7天
  * 
  * @param secret 密钥字符串
- * @param payload JWT载荷，不包含exp字段
+ * @param payload JWT载荷，可以包含 expiresIn 字段自定义过期时间
  * @returns 生成的JWT token字符串
  */
 export async function generateToken(
   secret: string,
-  payload: Omit<JWTPayload, 'exp'>
+  payload: Record<string, any>
 ): Promise<string> {
   const header = { alg: 'HS256', typ: 'JWT' };
-  const exp = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7; // 7天
+  
+  let exp: number;
+  if (payload.expiresIn) {
+    const expiresIn = payload.expiresIn;
+    delete payload.expiresIn;
+    
+    if (typeof expiresIn === 'string') {
+      const match = expiresIn.match(/^(\d+)([hd])$/);
+      if (match) {
+        const value = parseInt(match[1]);
+        const unit = match[2];
+        if (unit === 'h') {
+          exp = Math.floor(Date.now() / 1000) + value * 60 * 60;
+        } else {
+          exp = Math.floor(Date.now() / 1000) + value * 24 * 60 * 60;
+        }
+      } else {
+        exp = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7;
+      }
+    } else {
+      exp = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7;
+    }
+  } else {
+    exp = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7;
+  }
   
   const fullPayload = { ...payload, exp };
   
@@ -63,7 +95,7 @@ export async function generateToken(
 export async function verifyToken(
   token: string,
   secret: string
-): Promise<JWTPayload> {
+): Promise<TokenPayload> {
   const parts = token.split('.');
   if (parts.length !== 3) {
     throw new Error('Invalid token format');
@@ -71,7 +103,6 @@ export async function verifyToken(
   
   const [encodedHeader, encodedPayload, signature] = parts;
   
-  // 验证签名
   const expectedSignature = await sign(
     `${encodedHeader}.${encodedPayload}`,
     secret
@@ -81,11 +112,9 @@ export async function verifyToken(
     throw new Error('Invalid signature');
   }
   
-  // 解码payload
-  const payload = JSON.parse(base64urlDecode(encodedPayload)) as JWTPayload;
+  const payload = JSON.parse(base64urlDecode(encodedPayload)) as TokenPayload;
   
-  // 检查过期时间
-  if (payload.exp < Math.floor(Date.now() / 1000)) {
+  if ((payload as any).exp < Math.floor(Date.now() / 1000)) {
     throw new Error('Token expired');
   }
   

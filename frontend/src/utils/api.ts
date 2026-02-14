@@ -202,6 +202,15 @@ export const api = {
       method: 'DELETE',
     }),
 
+  /**
+   * 通用PATCH请求
+   */
+  patch: <T = any>(endpoint: string, data?: any) =>
+    apiRequest<T>(endpoint, {
+      method: 'PATCH',
+      body: data ? JSON.stringify(data) : undefined,
+    }),
+
   // ============= 健康检查 =============
 
   /**
