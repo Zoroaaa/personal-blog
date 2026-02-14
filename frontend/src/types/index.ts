@@ -418,6 +418,7 @@ export interface CreateCommentRequest {
   postId: number;
   content: string;
   parentId?: number;
+  mentionedUserIds?: number[];
 }
 
 /**

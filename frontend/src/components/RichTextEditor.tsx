@@ -26,6 +26,7 @@ interface RichTextEditorProps {
   maxLength?: number;
   mentionableUsers?: User[];
   onImageUpload?: (file: File) => Promise<string | null>;
+  onMention?: (user: User) => void;
 }
 
 const EMOJI_LIST = [
@@ -62,6 +63,7 @@ export function RichTextEditor({
   maxLength = 1000,
   mentionableUsers = [],
   onImageUpload,
+  onMention,
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState(false);
@@ -325,6 +327,10 @@ export function RichTextEditor({
     setShowMentions(false);
     setMentionQuery('');
     setMentionPosition(null);
+
+    if (onMention) {
+      onMention(user);
+    }
 
     isUpdatingRef.current = true;
     onChange(editorRef.current.innerHTML);

@@ -37,6 +37,12 @@ export interface NotificationRelatedData {
   senderId?: number;
   senderName?: string;
   senderAvatar?: string;
+  mentionerId?: number;
+  mentionerName?: string;
+  mentionerAvatar?: string;
+  contentType?: string;
+  contentId?: number;
+  link?: string;
 }
 
 export interface Notification {

@@ -93,6 +93,25 @@ function NotificationItem({
               {notification.content}
             </p>
           )}
+          {/* 艾特通知：显示艾特者信息 */}
+          {notification.subtype === 'mention' && notification.relatedData?.mentionerName && (
+            <div className="mt-2 flex items-center gap-2">
+              {notification.relatedData.mentionerAvatar ? (
+                <img 
+                  src={notification.relatedData.mentionerAvatar} 
+                  alt={notification.relatedData.mentionerName}
+                  className="w-5 h-5 rounded-full"
+                />
+              ) : (
+                <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-xs">
+                  {notification.relatedData.mentionerName[0]}
+                </div>
+              )}
+              <span className="text-xs text-muted-foreground">
+                来自 {notification.relatedData.mentionerName}
+              </span>
+            </div>
+          )}
           {/* 评论回复通知：显示被回复的评论内容 */}
           {notification.subtype === 'reply' && notification.relatedData?.parentCommentContent && (
             <div className="mt-2 p-2 bg-muted rounded text-xs text-muted-foreground">

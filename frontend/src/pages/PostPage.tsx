@@ -298,10 +298,12 @@ export function PostPage() {
         postId: post.id,
         content: newComment.trim(),
         parentId,
+        mentionedUserIds: mentionedUserIds.size > 0 ? Array.from(mentionedUserIds) : undefined,
       });
 
       if (response.success) {
         setNewComment('');
+        setMentionedUserIds(new Set());
         // 重新加载评论列表
         await loadComments(post.id);
         showSuccess('评论发表成功');
@@ -373,6 +375,8 @@ export function PostPage() {
   const [commentLiking, setCommentLiking] = useState<number | null>(null);
   const [mentionableUsers, setMentionableUsers] = useState<User[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [mentionedUserIds, setMentionedUserIds] = useState<Set<number>>(new Set());
+  const [replyMentionedUserIds, setReplyMentionedUserIds] = useState<Set<number>>(new Set());
 
   // 加载可@用户列表
   useEffect(() => {
@@ -390,6 +394,14 @@ export function PostPage() {
     } catch (error) {
       console.error('Failed to load mentionable users:', error);
     }
+  };
+
+  const handleMention = (user: User) => {
+    setMentionedUserIds(prev => new Set(prev).add(user.id));
+  };
+
+  const handleReplyMention = (user: User) => {
+    setReplyMentionedUserIds(prev => new Set(prev).add(user.id));
   };
 
   // 处理评论图片上传
@@ -470,11 +482,13 @@ export function PostPage() {
         postId: post.id,
         content: replyContent.trim(),
         parentId,
+        mentionedUserIds: replyMentionedUserIds.size > 0 ? Array.from(replyMentionedUserIds) : undefined,
       });
 
       if (response.success) {
         setReplyContent('');
         setReplyingTo(null);
+        setReplyMentionedUserIds(new Set());
         // 重新加载评论列表
         await loadComments(post.id);
         showSuccess('回复发表成功');
@@ -578,6 +592,7 @@ export function PostPage() {
                 maxLength={500}
                 mentionableUsers={mentionableUsers}
                 onImageUpload={handleCommentImageUpload}
+                onMention={handleReplyMention}
               />
               <div className="mt-4 flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">
@@ -970,6 +985,7 @@ export function PostPage() {
                 maxLength={1000}
                 mentionableUsers={mentionableUsers}
                 onImageUpload={handleCommentImageUpload}
+                onMention={handleMention}
               />
               <div className="flex items-center justify-between mt-4">
                 <span className="text-sm text-muted-foreground">
