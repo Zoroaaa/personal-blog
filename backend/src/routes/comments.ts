@@ -28,6 +28,7 @@ import { createLogger } from '../middleware/requestLogger';
 import {
   validateLength,
   sanitizeInput,
+  sanitizeCommentContent,
   safeParseInt
 } from '../utils/validation';
 import { isFeatureEnabled, getConfigValue } from './config';
@@ -282,7 +283,8 @@ commentRoutes.post('/', requireAuth, rateLimit({
     }
     
     // ===== 2. 清理和验证内容 =====
-    content = sanitizeInput(content);
+    // 使用 sanitizeCommentContent 保留安全的富文本标签
+    content = sanitizeCommentContent(content);
     
     const contentError = validateLength(content, MIN_COMMENT_LENGTH, maxCommentLength, 'Comment');
     if (contentError) {
