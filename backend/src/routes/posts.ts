@@ -1101,18 +1101,28 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
       console.log('Password protected post check:', {
         postId: post.id,
         hasAuthHeader: !!authHeader,
-        hasPostToken: !!postToken
+        hasPostToken: !!postToken,
+        postTokenValue: postToken ? postToken.substring(0, 20) + '...' : null
       });
 
       const tokenToVerify = postToken || (authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null);
 
+      console.log('Token to verify:', tokenToVerify ? 'present' : 'none');
+
       if (tokenToVerify) {
         try {
           const decoded = await verifyToken(c.env.JWT_SECRET, tokenToVerify);
-          console.log('Token decoded:', decoded ? { postId: (decoded as any).postId, type: (decoded as any).type } : 'invalid');
+          console.log('Token decoded:', decoded ? JSON.stringify(decoded) : 'invalid');
           if (decoded && 'postId' in decoded && decoded.postId === post.id && decoded.type === 'post_password_access') {
             hasPasswordAccess = true;
             console.log('Password access granted for post:', post.id);
+          } else {
+            console.log('Token validation failed:', {
+              hasDecoded: !!decoded,
+              hasPostId: decoded && 'postId' in decoded,
+              postIdMatch: decoded && 'postId' in decoded ? (decoded as any).postId === post.id : false,
+              hasCorrectType: decoded && 'type' in decoded ? (decoded as any).type === 'post_password_access' : false
+            });
           }
         } catch (e) {
           console.log('Token verification failed:', e);
