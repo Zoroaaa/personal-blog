@@ -388,6 +388,15 @@ export const api = {
     apiRequest<{ deleted: boolean }>(`/posts/${id}`, {
       method: 'DELETE',
     }),
+
+  /**
+   * 验证文章密码
+   */
+  verifyPostPassword: (postId: number, password: string) =>
+    apiRequest<{ verified: boolean; token: string; post: { id: number; title: string; slug: string } }>(`/posts/${postId}/verify-password`, {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }),
   
   /**
    * 点赞/取消点赞文章（返回最新 likeCount 便于前端实时更新）

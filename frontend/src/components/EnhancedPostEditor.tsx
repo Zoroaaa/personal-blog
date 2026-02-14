@@ -65,6 +65,8 @@ interface PostData {
   columnId: number | null;
   tags: number[];
   status: 'draft' | 'published';
+  visibility: 'public' | 'private' | 'password';
+  password?: string;
 }
 
 export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps) {
@@ -74,6 +76,9 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   const [summary, setSummary] = useState('');
   const [coverImage, setCoverImage] = useState('');
   const [status, setStatus] = useState<'draft' | 'published'>('draft');
+  const [visibility, setVisibility] = useState<'public' | 'private' | 'password'>('public');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // 为每个新建文章会话生成唯一的 sessionId
   const [sessionId] = useState(() => {
@@ -133,7 +138,9 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     categoryId: selectedCategoryId,
     columnId: selectedColumnId,
     tags: selectedTagIds,
-    status
+    status,
+    visibility,
+    password: visibility === 'password' ? password : undefined
   };
   
   const { lastSaved, isSaving, hasDraft, saveNow, clearLocalStorage } = useAutoSave({
@@ -326,6 +333,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
         setSummary(post.summary || '');
         setCoverImage(post.coverImage || '');
         setStatus(post.status as 'draft' | 'published');
+        setVisibility((post as any).visibility || 'public');
         setSelectedCategoryId(post.categoryId || null);
         setSelectedColumnId(post.columnId || null);
         setSelectedTagIds(post.tags?.map((t: any) => t.id) || []);
@@ -350,6 +358,11 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
       setError('内容不能为空');
       return;
     }
+
+    if (visibility === 'password' && !password.trim() && !postId) {
+      setError('密码保护的文章必须设置访问密码');
+      return;
+    }
     
     try {
       setLoading(true);
@@ -362,8 +375,13 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
         categoryId: selectedCategoryId ?? undefined,
         columnId: selectedColumnId ?? undefined,
         tags: selectedTagIds,
-        status
+        status,
+        visibility
       };
+
+      if (visibility === 'password' && password.trim()) {
+        postData.password = password;
+      }
       
       let response;
       if (postId) {
@@ -1367,6 +1385,108 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
               : '发布状态：文章将立即在前端页面显示。'}
           </p>
         </div>
+
+        {/* 文章可见性 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            文章可见性
+          </label>
+          <div className="flex flex-wrap gap-4 mb-2">
+            <label className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border-2 transition-all ${
+              visibility === 'public'
+                ? 'border-green-500 bg-green-50 dark:bg-green-900/30'
+                : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
+            }`}>
+              <input
+                type="radio"
+                value="public"
+                checked={visibility === 'public'}
+                onChange={(e) => setVisibility(e.target.value as 'public')}
+                className="w-4 h-4 text-green-600"
+              />
+              <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-gray-700 dark:text-gray-300 font-medium">公开</span>
+            </label>
+            <label className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border-2 transition-all ${
+              visibility === 'private'
+                ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/30'
+                : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
+            }`}>
+              <input
+                type="radio"
+                value="private"
+                checked={visibility === 'private'}
+                onChange={(e) => setVisibility(e.target.value as 'private')}
+                className="w-4 h-4 text-orange-600"
+              />
+              <svg className="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              <span className="text-gray-700 dark:text-gray-300 font-medium">私密</span>
+            </label>
+            <label className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border-2 transition-all ${
+              visibility === 'password'
+                ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30'
+                : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
+            }`}>
+              <input
+                type="radio"
+                value="password"
+                checked={visibility === 'password'}
+                onChange={(e) => setVisibility(e.target.value as 'password')}
+                className="w-4 h-4 text-purple-600"
+              />
+              <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+              <span className="text-gray-700 dark:text-gray-300 font-medium">密码保护</span>
+            </label>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {visibility === 'public' && '公开：所有人均可查看此文章'}
+            {visibility === 'private' && '私密：仅作者和管理员可查看此文章'}
+            {visibility === 'password' && '密码保护：访问者需要输入密码才能查看此文章'}
+          </p>
+        </div>
+
+        {/* 密码输入（仅在密码保护模式下显示） */}
+        {visibility === 'password' && (
+          <div className="animate-fade-in">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              访问密码 {postId && <span className="text-gray-400 text-xs">(留空保持原密码)</span>}
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-slate-700 dark:text-white"
+                placeholder={postId ? "输入新密码或留空保持原密码" : "请输入访问密码"}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                {showPassword ? (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                )}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              密码将被加密存储，访问者需要输入此密码才能查看文章内容
+            </p>
+          </div>
+        )}
         
         {/* 操作按钮 */}
         <div className="flex gap-4 pt-6 border-t border-gray-200 dark:border-slate-700">
