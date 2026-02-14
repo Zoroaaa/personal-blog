@@ -3,10 +3,12 @@
  * 
  * 变更说明：
  * - 移除 private_message 类型
+ * - 移除 follow 类型（关注功能未实现）
+ * - 移除 push 相关配置（浏览器推送功能未实现）
  * - 私信现在是完全独立的系统
  * 
  * @author 博客系统
- * @version 2.0.0 - 方案A
+ * @version 2.1.0
  * @created 2026-02-13
  */
 
@@ -20,12 +22,11 @@ export type NotificationSubtype =
   | 'like' 
   | 'favorite' 
   | 'mention' 
-  | 'follow' 
   | 'reply';
 
 export type NotificationFrequency = 'realtime' | 'daily' | 'weekly' | 'off';
 
-export type NotificationChannel = 'in_app' | 'email' | 'push';
+export type NotificationChannel = 'in_app' | 'email';
 
 export type DigestType = 'daily' | 'weekly';
 
@@ -55,7 +56,6 @@ export interface Notification {
   relatedData?: NotificationRelatedData;
   isInAppSent: boolean;
   isEmailSent: boolean;
-  isPushSent: boolean;
   isRead: boolean;
   readAt?: string;
   isDeleted: boolean;
@@ -66,7 +66,6 @@ export interface Notification {
 export interface NotificationTypeSettings {
   inApp: boolean;
   email: boolean;
-  push: boolean;
   frequency: NotificationFrequency;
 }
 
@@ -75,7 +74,6 @@ export interface InteractionSubtypes {
   like: boolean;
   favorite: boolean;
   mention: boolean;
-  follow: boolean;
   reply: boolean;
 }
 
@@ -103,19 +101,6 @@ export interface NotificationSettings {
   updatedAt?: string;
 }
 
-export interface PushSubscription {
-  id?: number;
-  userId: number;
-  endpoint: string;
-  p256dh: string;
-  auth: string;
-  userAgent?: string;
-  platform?: string;
-  isActive: boolean;
-  createdAt?: string;
-  lastUsedAt?: string;
-}
-
 export interface EmailDigestQueue {
   id?: number;
   userId: number;
@@ -138,7 +123,6 @@ export interface CreateNotificationRequest {
 export interface SendNotificationOptions {
   skipInApp?: boolean;
   skipEmail?: boolean;
-  skipPush?: boolean;
 }
 
 export interface NotificationQueryParams {
@@ -163,26 +147,6 @@ export interface UnreadCountResponse {
   byType: {
     system: number;
     interaction: number;
-  };
-}
-
-export interface PushSubscribeRequest {
-  subscription: {
-    endpoint: string;
-    keys: {
-      p256dh: string;
-      auth: string;
-    };
-  };
-  userAgent?: string;
-}
-
-export interface PushSubscriptionResponse {
-  endpoint: string;
-  expirationTime?: number | null;
-  keys: {
-    p256dh: string;
-    auth: string;
   };
 }
 

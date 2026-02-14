@@ -5,16 +5,17 @@
  * - 检查当前是否在免打扰时段
  * - 计算下一个非免打扰时间
  * 
+ * 变更说明：
+ * - 移除了 push 渠道的特殊处理
+ * - 免打扰现在只影响邮件通知
+ * 
  * @author 博客系统
- * @version 1.0.0
+ * @version 2.1.0
  * @created 2024-01-01
  */
 
 import type { NotificationSettings } from '../types/notifications';
 
-/**
- * 检查当前是否在免打扰时段
- */
 export function isInDoNotDisturb(
   settings: NotificationSettings['doNotDisturb']
 ): boolean {
@@ -31,20 +32,13 @@ export function isInDoNotDisturb(
   const startTime = startHour * 60 + startMin;
   const endTime = endHour * 60 + endMin;
 
-  // 处理跨天情况（如 22:00 - 08:00）
   if (startTime > endTime) {
-    // 跨天：当前时间在开始时间之后 或 在结束时间之前
     return currentTime >= startTime || currentTime <= endTime;
   } else {
-    // 不跨天：当前时间在开始和结束之间
     return currentTime >= startTime && currentTime <= endTime;
   }
 }
 
-/**
- * 计算距离免打扰结束还有多少分钟
- * 如果不在免打扰时段，返回0
- */
 export function getMinutesUntilDoNotDisturbEnd(
   settings: NotificationSettings['doNotDisturb']
 ): number {
@@ -61,25 +55,17 @@ export function getMinutesUntilDoNotDisturbEnd(
   const [startHour, startMin] = settings.start!.split(':').map(Number);
   const startTime = startHour * 60 + startMin;
 
-  // 跨天情况
   if (startTime > endTime) {
     if (currentTime <= endTime) {
-      // 当前在第二天的免打扰时段（00:00 - end）
       return endTime - currentTime;
     } else {
-      // 当前在第一天的免打扰时段（start - 24:00）
       return (24 * 60 - currentTime) + endTime;
     }
   } else {
-    // 不跨天
     return endTime - currentTime;
   }
 }
 
-/**
- * 计算下一个可以发送通知的时间点
- * 如果当前不在免打扰时段，返回当前时间
- */
 export function getNextAvailableTime(
   settings: NotificationSettings['doNotDisturb']
 ): Date {
@@ -95,34 +81,23 @@ export function getNextAvailableTime(
   return nextTime;
 }
 
-/**
- * 检查是否应该发送通知（考虑免打扰设置）
- */
 export function shouldSendNow(
   settings: NotificationSettings['doNotDisturb'],
-  channel: 'in_app' | 'email' | 'push'
+  channel: 'in_app' | 'email'
 ): boolean {
-  // 站内通知不受免打扰影响
   if (channel === 'in_app') {
     return true;
   }
 
-  // 检查是否在免打扰时段
   return !isInDoNotDisturb(settings);
 }
 
-/**
- * 格式化时间（HH:mm）
- */
 export function formatTime(date: Date): string {
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
   return `${hours}:${minutes}`;
 }
 
-/**
- * 解析时间字符串（HH:mm）
- */
 export function parseTime(timeStr: string): { hour: number; minute: number } | null {
   const match = timeStr.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
   if (!match) return null;
@@ -133,16 +108,10 @@ export function parseTime(timeStr: string): { hour: number; minute: number } | n
   };
 }
 
-/**
- * 验证时间格式
- */
 export function isValidTimeFormat(timeStr: string): boolean {
   return /^([01]\d|2[0-3]):([0-5]\d)$/.test(timeStr);
 }
 
-/**
- * 获取免打扰状态描述
- */
 export function getDoNotDisturbStatus(
   settings: NotificationSettings['doNotDisturb']
 ): { isActive: boolean; description: string } {

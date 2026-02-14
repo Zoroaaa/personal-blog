@@ -9,10 +9,12 @@
  * 
  * 变更说明：
  * - 移除了 privateMessage 字段
+ * - 移除了 follow 子类型
+ * - 移除了 push 相关配置
  * - 私信设置现在是独立的系统
  *
  * @author 博客系统
- * @version 2.0.0 - 方案A
+ * @version 2.1.0
  * @created 2026-02-13
  */
 
@@ -29,7 +31,6 @@ import type {
 const DEFAULT_TYPE_SETTINGS: NotificationTypeSettings = {
   inApp: true,
   email: true,
-  push: true,
   frequency: 'realtime',
 };
 
@@ -38,7 +39,6 @@ const DEFAULT_INTERACTION_SUBTYPES: InteractionSubtypes = {
   like: true,
   favorite: true,
   mention: true,
-  follow: true,
   reply: true,
 };
 
@@ -91,17 +91,14 @@ export async function updateNotificationSettings(
       SET
         system_in_app = ?,
         system_email = ?,
-        system_push = ?,
         system_frequency = ?,
         interaction_in_app = ?,
         interaction_email = ?,
-        interaction_push = ?,
         interaction_frequency = ?,
         interaction_comment = ?,
         interaction_like = ?,
         interaction_favorite = ?,
         interaction_mention = ?,
-        interaction_follow = ?,
         interaction_reply = ?,
         dnd_enabled = ?,
         dnd_start = ?,
@@ -115,17 +112,14 @@ export async function updateNotificationSettings(
     `).bind(
       newSettings.system.inApp ? 1 : 0,
       newSettings.system.email ? 1 : 0,
-      newSettings.system.push ? 1 : 0,
       newSettings.system.frequency,
       newSettings.interaction.inApp ? 1 : 0,
       newSettings.interaction.email ? 1 : 0,
-      newSettings.interaction.push ? 1 : 0,
       newSettings.interaction.frequency,
       newSettings.interaction.subtypes.comment ? 1 : 0,
       newSettings.interaction.subtypes.like ? 1 : 0,
       newSettings.interaction.subtypes.favorite ? 1 : 0,
       newSettings.interaction.subtypes.mention ? 1 : 0,
-      newSettings.interaction.subtypes.follow ? 1 : 0,
       newSettings.interaction.subtypes.reply ? 1 : 0,
       newSettings.doNotDisturb.enabled ? 1 : 0,
       newSettings.doNotDisturb.start,
@@ -159,28 +153,25 @@ export async function initializeSettings(
     const result = await db.prepare(`
       INSERT INTO notification_settings (
         user_id,
-        system_in_app, system_email, system_push, system_frequency,
-        interaction_in_app, interaction_email, interaction_push, interaction_frequency,
+        system_in_app, system_email, system_frequency,
+        interaction_in_app, interaction_email, interaction_frequency,
         interaction_comment, interaction_like, interaction_favorite,
-        interaction_mention, interaction_follow, interaction_reply,
+        interaction_mention, interaction_reply,
         dnd_enabled, dnd_start, dnd_end, dnd_timezone,
         digest_daily_time, digest_weekly_day, digest_weekly_time
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       userId,
       defaultSettings.system.inApp ? 1 : 0,
       defaultSettings.system.email ? 1 : 0,
-      defaultSettings.system.push ? 1 : 0,
       defaultSettings.system.frequency,
       defaultSettings.interaction.inApp ? 1 : 0,
       defaultSettings.interaction.email ? 1 : 0,
-      defaultSettings.interaction.push ? 1 : 0,
       defaultSettings.interaction.frequency,
       defaultSettings.interaction.subtypes.comment ? 1 : 0,
       defaultSettings.interaction.subtypes.like ? 1 : 0,
       defaultSettings.interaction.subtypes.favorite ? 1 : 0,
       defaultSettings.interaction.subtypes.mention ? 1 : 0,
-      defaultSettings.interaction.subtypes.follow ? 1 : 0,
       defaultSettings.interaction.subtypes.reply ? 1 : 0,
       defaultSettings.doNotDisturb.enabled ? 1 : 0,
       defaultSettings.doNotDisturb.start,
@@ -229,20 +220,17 @@ function mapSettingsFromRow(row: any, userId: number): NotificationSettings {
     system: {
       inApp: row.system_in_app === 1,
       email: row.system_email === 1,
-      push: row.system_push === 1,
       frequency: row.system_frequency,
     },
     interaction: {
       inApp: row.interaction_in_app === 1,
       email: row.interaction_email === 1,
-      push: row.interaction_push === 1,
       frequency: row.interaction_frequency,
       subtypes: {
         comment: row.interaction_comment === 1,
         like: row.interaction_like === 1,
         favorite: row.interaction_favorite === 1,
         mention: row.interaction_mention === 1,
-        follow: row.interaction_follow === 1,
         reply: row.interaction_reply === 1,
       },
     },

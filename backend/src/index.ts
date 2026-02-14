@@ -31,7 +31,6 @@ import { messageRoutes } from './routes/messages';
 import { userRoutes } from './routes/users';
 // 用户资源路由
 import { userNotificationSettingsRoutes } from './routes/users/notificationSettings';
-import { userNotificationSubscriptionsRoutes } from './routes/users/notificationSubscriptions';
 
 // 导入中间件
 import { requestLogger } from './middleware/requestLogger';
@@ -338,11 +337,6 @@ app.route('/api/users', userRoutes);
  * 用户通知设置路由（标准RESTful API位置）
  */
 app.route('/api/users/notification-settings', userNotificationSettingsRoutes);
-
-/**
- * 用户通知订阅路由（标准RESTful API位置，浏览器推送订阅）
- */
-app.route('/api/users/notification-subscriptions', userNotificationSubscriptionsRoutes);
 
 // ============= 错误处理 =============
 

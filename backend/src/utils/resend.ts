@@ -3,21 +3,17 @@
  * 用于发送邮箱验证码和通知邮件
  * 
  * @author 博客系统
- * @version 1.0.0
+ * @version 2.1.0
  * @created 2024-01-01
  */
 
 import type { Env } from '../types';
-import type { Notification } from '../types/notifications';
+import type { Notification, DigestType } from '../types/notifications';
 
 const RESEND_API = 'https://api.resend.com/emails';
 
-/** 验证码邮件类型 */
 export type VerificationEmailType = 'register' | 'password' | 'delete' | 'forgot_password';
 
-/**
- * 生成验证码邮件 HTML 模板（美观、响应式）
- */
 function getVerificationEmailHtml(code: string, type: string): string {
   const titles: Record<string, string> = {
     register: '邮箱验证 - 注册',
@@ -70,30 +66,24 @@ function getVerificationEmailHtml(code: string, type: string): string {
   `.trim();
 }
 
-/**
- * 生成通知邮件 HTML 模板
- */
 function getNotificationEmailHtml(
   notification: Notification,
   user: { name: string, email: string },
-  baseUrl: string = 'https://blog.example.com'  // 从参数传入，支持动态配置
+  baseUrl: string = 'https://blog.example.com'
 ): string {
   const typeColors: Record<string, string> = {
     system: '#ef4444',
     interaction: '#3b82f6',
-    private_message: '#8b5cf6'
   };
 
   const typeLabels: Record<string, string> = {
     system: '系统通知',
     interaction: '互动通知',
-    private_message: '私信通知'
   };
 
   const typeColor = typeColors[notification.type] || '#64748b';
   const typeLabel = typeLabels[notification.type] || '通知';
 
-  // 构建详情链接：优先使用notification中的link，否则使用baseUrl
   const detailLink = (notification.relatedData as any)?.link || baseUrl;
 
   return `
@@ -119,13 +109,6 @@ function getNotificationEmailHtml(
             <td style="padding:32px 24px;">
               <p style="margin:0 0 16px;color:#475569;font-size:15px;line-height:1.6;">您好 ${user.name}，</p>
               ${notification.content ? `<p style="margin:0 0 24px;color:#475569;font-size:15px;line-height:1.6;">${notification.content}</p>` : ''}
-              ${notification.relatedData ? `
-              <div style="background:#f1f5f9;border-radius:12px;padding:20px;margin-bottom:24px;">
-                ${Object.entries(notification.relatedData).map(([key, value]) =>
-                  `<p style="margin:0 0 8px;color:#64748b;font-size:14px;"><strong>${key}:</strong> ${String(value)}</p>`
-                ).join('')}
-              </div>
-              ` : ''}
               <p style="margin:0 0 24px;color:#64748b;font-size:14px;">此通知发送时间：${notification.createdAt}</p>
               <a href="${detailLink}" style="display:inline-block;background:${typeColor};color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:500;">查看详情</a>
             </td>
@@ -145,10 +128,69 @@ function getNotificationEmailHtml(
   `.trim();
 }
 
-/**
- * 通过 Resend 发送验证码邮件
- * @returns 成功返回 true，失败抛出或返回 false
- */
+function getDigestEmailHtml(
+  user: { name: string, email: string },
+  notifications: any[],
+  digestType: DigestType,
+  baseUrl: string
+): string {
+  const title = digestType === 'daily' ? '每日通知汇总' : '每周通知汇总';
+  const notificationList = notifications.map(n => `
+    <tr>
+      <td style="padding:16px;border-bottom:1px solid #e2e8f0;">
+        <p style="margin:0 0 4px;color:#1e293b;font-size:14px;font-weight:500;">${n.title}</p>
+        ${n.content ? `<p style="margin:0 0 8px;color:#64748b;font-size:13px;line-height:1.5;">${n.content.length > 100 ? n.content.substring(0, 100) + '...' : n.content}</p>` : ''}
+        <p style="margin:0;color:#94a3b8;font-size:12px;">${n.created_at}</p>
+      </td>
+    </tr>
+  `).join('');
+
+  return `
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+</head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#f1f5f9;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f1f5f9;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width:600px;background:#ffffff;border-radius:16px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1),0 2px 4px -2px rgba(0,0,0,0.1);overflow:hidden;">
+          <tr>
+            <td style="background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);padding:32px 24px;text-align:center;">
+              <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:600;">${title}</h1>
+              <p style="margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:14px;">您有 ${notifications.length} 条新通知</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px;">
+              <p style="margin:0 0 16px;color:#475569;font-size:15px;line-height:1.6;">您好 ${user.name}，</p>
+              <p style="margin:0 0 24px;color:#475569;font-size:15px;line-height:1.6;">以下是您的${digestType === 'daily' ? '今日' : '本周'}通知汇总：</p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                ${notificationList}
+              </table>
+              <div style="margin-top:24px;text-align:center;">
+                <a href="${baseUrl}/notifications" style="display:inline-block;background:#3b82f6;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:500;">查看全部通知</a>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;">
+              <p style="margin:0 0 8px;color:#94a3b8;font-size:12px;">此邮件由系统自动发送，请勿直接回复</p>
+              <p style="margin:0;color:#94a3b8;font-size:12px;">您可以在个人中心的通知设置中调整通知偏好</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+
 export async function sendVerificationEmail(
   env: Env,
   to: string,
@@ -193,10 +235,6 @@ export async function sendVerificationEmail(
   return true;
 }
 
-/**
- * 通过 Resend 发送通知邮件
- * @returns 成功返回 true，失败返回 false
- */
 export async function sendNotificationEmail(
   env: Env,
   notification: Notification,
@@ -209,10 +247,8 @@ export async function sendNotificationEmail(
   }
 
   const from = (env as any).RESEND_FROM_EMAIL || 'onboarding@resend.dev';
-  const subject = `【${notification.type === 'system' ? '系统' : notification.type === 'interaction' ? '互动' : '私信'}通知】${notification.title}`;
+  const subject = `【${notification.type === 'system' ? '系统' : '互动'}通知】${notification.title}`;
 
-  // 从 FRONTEND_URL 环境变量获取基础URL，支持灵活配置
-  // 这是用户访问博客的地址（前端域名）
   const baseUrl = env.FRONTEND_URL || 'https://blog.example.com';
   const html = getNotificationEmailHtml(notification, user, baseUrl);
 
@@ -239,6 +275,57 @@ export async function sendNotificationEmail(
     return true;
   } catch (error) {
     console.error('Failed to send notification email:', error);
+    return false;
+  }
+}
+
+export async function sendDigestEmail(
+  env: Env,
+  user: { name: string, email: string },
+  notifications: any[],
+  digestType: DigestType
+): Promise<boolean> {
+  const apiKey = env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error('RESEND_API_KEY is not configured');
+    return false;
+  }
+
+  if (!notifications || notifications.length === 0) {
+    return true;
+  }
+
+  const from = (env as any).RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+  const subject = digestType === 'daily' 
+    ? `【每日汇总】您有 ${notifications.length} 条新通知` 
+    : `【每周汇总】您有 ${notifications.length} 条新通知`;
+
+  const baseUrl = env.FRONTEND_URL || 'https://blog.example.com';
+  const html = getDigestEmailHtml(user, notifications, digestType, baseUrl);
+
+  try {
+    const res = await fetch(RESEND_API, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to: [user.email],
+        subject,
+        html,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error('Resend API error for digest:', res.status, err);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('Failed to send digest email:', error);
     return false;
   }
 }

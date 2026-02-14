@@ -64,7 +64,7 @@ adminNotificationRoutes.post('/send', requireAuth, requireAdmin, async (c) => {
       return c.json(errorResponse('Channels are required', '通知渠道不能为空'), 400);
     }
 
-    const validChannels = ['in_app', 'email', 'push'];
+    const validChannels = ['in_app', 'email'];
     const invalidChannels = body.channels.filter(
       (ch: string) => !validChannels.includes(ch)
     );
@@ -131,7 +131,6 @@ adminNotificationRoutes.post('/send', requireAuth, requireAdmin, async (c) => {
           {
             skipInApp: !body.channels.includes('in_app'),
             skipEmail: !body.channels.includes('email'),
-            skipPush: !body.channels.includes('push'),
           }
         );
 
