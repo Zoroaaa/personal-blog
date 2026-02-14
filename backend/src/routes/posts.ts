@@ -1095,17 +1095,27 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
 
     if (post.visibility === 'password') {
       const authHeader = c.req.header('Authorization');
+      const postToken = c.req.header('X-Post-Token');
       let hasPasswordAccess = false;
 
-      if (authHeader && authHeader.startsWith('Bearer ')) {
+      console.log('Password protected post check:', {
+        postId: post.id,
+        hasAuthHeader: !!authHeader,
+        hasPostToken: !!postToken
+      });
+
+      const tokenToVerify = postToken || (authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null);
+
+      if (tokenToVerify) {
         try {
-          const token = authHeader.slice(7);
-          const decoded = await verifyToken(c.env.JWT_SECRET, token);
+          const decoded = await verifyToken(c.env.JWT_SECRET, tokenToVerify);
+          console.log('Token decoded:', decoded ? { postId: (decoded as any).postId, type: (decoded as any).type } : 'invalid');
           if (decoded && 'postId' in decoded && decoded.postId === post.id && decoded.type === 'post_password_access') {
             hasPasswordAccess = true;
+            console.log('Password access granted for post:', post.id);
           }
         } catch (e) {
-          // Token invalid, continue without access
+          console.log('Token verification failed:', e);
         }
       }
 
