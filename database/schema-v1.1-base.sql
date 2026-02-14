@@ -166,7 +166,6 @@ CREATE TABLE IF NOT EXISTS posts (
     
     status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'published', 'archived')),
     visibility TEXT NOT NULL DEFAULT 'public' CHECK(visibility IN ('public', 'private', 'password')),
-    password TEXT,
     password_hash TEXT,
     
     view_count INTEGER DEFAULT 0,
