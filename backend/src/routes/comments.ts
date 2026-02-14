@@ -272,7 +272,7 @@ commentRoutes.post('/', requireAuth, rateLimit({
     
     const user = c.get('user') as any;
     const body = await c.req.json();
-    let { postId, content, parentId } = body;
+    let { postId, content, parentId, mentionedUserIds } = body;
     
     // ===== 1. 验证必填字段 =====
     if (!postId || !content) {
@@ -449,7 +449,27 @@ commentRoutes.post('/', requireAuth, rateLimit({
 
     // ===== 9. 检测并处理@mentions =====
     try {
-      const mentions = detectMentions(content);
+      let mentions = detectMentions(content);
+      
+      if (mentionedUserIds && Array.isArray(mentionedUserIds) && mentionedUserIds.length > 0) {
+        const validMentionedUsers = await c.env.DB.prepare(
+          `SELECT id, username, display_name FROM users 
+           WHERE id IN (${mentionedUserIds.map(() => '?').join(',')}) 
+           AND status = 'active' AND deleted_at IS NULL`
+        ).bind(...mentionedUserIds).all() as any;
+        
+        if (validMentionedUsers.results && validMentionedUsers.results.length > 0) {
+          const userIdsFromClient = new Set(mentionedUserIds);
+          const detectedNames = new Set(mentions);
+          
+          for (const user of validMentionedUsers.results) {
+            if (!detectedNames.has(user.username) && !detectedNames.has(user.display_name)) {
+              mentions.push(user.display_name || user.username);
+            }
+          }
+        }
+      }
+      
       if (mentions.length > 0) {
         // 获取文章信息
         const postInfo = await c.env.DB.prepare(
@@ -468,7 +488,8 @@ commentRoutes.post('/', requireAuth, rateLimit({
 
         logger.info('Mention notifications created', {
           commentId,
-          mentions: mentions.length
+          mentions: mentions.length,
+          source: mentionedUserIds ? 'client+detect' : 'detect'
         });
       }
     } catch (mentionError) {
