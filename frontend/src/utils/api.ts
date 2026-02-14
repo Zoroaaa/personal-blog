@@ -340,15 +340,10 @@ export const api = {
   /**
    * 获取文章详情
    */
-  getPost: (slug: string, postToken?: string) => {
-    console.log('getPost called with postToken:', postToken ? `present, length=${postToken.length}, parts=${postToken.split('.').length}` : 'none');
-    if (postToken) {
-      console.log('postToken preview:', postToken.substring(0, 50) + '...');
-    }
-    return apiRequest<Post>(`/posts/${slug}`, {
+  getPost: (slug: string, postToken?: string) => 
+    apiRequest<Post>(`/posts/${slug}`, {
       headers: postToken ? { 'X-Post-Token': postToken } : undefined
-    });
-  },
+    }),
   
   /**
  * 通过ID获取文章详情(用于编辑)

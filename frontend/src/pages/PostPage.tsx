@@ -190,23 +190,16 @@ export function PostPage() {
       setRequiresPassword(false);
       setPasswordError(null);
 
-      console.log('loadPost called with explicitToken:', explicitToken ? 'present' : 'none');
       const response = await api.getPost(slug!, explicitToken);
-
-      console.log('Post response:', response);
 
       if (response.success && response.data) {
         if ((response.data as any).requires_password) {
-          console.log('Response indicates requires_password');
           const postId = (response.data as any).id;
           const savedToken = getPasswordToken(postId);
-          console.log('Saved token:', savedToken ? 'present' : 'none');
           
           if (savedToken && !explicitToken) {
-            console.log('Retrying with saved token');
             const retryResponse = await api.getPost(slug!, savedToken);
             if (retryResponse.success && retryResponse.data && !(retryResponse.data as any).requires_password) {
-              console.log('Retry successful, loading full post');
               const transformedPost = transformPost(retryResponse.data);
               setPost(transformedPost);
               if (transformedPost.id) {
@@ -217,7 +210,6 @@ export function PostPage() {
             }
           }
           
-          console.log('Showing password input');
           setRequiresPassword(true);
           const transformedPost = transformPost(response.data);
           setPost(transformedPost);
@@ -225,7 +217,6 @@ export function PostPage() {
           return;
         }
 
-        console.log('Loading full post content');
         const transformedPost = transformPost(response.data);
         setPost(transformedPost);
 
@@ -252,20 +243,15 @@ export function PostPage() {
       setPasswordVerifying(true);
       setPasswordError(null);
 
-      console.log('Verifying password for post:', post.id);
       const response = await api.verifyPostPassword(post.id, passwordInput);
-      console.log('Password verification response:', response);
 
       if (response.success && response.data?.verified) {
         const token = response.data.token;
-        console.log('Received token:', token ? `present, length=${token.length}, parts=${token.split('.').length}` : 'missing');
-        console.log('Token preview:', token ? token.substring(0, 50) + '...' : 'none');
         
         if (token) {
           setPasswordToken(post.id, token);
           setRequiresPassword(false);
           setPasswordInput('');
-          console.log('Calling loadPost with token');
           loadPost(token);
           showSuccess('密码验证成功');
         } else {
