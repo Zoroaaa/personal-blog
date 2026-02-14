@@ -131,7 +131,7 @@ app.use('*', (c, next) => {
     },
     credentials: true,
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Request-ID'],
+    allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Request-ID', 'X-Post-Token'],
     exposeHeaders: ['X-Total-Count', 'X-Page', 'X-Per-Page', 'Content-Length'],
     maxAge: 86400, // 24小时
   });
