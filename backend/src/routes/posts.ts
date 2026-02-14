@@ -37,7 +37,7 @@ import {
 import { createInteractionNotification } from '../services/notificationService';
 import { isInteractionSubtypeEnabled } from '../services/notificationSettingsService';
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
-import { verifyToken, generateToken } from '../utils/jwt';
+import { verifyToken, generateToken, asSecret, asJWTToken } from '../utils/jwt';
 import bcrypt from 'bcryptjs';
 
 // 定义应用路由类型
@@ -1098,36 +1098,16 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
       const postToken = c.req.header('X-Post-Token');
       let hasPasswordAccess = false;
 
-      console.log('Password protected post check:', {
-        postId: post.id,
-        hasAuthHeader: !!authHeader,
-        hasPostToken: !!postToken,
-        postTokenValue: postToken ? postToken.substring(0, 20) + '...' : null
-      });
-
       const tokenToVerify = postToken || (authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null);
-
-      console.log('Token to verify:', tokenToVerify ? 'present' : 'none');
-      console.log('Token length:', tokenToVerify ? tokenToVerify.length : 0);
-      console.log('Token parts:', tokenToVerify ? tokenToVerify.split('.').length : 0);
 
       if (tokenToVerify) {
         try {
-          const decoded = await verifyToken(c.env.JWT_SECRET, tokenToVerify);
-          console.log('Token decoded:', decoded ? JSON.stringify(decoded) : 'invalid');
+          const decoded = await verifyToken(asJWTToken(tokenToVerify), asSecret(c.env.JWT_SECRET));
           if (decoded && 'postId' in decoded && decoded.postId === post.id && decoded.type === 'post_password_access') {
             hasPasswordAccess = true;
-            console.log('Password access granted for post:', post.id);
-          } else {
-            console.log('Token validation failed:', {
-              hasDecoded: !!decoded,
-              hasPostId: decoded && 'postId' in decoded,
-              postIdMatch: decoded && 'postId' in decoded ? (decoded as any).postId === post.id : false,
-              hasCorrectType: decoded && 'type' in decoded ? (decoded as any).type === 'post_password_access' : false
-            });
           }
         } catch (e) {
-          console.log('Token verification failed:', e);
+          // Token invalid, continue without access
         }
       }
 
@@ -1983,7 +1963,7 @@ postRoutes.post('/:id/verify-password', async (c) => {
 
     // 生成临时访问令牌（可选）
     // 这个令牌可以存储在客户端，以避免重复输入密码
-    const token = await generateToken(c.env.JWT_SECRET, {
+    const token = await generateToken(asSecret(c.env.JWT_SECRET), {
       postId: post.id,
       type: 'post_password_access',
       expiresIn: '24h'

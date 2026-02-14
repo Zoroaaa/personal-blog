@@ -26,7 +26,7 @@ import bcrypt from 'bcryptjs';
 import type { Env, Variables } from '../types';
 import { successResponse, errorResponse } from '../utils/response';
 import { safeGetCache, safePutCache, safeDeleteCache } from '../utils/cache';
-import { generateToken } from '../utils/jwt';
+import { generateToken, asSecret } from '../utils/jwt';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { rateLimit } from '../middleware/rateLimit';
@@ -449,7 +449,7 @@ authRoutes.post(
     const userId = result.meta.last_row_id;
     
     // ===== 9. 生成JWT Token =====
-    const token = await generateToken(c.env.JWT_SECRET, {
+    const token = await generateToken(asSecret(c.env.JWT_SECRET), {
       userId,
       username,
       role: 'user',
@@ -555,7 +555,7 @@ authRoutes.post(
     }
 
     // ===== 5. 生成JWT Token =====
-    const token = await generateToken(c.env.JWT_SECRET, {
+    const token = await generateToken(asSecret(c.env.JWT_SECRET), {
       userId: user.id,
       username: user.username,
       role: user.role,
@@ -943,7 +943,7 @@ authRoutes.post(
 
     // ===== 5. 生成JWT Token =====
     logger.info('Generating JWT token', { userId: user.id });
-    const token = await generateToken(c.env.JWT_SECRET, {
+    const token = await generateToken(asSecret(c.env.JWT_SECRET), {
       userId: user.id,
       username: user.username,
       role: user.role,
