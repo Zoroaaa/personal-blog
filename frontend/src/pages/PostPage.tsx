@@ -258,7 +258,8 @@ export function PostPage() {
 
       if (response.success && response.data?.verified) {
         const token = response.data.token;
-        console.log('Received token:', token ? 'present' : 'missing');
+        console.log('Received token:', token ? `present, length=${token.length}, parts=${token.split('.').length}` : 'missing');
+        console.log('Token preview:', token ? token.substring(0, 50) + '...' : 'none');
         
         if (token) {
           setPasswordToken(post.id, token);
