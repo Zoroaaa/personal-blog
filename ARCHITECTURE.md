@@ -2,7 +2,7 @@
 
 本文档详细介绍个人博客系统的架构设计、技术选型和实现细节。
 
-**版本**: v1.3.2 | **更新日期**: 2026-02-15
+**版本**: v1.3.3 | **更新日期**: 2026-02-16
 
 ---
 
@@ -172,15 +172,19 @@ CREATE TABLE users (
   username TEXT UNIQUE NOT NULL,
   email TEXT UNIQUE,
   password_hash TEXT,
-  avatar TEXT,
+  display_name TEXT NOT NULL,
+  avatar_url TEXT,
   bio TEXT,
-  role TEXT DEFAULT 'user' CHECK(role IN ('admin', 'user')),
-  status TEXT DEFAULT 'active' CHECK(status IN ('active', 'banned')),
-  github_id TEXT UNIQUE,
-  email_verified BOOLEAN DEFAULT 0,
+  role TEXT DEFAULT 'user' CHECK(role IN ('admin', 'user', 'moderator')),
+  status TEXT DEFAULT 'active' CHECK(status IN ('active', 'suspended', 'deleted')),
+  oauth_provider TEXT CHECK(oauth_provider IN ('github', 'google', NULL)),
+  oauth_id TEXT,
+  post_count INTEGER DEFAULT 0,
+  comment_count INTEGER DEFAULT 0,
   deleted_at DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  last_login_at DATETIME
 );
 ```
 
@@ -199,10 +203,12 @@ CREATE TABLE posts (
   category_id INTEGER,
   status TEXT DEFAULT 'draft' CHECK(status IN ('draft', 'published', 'archived')),
   visibility TEXT DEFAULT 'public' CHECK(visibility IN ('public', 'private', 'password')),
-  password TEXT,
+  password_hash TEXT,
   view_count INTEGER DEFAULT 0,
   like_count INTEGER DEFAULT 0,
   comment_count INTEGER DEFAULT 0,
+  featured INTEGER DEFAULT 0,
+  allow_comments INTEGER DEFAULT 1,
   deleted_at DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -242,7 +248,7 @@ CREATE TABLE comments (
   parent_id INTEGER,
   content TEXT NOT NULL,
   status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'rejected')),
-  is_author BOOLEAN DEFAULT 0,
+  is_author INTEGER DEFAULT 0,
   like_count INTEGER DEFAULT 0,
   ip_address TEXT,
   user_agent TEXT,
@@ -287,10 +293,10 @@ CREATE TABLE notification_settings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL UNIQUE,
   system_in_app INTEGER DEFAULT 1,
-  system_email INTEGER DEFAULT 1,
+  system_email INTEGER DEFAULT 0,
   system_frequency TEXT DEFAULT 'realtime' CHECK(system_frequency IN ('realtime', 'daily', 'weekly', 'off')),
   interaction_in_app INTEGER DEFAULT 1,
-  interaction_email INTEGER DEFAULT 1,
+  interaction_email INTEGER DEFAULT 0,
   interaction_frequency TEXT DEFAULT 'realtime' CHECK(interaction_frequency IN ('realtime', 'daily', 'weekly', 'off')),
   interaction_comment INTEGER DEFAULT 1,
   interaction_like INTEGER DEFAULT 1,
@@ -327,6 +333,7 @@ CREATE TABLE messages (
   sender_deleted_at DATETIME,
   recipient_deleted INTEGER DEFAULT 0,
   recipient_deleted_at DATETIME,
+  recalled_at DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (sender_id) REFERENCES users(id),
   FOREIGN KEY (recipient_id) REFERENCES users(id),
@@ -340,7 +347,7 @@ CREATE TABLE messages (
 CREATE TABLE message_settings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL UNIQUE,
-  email_notification INTEGER DEFAULT 1,
+  email_notification INTEGER DEFAULT 0,
   respect_dnd INTEGER DEFAULT 1,
   allow_strangers INTEGER DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -381,6 +388,19 @@ CREATE VIRTUAL TABLE posts_fts USING fts5(
   tokenize='porter unicode61'
 );
 ```
+
+#### 其他核心表
+
+- **categories** - 文章分类
+- **tags** - 文章标签
+- **post_tags** - 文章标签关联
+- **likes** - 点赞记录
+- **view_history** - 浏览历史
+- **reading_history** - 阅读历史（含进度）
+- **favorites** - 收藏记录
+- **site_config** - 站点配置
+- **oauth_tokens** - OAuth令牌存储
+- **notification_reads** - 通知已读状态（v1.5新增）
 
 ---
 
@@ -438,6 +458,8 @@ CREATE VIRTUAL TABLE posts_fts USING fts5(
 │   ├── GET    /:id
 │   ├── PUT    /:id
 │   ├── DELETE /:id
+│   ├── GET    /by-slug/:slug
+│   ├── GET    /search
 │   ├── GET    /:id/comments
 │   ├── POST   /:id/comments
 │   ├── POST   /:id/like
@@ -445,16 +467,19 @@ CREATE VIRTUAL TABLE posts_fts USING fts5(
 │   ├── POST   /:id/favorite
 │   ├── DELETE /:id/favorite
 │   ├── POST   /:id/verify-password
-│   ├── GET    /search
-│   └── GET    /by-slug/:slug
+│   ├── GET    /reading-history
+│   ├── GET    /:id/reading-progress
+│   ├── POST   /:id/reading-progress
+│   └── GET    /:id/mentionable-users
 ├── /columns           # 专栏管理
 │   ├── GET    /
 │   ├── POST   /
 │   ├── GET    /:id
 │   ├── PUT    /:id
 │   ├── DELETE /:id
-│   ├── POST   /:id/refresh-stats
-│   └── GET    /by-slug/:slug
+│   ├── GET    /by-slug/:slug
+│   ├── GET    /:id/posts
+│   └── POST   /:id/refresh-stats
 ├── /comments          # 评论管理
 │   ├── GET    /
 │   ├── POST   /
@@ -466,9 +491,16 @@ CREATE VIRTUAL TABLE posts_fts USING fts5(
 │   ├── GET    /
 │   ├── POST   /
 │   ├── PUT    /:id
-│   └── DELETE /:id
+│   ├── DELETE /:id
+│   └── GET    /:id/posts
+├── /tags              # 标签管理
+│   ├── GET    /
+│   ├── POST   /
+│   └── GET    /:id/posts
 ├── /notifications     # 通知管理
 │   ├── GET    /
+│   ├── GET    /unread-count
+│   ├── GET    /carousel
 │   ├── PUT    /:id/read
 │   ├── PUT    /read-all
 │   ├── DELETE /:id
@@ -476,16 +508,21 @@ CREATE VIRTUAL TABLE posts_fts USING fts5(
 ├── /messages          # 私信管理
 │   ├── GET    /conversations
 │   ├── GET    /conversations/:userId
+│   ├── GET    /inbox
+│   ├── GET    /sent
 │   ├── POST   /
 │   ├── PUT    /:id/read
-│   └── DELETE /:id
+│   ├── DELETE /:id
+│   └── POST   /:id/retry
 ├── /users             # 用户相关
 │   ├── GET    /search
 │   ├── GET    /:id
 │   ├── GET    /:id/posts
 │   ├── GET    /:id/favorites
 │   ├── GET    /notification-settings
-│   └── PUT    /notification-settings
+│   ├── PUT    /notification-settings
+│   ├── GET    /message-settings
+│   └── PUT    /message-settings
 ├── /admin             # 管理后台
 │   ├── GET    /dashboard
 │   ├── GET    /stats
@@ -496,17 +533,30 @@ CREATE VIRTUAL TABLE posts_fts USING fts5(
 │   ├── PUT    /posts/:id/status
 │   ├── GET    /comments
 │   ├── PUT    /comments/:id/status
-│   └── POST   /notifications
+│   ├── GET    /notifications
+│   ├── GET    /notifications/:id
+│   ├── POST   /notifications
+│   ├── PUT    /notifications/:id
+│   └── DELETE /notifications/:id
 ├── /upload            # 文件上传
-│   └── POST   /image
+│   ├── POST   /image
+│   ├── POST   /file
+│   ├── GET    /:key
+│   └── DELETE /:key
 ├── /config            # 站点配置
 │   ├── GET    /
-│   └── PUT    /
+│   ├── PUT    /
+│   ├── GET    /admin
+│   └── PUT    /batch
 └── /analytics         # 数据分析
     ├── GET    /overview
     ├── GET    /posts
     ├── GET    /users
-    └── GET    /traffic
+    ├── GET    /traffic
+    ├── GET    /popular-posts
+    ├── GET    /post/:id
+    ├── GET    /user/:id
+    └── POST   /track
 ```
 
 ---

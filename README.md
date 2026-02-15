@@ -3,7 +3,7 @@
 一个基于 Cloudflare 全栈技术构建的现代化个人博客系统。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.3.2-green.svg)](https://github.com/yourusername/personal-blog)
+[![Version](https://img.shields.io/badge/version-1.3.3-green.svg)](https://github.com/yourusername/personal-blog)
 [![Cloudflare](https://img.shields.io/badge/Cloudflare-Workers-orange.svg)](https://workers.cloudflare.com/)
 
 **体验地址**: [blog.neutronx.uk](https://blog.neutronx.uk)
@@ -111,8 +111,11 @@
    wrangler d1 create personal-blog-dev
    
    # 执行数据库迁移（需按顺序执行）
-   wrangler d1 execute personal-blog-dev --file=./database/schema-v1.1-base.sql
-   wrangler d1 execute personal-blog-dev --file=./database/schema-v1.3-notification-messaging.sql
+   wrangler d1 execute personal-blog-dev --file=../database/schema-v1.1-base.sql
+   wrangler d1 execute personal-blog-dev --file=../database/schema-v1.3-notification-messaging.sql
+   # 可选：执行增量迁移
+   wrangler d1 execute personal-blog-dev --file=../database/migration-v1.4-message-recall.sql
+   wrangler d1 execute personal-blog-dev --file=../database/migration-v1.5-notification-reads.sql
    ```
 
 5. **创建 R2 存储桶**
@@ -142,31 +145,57 @@ personal-blog/
 │   │   ├── index.ts        # 应用入口
 │   │   ├── routes/         # API 路由
 │   │   │   ├── auth.ts     # 认证相关（注册/登录/OAuth/邮箱验证）
-│   │   │   ├── posts.ts    # 文章管理（CRUD/搜索/点赞/收藏）
+│   │   │   ├── posts.ts    # 文章管理（CRUD/搜索/点赞/收藏/阅读历史）
 │   │   │   ├── columns.ts  # 专栏管理
 │   │   │   ├── comments.ts # 评论系统（嵌套回复/@提及）
 │   │   │   ├── admin.ts    # 后台管理
-│   │   │   ├── categories.ts # 分类标签
+│   │   │   ├── categories.ts # 分类标签管理
 │   │   │   ├── config.ts   # 站点配置
 │   │   │   ├── upload.ts   # 文件上传
 │   │   │   ├── analytics.ts # 数据分析
 │   │   │   ├── notifications.ts # 通知系统
-│   │   │   ├── adminNotifications.ts # 管理员通知
+│   │   │   ├── adminNotifications.ts # 管理员通知管理
 │   │   │   ├── messages.ts # 私信系统
-│   │   │   └── users.ts    # 用户相关
+│   │   │   ├── users.ts    # 用户相关
 │   │   │   └── users/      # 用户子路由
 │   │   │       ├── notificationSettings.ts # 通知设置
-│   │   │       └── notificationSubscriptions.ts # 推送订阅
+│   │   │       └── messageSettings.ts # 私信设置
 │   │   ├── middleware/     # 中间件
+│   │   │   ├── auth.ts     # 认证中间件
+│   │   │   ├── rateLimit.ts # 限流中间件
+│   │   │   └── requestLogger.ts # 请求日志
 │   │   ├── services/       # 业务服务
+│   │   │   ├── digestService.ts # 邮件汇总服务
+│   │   │   ├── doNotDisturb.ts # 免打扰服务
+│   │   │   ├── emailVerificationService.ts # 邮箱验证服务
+│   │   │   ├── mentionService.ts # @提及服务
+│   │   │   ├── messageService.ts # 私信服务
+│   │   │   ├── messageSettingsService.ts # 私信设置服务
+│   │   │   ├── notificationService.ts # 通知服务
+│   │   │   └── notificationSettingsService.ts # 通知设置服务
 │   │   ├── utils/          # 工具函数
-│   │   └── types/          # 类型定义
-│   ├── database/
-│   │   ├── schema-v1.1-base.sql          # 基础数据库架构
-│   │   ├── schema-v1.3-notification-messaging.sql # 通知私信架构
-│   │   ├── migration-v1.3-notification-cleanup.sql # 通知系统清理迁移
-│   │   └── migration-v1.3-remove-password-field.sql # 密码字段迁移
+│   │   │   ├── cache.ts    # 缓存工具
+│   │   │   ├── jwt.ts      # JWT处理
+│   │   │   ├── queryOptimizer.ts # 查询优化
+│   │   │   ├── resend.ts   # 邮件发送
+│   │   │   ├── response.ts # 响应格式化
+│   │   │   ├── softDeleteHelper.ts # 软删除助手
+│   │   │   └── validation.ts # 数据验证
+│   │   ├── types/          # 类型定义
+│   │   └── config/         # 配置文件
+│   ├── package.json
+│   ├── tsconfig.json
 │   └── wrangler.toml       # Workers 配置
+├── database/               # 数据库文件（项目根目录）
+│   ├── schema-v1.1-base.sql          # 基础数据库架构
+│   ├── schema-v1.3-notification-messaging.sql # 通知私信架构
+│   ├── migration-v1.3-notification-cleanup.sql # 通知系统清理迁移
+│   ├── migration-v1.3-remove-password-field.sql # 密码字段迁移
+│   ├── migration-v1.4-message-recall.sql # 消息撤回迁移
+│   ├── migration-v1.5-notification-reads.sql # 通知已读迁移
+│   ├── migration-v1.6-email-default-off.sql # 邮件默认关闭迁移
+│   ├── migration-v1.7-message-email-default-off.sql # 私信邮件默认关闭
+│   └── migration-v1.8-remove-push-notification-field.sql # 移除推送字段
 ├── frontend/               # 前端应用
 │   ├── src/
 │   │   ├── pages/          # 页面组件
@@ -179,19 +208,27 @@ personal-blog/
 │   │   │   ├── ColumnPage.tsx    # 专栏详情
 │   │   │   ├── CategoryPage.tsx  # 分类页
 │   │   │   ├── TagPage.tsx       # 标签页
+│   │   │   ├── AboutPage.tsx     # 关于页面
+│   │   │   ├── ConfigPage.tsx    # 配置页面
 │   │   │   ├── NotificationCenter.tsx # 通知中心
 │   │   │   ├── NotificationSettings.tsx # 通知设置
+│   │   │   ├── MessageSettings.tsx # 私信设置
 │   │   │   ├── MessagesPage.tsx  # 私信列表
+│   │   │   ├── NewMessagePage.tsx # 发起新私信
 │   │   │   ├── ThreadPage.tsx    # 私信会话
+│   │   │   ├── ApiTestPage.tsx   # API测试页
+│   │   │   ├── NotFoundPage.tsx  # 404页面
 │   │   │   └── admin/            # 管理页面
-│   │   │       └── SystemNotificationPage.tsx # 系统通知
+│   │   │       └── SystemNotificationPage.tsx # 系统通知管理
 │   │   ├── components/     # 可复用组件
 │   │   ├── stores/         # 状态管理
 │   │   ├── hooks/          # 自定义 Hooks
 │   │   ├── utils/          # 工具函数
 │   │   └── types/          # 类型定义
 │   └── index.html
-├── docs/                   # 修复文档
+├── docs/                   # 文档目录
+├── CHANGELOG_v1.3.2.md     # v1.3.2 更新日志
+├── CHANGELOG_v1.3.3.md     # v1.3.3 更新日志
 ├── DEPLOYMENT.md           # 部署指南
 ├── API.md                  # API 文档
 ├── ARCHITECTURE.md         # 架构文档
@@ -250,9 +287,10 @@ personal-blog/
 - ✅ 站内通知中心
 - ✅ 通知类型：系统通知、互动通知
 - ✅ 首页通知轮播
-- ✅ 通知设置管理
-- ✅ 免打扰模式
-- ✅ 推送订阅支持
+- ✅ 通知设置管理（细粒度控制）
+- ✅ 免打扰模式（支持时段设置）
+- ✅ 邮件汇总（每日/每周）
+- ✅ 通知未读计数
 
 ### 私信系统
 
@@ -260,6 +298,8 @@ personal-blog/
 - ✅ 会话列表管理
 - ✅ 未读消息计数
 - ✅ 消息已读状态
+- ✅ 私信设置（陌生人限制）
+- ✅ 收件箱/发件箱管理
 
 ### 管理后台
 
@@ -379,4 +419,4 @@ wrangler pages deploy dist
 
 ---
 
-**版本**: v1.3.2 | **更新日期**: 2026-02-15
+**版本**: v1.3.3 | **更新日期**: 2026-02-16

@@ -2,7 +2,7 @@
 
 本文档帮助您在 5 分钟内启动并运行个人博客系统。
 
-**版本**: v1.3.2 | **更新日期**: 2026-02-15
+**版本**: v1.3.3 | **更新日期**: 2026-02-16
 
 ---
 
@@ -142,8 +142,13 @@ wrangler kv:namespace create "CACHE"
 
 ```bash
 # 执行数据库迁移（需按顺序执行）
-wrangler d1 execute personal-blog-dev --file=./database/schema-v1.1-base.sql
-wrangler d1 execute personal-blog-dev --file=./database/schema-v1.3-notification-messaging.sql
+# 注意：数据库文件在项目根目录的 database/ 文件夹中
+wrangler d1 execute personal-blog-dev --file=../database/schema-v1.1-base.sql
+wrangler d1 execute personal-blog-dev --file=../database/schema-v1.3-notification-messaging.sql
+
+# 可选：执行增量迁移以获得最新功能
+wrangler d1 execute personal-blog-dev --file=../database/migration-v1.4-message-recall.sql
+wrangler d1 execute personal-blog-dev --file=../database/migration-v1.5-notification-reads.sql
 
 # 验证表创建成功
 wrangler d1 execute personal-blog-dev --command="SELECT name FROM sqlite_master WHERE type='table';"
@@ -231,8 +236,8 @@ pnpm dev
   "success": true,
   "data": {
     "status": "healthy",
-    "version": "1.3.2",
-    "timestamp": "2026-02-15T10:00:00.000Z",
+    "version": "1.3.3",
+    "timestamp": "2026-02-16T10:00:00.000Z",
     "services": {
       "database": "healthy",
       "cache": "healthy",
@@ -301,21 +306,25 @@ personal-blog/
 │   │   │   ├── upload.ts   # 文件上传
 │   │   │   ├── analytics.ts # 数据分析
 │   │   │   ├── notifications.ts # 通知系统
-│   │   │   ├── notificationSettings.ts # 通知设置
 │   │   │   ├── adminNotifications.ts # 管理员通知
 │   │   │   ├── messages.ts # 私信系统
-│   │   │   └── users.ts    # 用户相关
+│   │   │   ├── users.ts    # 用户相关
+│   │   │   └── users/      # 用户子路由
+│   │   │       ├── notificationSettings.ts # 通知设置
+│   │   │       └── messageSettings.ts # 私信设置
 │   │   ├── middleware/     # 中间件
 │   │   ├── services/       # 业务服务
 │   │   ├── utils/          # 工具函数
 │   │   └── types/          # 类型定义
-│   ├── database/
-│   │   ├── schema-v1.1-base.sql          # 基础数据库架构
-│   │   ├── schema-v1.3-notification-messaging.sql # 通知私信架构
-│   │   ├── migration-v1.3-notification-cleanup.sql # 通知系统清理迁移
-│   │   └── migration-v1.3-remove-password-field.sql # 密码字段迁移
 │   ├── .env                # 环境变量
 │   └── wrangler.toml       # Workers 配置
+├── database/               # 数据库文件（项目根目录）
+│   ├── schema-v1.1-base.sql          # 基础数据库架构
+│   ├── schema-v1.3-notification-messaging.sql # 通知私信架构
+│   ├── migration-v1.3-notification-cleanup.sql # 通知系统清理迁移
+│   ├── migration-v1.3-remove-password-field.sql # 密码字段迁移
+│   ├── migration-v1.4-message-recall.sql # 消息撤回迁移
+│   └── migration-v1.5-notification-reads.sql # 通知已读迁移
 ├── frontend/               # 前端应用
 │   ├── src/
 │   │   ├── pages/          # 页面组件
@@ -326,7 +335,12 @@ personal-blog/
 │   │   └── types/          # 类型定义
 │   ├── .env                # 环境变量
 │   └── index.html
-└── package.json
+├── CHANGELOG_v1.3.2.md     # v1.3.2 更新日志
+├── CHANGELOG_v1.3.3.md     # v1.3.3 更新日志
+├── DEPLOYMENT.md           # 部署指南
+├── API.md                  # API 文档
+├── ARCHITECTURE.md         # 架构文档
+└── QUICKSTART.md           # 快速开始
 ```
 
 ---
@@ -409,12 +423,12 @@ wrangler d1 list
 **A**: 检查 SQL 文件路径：
 
 ```bash
-# 确认 schema 文件存在
-ls backend/database/
+# 确认 schema 文件存在（在项目根目录的 database/ 文件夹）
+ls database/
 
-# 重新执行迁移（按顺序）
-wrangler d1 execute personal-blog-dev --file=./database/schema-v1.1-base.sql
-wrangler d1 execute personal-blog-dev --file=./database/schema-v1.3-notification-messaging.sql
+# 重新执行迁移（按顺序，从 backend 目录执行）
+wrangler d1 execute personal-blog-dev --file=../database/schema-v1.1-base.sql
+wrangler d1 execute personal-blog-dev --file=../database/schema-v1.3-notification-messaging.sql
 ```
 
 ### Q: 登录提示 "Invalid credentials"
