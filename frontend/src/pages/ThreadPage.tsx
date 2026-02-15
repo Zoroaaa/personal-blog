@@ -225,34 +225,21 @@ export default function ThreadPage() {
       
       // 处理数据库返回的时间格式 "2026-02-15 12:37:00"
       if (typeof message.createdAt === 'string' && message.createdAt.includes(' ') && !message.createdAt.includes('T')) {
-        // SQLite返回的本地时间格式: "2026-02-15 12:37:00"
-        // 需要将其解析为本地时间，而不是UTC
-        console.log('4. 检测到本地时间格式，使用本地时区解析');
+        // SQLite的CURRENT_TIMESTAMP返回的是UTC时间，格式为 "2026-02-15 12:37:00"
+        // 我们需要把它当作UTC时间来解析
+        console.log('4. 检测到SQLite时间格式，作为UTC时间解析');
         
-        // 分解时间字符串
-        const parts = message.createdAt.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
-        if (parts) {
-          const [, year, month, day, hour, minute, second] = parts;
-          // 使用本地时区创建Date对象（月份从0开始）
-          createdAt = new Date(
-            parseInt(year),
-            parseInt(month) - 1,
-            parseInt(day),
-            parseInt(hour),
-            parseInt(minute),
-            parseInt(second)
-          );
-          console.log('解析参数:', { year, month, day, hour, minute, second });
-        } else {
-          // 如果正则匹配失败，尝试替换空格为T（这样会被当作本地时间）
-          createdAt = new Date(message.createdAt.replace(' ', 'T'));
-        }
+        // 方法1：添加Z后缀表示UTC时间
+        const utcTimeStr = message.createdAt.replace(' ', 'T') + 'Z';
+        createdAt = new Date(utcTimeStr);
+        console.log('   转换为UTC格式:', utcTimeStr);
       } else {
         // ISO格式或其他格式
         createdAt = new Date(message.createdAt);
       }
       
       console.log('5. 解析后的时间（本地）:', createdAt.toLocaleString());
+      console.log('   解析后的时间（UTC）:', createdAt.toUTCString());
       console.log('   解析后的时间（ISO）:', createdAt.toISOString());
       
       if (isNaN(createdAt.getTime())) {
@@ -268,9 +255,10 @@ export default function ThreadPage() {
       console.log('6. 时间检查:', {
         现在本地: now.toLocaleString(),
         创建本地: createdAt.toLocaleString(),
-        现在ISO: now.toISOString(),
-        创建ISO: createdAt.toISOString(),
+        现在UTC: now.toUTCString(),
+        创建UTC: createdAt.toUTCString(),
         时间差秒: (timeDiff / 1000).toFixed(1),
+        时间差分钟: (timeDiff / 60000).toFixed(1),
         限制秒: timeLimit / 1000,
         可撤回: timeDiff <= timeLimit
       });
