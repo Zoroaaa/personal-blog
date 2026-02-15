@@ -224,19 +224,36 @@ export default function ThreadPage() {
       let createdAt: Date;
       
       // 处理数据库返回的时间格式 "2026-02-15 12:37:00"
-      // 这是本地时间，需要特殊处理，不能直接用 new Date() 否则会被当成UTC
       if (typeof message.createdAt === 'string' && message.createdAt.includes(' ') && !message.createdAt.includes('T')) {
-        // 格式: "2026-02-15 12:37:00" - 本地时间格式
-        // 将空格替换为T，然后添加本地时区
-        const localTimeStr = message.createdAt.replace(' ', 'T');
-        createdAt = new Date(localTimeStr);
-        console.log('4. 检测到本地时间格式，转换为:', localTimeStr);
+        // SQLite返回的本地时间格式: "2026-02-15 12:37:00"
+        // 需要将其解析为本地时间，而不是UTC
+        console.log('4. 检测到本地时间格式，使用本地时区解析');
+        
+        // 分解时间字符串
+        const parts = message.createdAt.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+        if (parts) {
+          const [, year, month, day, hour, minute, second] = parts;
+          // 使用本地时区创建Date对象（月份从0开始）
+          createdAt = new Date(
+            parseInt(year),
+            parseInt(month) - 1,
+            parseInt(day),
+            parseInt(hour),
+            parseInt(minute),
+            parseInt(second)
+          );
+          console.log('解析参数:', { year, month, day, hour, minute, second });
+        } else {
+          // 如果正则匹配失败，尝试替换空格为T（这样会被当作本地时间）
+          createdAt = new Date(message.createdAt.replace(' ', 'T'));
+        }
       } else {
         // ISO格式或其他格式
         createdAt = new Date(message.createdAt);
       }
       
-      console.log('5. 解析后的时间:', createdAt.toISOString());
+      console.log('5. 解析后的时间（本地）:', createdAt.toLocaleString());
+      console.log('   解析后的时间（ISO）:', createdAt.toISOString());
       
       if (isNaN(createdAt.getTime())) {
         console.log('⚠️ 无效的日期格式，默认允许撤回');
@@ -249,8 +266,10 @@ export default function ThreadPage() {
       const timeLimit = RECALL_TIME_LIMIT_MS;
       
       console.log('6. 时间检查:', {
-        现在: now.toISOString(),
-        创建时间: createdAt.toISOString(),
+        现在本地: now.toLocaleString(),
+        创建本地: createdAt.toLocaleString(),
+        现在ISO: now.toISOString(),
+        创建ISO: createdAt.toISOString(),
         时间差秒: (timeDiff / 1000).toFixed(1),
         限制秒: timeLimit / 1000,
         可撤回: timeDiff <= timeLimit
