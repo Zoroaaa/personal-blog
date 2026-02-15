@@ -224,37 +224,106 @@ export async function getNotifications(
     const limit = Math.min(MAX_LIMIT, Math.max(1, params.limit || DEFAULT_LIMIT));
     const offset = (page - 1) * limit;
 
-    const conditions: string[] = ['user_id = ?', 'deleted_at IS NULL'];
-    const bindings: any[] = [userId];
+    const typeFilter = params.type;
+    const isReadFilter = params.isRead;
 
-    if (params.type) {
-      conditions.push('type = ?');
-      bindings.push(params.type);
+    const systemConditions: string[] = [
+      'sn.user_id = 0',
+      'sn.type = \'system\'',
+      'sn.is_active = 1',
+      'sn.deleted_at IS NULL'
+    ];
+    const systemBindings: any[] = [];
+
+    const interactionConditions: string[] = [
+      'in.user_id = ?',
+      'in.deleted_at IS NULL'
+    ];
+    const interactionBindings: any[] = [userId];
+
+    if (typeFilter) {
+      systemConditions.push('sn.type = ?');
+      systemBindings.push(typeFilter);
+      interactionConditions.push('in.type = ?');
+      interactionBindings.push(typeFilter);
     }
 
-    if (params.isRead !== undefined) {
-      conditions.push('is_read = ?');
-      bindings.push(params.isRead ? 1 : 0);
+    if (isReadFilter !== undefined) {
+      if (isReadFilter) {
+        systemConditions.push('COALESCE(nr.is_read, 0) = 1');
+      } else {
+        systemConditions.push('COALESCE(nr.is_read, 0) = 0');
+      }
+      interactionConditions.push('in.is_read = ?');
+      interactionBindings.push(isReadFilter ? 1 : 0);
     }
 
-    const whereClause = conditions.join(' AND ');
+    const systemWhere = systemConditions.join(' AND ');
+    const interactionWhere = interactionConditions.join(' AND ');
 
-    const countResult = await db.prepare(
-      `SELECT COUNT(*) as total FROM notifications WHERE ${whereClause}`
-    ).bind(...bindings).first();
+    const countQuery = `
+      SELECT COUNT(*) as total FROM (
+        SELECT sn.id
+        FROM notifications sn
+        LEFT JOIN notification_reads nr ON sn.id = nr.notification_id AND nr.user_id = ?
+        WHERE ${systemWhere}
+        UNION ALL
+        SELECT in.id
+        FROM notifications in
+        WHERE ${interactionWhere}
+      )
+    `;
+
+    const countResult = await db.prepare(countQuery)
+      .bind(userId, ...systemBindings, ...interactionBindings)
+      .first();
 
     const total = (countResult?.total as number) || 0;
 
-    const rows = await db.prepare(
-      `SELECT 
-        id, user_id, type, subtype, title, content, related_data,
-        is_in_app_sent, is_email_sent,
-        is_read, read_at, deleted_at, created_at
-      FROM notifications
-      WHERE ${whereClause}
+    const dataQuery = `
+      SELECT * FROM (
+        SELECT 
+          sn.id,
+          sn.user_id,
+          sn.type,
+          sn.subtype,
+          sn.title,
+          sn.content,
+          sn.related_data,
+          sn.is_in_app_sent,
+          sn.is_email_sent,
+          COALESCE(nr.is_read, 0) as is_read,
+          nr.read_at,
+          sn.deleted_at,
+          sn.created_at
+        FROM notifications sn
+        LEFT JOIN notification_reads nr ON sn.id = nr.notification_id AND nr.user_id = ?
+        WHERE ${systemWhere}
+        UNION ALL
+        SELECT 
+          in.id,
+          in.user_id,
+          in.type,
+          in.subtype,
+          in.title,
+          in.content,
+          in.related_data,
+          in.is_in_app_sent,
+          in.is_email_sent,
+          in.is_read,
+          in.read_at,
+          in.deleted_at,
+          in.created_at
+        FROM notifications in
+        WHERE ${interactionWhere}
+      )
       ORDER BY created_at DESC
-      LIMIT ? OFFSET ?`
-    ).bind(...bindings, limit, offset).all();
+      LIMIT ? OFFSET ?
+    `;
+
+    const rows = await db.prepare(dataQuery)
+      .bind(userId, ...systemBindings, ...interactionBindings, limit, offset)
+      .all();
 
     const notifications = (rows.results || []).map(mapNotificationFromRow);
 
@@ -286,14 +355,32 @@ export async function getUnreadCount(
   userId: number
 ): Promise<UnreadCountResponse> {
   try {
-    const rows = await db.prepare(
-      `SELECT 
+    const systemUnreadQuery = `
+      SELECT 
+        sn.type,
+        COUNT(*) as count
+      FROM notifications sn
+      LEFT JOIN notification_reads nr ON sn.id = nr.notification_id AND nr.user_id = ?
+      WHERE sn.user_id = 0 
+        AND sn.type = 'system'
+        AND sn.is_active = 1
+        AND sn.deleted_at IS NULL
+        AND COALESCE(nr.is_read, 0) = 0
+      GROUP BY sn.type
+    `;
+
+    const systemRows = await db.prepare(systemUnreadQuery).bind(userId).all();
+
+    const interactionUnreadQuery = `
+      SELECT 
         type,
         COUNT(*) as count
       FROM notifications
       WHERE user_id = ? AND is_read = 0 AND deleted_at IS NULL
-      GROUP BY type`
-    ).bind(userId).all();
+      GROUP BY type
+    `;
+
+    const interactionRows = await db.prepare(interactionUnreadQuery).bind(userId).all();
 
     const byType = {
       system: 0,
@@ -301,11 +388,21 @@ export async function getUnreadCount(
     };
 
     let total = 0;
-    for (const row of rows.results || []) {
+
+    for (const row of systemRows.results || []) {
       const type = row.type as NotificationType;
       const count = (row.count as number) || 0;
       if (type in byType) {
-        byType[type] = count;
+        byType[type] += count;
+        total += count;
+      }
+    }
+
+    for (const row of interactionRows.results || []) {
+      const type = row.type as NotificationType;
+      const count = (row.count as number) || 0;
+      if (type in byType) {
+        byType[type] += count;
         total += count;
       }
     }
@@ -329,6 +426,31 @@ export async function markAsRead(
   userId: number
 ): Promise<boolean> {
   try {
+    const notification = await db.prepare(
+      'SELECT id, user_id, type FROM notifications WHERE id = ? AND deleted_at IS NULL'
+    ).bind(notificationId).first() as any;
+
+    if (!notification) {
+      return false;
+    }
+
+    if (notification.user_id === 0 && notification.type === 'system') {
+      const existing = await db.prepare(
+        'SELECT id FROM notification_reads WHERE notification_id = ? AND user_id = ?'
+      ).bind(notificationId, userId).first();
+
+      if (existing) {
+        await db.prepare(
+          'UPDATE notification_reads SET is_read = 1, read_at = CURRENT_TIMESTAMP WHERE notification_id = ? AND user_id = ?'
+        ).bind(notificationId, userId).run();
+      } else {
+        await db.prepare(
+          'INSERT INTO notification_reads (notification_id, user_id, is_read, read_at, created_at) VALUES (?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)'
+        ).bind(notificationId, userId).run();
+      }
+      return true;
+    }
+
     const result = await db.prepare(
       `UPDATE notifications 
        SET is_read = 1, read_at = CURRENT_TIMESTAMP
@@ -348,18 +470,55 @@ export async function markAllAsRead(
   type?: NotificationType
 ): Promise<number> {
   try {
-    let sql = `UPDATE notifications 
-               SET is_read = 1, read_at = CURRENT_TIMESTAMP
-               WHERE user_id = ? AND is_read = 0 AND deleted_at IS NULL`;
-    const bindings: any[] = [userId];
+    let markedCount = 0;
 
-    if (type) {
-      sql += ' AND type = ?';
-      bindings.push(type);
+    if (!type || type === 'system') {
+      const systemNotifications = await db.prepare(
+        `SELECT sn.id 
+         FROM notifications sn
+         LEFT JOIN notification_reads nr ON sn.id = nr.notification_id AND nr.user_id = ?
+         WHERE sn.user_id = 0 
+           AND sn.type = 'system'
+           AND sn.is_active = 1
+           AND sn.deleted_at IS NULL
+           AND COALESCE(nr.is_read, 0) = 0`
+      ).bind(userId).all();
+
+      for (const row of systemNotifications.results || []) {
+        const notificationId = (row as any).id;
+        const existing = await db.prepare(
+          'SELECT id FROM notification_reads WHERE notification_id = ? AND user_id = ?'
+        ).bind(notificationId, userId).first();
+
+        if (existing) {
+          await db.prepare(
+            'UPDATE notification_reads SET is_read = 1, read_at = CURRENT_TIMESTAMP WHERE notification_id = ? AND user_id = ?'
+          ).bind(notificationId, userId).run();
+        } else {
+          await db.prepare(
+            'INSERT INTO notification_reads (notification_id, user_id, is_read, read_at, created_at) VALUES (?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)'
+          ).bind(notificationId, userId).run();
+        }
+        markedCount++;
+      }
     }
 
-    const result = await db.prepare(sql).bind(...bindings).run();
-    return result.meta?.changes || 0;
+    if (!type || type === 'interaction') {
+      let sql = `UPDATE notifications 
+                 SET is_read = 1, read_at = CURRENT_TIMESTAMP
+                 WHERE user_id = ? AND is_read = 0 AND deleted_at IS NULL`;
+      const bindings: any[] = [userId];
+
+      if (type) {
+        sql += ' AND type = ?';
+        bindings.push(type);
+      }
+
+      const result = await db.prepare(sql).bind(...bindings).run();
+      markedCount += result.meta?.changes || 0;
+    }
+
+    return markedCount;
   } catch (error) {
     console.error('Mark all as read error:', error);
     return 0;
@@ -372,6 +531,31 @@ export async function deleteNotification(
   userId: number
 ): Promise<boolean> {
   try {
+    const notification = await db.prepare(
+      'SELECT id, user_id, type FROM notifications WHERE id = ? AND deleted_at IS NULL'
+    ).bind(notificationId).first() as any;
+
+    if (!notification) {
+      return false;
+    }
+
+    if (notification.user_id === 0 && notification.type === 'system') {
+      const existing = await db.prepare(
+        'SELECT id FROM notification_reads WHERE notification_id = ? AND user_id = ?'
+      ).bind(notificationId, userId).first();
+
+      if (existing) {
+        await db.prepare(
+          'UPDATE notification_reads SET is_read = 1, read_at = CURRENT_TIMESTAMP WHERE notification_id = ? AND user_id = ?'
+        ).bind(notificationId, userId).run();
+      } else {
+        await db.prepare(
+          'INSERT INTO notification_reads (notification_id, user_id, is_read, read_at, created_at) VALUES (?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)'
+        ).bind(notificationId, userId).run();
+      }
+      return true;
+    }
+
     const result = await db.prepare(
       `UPDATE notifications 
        SET deleted_at = CURRENT_TIMESTAMP

@@ -399,65 +399,6 @@ adminNotificationRoutes.post('/system-notifications', requireAuth, requireAdmin,
       isCarousel: subtype === 'announcement',
     });
 
-    if (subtype === 'maintenance' || subtype === 'update') {
-      const users = await c.env.DB.prepare(
-        'SELECT id FROM users WHERE status = ?'
-      ).bind('active').all();
-
-      const userIds = (users.results || []).map((u: any) => u.id);
-
-      if (userIds.length === 0) {
-        return c.json(errorResponse('No active users', '没有活跃用户'), 400);
-      }
-
-      const batchSize = 100;
-      let insertedCount = 0;
-
-      for (let i = 0; i < userIds.length; i += batchSize) {
-        const batch = userIds.slice(i, i + batchSize);
-        const placeholders = batch.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)').join(', ');
-        const values: any[] = [];
-
-        for (const userId of batch) {
-          values.push(
-            userId,
-            'system',
-            subtype,
-            title,
-            content,
-            relatedData,
-            isActive ? 1 : 0,
-            1
-          );
-        }
-
-        const result = await c.env.DB.prepare(
-          `INSERT INTO notifications (
-            user_id, type, subtype, title, content, related_data,
-            is_active, is_in_app_sent, created_at
-          ) VALUES ${placeholders}`
-        ).bind(...values).run();
-
-        if (result.success) {
-          insertedCount += batch.length;
-        }
-      }
-
-      logger.info('System notification broadcast created', { 
-        subtype, 
-        title, 
-        userCount: insertedCount 
-      });
-
-      return c.json(successResponse({
-        broadcast: true,
-        recipientCount: insertedCount,
-        title,
-        content,
-        subtype,
-      }, `已向 ${insertedCount} 位用户推送${subtype === 'maintenance' ? '维护' : '更新'}通知`), 201);
-    }
-
     const result = await c.env.DB.prepare(
       `INSERT INTO notifications (
         user_id, type, subtype, title, content, related_data,
@@ -466,7 +407,7 @@ adminNotificationRoutes.post('/system-notifications', requireAuth, requireAdmin,
     ).bind(
       0,
       'system',
-      'announcement',
+      subtype,
       title,
       content,
       relatedData,
@@ -487,9 +428,9 @@ adminNotificationRoutes.post('/system-notifications', requireAuth, requireAdmin,
       title,
       content,
       link,
-      subtype: 'announcement',
+      subtype,
       isActive,
-    }, '公告通知创建成功'), 201);
+    }, '系统通知创建成功'), 201);
 
   } catch (error) {
     logger.error('Create system notification error', error);
