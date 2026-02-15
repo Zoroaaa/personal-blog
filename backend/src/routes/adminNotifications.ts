@@ -304,18 +304,17 @@ adminNotificationRoutes.get('/system-notifications', requireAuth, requireAdmin, 
     const isActive = c.req.query('isActive');
     const offset = (page - 1) * limit;
 
-    let whereClause = 'WHERE n.type = ? AND n.subtype = ? AND n.deleted_at IS NULL';
-    const params: any[] = ['system', 'announcement'];
+    let whereClause = 'WHERE n.type = ? AND n.deleted_at IS NULL';
+    const params: any[] = ['system'];
 
     if (isActive !== undefined) {
       whereClause += ' AND n.is_active = ?';
       params.push(isActive === 'true' ? 1 : 0);
     }
 
-    // 获取系统通知列表
     const notifications = await c.env.DB.prepare(
       `SELECT 
-        n.id, n.title, n.content, n.related_data,
+        n.id, n.title, n.content, n.subtype, n.related_data,
         n.is_active, n.created_at, n.updated_at
       FROM notifications n
       ${whereClause}
@@ -323,7 +322,6 @@ adminNotificationRoutes.get('/system-notifications', requireAuth, requireAdmin, 
       LIMIT ? OFFSET ?`
     ).bind(...params, limit, offset).all() as any;
 
-    // 获取总数
     const countResult = await c.env.DB.prepare(
       `SELECT COUNT(*) as count FROM notifications n ${whereClause}`
     ).bind(...params).first() as any;
@@ -340,6 +338,7 @@ adminNotificationRoutes.get('/system-notifications', requireAuth, requireAdmin, 
         id: n.id,
         title: n.title,
         content: n.content,
+        subtype: n.subtype || 'announcement',
         link: relatedData.link,
         isActive: n.is_active === 1,
         createdAt: n.created_at,
@@ -380,9 +379,8 @@ adminNotificationRoutes.post('/system-notifications', requireAuth, requireAdmin,
 
   try {
     const body = await c.req.json();
-    const { title, content, link, isActive = true } = body;
+    const { title, content, link, subtype = 'announcement', isActive = true } = body;
 
-    // 验证必填字段
     if (!title || typeof title !== 'string') {
       return c.json(errorResponse('Title is required', '标题不能为空'), 400);
     }
@@ -391,20 +389,82 @@ adminNotificationRoutes.post('/system-notifications', requireAuth, requireAdmin,
       return c.json(errorResponse('Content is required', '内容不能为空'), 400);
     }
 
-    // 构建related_data
+    const validSubtypes = ['maintenance', 'update', 'announcement'];
+    if (!validSubtypes.includes(subtype)) {
+      return c.json(errorResponse('Invalid subtype', '无效的通知类型'), 400);
+    }
+
     const relatedData = JSON.stringify({
       link,
-      isCarousel: true,
+      isCarousel: subtype === 'announcement',
     });
 
-    // 插入系统通知
+    if (subtype === 'maintenance' || subtype === 'update') {
+      const users = await c.env.DB.prepare(
+        'SELECT id FROM users WHERE status = ?'
+      ).bind('active').all();
+
+      const userIds = (users.results || []).map((u: any) => u.id);
+
+      if (userIds.length === 0) {
+        return c.json(errorResponse('No active users', '没有活跃用户'), 400);
+      }
+
+      const batchSize = 100;
+      let insertedCount = 0;
+
+      for (let i = 0; i < userIds.length; i += batchSize) {
+        const batch = userIds.slice(i, i + batchSize);
+        const placeholders = batch.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)').join(', ');
+        const values: any[] = [];
+
+        for (const userId of batch) {
+          values.push(
+            userId,
+            'system',
+            subtype,
+            title,
+            content,
+            relatedData,
+            isActive ? 1 : 0,
+            1
+          );
+        }
+
+        const result = await c.env.DB.prepare(
+          `INSERT INTO notifications (
+            user_id, type, subtype, title, content, related_data,
+            is_active, is_in_app_sent, created_at
+          ) VALUES ${placeholders}`
+        ).bind(...values).run();
+
+        if (result.success) {
+          insertedCount += batch.length;
+        }
+      }
+
+      logger.info('System notification broadcast created', { 
+        subtype, 
+        title, 
+        userCount: insertedCount 
+      });
+
+      return c.json(successResponse({
+        broadcast: true,
+        recipientCount: insertedCount,
+        title,
+        content,
+        subtype,
+      }, `已向 ${insertedCount} 位用户推送${subtype === 'maintenance' ? '维护' : '更新'}通知`), 201);
+    }
+
     const result = await c.env.DB.prepare(
       `INSERT INTO notifications (
         user_id, type, subtype, title, content, related_data,
         is_active, is_in_app_sent, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
     ).bind(
-      0, // user_id=0 表示系统广播
+      0,
       'system',
       'announcement',
       title,
@@ -420,15 +480,16 @@ adminNotificationRoutes.post('/system-notifications', requireAuth, requireAdmin,
 
     const notificationId = result.meta.last_row_id;
 
-    logger.info('System notification created', { notificationId, title });
+    logger.info('System notification created', { notificationId, title, subtype });
 
     return c.json(successResponse({
       id: notificationId,
       title,
       content,
       link,
+      subtype: 'announcement',
       isActive,
-    }, '系统通知创建成功'), 201);
+    }, '公告通知创建成功'), 201);
 
   } catch (error) {
     logger.error('Create system notification error', error);
@@ -453,18 +514,16 @@ adminNotificationRoutes.put('/system-notifications/:id', requireAuth, requireAdm
     }
 
     const body = await c.req.json();
-    const { title, content, link, isActive } = body;
+    const { title, content, link, subtype, isActive } = body;
 
-    // 检查通知是否存在
     const existing = await c.env.DB.prepare(
-      'SELECT id FROM notifications WHERE id = ? AND type = ? AND subtype = ?'
-    ).bind(id, 'system', 'announcement').first();
+      'SELECT id, subtype, related_data FROM notifications WHERE id = ? AND type = ?'
+    ).bind(id, 'system').first() as any;
 
     if (!existing) {
       return c.json(errorResponse('Not found', '通知不存在'), 404);
     }
 
-    // 构建更新字段
     const updates: string[] = [];
     const params: any[] = [];
 
@@ -483,15 +542,19 @@ adminNotificationRoutes.put('/system-notifications/:id', requireAuth, requireAdm
       params.push(isActive ? 1 : 0);
     }
 
+    if (subtype !== undefined) {
+      const validSubtypes = ['maintenance', 'update', 'announcement'];
+      if (!validSubtypes.includes(subtype)) {
+        return c.json(errorResponse('Invalid subtype', '无效的通知类型'), 400);
+      }
+      updates.push('subtype = ?');
+      params.push(subtype);
+    }
+
     if (link !== undefined) {
-      // 需要更新related_data
-      const existingData = await c.env.DB.prepare(
-        'SELECT related_data FROM notifications WHERE id = ?'
-      ).bind(id).first() as any;
-      
       let relatedData = {};
       try {
-        relatedData = JSON.parse(existingData?.related_data || '{}');
+        relatedData = JSON.parse(existing?.related_data || '{}');
       } catch {
         relatedData = {};
       }
@@ -507,7 +570,6 @@ adminNotificationRoutes.put('/system-notifications/:id', requireAuth, requireAdm
 
     params.push(id);
 
-    // 执行更新
     await c.env.DB.prepare(
       `UPDATE notifications SET ${updates.join(', ')} WHERE id = ?`
     ).bind(...params).run();
@@ -538,16 +600,14 @@ adminNotificationRoutes.delete('/system-notifications/:id', requireAuth, require
       return c.json(errorResponse('Invalid ID', '无效的通知ID'), 400);
     }
 
-    // 检查通知是否存在
     const existing = await c.env.DB.prepare(
-      'SELECT id FROM notifications WHERE id = ? AND type = ? AND subtype = ?'
-    ).bind(id, 'system', 'announcement').first();
+      'SELECT id FROM notifications WHERE id = ? AND type = ?'
+    ).bind(id, 'system').first();
 
     if (!existing) {
       return c.json(errorResponse('Not found', '通知不存在'), 404);
     }
 
-    // 软删除
     await c.env.DB.prepare(
       'UPDATE notifications SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?'
     ).bind(id).run();
