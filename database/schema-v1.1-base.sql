@@ -583,15 +583,6 @@ BEGIN
     WHERE id = OLD.parent_id AND OLD.parent_id IS NOT NULL;
 END;
 
-CREATE TRIGGER IF NOT EXISTS trg_post_tags_hard_delete
-AFTER DELETE ON post_tags
-BEGIN
-    UPDATE tags
-    SET post_count = MAX(0, post_count - 1),
-        updated_at = CURRENT_TIMESTAMP
-    WHERE id = OLD.tag_id;
-END;
-
 -- ============= 视图 =============
 
 CREATE VIEW IF NOT EXISTS vw_posts_detailed AS
