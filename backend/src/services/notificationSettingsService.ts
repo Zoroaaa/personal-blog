@@ -30,7 +30,7 @@ import type {
 
 const DEFAULT_TYPE_SETTINGS: NotificationTypeSettings = {
   inApp: true,
-  email: true,
+  email: false,
   frequency: 'realtime',
 };
 
