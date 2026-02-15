@@ -14,17 +14,24 @@ export function TruncatedText({ text, className = '', lines = 2 }: TruncatedText
   const tooltipRef = useRef<HTMLDivElement>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 检查文本是否被截断
   const checkTruncation = useCallback(() => {
     if (textRef.current) {
       const el = textRef.current;
-      setIsTruncated(el.scrollHeight > el.clientHeight + 2);
+      // 检查实际渲染高度是否超过可见高度
+      const isTruncatedNow = el.scrollHeight > el.clientHeight + 2;
+      setIsTruncated(isTruncatedNow);
     }
-  }, []);
+  }, [text]);
 
+  // 初始化和监听变化
   useEffect(() => {
     checkTruncation();
+    // 使用 requestAnimationFrame 确保 DOM 渲染完成后再检查
     const rafId = requestAnimationFrame(checkTruncation);
+    // 延迟检查，以防字体未加载完成
     const timeoutId = setTimeout(checkTruncation, 100);
+    
     window.addEventListener('resize', checkTruncation);
 
     return () => {
@@ -34,6 +41,7 @@ export function TruncatedText({ text, className = '', lines = 2 }: TruncatedText
     };
   }, [text, checkTruncation]);
 
+  // 更新 tooltip 位置
   const updateTooltipPosition = useCallback(() => {
     if (!textRef.current || !tooltipRef.current) return;
 
@@ -43,21 +51,25 @@ export function TruncatedText({ text, className = '', lines = 2 }: TruncatedText
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
+    // 计算 tooltip 宽度和位置
     const tooltipWidth = Math.min(320, viewportWidth - 32);
     let left = textRect.left + textRect.width / 2 - tooltipWidth / 2;
     left = Math.max(16, Math.min(left, viewportWidth - tooltipWidth - 16));
 
+    // 计算垂直位置（优先显示在上方）
     const spaceAbove = textRect.top;
     const spaceBelow = viewportHeight - textRect.bottom;
     const tooltipHeight = tooltipRect.height || 100;
 
     let top: number;
-
     if (spaceAbove >= tooltipHeight + 16) {
+      // 上方有足够空间
       top = textRect.top - tooltipHeight - 8;
     } else if (spaceBelow >= tooltipHeight + 16) {
+      // 下方有足够空间
       top = textRect.bottom + 8;
     } else {
+      // 都不够，放在上方尽可能高的位置
       top = Math.max(8, Math.min(spaceAbove - tooltipHeight - 8, textRect.top - tooltipHeight - 8));
     }
 
@@ -72,6 +84,7 @@ export function TruncatedText({ text, className = '', lines = 2 }: TruncatedText
     });
   }, []);
 
+  // 鼠标进入文本区域
   const handleMouseEnter = useCallback(() => {
     if (!isTruncated) return;
 
@@ -83,6 +96,7 @@ export function TruncatedText({ text, className = '', lines = 2 }: TruncatedText
     setShowTooltip(true);
   }, [isTruncated]);
 
+  // 更新 tooltip 位置（当 tooltip 显示时）
   useEffect(() => {
     if (showTooltip) {
       requestAnimationFrame(() => {
@@ -91,12 +105,14 @@ export function TruncatedText({ text, className = '', lines = 2 }: TruncatedText
     }
   }, [showTooltip, updateTooltipPosition]);
 
+  // 鼠标离开文本区域
   const handleMouseLeave = useCallback(() => {
     hideTimeoutRef.current = setTimeout(() => {
       setShowTooltip(false);
     }, 150);
   }, []);
 
+  // 鼠标进入 tooltip 区域
   const handleTooltipMouseEnter = useCallback(() => {
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);
@@ -104,12 +120,14 @@ export function TruncatedText({ text, className = '', lines = 2 }: TruncatedText
     }
   }, []);
 
+  // 鼠标离开 tooltip 区域
   const handleTooltipMouseLeave = useCallback(() => {
     hideTimeoutRef.current = setTimeout(() => {
       setShowTooltip(false);
     }, 150);
   }, []);
 
+  // 清理定时器
   useEffect(() => {
     return () => {
       if (hideTimeoutRef.current) {
@@ -122,21 +140,22 @@ export function TruncatedText({ text, className = '', lines = 2 }: TruncatedText
     <>
       <p
         ref={textRef}
-        className={`${className} ${isTruncated ? 'cursor-pointer' : ''}`}
+        className={`${className} ${isTruncated ? 'cursor-help' : ''}`}
         style={{
           display: '-webkit-box',
           WebkitLineClamp: lines,
           WebkitBoxOrient: 'vertical',
           overflow: 'hidden',
-          position: 'relative',
-          zIndex: 1,
+          wordBreak: 'break-word',
         }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        title="" // 清空默认 title，避免浏览器默认 tooltip
       >
         {text}
       </p>
 
+      {/* Tooltip 弹窗 */}
       {showTooltip && isTruncated && (
         <div
           ref={tooltipRef}
@@ -145,10 +164,13 @@ export function TruncatedText({ text, className = '', lines = 2 }: TruncatedText
           onMouseEnter={handleTooltipMouseEnter}
           onMouseLeave={handleTooltipMouseLeave}
         >
-          <div className="whitespace-pre-wrap break-words">{text}</div>
+          <div className="whitespace-pre-wrap break-words max-h-96 overflow-y-auto">
+            {text}
+          </div>
         </div>
       )}
 
+      {/* 动画样式 */}
       <style>{`
         @keyframes tooltip-fade-in {
           from {
