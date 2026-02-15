@@ -998,6 +998,19 @@ export const api = {
       method: 'POST',
     }),
 
+  resendMessage: (messageId: number, data: {
+    content: string;
+    messageType?: 'text' | 'image' | 'attachment' | 'mixed';
+    attachmentUrl?: string;
+    attachmentFilename?: string;
+    attachmentSize?: number;
+    attachmentMimeType?: string;
+  }) =>
+    apiRequest<any>(`/messages/${messageId}/resend`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   markThreadAsRead: (threadId: string) =>
     apiRequest<{ count: number }>(`/messages/threads/${threadId}/read`, {
       method: 'PATCH',

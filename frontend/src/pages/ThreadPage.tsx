@@ -193,31 +193,34 @@ export default function ThreadPage() {
   };
 
   const canRecall = useCallback((message: Message) => {
+    // 必须是自己发送的消息
     if (message.senderId !== user?.id) return false;
+    
+    // 已经撤回的消息不能再次撤回
     if (message.isRecalled) return false;
     
-    if (!message.createdAt) return true;
+    // 如果没有 createdAt，说明是刚发送的消息，允许撤回
+    if (!message.createdAt) {
+      console.warn('Message missing createdAt, allowing recall:', message.id);
+      return true;
+    }
     
     try {
-      let createdAt: Date;
+      const createdAt = new Date(message.createdAt);
       
-      // 处理SQLite返回的UTC时间格式 "2026-02-15 12:37:00"
-      if (typeof message.createdAt === 'string' && message.createdAt.includes(' ') && !message.createdAt.includes('T')) {
-        // 添加Z后缀表示UTC时间
-        const utcTimeStr = message.createdAt.replace(' ', 'T') + 'Z';
-        createdAt = new Date(utcTimeStr);
-      } else {
-        createdAt = new Date(message.createdAt);
+      // 检查日期是否有效
+      if (isNaN(createdAt.getTime())) {
+        console.warn('Invalid createdAt date, allowing recall:', message.id, message.createdAt);
+        return true;
       }
-      
-      if (isNaN(createdAt.getTime())) return true;
       
       const now = new Date();
       const timeDiff = now.getTime() - createdAt.getTime();
       
       return timeDiff <= RECALL_TIME_LIMIT_MS;
     } catch (error) {
-      return true;
+      console.error('Error parsing createdAt, allowing recall:', error);
+      return true; // 解析失败，默认允许撤回
     }
   }, [user?.id]);
 
@@ -245,6 +248,19 @@ export default function ThreadPage() {
     setEditingMessage(message);
     setNewMessage(message.content);
     setShowRecallMenu(null);
+    
+    if (message.attachmentUrl) {
+      setAttachmentPreview({
+        url: message.attachmentUrl,
+        filename: message.attachmentFilename || 'file',
+        size: message.attachmentSize || 0,
+        mimeType: message.attachmentMimeType || '',
+        type: message.messageType === 'image' ? 'image' : 'file',
+      });
+    } else {
+      setAttachmentPreview(null);
+    }
+    
     textareaRef.current?.focus();
   };
 
@@ -344,31 +360,59 @@ export default function ThreadPage() {
         }
       }
 
-      const response = await api.sendMessage({
-        recipientId: threadInfo.otherUserId,
-        content: newMessage.trim() || (attachmentPreview ? `[${attachmentPreview.type === 'image' ? '图片' : '附件'}]` : ''),
-        messageType,
-        attachmentUrl: attachmentPreview?.url,
-        attachmentFilename: attachmentPreview?.filename,
-        attachmentSize: attachmentPreview?.size,
-        attachmentMimeType: attachmentPreview?.mimeType,
-      });
+      if (editingMessage) {
+        const response = await api.resendMessage(editingMessage.id, {
+          content: newMessage.trim() || (attachmentPreview ? `[${attachmentPreview.type === 'image' ? '图片' : '附件'}]` : ''),
+          messageType,
+          attachmentUrl: attachmentPreview?.url,
+          attachmentFilename: attachmentPreview?.filename,
+          attachmentSize: attachmentPreview?.size,
+          attachmentMimeType: attachmentPreview?.mimeType,
+        });
 
-      if (response.success && response.data) {
-        // 确保消息有正确的创建时间戳和必要字段
-        const messageWithTime = {
-          ...response.data,
-          createdAt: response.data.createdAt || new Date().toISOString(),
-          isRecalled: response.data.isRecalled ?? false,
-          isRead: response.data.isRead ?? false,
-        };
-        
-        setMessages(prev => [...prev, messageWithTime]);
-        setNewMessage('');
-        setAttachmentPreview(null);
-        setEditingMessage(null);
-        scrollToBottom();
-        showSuccess('消息发送成功');
+        if (response.success && response.data) {
+          const messageWithTime = {
+            ...response.data,
+            createdAt: response.data.createdAt || new Date().toISOString(),
+            isRecalled: response.data.isRecalled ?? false,
+            isRead: response.data.isRead ?? false,
+          };
+          
+          setMessages(prev => prev.map(msg => 
+            msg.id === editingMessage.id ? messageWithTime : msg
+          ));
+          setNewMessage('');
+          setAttachmentPreview(null);
+          setEditingMessage(null);
+          scrollToBottom();
+          showSuccess('消息已重新发送');
+        }
+      } else {
+        const response = await api.sendMessage({
+          recipientId: threadInfo.otherUserId,
+          content: newMessage.trim() || (attachmentPreview ? `[${attachmentPreview.type === 'image' ? '图片' : '附件'}]` : ''),
+          messageType,
+          attachmentUrl: attachmentPreview?.url,
+          attachmentFilename: attachmentPreview?.filename,
+          attachmentSize: attachmentPreview?.size,
+          attachmentMimeType: attachmentPreview?.mimeType,
+        });
+
+        if (response.success && response.data) {
+          const messageWithTime = {
+            ...response.data,
+            createdAt: response.data.createdAt || new Date().toISOString(),
+            isRecalled: response.data.isRecalled ?? false,
+            isRead: response.data.isRead ?? false,
+          };
+          
+          setMessages(prev => [...prev, messageWithTime]);
+          setNewMessage('');
+          setAttachmentPreview(null);
+          setEditingMessage(null);
+          scrollToBottom();
+          showSuccess('消息发送成功');
+        }
       }
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -634,6 +678,14 @@ export default function ThreadPage() {
                         {isMine && message.isRead && !message.isRecalled && (
                           <span className="text-xs text-blue-500">已读</span>
                         )}
+                        {isMine && message.isRecalled && (
+                          <button
+                            onClick={() => handleEditMessage(message)}
+                            className="text-xs text-blue-500 hover:text-blue-600"
+                          >
+                            编辑重新发送
+                          </button>
+                        )}
                         {canRecallThis && (
                           <div className="relative">
                             <button
@@ -649,12 +701,6 @@ export default function ThreadPage() {
                                   className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
                                 >
                                   撤回
-                                </button>
-                                <button
-                                  onClick={() => handleEditMessage(message)}
-                                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-                                >
-                                  编辑
                                 </button>
                               </div>
                             )}
@@ -701,11 +747,12 @@ export default function ThreadPage() {
         <div className="p-4 border-t border-border">
           {editingMessage && (
             <div className="mb-2 text-sm text-blue-600 flex items-center gap-2">
-              <span>正在编辑消息</span>
+              <span>正在编辑已撤回的消息，发送后将重新发送</span>
               <button
                 onClick={() => {
                   setEditingMessage(null);
                   setNewMessage('');
+                  setAttachmentPreview(null);
                 }}
                 className="text-gray-400 hover:text-gray-600"
               >
