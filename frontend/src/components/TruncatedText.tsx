@@ -9,33 +9,22 @@ interface TruncatedTextProps {
 export function TruncatedText({ text, className = '', lines = 2 }: TruncatedTextProps) {
   const [isTruncated, setIsTruncated] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
-  const [tooltipDirection, setTooltipDirection] = useState<'up' | 'down'>('up');
-  const [tooltipHeight, setTooltipHeight] = useState(0);
+  const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({});
   const textRef = useRef<HTMLParagraphElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const touchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const checkTruncation = useCallback(() => {
     if (textRef.current) {
       const el = textRef.current;
-      const isContentTruncated = el.scrollHeight > el.clientHeight + 2;
-      setIsTruncated(isContentTruncated);
+      setIsTruncated(el.scrollHeight > el.clientHeight + 2);
     }
   }, []);
 
   useEffect(() => {
     checkTruncation();
-
-    const rafId = requestAnimationFrame(() => {
-      checkTruncation();
-    });
-
-    const timeoutId = setTimeout(() => {
-      checkTruncation();
-    }, 100);
-
+    const rafId = requestAnimationFrame(checkTruncation);
+    const timeoutId = setTimeout(checkTruncation, 100);
     window.addEventListener('resize', checkTruncation);
 
     return () => {
@@ -45,39 +34,41 @@ export function TruncatedText({ text, className = '', lines = 2 }: TruncatedText
     };
   }, [text, checkTruncation]);
 
-  useEffect(() => {
-    if (showTooltip && tooltipRef.current) {
-      setTooltipHeight(tooltipRef.current.offsetHeight);
-    }
-  }, [showTooltip]);
+  const updateTooltipPosition = useCallback(() => {
+    if (!textRef.current || !tooltipRef.current) return;
 
-  const calculatePosition = useCallback(() => {
-    if (!textRef.current) return;
-
-    const rect = textRef.current.getBoundingClientRect();
+    const textRect = textRef.current.getBoundingClientRect();
+    const tooltipEl = tooltipRef.current;
+    const tooltipRect = tooltipEl.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
-    const tooltipWidth = Math.min(320, viewportWidth - 32);
 
-    let left = rect.left + rect.width / 2 - tooltipWidth / 2;
+    const tooltipWidth = Math.min(320, viewportWidth - 32);
+    let left = textRect.left + textRect.width / 2 - tooltipWidth / 2;
     left = Math.max(16, Math.min(left, viewportWidth - tooltipWidth - 16));
 
-    const spaceAbove = rect.top;
-    const spaceBelow = viewportHeight - rect.bottom;
+    const spaceAbove = textRect.top;
+    const spaceBelow = viewportHeight - textRect.bottom;
+    const tooltipHeight = tooltipRect.height || 100;
 
-    let direction: 'up' | 'down' = 'up';
     let top: number;
 
-    if (spaceAbove >= 120 || spaceAbove > spaceBelow) {
-      direction = 'up';
-      top = rect.top - 10;
+    if (spaceAbove >= tooltipHeight + 16) {
+      top = textRect.top - tooltipHeight - 8;
+    } else if (spaceBelow >= tooltipHeight + 16) {
+      top = textRect.bottom + 8;
     } else {
-      direction = 'down';
-      top = rect.bottom + 10;
+      top = Math.max(8, Math.min(spaceAbove - tooltipHeight - 8, textRect.top - tooltipHeight - 8));
     }
 
-    setPosition({ top, left });
-    setTooltipDirection(direction);
+    setTooltipStyle({
+      position: 'fixed',
+      top: `${top}px`,
+      left: `${left}px`,
+      width: 'max-content',
+      maxWidth: `${tooltipWidth}px`,
+      zIndex: 9999,
+    });
   }, []);
 
   const handleMouseEnter = useCallback(() => {
@@ -88,30 +79,21 @@ export function TruncatedText({ text, className = '', lines = 2 }: TruncatedText
       hideTimeoutRef.current = null;
     }
 
-    calculatePosition();
     setShowTooltip(true);
-  }, [isTruncated, calculatePosition]);
+  }, [isTruncated]);
+
+  useEffect(() => {
+    if (showTooltip) {
+      requestAnimationFrame(() => {
+        updateTooltipPosition();
+      });
+    }
+  }, [showTooltip, updateTooltipPosition]);
 
   const handleMouseLeave = useCallback(() => {
     hideTimeoutRef.current = setTimeout(() => {
       setShowTooltip(false);
-    }, 100);
-  }, []);
-
-  const handleTouchStart = useCallback(() => {
-    if (!isTruncated) return;
-
-    touchTimeoutRef.current = setTimeout(() => {
-      calculatePosition();
-      setShowTooltip(true);
-    }, 500);
-  }, [isTruncated, calculatePosition]);
-
-  const handleTouchEnd = useCallback(() => {
-    if (touchTimeoutRef.current) {
-      clearTimeout(touchTimeoutRef.current);
-      touchTimeoutRef.current = null;
-    }
+    }, 150);
   }, []);
 
   const handleTooltipMouseEnter = useCallback(() => {
@@ -124,59 +106,30 @@ export function TruncatedText({ text, className = '', lines = 2 }: TruncatedText
   const handleTooltipMouseLeave = useCallback(() => {
     hideTimeoutRef.current = setTimeout(() => {
       setShowTooltip(false);
-    }, 100);
-  }, []);
-
-  const handleDocumentTouch = useCallback((e: TouchEvent) => {
-    if (tooltipRef.current && !tooltipRef.current.contains(e.target as Node) &&
-        textRef.current && !textRef.current.contains(e.target as Node)) {
-      setShowTooltip(false);
-    }
+    }, 150);
   }, []);
 
   useEffect(() => {
-    if (showTooltip) {
-      document.addEventListener('touchstart', handleDocumentTouch);
-    }
     return () => {
-      document.removeEventListener('touchstart', handleDocumentTouch);
-    };
-  }, [showTooltip, handleDocumentTouch]);
-
-  useEffect(() => {
-    return () => {
-      if (touchTimeoutRef.current) {
-        clearTimeout(touchTimeoutRef.current);
-      }
       if (hideTimeoutRef.current) {
         clearTimeout(hideTimeoutRef.current);
       }
     };
   }, []);
 
-  const lineClampStyle = {
-    display: '-webkit-box',
-    WebkitLineClamp: lines,
-    WebkitBoxOrient: 'vertical' as const,
-    overflow: 'hidden',
-  };
-
-  const finalTop = tooltipDirection === 'up' 
-    ? position.top - tooltipHeight 
-    : position.top;
-
   return (
     <>
       <p
         ref={textRef}
         className={`${className} ${isTruncated ? 'cursor-pointer' : ''}`}
-        style={lineClampStyle}
+        style={{
+          display: '-webkit-box',
+          WebkitLineClamp: lines,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+        }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
-        title={isTruncated ? '悬停查看完整内容' : undefined}
       >
         {text}
       </p>
@@ -184,24 +137,12 @@ export function TruncatedText({ text, className = '', lines = 2 }: TruncatedText
       {showTooltip && isTruncated && (
         <div
           ref={tooltipRef}
-          className="fixed z-[9999] max-w-[320px] p-3 rounded-lg shadow-xl border border-gray-200/80 dark:border-slate-600/80 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm text-sm text-gray-700 dark:text-gray-200 leading-relaxed"
-          style={{
-            top: finalTop,
-            left: position.left,
-            width: 'max-content',
-            maxWidth: '320px',
-            animation: 'tooltip-fade-in 0.2s ease-out forwards',
-          }}
+          className="fixed p-3 rounded-lg shadow-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-gray-700 dark:text-gray-200 leading-relaxed animate-tooltip-fade-in"
+          style={tooltipStyle}
           onMouseEnter={handleTooltipMouseEnter}
           onMouseLeave={handleTooltipMouseLeave}
         >
-          {tooltipDirection === 'down' && (
-            <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-b-8 border-transparent border-b-gray-200/80 dark:border-b-slate-600/80" />
-          )}
           <div className="whitespace-pre-wrap break-words">{text}</div>
-          {tooltipDirection === 'up' && (
-            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-gray-200/80 dark:border-t-slate-600/80" />
-          )}
         </div>
       )}
 
@@ -209,12 +150,15 @@ export function TruncatedText({ text, className = '', lines = 2 }: TruncatedText
         @keyframes tooltip-fade-in {
           from {
             opacity: 0;
-            transform: translateY(${tooltipDirection === 'up' ? '8px' : '-8px'});
+            transform: translateY(4px);
           }
           to {
             opacity: 1;
             transform: translateY(0);
           }
+        }
+        .animate-tooltip-fade-in {
+          animation: tooltip-fade-in 0.15s ease-out forwards;
         }
       `}</style>
     </>
