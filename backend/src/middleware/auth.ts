@@ -19,7 +19,7 @@
 import { Context, Next } from 'hono';
 import { Env, Variables } from '../types';
 import { errorResponse } from '../utils/response';
-import { verifyToken, JWTPayload, TokenPayload } from '../utils/jwt';
+import { verifyToken, JWTPayload, TokenPayload, asSecret, asJWTToken } from '../utils/jwt';
 
 type AppContext = Context<{ Bindings: Env; Variables: Variables }>;
 
@@ -48,7 +48,7 @@ export async function requireAuth(c: AppContext, next: Next) {
       ), 401);
     }
 
-    const payload = await verifyToken(token, c.env.JWT_SECRET);
+    const payload = await verifyToken(asJWTToken(token), asSecret(c.env.JWT_SECRET));
 
     if (!isUserPayload(payload)) {
       return c.json(errorResponse(
@@ -88,7 +88,7 @@ export async function optionalAuth(c: AppContext, next: Next) {
       const blacklisted = c.env.CACHE ? await c.env.CACHE.get(`blacklist:${token}`) : null;
 
       if (!blacklisted) {
-        const payload = await verifyToken(token, c.env.JWT_SECRET);
+        const payload = await verifyToken(asJWTToken(token), asSecret(c.env.JWT_SECRET));
 
         if (isUserPayload(payload)) {
           c.set('user', payload);

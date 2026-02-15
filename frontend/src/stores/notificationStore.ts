@@ -3,7 +3,7 @@
  *
  * 使用 Zustand 管理通知状态
  *
- * @version 1.0.0
+ * @version 2.1.0
  * @author 博客系统
  * @created 2024-01-01
  */
@@ -19,25 +19,20 @@ import type {
 import * as notificationApi from '../utils/notificationApi';
 
 interface NotificationState {
-  // 通知列表
   notifications: Notification[];
   unreadCount: UnreadCountResponse;
   hasMore: boolean;
   currentPage: number;
 
-  // 加载状态
   isLoading: boolean;
   isLoadingMore: boolean;
   error: string | null;
 
-  // 通知设置
   settings: NotificationSettings | null;
   isSettingsLoading: boolean;
 
-  // 筛选条件
   filter: NotificationFilter;
 
-  // Actions
   fetchNotifications: (reset?: boolean) => Promise<void>;
   loadMore: () => Promise<void>;
   fetchUnreadCount: () => Promise<void>;
@@ -46,11 +41,9 @@ interface NotificationState {
   deleteNotification: (notificationId: number) => Promise<void>;
   setFilter: (filter: NotificationFilter) => void;
 
-  // 设置相关
   fetchSettings: () => Promise<void>;
   updateSettings: (settings: import('../types/notifications').PartialNotificationSettings) => Promise<void>;
 
-  // 清除错误
   clearError: () => void;
 }
 
@@ -58,20 +51,17 @@ const defaultSettings: NotificationSettings = {
   system: {
     inApp: true,
     email: true,
-    push: false,
     frequency: 'realtime',
   },
   interaction: {
     inApp: true,
     email: false,
-    push: true,
     frequency: 'realtime',
     subtypes: {
       comment: true,
       like: true,
       favorite: true,
       mention: true,
-      follow: true,
       reply: true,
     },
   },
@@ -98,7 +88,6 @@ const defaultUnreadCount: UnreadCountResponse = {
 export const useNotificationStore = create<NotificationState>()(
   persist(
     (set, get) => ({
-      // 初始状态
       notifications: [],
       unreadCount: defaultUnreadCount,
       hasMore: true,
@@ -112,7 +101,6 @@ export const useNotificationStore = create<NotificationState>()(
         type: 'all',
       },
 
-      // 获取通知列表
       fetchNotifications: async (reset = true) => {
         const { filter } = get();
         const page = reset ? 1 : get().currentPage;
@@ -145,7 +133,6 @@ export const useNotificationStore = create<NotificationState>()(
         }
       },
 
-      // 加载更多
       loadMore: async () => {
         const { hasMore, isLoadingMore } = get();
         if (!hasMore || isLoadingMore) return;
@@ -153,7 +140,6 @@ export const useNotificationStore = create<NotificationState>()(
         await get().fetchNotifications(false);
       },
 
-      // 获取未读数
       fetchUnreadCount: async () => {
         try {
           const count = await notificationApi.getUnreadCount();
@@ -163,7 +149,6 @@ export const useNotificationStore = create<NotificationState>()(
         }
       },
 
-      // 标记已读
       markAsRead: async (notificationId: number) => {
         try {
           await notificationApi.markAsRead(notificationId);
@@ -177,12 +162,10 @@ export const useNotificationStore = create<NotificationState>()(
               return state;
             }
 
-            // 更新通知列表
             const updatedNotifications = state.notifications.map((n) =>
               n.id === notificationId ? { ...n, isRead: true } : n
             );
 
-            // 更新未读数
             const type = notification.type;
             const updatedUnreadCount = {
               ...state.unreadCount,
@@ -204,18 +187,15 @@ export const useNotificationStore = create<NotificationState>()(
         }
       },
 
-      // 标记全部已读
       markAllAsRead: async (type?: string) => {
         try {
           const result = await notificationApi.markAllAsRead(type);
 
           set((state) => {
-            // 更新通知列表
             const updatedNotifications = state.notifications.map((n) =>
               !type || n.type === type ? { ...n, isRead: true } : n
             );
 
-            // 更新未读数
             const updatedUnreadCount = type
               ? {
                   ...state.unreadCount,
@@ -240,7 +220,6 @@ export const useNotificationStore = create<NotificationState>()(
         }
       },
 
-      // 删除通知
       deleteNotification: async (notificationId: number) => {
         try {
           await notificationApi.deleteNotification(notificationId);
@@ -250,12 +229,10 @@ export const useNotificationStore = create<NotificationState>()(
               (n) => n.id === notificationId
             );
 
-            // 更新通知列表
             const updatedNotifications = state.notifications.filter(
               (n) => n.id !== notificationId
             );
 
-            // 如果删除的是未读通知，更新未读数
             if (notification && !notification.isRead) {
               const type = notification.type;
               return {
@@ -279,14 +256,11 @@ export const useNotificationStore = create<NotificationState>()(
         }
       },
 
-      // 设置筛选条件
       setFilter: (filter: NotificationFilter) => {
         set({ filter });
-        // 重置并重新获取
         get().fetchNotifications(true);
       },
 
-      // 获取设置
       fetchSettings: async () => {
         set({ isSettingsLoading: true });
         try {
@@ -298,7 +272,6 @@ export const useNotificationStore = create<NotificationState>()(
         }
       },
 
-      // 更新设置
       updateSettings: async (newSettings: import('../types/notifications').PartialNotificationSettings) => {
         try {
           const updated = await notificationApi.updateNotificationSettings(newSettings);
@@ -309,7 +282,6 @@ export const useNotificationStore = create<NotificationState>()(
         }
       },
 
-      // 清除错误
       clearError: () => set({ error: null }),
     }),
     {

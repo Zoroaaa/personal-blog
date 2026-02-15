@@ -3,10 +3,12 @@
  * 
  * 变更说明：
  * - 移除 private_message 类型
+ * - 移除 follow 类型（关注功能未实现）
+ * - 移除 push 相关配置（浏览器推送功能未实现）
  * - 私信现在是完全独立的系统
  * 
  * @author 博客系统
- * @version 2.0.0 - 方案A
+ * @version 2.1.0
  * @created 2026-02-13
  */
 
@@ -20,7 +22,6 @@ export type NotificationSubtype =
   | 'like' 
   | 'favorite' 
   | 'mention' 
-  | 'follow' 
   | 'reply';
 
 export type NotificationFrequency = 'realtime' | 'daily' | 'weekly' | 'off';
@@ -37,6 +38,12 @@ export interface NotificationRelatedData {
   senderId?: number;
   senderName?: string;
   senderAvatar?: string;
+  mentionerId?: number;
+  mentionerName?: string;
+  mentionerAvatar?: string;
+  contentType?: string;
+  contentId?: number;
+  link?: string;
 }
 
 export interface Notification {
@@ -56,7 +63,6 @@ export interface InteractionSubtypes {
   like: boolean;
   favorite: boolean;
   mention: boolean;
-  follow: boolean;
   reply: boolean;
 }
 
@@ -76,7 +82,6 @@ export interface DigestTimeSettings {
 export interface NotificationTypeSettings {
   inApp: boolean;
   email: boolean;
-  push: boolean;
   frequency: NotificationFrequency;
 }
 
@@ -119,16 +124,6 @@ export interface UnreadCountResponse {
     system: number;
     interaction: number;
   };
-}
-
-export interface PushSubscription {
-  endpoint: string;
-  expirationTime?: number | null;
-  keys: {
-    p256dh: string;
-    auth: string;
-  };
-  toJSON?: () => { keys: { p256dh: string; auth: string } };
 }
 
 export type NotificationStatus = 'idle' | 'loading' | 'error' | 'success';

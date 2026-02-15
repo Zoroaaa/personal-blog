@@ -2,7 +2,7 @@
 
 本文档详细描述个人博客系统的所有 API 接口。
 
-**版本**: v3.0.1 | **更新日期**: 2026-02-14
+**版本**: v1.3.2 | **更新日期**: 2026-02-15
 
 ---
 
@@ -1048,8 +1048,8 @@ file: <binary>
   "success": true,
   "data": {
     "status": "healthy",
-    "version": "1.3.1",
-    "timestamp": "2026-02-14T10:00:00.000Z",
+    "version": "1.3.2",
+    "timestamp": "2026-02-15T10:00:00.000Z",
     "services": {
       "database": "healthy",
       "cache": "healthy",

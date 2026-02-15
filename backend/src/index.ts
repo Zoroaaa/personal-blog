@@ -31,7 +31,6 @@ import { messageRoutes } from './routes/messages';
 import { userRoutes } from './routes/users';
 // 用户资源路由
 import { userNotificationSettingsRoutes } from './routes/users/notificationSettings';
-import { userNotificationSubscriptionsRoutes } from './routes/users/notificationSubscriptions';
 
 // 导入中间件
 import { requestLogger } from './middleware/requestLogger';
@@ -131,7 +130,7 @@ app.use('*', (c, next) => {
     },
     credentials: true,
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Request-ID'],
+    allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Request-ID', 'X-Post-Token'],
     exposeHeaders: ['X-Total-Count', 'X-Page', 'X-Per-Page', 'Content-Length'],
     maxAge: 86400, // 24小时
   });
@@ -332,17 +331,13 @@ app.route('/api/admin/notifications', adminNotificationRoutes);
  */
 app.route('/api/messages', messageRoutes);
 
-app.route('/api/users', userRoutes);
-
 /**
  * 用户通知设置路由（标准RESTful API位置）
+ * 注意：必须在 userRoutes 之前注册，否则 /:id 会匹配 /notification-settings
  */
 app.route('/api/users/notification-settings', userNotificationSettingsRoutes);
 
-/**
- * 用户通知订阅路由（标准RESTful API位置，浏览器推送订阅）
- */
-app.route('/api/users/notification-subscriptions', userNotificationSubscriptionsRoutes);
+app.route('/api/users', userRoutes);
 
 // ============= 错误处理 =============
 
@@ -443,7 +438,7 @@ app.onError((err, c) => {
   }
 
   // 返回错误响应
-  return c.json<ApiResponse>(responseData, statusCode);
+  return c.json<ApiResponse>(responseData, statusCode as 400 | 401 | 403 | 404 | 409 | 429 | 500);
 });
 
 // ============= 导出 =============

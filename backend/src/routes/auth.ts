@@ -26,7 +26,7 @@ import bcrypt from 'bcryptjs';
 import type { Env, Variables } from '../types';
 import { successResponse, errorResponse } from '../utils/response';
 import { safeGetCache, safePutCache, safeDeleteCache } from '../utils/cache';
-import { generateToken } from '../utils/jwt';
+import { generateToken, asSecret } from '../utils/jwt';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { rateLimit } from '../middleware/rateLimit';
@@ -449,7 +449,7 @@ authRoutes.post(
     const userId = result.meta.last_row_id;
     
     // ===== 9. 生成JWT Token =====
-    const token = await generateToken(c.env.JWT_SECRET, {
+    const token = await generateToken(asSecret(c.env.JWT_SECRET), {
       userId,
       username,
       role: 'user',
@@ -524,7 +524,7 @@ authRoutes.post(
 
     // ===== 2. 查找用户 =====
     const user = await c.env.DB.prepare(
-      'SELECT id, username, email, password_hash, display_name, avatar_url, bio, role FROM users WHERE (username = ? OR email = ?) AND deleted_at IS NULL'
+      'SELECT id, username, email, password_hash, display_name, avatar_url, bio, role, status FROM users WHERE (username = ? OR email = ?) AND deleted_at IS NULL'
     ).bind(username, username).first() as any;
 
     // ===== 3. 验证用户存在 =====
@@ -534,6 +534,23 @@ authRoutes.post(
         'Invalid credentials',
         'Username or password is incorrect'
       ), 401);
+    }
+
+    // ===== 3.5 检查用户状态 =====
+    if (user.status === 'suspended') {
+      logger.warn('Login failed: Account suspended', { username });
+      return c.json(errorResponse(
+        'Account suspended',
+        '该账户已被暂停，请联系管理员'
+      ), 403);
+    }
+
+    if (user.status === 'deleted') {
+      logger.warn('Login failed: Account deleted', { username });
+      return c.json(errorResponse(
+        'Account deleted',
+        '该账户已被删除'
+      ), 403);
     }
 
     // ===== 4. 验证密码 =====
@@ -555,7 +572,7 @@ authRoutes.post(
     }
 
     // ===== 5. 生成JWT Token =====
-    const token = await generateToken(c.env.JWT_SECRET, {
+    const token = await generateToken(asSecret(c.env.JWT_SECRET), {
       userId: user.id,
       username: user.username,
       role: user.role,
@@ -904,6 +921,23 @@ authRoutes.post(
       }
     } else {
       logger.info('GitHub user found in database', { userId: user.id, username: user.username });
+      
+      // 检查用户状态
+      if (user.status === 'suspended') {
+        logger.warn('GitHub login failed: Account suspended', { username: user.username });
+        return c.json(errorResponse(
+          'Account suspended',
+          '该账户已被暂停，请联系管理员'
+        ), 403);
+      }
+
+      if (user.status === 'deleted') {
+        logger.warn('GitHub login failed: Account deleted', { username: user.username });
+        return c.json(errorResponse(
+          'Account deleted',
+          '该账户已被删除'
+        ), 403);
+      }
     }
 
     // ===== 4. 存储或更新 OAuth 令牌 =====
@@ -943,7 +977,7 @@ authRoutes.post(
 
     // ===== 5. 生成JWT Token =====
     logger.info('Generating JWT token', { userId: user.id });
-    const token = await generateToken(c.env.JWT_SECRET, {
+    const token = await generateToken(asSecret(c.env.JWT_SECRET), {
       userId: user.id,
       username: user.username,
       role: user.role,

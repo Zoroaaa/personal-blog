@@ -2,7 +2,7 @@
 
 本文档帮助您在 5 分钟内启动并运行个人博客系统。
 
-**版本**: v3.0.1 | **更新日期**: 2026-02-14
+**版本**: v1.3.2 | **更新日期**: 2026-02-15
 
 ---
 
@@ -143,7 +143,7 @@ wrangler kv:namespace create "CACHE"
 ```bash
 # 执行数据库迁移（需按顺序执行）
 wrangler d1 execute personal-blog-dev --file=./database/schema-v1.1-base.sql
-wrangler d1 execute personal-blog-dev --file=./database/schema-v1.2-notification-messaging.sql
+wrangler d1 execute personal-blog-dev --file=./database/schema-v1.3-notification-messaging.sql
 
 # 验证表创建成功
 wrangler d1 execute personal-blog-dev --command="SELECT name FROM sqlite_master WHERE type='table';"
@@ -231,8 +231,8 @@ pnpm dev
   "success": true,
   "data": {
     "status": "healthy",
-    "version": "1.3.1",
-    "timestamp": "2026-02-14T10:00:00.000Z",
+    "version": "1.3.2",
+    "timestamp": "2026-02-15T10:00:00.000Z",
     "services": {
       "database": "healthy",
       "cache": "healthy",
@@ -311,7 +311,9 @@ personal-blog/
 │   │   └── types/          # 类型定义
 │   ├── database/
 │   │   ├── schema-v1.1-base.sql          # 基础数据库架构
-│   │   └── schema-v1.2-notification-messaging.sql # 通知私信架构
+│   │   ├── schema-v1.3-notification-messaging.sql # 通知私信架构
+│   │   ├── migration-v1.3-notification-cleanup.sql # 通知系统清理迁移
+│   │   └── migration-v1.3-remove-password-field.sql # 密码字段迁移
 │   ├── .env                # 环境变量
 │   └── wrangler.toml       # Workers 配置
 ├── frontend/               # 前端应用
@@ -412,7 +414,7 @@ ls backend/database/
 
 # 重新执行迁移（按顺序）
 wrangler d1 execute personal-blog-dev --file=./database/schema-v1.1-base.sql
-wrangler d1 execute personal-blog-dev --file=./database/schema-v1.2-notification-messaging.sql
+wrangler d1 execute personal-blog-dev --file=./database/schema-v1.3-notification-messaging.sql
 ```
 
 ### Q: 登录提示 "Invalid credentials"

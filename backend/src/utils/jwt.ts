@@ -29,6 +29,19 @@ export interface PostPasswordPayload {
 
 export type TokenPayload = JWTPayload | PostPasswordPayload | Record<string, any>;
 
+declare const __brand: unique symbol;
+
+export type JWTToken = string & { readonly [__brand]: 'JWTToken' };
+export type Secret = string & { readonly [__brand]: 'Secret' };
+
+export function asJWTToken(token: string): JWTToken {
+  return token as JWTToken;
+}
+
+export function asSecret(secret: string): Secret {
+  return secret as Secret;
+}
+
 /**
  * 生成JWT token
  * 
@@ -39,9 +52,9 @@ export type TokenPayload = JWTPayload | PostPasswordPayload | Record<string, any
  * @returns 生成的JWT token字符串
  */
 export async function generateToken(
-  secret: string,
+  secret: Secret | string,
   payload: Record<string, any>
-): Promise<string> {
+): Promise<JWTToken> {
   const header = { alg: 'HS256', typ: 'JWT' };
   
   let exp: number;
@@ -79,7 +92,7 @@ export async function generateToken(
     secret
   );
   
-  return `${encodedHeader}.${encodedPayload}.${signature}`;
+  return asJWTToken(`${encodedHeader}.${encodedPayload}.${signature}`);
 }
 
 /**
@@ -93,9 +106,17 @@ export async function generateToken(
  * @throws 当token格式无效、签名错误或过期时抛出异常
  */
 export async function verifyToken(
-  token: string,
-  secret: string
+  token: JWTToken | string,
+  secret: Secret | string
 ): Promise<TokenPayload> {
+  if (!token || !token.includes('.')) {
+    throw new Error('Invalid token: must be in JWT format (xxx.yyy.zzz)');
+  }
+  
+  if (!secret || secret.includes('.')) {
+    throw new Error('Invalid secret: must not be in JWT format');
+  }
+  
   const parts = token.split('.');
   if (parts.length !== 3) {
     throw new Error('Invalid token format');

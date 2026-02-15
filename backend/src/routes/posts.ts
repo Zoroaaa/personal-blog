@@ -37,7 +37,7 @@ import {
 import { createInteractionNotification } from '../services/notificationService';
 import { isInteractionSubtypeEnabled } from '../services/notificationSettingsService';
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
-import { verifyToken, generateToken } from '../utils/jwt';
+import { verifyToken, generateToken, asSecret, asJWTToken } from '../utils/jwt';
 import bcrypt from 'bcryptjs';
 
 // 定义应用路由类型
@@ -135,10 +135,11 @@ postRoutes.get('/', async (c) => {
     logger.info('Fetching posts from D1', { page, limit, category, tag, author, search });
     
     // ===== 3. 构建查询 =====
+    // 隐藏专栏的文章不在首页显示
     let query = `
       SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
              p.view_count, p.like_count, p.comment_count, p.reading_time,
-             p.published_at, p.created_at,
+             p.published_at, p.created_at, p.visibility,
              u.username as author_name, u.display_name as author_display_name,
              u.avatar_url as author_avatar,
              c.name as category_name, c.slug as category_slug, c.color as category_color,
@@ -147,7 +148,8 @@ postRoutes.get('/', async (c) => {
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN columns col ON p.column_id = col.id
-      WHERE p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
+      WHERE p.status = 'published' AND p.visibility IN ('public', 'password') AND p.deleted_at IS NULL AND u.deleted_at IS NULL
+      AND (col.status IS NULL OR col.status != 'hidden')
     `;
     
     const params: any[] = [];
@@ -189,10 +191,13 @@ postRoutes.get('/', async (c) => {
     const { results } = await c.env.DB.prepare(query).bind(...params).all();
     
     // ===== 5. 获取总数 =====
+    // 隐藏专栏的文章不在首页显示
     let countQuery = `SELECT COUNT(*) as total FROM posts p
                       LEFT JOIN categories c ON p.category_id = c.id
                       LEFT JOIN users u ON p.author_id = u.id
-                      WHERE p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL`;
+                      LEFT JOIN columns col ON p.column_id = col.id
+                      WHERE p.status = 'published' AND p.visibility IN ('public', 'password') AND p.deleted_at IS NULL AND u.deleted_at IS NULL
+                      AND (col.status IS NULL OR col.status != 'hidden')`;
     const countParams: any[] = [];
     
     if (category) {
@@ -1095,12 +1100,14 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
 
     if (post.visibility === 'password') {
       const authHeader = c.req.header('Authorization');
+      const postToken = c.req.header('X-Post-Token');
       let hasPasswordAccess = false;
 
-      if (authHeader && authHeader.startsWith('Bearer ')) {
+      const tokenToVerify = postToken || (authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null);
+
+      if (tokenToVerify) {
         try {
-          const token = authHeader.slice(7);
-          const decoded = await verifyToken(c.env.JWT_SECRET, token);
+          const decoded = await verifyToken(asJWTToken(tokenToVerify), asSecret(c.env.JWT_SECRET));
           if (decoded && 'postId' in decoded && decoded.postId === post.id && decoded.type === 'post_password_access') {
             hasPasswordAccess = true;
           }
@@ -1308,11 +1315,12 @@ postRoutes.post('/', requireAuth, async (c) => {
     
     const postId = result.meta.last_row_id;
     
-    // ===== 7. 添加标签 =====
+    // ===== 7. 添加标签（去重处理）=====
     if (tags && Array.isArray(tags) && tags.length > 0) {
-      for (const tagId of tags) {
+      const uniqueTagIds = [...new Set(tags.filter(id => id != null))];
+      for (const tagId of uniqueTagIds) {
         await c.env.DB.prepare(
-          'INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)'
+          'INSERT OR IGNORE INTO post_tags (post_id, tag_id) VALUES (?, ?)'
         ).bind(postId, tagId).run();
       }
     }
@@ -1449,15 +1457,27 @@ postRoutes.put('/:id', requireAuth, async (c) => {
       id
     ).run();
     
-    // ===== 6. 更新标签 =====
+    // ===== 6. 更新标签（增量更新，避免不必要的计数变化）=====
     if (tags && Array.isArray(tags)) {
-      // 删除旧标签
-      await c.env.DB.prepare('DELETE FROM post_tags WHERE post_id = ?').bind(id).run();
+      const newTagIds = [...new Set(tags.filter(id => id != null))];
       
-      // 添加新标签
-      for (const tagId of tags) {
+      const { results: existingTags } = await c.env.DB.prepare(
+        'SELECT tag_id FROM post_tags WHERE post_id = ?'
+      ).bind(id).all() as any;
+      const existingTagIds = existingTags.map((t: any) => t.tag_id);
+      
+      const tagsToAdd = newTagIds.filter(id => !existingTagIds.includes(id));
+      const tagsToRemove = existingTagIds.filter((id: number) => !newTagIds.includes(id));
+      
+      for (const tagId of tagsToRemove) {
         await c.env.DB.prepare(
-          'INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)'
+          'DELETE FROM post_tags WHERE post_id = ? AND tag_id = ?'
+        ).bind(id, tagId).run();
+      }
+      
+      for (const tagId of tagsToAdd) {
+        await c.env.DB.prepare(
+          'INSERT OR IGNORE INTO post_tags (post_id, tag_id) VALUES (?, ?)'
         ).bind(id, tagId).run();
       }
     }
@@ -1961,7 +1981,7 @@ postRoutes.post('/:id/verify-password', async (c) => {
 
     // 生成临时访问令牌（可选）
     // 这个令牌可以存储在客户端，以避免重复输入密码
-    const token = await generateToken(c.env.JWT_SECRET, {
+    const token = await generateToken(asSecret(c.env.JWT_SECRET), {
       postId: post.id,
       type: 'post_password_access',
       expiresIn: '24h'

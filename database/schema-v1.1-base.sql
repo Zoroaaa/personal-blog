@@ -166,7 +166,6 @@ CREATE TABLE IF NOT EXISTS posts (
     
     status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'published', 'archived')),
     visibility TEXT NOT NULL DEFAULT 'public' CHECK(visibility IN ('public', 'private', 'password')),
-    password TEXT,
     password_hash TEXT,
     
     view_count INTEGER DEFAULT 0,
@@ -582,15 +581,6 @@ BEGIN
     SET reply_count = MAX(0, reply_count - 1),
         updated_at = CURRENT_TIMESTAMP
     WHERE id = OLD.parent_id AND OLD.parent_id IS NOT NULL;
-END;
-
-CREATE TRIGGER IF NOT EXISTS trg_post_tags_hard_delete
-AFTER DELETE ON post_tags
-BEGIN
-    UPDATE tags
-    SET post_count = MAX(0, post_count - 1),
-        updated_at = CURRENT_TIMESTAMP
-    WHERE id = OLD.tag_id;
 END;
 
 -- ============= 视图 =============

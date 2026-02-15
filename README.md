@@ -3,7 +3,7 @@
 一个基于 Cloudflare 全栈技术构建的现代化个人博客系统。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.3.1-green.svg)](https://github.com/yourusername/personal-blog)
+[![Version](https://img.shields.io/badge/version-1.3.2-green.svg)](https://github.com/yourusername/personal-blog)
 [![Cloudflare](https://img.shields.io/badge/Cloudflare-Workers-orange.svg)](https://workers.cloudflare.com/)
 
 **体验地址**: [blog.neutronx.uk](https://blog.neutronx.uk)
@@ -112,7 +112,7 @@
    
    # 执行数据库迁移（需按顺序执行）
    wrangler d1 execute personal-blog-dev --file=./database/schema-v1.1-base.sql
-   wrangler d1 execute personal-blog-dev --file=./database/schema-v1.2-notification-messaging.sql
+   wrangler d1 execute personal-blog-dev --file=./database/schema-v1.3-notification-messaging.sql
    ```
 
 5. **创建 R2 存储桶**
@@ -163,7 +163,9 @@ personal-blog/
 │   │   └── types/          # 类型定义
 │   ├── database/
 │   │   ├── schema-v1.1-base.sql          # 基础数据库架构
-│   │   └── schema-v1.2-notification-messaging.sql # 通知私信架构
+│   │   ├── schema-v1.3-notification-messaging.sql # 通知私信架构
+│   │   ├── migration-v1.3-notification-cleanup.sql # 通知系统清理迁移
+│   │   └── migration-v1.3-remove-password-field.sql # 密码字段迁移
 │   └── wrangler.toml       # Workers 配置
 ├── frontend/               # 前端应用
 │   ├── src/
@@ -377,4 +379,4 @@ wrangler pages deploy dist
 
 ---
 
-**版本**: v1.3.1 | **更新日期**: 2026-02-14
+**版本**: v1.3.2 | **更新日期**: 2026-02-15

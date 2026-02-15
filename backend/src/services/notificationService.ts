@@ -6,14 +6,16 @@
  * - 通知发送逻辑
  * - 与数据库交互
  * - 免打扰检查
+ * - 邮件汇总功能
  * 
  * 变更说明：
+ * - 移除了 push 相关功能
  * - 移除了 private_message 类型的支持
- * - 移除了 createPrivateMessageNotification 函数
+ * - 添加了邮件汇总入队逻辑
  * - 私信现在是完全独立的系统
  *
  * @author 博客系统
- * @version 2.0.0 - 方案A
+ * @version 2.1.0
  * @created 2026-02-13
  */
 
@@ -28,6 +30,7 @@ import type {
   NotificationChannel,
   SendNotificationOptions,
   NotificationRelatedData,
+  NotificationFrequency,
 } from '../types/notifications';
 import type { Env } from '../types';
 import { getNotificationSettings } from './notificationSettingsService';
@@ -66,25 +69,22 @@ export async function createNotification(
       return null;
     }
 
-    const shouldSendEmail = !options.skipEmail &&
+    const frequency = typeSettings.frequency;
+    const shouldSendEmailNow = !options.skipEmail &&
       typeSettings.email &&
       shouldSendNow(settings.doNotDisturb, 'email');
 
-    const shouldSendPush = !options.skipPush &&
-      typeSettings.push &&
-      shouldSendNow(settings.doNotDisturb, 'push');
-
     const shouldSendInApp = !options.skipInApp && typeSettings.inApp;
 
-    if (!shouldSendInApp && !shouldSendEmail && !shouldSendPush) {
+    if (!shouldSendInApp && !shouldSendEmailNow && frequency === 'realtime') {
       return null;
     }
 
     const result = await db.prepare(
       `INSERT INTO notifications (
         user_id, type, subtype, title, content, related_data,
-        is_in_app_sent, is_email_sent, is_push_sent, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+        is_in_app_sent, is_email_sent, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
     ).bind(
       userId,
       type,
@@ -93,8 +93,7 @@ export async function createNotification(
       content || null,
       relatedData ? JSON.stringify(relatedData) : null,
       shouldSendInApp ? 1 : 0,
-      shouldSendEmail ? 0 : 0,
-      shouldSendPush ? 0 : 0
+      0
     ).run();
 
     if (!result.success) {
@@ -105,7 +104,11 @@ export async function createNotification(
     const notificationId = result.meta.last_row_id;
     const notification = await getNotificationById(db, notificationId);
 
-    if (shouldSendEmail && env && notification) {
+    if (!notification) {
+      return null;
+    }
+
+    if (frequency === 'realtime' && shouldSendEmailNow && env) {
       try {
         const user = await db.prepare(
           'SELECT display_name, email FROM users WHERE id = ?'
@@ -124,12 +127,67 @@ export async function createNotification(
       } catch (error) {
         console.error('Failed to send notification email:', error);
       }
+    } else if (frequency === 'daily' || frequency === 'weekly') {
+      await queueNotificationForDigest(db, notificationId, userId, frequency, settings);
     }
 
     return notification;
   } catch (error) {
     console.error('Create notification error:', error);
     return null;
+  }
+}
+
+async function queueNotificationForDigest(
+  db: D1Database,
+  notificationId: number,
+  userId: number,
+  frequency: NotificationFrequency,
+  settings: any
+): Promise<void> {
+  try {
+    const digestTime = settings.digestTime;
+    const now = new Date();
+    
+    let scheduledAt: Date;
+    
+    if (frequency === 'daily') {
+      const [hours, minutes] = digestTime.daily.split(':').map(Number);
+      scheduledAt = new Date(now);
+      scheduledAt.setHours(hours, minutes, 0, 0);
+      
+      if (scheduledAt <= now) {
+        scheduledAt.setDate(scheduledAt.getDate() + 1);
+      }
+    } else {
+      const targetDay = digestTime.weeklyDay;
+      const [hours, minutes] = digestTime.weeklyTime.split(':').map(Number);
+      scheduledAt = new Date(now);
+      scheduledAt.setHours(hours, minutes, 0, 0);
+      
+      const currentDay = scheduledAt.getDay();
+      let daysUntilTarget = targetDay - currentDay;
+      if (daysUntilTarget <= 0) {
+        daysUntilTarget += 7;
+      }
+      if (daysUntilTarget === 0 && scheduledAt <= now) {
+        daysUntilTarget = 7;
+      }
+      scheduledAt.setDate(scheduledAt.getDate() + daysUntilTarget);
+    }
+
+    await db.prepare(
+      `INSERT INTO email_digest_queue (
+        user_id, notification_id, digest_type, scheduled_at, is_sent, created_at
+      ) VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP)`
+    ).bind(
+      userId,
+      notificationId,
+      frequency,
+      scheduledAt.toISOString()
+    ).run();
+  } catch (error) {
+    console.error('Failed to queue notification for digest:', error);
   }
 }
 
@@ -141,7 +199,7 @@ export async function getNotificationById(
     const row = await db.prepare(
       `SELECT 
         id, user_id, type, subtype, title, content, related_data,
-        is_in_app_sent, is_email_sent, is_push_sent,
+        is_in_app_sent, is_email_sent,
         is_read, read_at, deleted_at, created_at
       FROM notifications
       WHERE id = ? AND deleted_at IS NULL`
@@ -190,7 +248,7 @@ export async function getNotifications(
     const rows = await db.prepare(
       `SELECT 
         id, user_id, type, subtype, title, content, related_data,
-        is_in_app_sent, is_email_sent, is_push_sent,
+        is_in_app_sent, is_email_sent,
         is_read, read_at, deleted_at, created_at
       FROM notifications
       WHERE ${whereClause}
@@ -337,7 +395,6 @@ export async function updateChannelStatus(
     const columnMap = {
       in_app: 'is_in_app_sent',
       email: 'is_email_sent',
-      push: 'is_push_sent',
     };
 
     const column = columnMap[channel];
@@ -382,7 +439,6 @@ function mapNotificationFromRow(row: any): Notification {
     relatedData: row.related_data ? JSON.parse(row.related_data) : undefined,
     isInAppSent: row.is_in_app_sent === 1,
     isEmailSent: row.is_email_sent === 1,
-    isPushSent: row.is_push_sent === 1,
     isRead: row.is_read === 1,
     readAt: row.read_at,
     isDeleted: row.deleted_at !== null && row.deleted_at !== undefined,
@@ -395,7 +451,7 @@ export async function createInteractionNotification(
   db: D1Database,
   params: {
     userId: number;
-    subtype: 'comment' | 'like' | 'favorite' | 'mention' | 'follow' | 'reply';
+    subtype: 'comment' | 'like' | 'favorite' | 'mention' | 'reply';
     title: string;
     content?: string;
     relatedData: NotificationRelatedData;

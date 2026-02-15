@@ -40,6 +40,7 @@ const MAX_PAGE_SIZE = 100;
  * - limit: 每页数量（默认20，最大100）
  * - status: 状态筛选（all, approved, pending, rejected, deleted）
  * - postId: 文章ID筛选
+ * - includeDeleted: 是否包含软删除的评论（默认false）
  */
 adminRoutes.get('/comments', requireAdmin, async (c) => {
   const logger = createLogger(c);
@@ -49,9 +50,10 @@ adminRoutes.get('/comments', requireAdmin, async (c) => {
     const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
     const status = c.req.query('status') || 'all';
     const postId = c.req.query('postId');
+    const includeDeleted = c.req.query('includeDeleted') === 'true';
     const offset = (page - 1) * limit;
     
-    // 构建查询
+    // 构建查询（默认排除软删除的评论和用户）
     let query = `
       SELECT c.*, 
              u.username, u.display_name, u.avatar_url,
@@ -63,6 +65,11 @@ adminRoutes.get('/comments', requireAdmin, async (c) => {
     `;
     
     const params: any[] = [];
+    
+    // 软删除过滤（默认不显示软删除的评论）
+    if (!includeDeleted) {
+      query += ' AND c.deleted_at IS NULL AND u.deleted_at IS NULL';
+    }
     
     // 状态筛选
     if (status !== 'all') {
@@ -91,6 +98,11 @@ adminRoutes.get('/comments', requireAdmin, async (c) => {
     `;
     const countParams: any[] = [];
     
+    // 软删除过滤
+    if (!includeDeleted) {
+      countQuery += ' AND c.deleted_at IS NULL AND u.deleted_at IS NULL';
+    }
+    
     if (status !== 'all') {
       countQuery += ' AND c.status = ?';
       countParams.push(status);
@@ -104,7 +116,7 @@ adminRoutes.get('/comments', requireAdmin, async (c) => {
     const countResult = await c.env.DB.prepare(countQuery).bind(...countParams).first() as any;
     const total = countResult?.total || 0;
     
-    logger.info('Admin comments fetched', { count: results.length, page, status, postId });
+    logger.info('Admin comments fetched', { count: results.length, page, status, postId, includeDeleted });
     
     return c.json(successResponse({
       comments: results,
@@ -229,6 +241,7 @@ adminRoutes.delete('/comments/:id', requireAdmin, async (c) => {
  * - limit: 每页数量（默认20，最大100）
  * - role: 角色筛选（all, admin, user, moderator）
  * - status: 状态筛选（all, active, suspended, deleted）
+ * - includeDeleted: 是否包含软删除的用户（默认false）
  */
 adminRoutes.get('/users', requireAdmin, async (c) => {
   const logger = createLogger(c);
@@ -238,9 +251,10 @@ adminRoutes.get('/users', requireAdmin, async (c) => {
     const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
     const role = c.req.query('role') || 'all';
     const status = c.req.query('status') || 'all';
+    const includeDeleted = c.req.query('includeDeleted') === 'true';
     const offset = (page - 1) * limit;
     
-    // 构建查询
+    // 构建查询（默认排除软删除的用户）
     let query = `
       SELECT u.*
       FROM users u
@@ -248,6 +262,11 @@ adminRoutes.get('/users', requireAdmin, async (c) => {
     `;
     
     const params: any[] = [];
+    
+    // 软删除过滤（默认不显示软删除的用户）
+    if (!includeDeleted) {
+      query += ' AND u.deleted_at IS NULL';
+    }
     
     // 角色筛选
     if (role !== 'all') {
@@ -275,6 +294,11 @@ adminRoutes.get('/users', requireAdmin, async (c) => {
     `;
     const countParams: any[] = [];
     
+    // 软删除过滤
+    if (!includeDeleted) {
+      countQuery += ' AND u.deleted_at IS NULL';
+    }
+    
     if (role !== 'all') {
       countQuery += ' AND u.role = ?';
       countParams.push(role);
@@ -288,7 +312,7 @@ adminRoutes.get('/users', requireAdmin, async (c) => {
     const countResult = await c.env.DB.prepare(countQuery).bind(...countParams).first() as any;
     const total = countResult?.total || 0;
     
-    logger.info('Admin users fetched', { count: results.length, page, role, status });
+    logger.info('Admin users fetched', { count: results.length, page, role, status, includeDeleted });
     
     return c.json(successResponse({
       users: results,

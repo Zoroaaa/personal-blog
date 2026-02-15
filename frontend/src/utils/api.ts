@@ -42,9 +42,8 @@ import type {
 
 // ============= 配置 =============
 
-// 支持Vite环境变量和Node.js环境变量
-const API_URL = (import.meta?.env?.VITE_API_URL || process.env.VITE_API_URL) || '/api';
-const isDevelopment = (import.meta?.env?.DEV || process.env.NODE_ENV === 'development');
+const API_URL = import.meta?.env?.VITE_API_URL || '/api';
+const isDevelopment = import.meta?.env?.DEV;
 
 
 // ============= 核心请求函数 =============
@@ -340,8 +339,10 @@ export const api = {
   /**
    * 获取文章详情
    */
-  getPost: (slug: string) => 
-    apiRequest<Post>(`/posts/${slug}`),
+  getPost: (slug: string, postToken?: string) => 
+    apiRequest<Post>(`/posts/${slug}`, {
+      headers: postToken ? { 'X-Post-Token': postToken } : undefined
+    }),
   
   /**
  * 通过ID获取文章详情(用于编辑)
@@ -387,6 +388,15 @@ export const api = {
   deletePost: (id: number) => 
     apiRequest<{ deleted: boolean }>(`/posts/${id}`, {
       method: 'DELETE',
+    }),
+
+  /**
+   * 验证文章密码
+   */
+  verifyPostPassword: (postId: number, password: string) =>
+    apiRequest<{ verified: boolean; token: string; post: { id: number; title: string; slug: string } }>(`/posts/${postId}/verify-password`, {
+      method: 'POST',
+      body: JSON.stringify({ password }),
     }),
   
   /**
@@ -830,7 +840,7 @@ export const api = {
   /**
    * 更新评论状态
    */
-  updateCommentStatus: (id: number, status: 'approved' | 'pending' | 'spam') =>
+  updateCommentStatus: (id: number, status: 'approved' | 'pending' | 'rejected' | 'deleted') =>
     apiRequest<{ updated: boolean }>(`/admin/comments/${id}/status`, {
       method: 'PUT',
       body: JSON.stringify({ status }),
@@ -861,7 +871,16 @@ export const api = {
     }),
   
   /**
-   * 删除用户
+   * 更新用户状态
+   */
+  updateUserStatus: (id: number, status: 'active' | 'suspended' | 'deleted') =>
+    apiRequest<{ updated: boolean }>(`/admin/users/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    }),
+  
+  /**
+   * 删除用户（软删除）
    */
   deleteUser: (id: number) =>
     apiRequest<{ deleted: boolean }>(`/admin/users/${id}`, {
@@ -924,6 +943,84 @@ export const api = {
 
   getUserProfile: (userId: number) =>
     apiRequest<{ user: { id: number; username: string; displayName: string; avatarUrl?: string; bio?: string; createdAt: string; postCount: number; commentCount: number } }>(`/users/${userId}`),
+
+  // ============= 私信相关 =============
+
+  getThreads: (page?: number, limit?: number) => {
+    const params = new URLSearchParams();
+    if (page) params.append('page', String(page));
+    if (limit) params.append('limit', String(limit));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return apiRequest<{
+      threads: Array<{
+        threadId: string;
+        otherUserId: number;
+        otherUsername: string;
+        otherName: string;
+        otherAvatar?: string;
+        lastMessage: string;
+        lastMessageAt: string;
+        unreadCount: number;
+        totalMessages: number;
+      }>;
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>(`/messages/threads${query}`);
+  },
+
+  getThreadMessages: (threadId: string, page?: number, limit?: number) => {
+    const params = new URLSearchParams();
+    params.append('page', String(page || 1));
+    params.append('limit', String(limit || 20));
+    return apiRequest<{
+      messages: any[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>(`/messages/thread/${threadId}?${params.toString()}`);
+  },
+
+  sendMessage: (data: {
+    recipientId: number;
+    content: string;
+    subject?: string;
+    replyToId?: number;
+    messageType?: 'text' | 'image' | 'attachment' | 'mixed';
+    attachmentUrl?: string;
+    attachmentFilename?: string;
+    attachmentSize?: number;
+    attachmentMimeType?: string;
+  }) =>
+    apiRequest<any>('/messages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  recallMessage: (messageId: number) =>
+    apiRequest<{ recalled: boolean }>(`/messages/${messageId}/recall`, {
+      method: 'POST',
+    }),
+
+  resendMessage: (messageId: number, data: {
+    content: string;
+    messageType?: 'text' | 'image' | 'attachment' | 'mixed';
+    attachmentUrl?: string;
+    attachmentFilename?: string;
+    attachmentSize?: number;
+    attachmentMimeType?: string;
+  }) =>
+    apiRequest<any>(`/messages/${messageId}/resend`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  markThreadAsRead: (threadId: string) =>
+    apiRequest<{ count: number }>(`/messages/threads/${threadId}/read`, {
+      method: 'PATCH',
+    }),
+
+  getUnreadMessageCount: () =>
+    apiRequest<{ count: number }>('/messages/unread/count'),
+
+  getThreadId: (userId: number) =>
+    apiRequest<{ threadId: string }>(`/messages/thread-id/${userId}`),
 };
 
 // ============= 辅助函数 =============

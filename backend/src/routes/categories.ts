@@ -43,9 +43,10 @@ categoryRoutes.get('/', async (c) => {
   const logger = createLogger(c);
 
   try {
-    // 从数据库获取
+    // 从数据库获取（排除软删除的分类）
     const { results } = await c.env.DB.prepare(`
       SELECT * FROM categories
+      WHERE deleted_at IS NULL
       ORDER BY display_order ASC, name ASC
     `).all();
 
@@ -74,9 +75,10 @@ categoryRoutes.get('/tags', async (c) => {
   const logger = createLogger(c);
 
   try {
-    // 从数据库获取
+    // 从数据库获取（排除软删除的标签）
     const { results } = await c.env.DB.prepare(`
       SELECT * FROM tags
+      WHERE deleted_at IS NULL
       ORDER BY post_count DESC, name ASC
     `).all();
 
@@ -438,11 +440,11 @@ categoryRoutes.get('/:slug', async (c) => {
       return c.json(errorResponse('Invalid slug'), 400);
     }
 
-    // 获取分类详情
+    // 获取分类详情（排除软删除的分类）
     const category = await c.env.DB.prepare(`
       SELECT *
       FROM categories
-      WHERE slug = ?
+      WHERE slug = ? AND deleted_at IS NULL
     `).bind(slug).first() as any;
 
     if (!category) {
@@ -492,16 +494,16 @@ categoryRoutes.get('/:slug/posts', async (c) => {
     const allowedSortFields = ['published_at', 'view_count', 'like_count', 'comment_count', 'created_at'];
     const finalSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'published_at';
 
-    // 先获取分类ID
+    // 先获取分类ID（排除软删除的分类）
     const category = await c.env.DB.prepare(
-      'SELECT id FROM categories WHERE slug = ?'
+      'SELECT id FROM categories WHERE slug = ? AND deleted_at IS NULL'
     ).bind(slug).first() as any;
 
     if (!category) {
       return c.json(errorResponse('Category not found'), 404);
     }
 
-    // 获取文章列表
+    // 获取文章列表（排除软删除的文章和用户）
     let query = `
       SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
              p.view_count, p.like_count, p.comment_count, p.reading_time,
@@ -512,18 +514,19 @@ categoryRoutes.get('/:slug/posts', async (c) => {
       FROM posts p
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
-      WHERE p.category_id = ? AND p.status = 'published' AND p.visibility = 'public'
+      WHERE p.category_id = ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
     `;
 
     query += ` ORDER BY p.${finalSortBy} ${order} LIMIT ? OFFSET ?`;
 
     const { results } = await c.env.DB.prepare(query).bind(category.id, limit, offset).all();
 
-    // 获取总数
+    // 获取总数（排除软删除的文章）
     const countResult = await c.env.DB.prepare(`
       SELECT COUNT(*) as total
-      FROM posts
-      WHERE category_id = ? AND status = 'published' AND visibility = 'public'
+      FROM posts p
+      LEFT JOIN users u ON p.author_id = u.id
+      WHERE p.category_id = ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
     `).bind(category.id).first() as any;
     const total = countResult?.total || 0;
 
@@ -605,11 +608,11 @@ categoryRoutes.get('/tags/:slug', async (c) => {
       return c.json(errorResponse('Invalid slug'), 400);
     }
 
-    // 获取标签详情
+    // 获取标签详情（排除软删除的标签）
     const tag = await c.env.DB.prepare(`
       SELECT *
       FROM tags
-      WHERE slug = ?
+      WHERE slug = ? AND deleted_at IS NULL
     `).bind(slug).first() as any;
 
     if (!tag) {
@@ -659,16 +662,16 @@ categoryRoutes.get('/tags/:slug/posts', async (c) => {
     const allowedSortFields = ['published_at', 'view_count', 'like_count', 'comment_count', 'created_at'];
     const finalSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'published_at';
 
-    // 先获取标签ID
+    // 先获取标签ID（排除软删除的标签）
     const tag = await c.env.DB.prepare(
-      'SELECT id FROM tags WHERE slug = ?'
+      'SELECT id FROM tags WHERE slug = ? AND deleted_at IS NULL'
     ).bind(slug).first() as any;
 
     if (!tag) {
       return c.json(errorResponse('Tag not found'), 404);
     }
 
-    // 获取文章列表（通过post_tags关联）
+    // 获取文章列表（通过post_tags关联，排除软删除的文章和用户）
     let query = `
       SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
              p.view_count, p.like_count, p.comment_count, p.reading_time,
@@ -680,19 +683,20 @@ categoryRoutes.get('/tags/:slug/posts', async (c) => {
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
       INNER JOIN post_tags pt ON p.id = pt.post_id
-      WHERE pt.tag_id = ? AND p.status = 'published' AND p.visibility = 'public'
+      WHERE pt.tag_id = ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
     `;
 
     query += ` ORDER BY p.${finalSortBy} ${order} LIMIT ? OFFSET ?`;
 
     const { results } = await c.env.DB.prepare(query).bind(tag.id, limit, offset).all();
 
-    // 获取总数
+    // 获取总数（排除软删除的文章）
     const countResult = await c.env.DB.prepare(`
       SELECT COUNT(*) as total
       FROM posts p
       INNER JOIN post_tags pt ON p.id = pt.post_id
-      WHERE pt.tag_id = ? AND p.status = 'published' AND p.visibility = 'public'
+      LEFT JOIN users u ON p.author_id = u.id
+      WHERE pt.tag_id = ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
     `).bind(tag.id).first() as any;
     const total = countResult?.total || 0;
 

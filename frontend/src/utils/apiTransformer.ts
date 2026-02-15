@@ -39,6 +39,7 @@ export function transformPostListItem(post: any): PostListItem {
     slug: post.slug,
     summary: post.summary,
     coverImage: post.cover_image,
+    visibility: post.visibility,
     authorName: post.author_display_name || post.author_name || '未知用户',
     authorAvatar: post.author_avatar,
     categoryName: post.category_name,
@@ -195,14 +196,26 @@ export function transformColumnList(columns: any[]): Column[] {
  * 转换标签
  */
 export function transformTag(tag: any): Tag {
+  if (!tag) {
+    return {
+      id: 0,
+      name: '',
+      slug: '',
+      description: undefined,
+      postCount: 0,
+      createdAt: '',
+      updatedAt: '',
+      color: undefined
+    };
+  }
   return {
     id: tag.id,
-    name: tag.name,
-    slug: tag.slug,
+    name: tag.name || '',
+    slug: tag.slug || '',
     description: tag.description,
     postCount: tag.post_count,
-    createdAt: tag.created_at,
-    updatedAt: tag.updated_at,
+    createdAt: tag.created_at || '',
+    updatedAt: tag.updated_at || '',
     color: tag.color
   };
 }

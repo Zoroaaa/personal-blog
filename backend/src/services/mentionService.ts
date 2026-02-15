@@ -282,6 +282,125 @@ export async function createMentionNotifications(
 }
 
 /**
+ * 通过用户ID列表创建提及通知
+ * 
+ * @param db Cloudflare D1 数据库
+ * @param mentionedUserIds 被@的用户ID列表
+ * @param mentionerUserId 发起@的用户ID
+ * @param contentType 内容类型（'comment' | 'message'）
+ * @param contentId 内容ID（评论ID或私信ID）
+ * @param relatedLink 相关内容链接
+ * @param env 环境变量（用于邮件通知）
+ */
+export async function createMentionNotificationsByIds(
+  db: any,
+  mentionedUserIds: number[],
+  mentionerUserId: number,
+  contentType: 'comment' | 'message' = 'comment',
+  contentId: number,
+  relatedLink?: string,
+  env?: Env
+): Promise<void> {
+  if (!mentionedUserIds || mentionedUserIds.length === 0) {
+    return;
+  }
+
+  try {
+    // 获取提及者的用户信息
+    const mentioner = await db
+      .prepare('SELECT id, username, display_name, avatar_url FROM users WHERE id = ? AND deleted_at IS NULL')
+      .bind(mentionerUserId)
+      .first() as { id: number; username: string; display_name: string; avatar_url: string } | undefined;
+
+    if (!mentioner) {
+      console.error(`Mentioner user ${mentionerUserId} not found`);
+      return;
+    }
+
+    // 获取内容相关信息
+    let contentInfo: { postId?: number; postTitle?: string; postSlug?: string; content?: string } = {};
+    
+    if (contentType === 'comment') {
+      const comment = await db
+        .prepare(`
+          SELECT c.content, c.post_id, p.title, p.slug 
+          FROM comments c 
+          JOIN posts p ON c.post_id = p.id 
+          WHERE c.id = ? AND c.deleted_at IS NULL
+        `)
+        .bind(contentId)
+        .first() as any;
+
+      if (comment) {
+        contentInfo = {
+          postId: comment.post_id,
+          postTitle: comment.title,
+          postSlug: comment.slug,
+          content: comment.content,
+        };
+      }
+    }
+
+    // 获取所有被提及用户的信息
+    const { results: targetUsers } = await db
+      .prepare(`SELECT id, username, display_name FROM users WHERE id IN (${mentionedUserIds.map(() => '?').join(',')}) AND status = 'active' AND deleted_at IS NULL`)
+      .bind(...mentionedUserIds)
+      .all() as any;
+
+    if (!targetUsers || targetUsers.length === 0) {
+      return;
+    }
+
+    // 为每个被提及的用户创建通知
+    for (const targetUser of targetUsers) {
+      if (targetUser.id === mentionerUserId) {
+        continue;
+      }
+
+      // 检查用户是否开启了提及通知
+      const isEnabled = await isInteractionSubtypeEnabled(
+        db,
+        targetUser.id,
+        'mention'
+      );
+
+      if (!isEnabled) {
+        continue;
+      }
+
+      // 构建通知标题
+      const actionText = contentType === 'comment' ? '评论中提及了你' : '私信中提及了你';
+      const title = `${mentioner.display_name || mentioner.username} 在${actionText}`;
+
+      // 创建通知
+      await createInteractionNotification(db, {
+        userId: targetUser.id,
+        subtype: 'mention',
+        title,
+        content: contentInfo.content ? 
+          (contentInfo.content.length > 100 ? contentInfo.content.substring(0, 100) + '...' : contentInfo.content) 
+          : undefined,
+        relatedData: {
+          mentionerId: mentionerUserId,
+          mentionerName: mentioner.display_name || mentioner.username,
+          mentionerAvatar: mentioner.avatar_url,
+          contentType,
+          contentId,
+          postId: contentInfo.postId,
+          postTitle: contentInfo.postTitle,
+          postSlug: contentInfo.postSlug,
+          link: relatedLink,
+        },
+      }, env);
+
+      console.log(`Mention notification created for user ${targetUser.id} (${targetUser.username}) by ID`);
+    }
+  } catch (error) {
+    console.error('Failed to create mention notifications by IDs:', error);
+  }
+}
+
+/**
  * 验证用户是否被@
  * 用于检查用户是否需要被通知
  *

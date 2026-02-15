@@ -16,11 +16,14 @@ import { api } from '../../utils/api';
 import { useToast } from '../../components/Toast';
 import { SEO } from '../../components/SEO';
 
+type SystemNotificationSubtype = 'maintenance' | 'update' | 'announcement';
+
 interface SystemNotification {
   id: number;
   title: string;
   content: string;
   link?: string;
+  subtype: SystemNotificationSubtype;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -36,6 +39,7 @@ export function SystemNotificationPage() {
     title: '',
     content: '',
     link: '',
+    subtype: 'announcement' as SystemNotificationSubtype,
     isActive: true,
   });
 
@@ -66,6 +70,7 @@ export function SystemNotificationPage() {
       title: '',
       content: '',
       link: '',
+      subtype: 'announcement',
       isActive: true,
     });
     setIsModalOpen(true);
@@ -78,6 +83,7 @@ export function SystemNotificationPage() {
       title: notification.title,
       content: notification.content,
       link: notification.link || '',
+      subtype: notification.subtype || 'announcement',
       isActive: notification.isActive,
     });
     setIsModalOpen(true);
@@ -172,6 +178,15 @@ export function SystemNotificationPage() {
     }
   };
 
+  const getSubtypeLabel = (subtype: SystemNotificationSubtype) => {
+    const labels: Record<SystemNotificationSubtype, { text: string; color: string }> = {
+      maintenance: { text: '维护通知', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' },
+      update: { text: '更新通知', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
+      announcement: { text: '公告通知', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
+    };
+    return labels[subtype] || labels.announcement;
+  };
+
   return (
     <>
       <SEO title="系统通知管理" />
@@ -230,6 +245,9 @@ export function SystemNotificationPage() {
                       标题
                     </th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                      类型
+                    </th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
                       内容
                     </th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
@@ -256,6 +274,11 @@ export function SystemNotificationPage() {
                         <div className="font-medium text-gray-900 dark:text-white">
                           {notification.title}
                         </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSubtypeLabel(notification.subtype || 'announcement').color}`}>
+                          {getSubtypeLabel(notification.subtype || 'announcement').text}
+                        </span>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-gray-600 dark:text-gray-400 max-w-xs truncate">
@@ -364,6 +387,46 @@ export function SystemNotificationPage() {
                     className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                     required
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    通知类型 <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex flex-wrap gap-3">
+                    {(['maintenance', 'update', 'announcement'] as const).map((type) => (
+                      <label
+                        key={type}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-all ${
+                          formData.subtype === type
+                            ? type === 'maintenance'
+                              ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
+                              : type === 'update'
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                              : 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                            : 'border-gray-300 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="subtype"
+                          value={type}
+                          checked={formData.subtype === type}
+                          onChange={(e) => setFormData({ ...formData, subtype: e.target.value as SystemNotificationSubtype })}
+                          className="sr-only"
+                        />
+                        <span className={`w-3 h-3 rounded-full ${
+                          type === 'maintenance' ? 'bg-orange-500' : type === 'update' ? 'bg-blue-500' : 'bg-green-500'
+                        }`}></span>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {type === 'maintenance' ? '维护通知' : type === 'update' ? '更新通知' : '公告通知'}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    维护通知和更新通知将推送给所有用户，公告通知仅用于首页轮播展示
+                  </p>
                 </div>
 
                 <div>

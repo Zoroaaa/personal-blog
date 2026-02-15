@@ -35,10 +35,13 @@ import { useToast } from '../components/Toast';
 type AdminTab = 'posts' | 'comments' | 'users' | 'analytics' | 'categories' | 'tags' | 'columns';
 
 // 定义评论状态类型
-type CommentStatus = 'approved' | 'pending' | 'spam';
+type CommentStatus = 'approved' | 'pending' | 'rejected';
 
 // 定义用户角色类型
 type UserRole = 'admin' | 'user';
+
+// 定义用户状态类型
+type UserStatus = 'active' | 'suspended' | 'deleted';
 
 export function AdminPage() {
   const { user } = useAuthStore();
@@ -278,6 +281,32 @@ export function AdminPage() {
     }
   };
   
+  // 更新用户状态
+  const updateUserStatus = async (id: number, status: UserStatus) => {
+    try {
+      await api.updateUserStatus(id, status);
+      loadUsers();
+    } catch (err: any) {
+      setUsersError(err.message || '更新用户状态失败');
+    }
+  };
+  
+  // 软删除用户
+  const softDeleteUser = async (id: number) => {
+    if (!confirm('确定要删除该用户吗？此操作为软删除，用户数据将保留。')) return;
+    try {
+      setUsersLoading(true);
+      await api.deleteUser(id);
+      setUsers(prevUsers => prevUsers.filter(user => user.id !== id));
+      showSuccess('用户已软删除');
+    } catch (err: any) {
+      setUsersError(err.message || '删除失败');
+      showError(err.message || '删除失败');
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+  
 
   
   // 渲染不同的标签页内容
@@ -488,21 +517,27 @@ export function AdminPage() {
                           <select
                             value={comment.status}
                             onChange={(e) => updateCommentStatus(comment.id, e.target.value as CommentStatus)}
-                            className="border border-border bg-card rounded px-2 py-1 text-sm"
+                            className={`border border-border bg-card rounded px-2 py-1 text-sm ${
+                              comment.status === 'pending' ? 'text-yellow-600' :
+                              comment.status === 'rejected' ? 'text-red-600' : ''
+                            }`}
                           >
                             <option value="approved">已批准</option>
                             <option value="pending">待审核</option>
-                            <option value="spam">垃圾评论</option>
+                            <option value="rejected">已拒绝</option>
                           </select>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <button
                             onClick={async () => {
+                              if (!confirm('确定要删除该评论吗？此操作为软删除。')) return;
                               try {
                                 await api.deleteComment(comment.id);
-                                loadComments();
-                              } catch (error) {
-                                setCommentsError('删除失败');
+                                setComments(prevComments => prevComments.filter(c => c.id !== comment.id));
+                                showSuccess('评论已删除');
+                              } catch (error: any) {
+                                setCommentsError(error.message || '删除失败');
+                                showError('删除失败');
                               }
                             }}
                             className="text-red-600 hover:text-red-700"
@@ -547,6 +582,9 @@ export function AdminPage() {
                       角色
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      状态
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       注册时间
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -557,13 +595,13 @@ export function AdminPage() {
                 <tbody className="bg-card divide-y divide-border">
                   {usersLoading ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-4 text-center">
+                      <td colSpan={7} className="px-6 py-4 text-center">
                         加载中...
                       </td>
                     </tr>
                   ) : users.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-4 text-center">
+                      <td colSpan={7} className="px-6 py-4 text-center">
                         暂无用户
                       </td>
                     </tr>
@@ -589,29 +627,25 @@ export function AdminPage() {
                             <option value="admin">管理员</option>
                           </select>
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <select
+                            value={userItem.status || 'active'}
+                            onChange={(e) => updateUserStatus(userItem.id, e.target.value as UserStatus)}
+                            className={`border border-border bg-card rounded px-2 py-1 text-sm ${
+                              userItem.status === 'suspended' ? 'text-yellow-600' : 
+                              userItem.status === 'deleted' ? 'text-red-600' : ''
+                            }`}
+                          >
+                            <option value="active">活跃</option>
+                            <option value="suspended">暂停</option>
+                          </select>
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                           {userItem.createdAt ? new Date(userItem.createdAt).toLocaleString() : '未知'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <button
-                            onClick={async () => {
-                              if (!confirm('确定要删除该用户吗？')) return;
-                              try {
-                                setUsersLoading(true);
-                                await api.deleteUser(userItem.id);
-                                // 先从本地状态中移除该用户，立即更新UI
-                                setUsers(prevUsers => prevUsers.filter(user => user.id !== userItem.id));
-                                // 然后重新加载列表以确保数据一致性
-                                setTimeout(() => {
-                                  loadUsers();
-                                }, 500);
-                                alert('用户删除成功');
-                              } catch (err: any) {
-                                setUsersError(err.message || '删除失败');
-                              } finally {
-                                setUsersLoading(false);
-                              }
-                            }}
+                            onClick={() => softDeleteUser(userItem.id)}
                             className="text-red-600 hover:text-red-700"
                           >
                             删除

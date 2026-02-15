@@ -20,8 +20,38 @@ import { useNotificationStore } from '../stores/notificationStore';
 import { useAuthStore } from '../stores/authStore';
 import {
   getNotificationIcon,
+  getNotificationSubtypeText,
 } from '../utils/notificationApi';
 import type { Notification } from '../types/notifications';
+
+function getSystemNotificationStyle(subtype?: string): { bg: string; border: string; badge: string } {
+  switch (subtype) {
+    case 'maintenance':
+      return {
+        bg: 'bg-orange-50 dark:bg-orange-900/10',
+        border: 'border-l-4 border-orange-500',
+        badge: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+      };
+    case 'update':
+      return {
+        bg: 'bg-blue-50 dark:bg-blue-900/10',
+        border: 'border-l-4 border-blue-500',
+        badge: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+      };
+    case 'announcement':
+      return {
+        bg: 'bg-green-50 dark:bg-green-900/10',
+        border: 'border-l-4 border-green-500',
+        badge: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+      };
+    default:
+      return {
+        bg: '',
+        border: '',
+        badge: '',
+      };
+  }
+}
 
 // 通知项组件
 function NotificationItem({
@@ -73,6 +103,8 @@ function NotificationItem({
         p-4 border-b border-border cursor-pointer transition-colors
         hover:bg-accent
         ${!notification.isRead ? 'bg-primary/10' : ''}
+        ${notification.type === 'system' ? getSystemNotificationStyle(notification.subtype).bg : ''}
+        ${notification.type === 'system' ? getSystemNotificationStyle(notification.subtype).border : ''}
       `}
     >
       <div className="flex items-start gap-3">
@@ -80,10 +112,15 @@ function NotificationItem({
           {getNotificationIcon(notification.type, notification.subtype)}
         </span>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h4 className="font-medium text-foreground truncate">
               {notification.title}
             </h4>
+            {notification.type === 'system' && notification.subtype && (
+              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getSystemNotificationStyle(notification.subtype).badge}`}>
+                {getNotificationSubtypeText(notification.subtype)}
+              </span>
+            )}
             {!notification.isRead && (
               <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></span>
             )}
@@ -92,6 +129,25 @@ function NotificationItem({
             <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
               {notification.content}
             </p>
+          )}
+          {/* 艾特通知：显示艾特者信息 */}
+          {notification.subtype === 'mention' && notification.relatedData?.mentionerName && (
+            <div className="mt-2 flex items-center gap-2">
+              {notification.relatedData.mentionerAvatar ? (
+                <img 
+                  src={notification.relatedData.mentionerAvatar} 
+                  alt={notification.relatedData.mentionerName}
+                  className="w-5 h-5 rounded-full"
+                />
+              ) : (
+                <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-xs">
+                  {notification.relatedData.mentionerName[0]}
+                </div>
+              )}
+              <span className="text-xs text-muted-foreground">
+                来自 {notification.relatedData.mentionerName}
+              </span>
+            </div>
           )}
           {/* 评论回复通知：显示被回复的评论内容 */}
           {notification.subtype === 'reply' && notification.relatedData?.parentCommentContent && (

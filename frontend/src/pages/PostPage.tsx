@@ -75,6 +75,19 @@ export function PostPage() {
   const readProgressSent = useRef<boolean>(false);
   const progressTimeoutRef = useRef<number | null>(null);
 
+  const [requiresPassword, setRequiresPassword] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordVerifying, setPasswordVerifying] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  const getPasswordToken = useCallback((postId: number) => {
+    return sessionStorage.getItem(`post_token_${postId}`);
+  }, []);
+
+  const setPasswordToken = useCallback((postId: number, token: string) => {
+    sessionStorage.setItem(`post_token_${postId}`, token);
+  }, []);
+
   // 获取 Markdown 组件和目录
   const markdownComponents = useMemo(() => getMarkdownComponents(), []);
   const toc = useMemo(() => post ? generateToc(post.content) : [], [post]);
@@ -170,20 +183,43 @@ export function PostPage() {
     };
   }, [post?.id, isAuthenticated, sendReadingProgress]);
 
-  const loadPost = async () => {
+  const loadPost = async (explicitToken?: string) => {
     try {
       setLoading(true);
       setError(null);
+      setRequiresPassword(false);
+      setPasswordError(null);
 
-      const response = await api.getPost(slug!);
-
-      console.log('Post response:', response);
+      const response = await api.getPost(slug!, explicitToken);
 
       if (response.success && response.data) {
+        if ((response.data as any).requires_password) {
+          const postId = (response.data as any).id;
+          const savedToken = getPasswordToken(postId);
+          
+          if (savedToken && !explicitToken) {
+            const retryResponse = await api.getPost(slug!, savedToken);
+            if (retryResponse.success && retryResponse.data && !(retryResponse.data as any).requires_password) {
+              const transformedPost = transformPost(retryResponse.data);
+              setPost(transformedPost);
+              if (transformedPost.id) {
+                loadComments(transformedPost.id);
+              }
+              setLoading(false);
+              return;
+            }
+          }
+          
+          setRequiresPassword(true);
+          const transformedPost = transformPost(response.data);
+          setPost(transformedPost);
+          setLoading(false);
+          return;
+        }
+
         const transformedPost = transformPost(response.data);
         setPost(transformedPost);
 
-        // 加载评论
         if (transformedPost.id) {
           loadComments(transformedPost.id);
         }
@@ -195,6 +231,39 @@ export function PostPage() {
       setError(error instanceof Error ? error.message : '加载失败');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleVerifyPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!passwordInput.trim() || !post) return;
+
+    try {
+      setPasswordVerifying(true);
+      setPasswordError(null);
+
+      const response = await api.verifyPostPassword(post.id, passwordInput);
+
+      if (response.success && response.data?.verified) {
+        const token = response.data.token;
+        
+        if (token) {
+          setPasswordToken(post.id, token);
+          setRequiresPassword(false);
+          setPasswordInput('');
+          loadPost(token);
+          showSuccess('密码验证成功');
+        } else {
+          setPasswordError('验证成功但未收到访问令牌');
+        }
+      } else {
+        setPasswordError(response.error || '密码错误');
+      }
+    } catch (error) {
+      setPasswordError(error instanceof Error ? error.message : '验证失败');
+    } finally {
+      setPasswordVerifying(false);
     }
   };
 
@@ -229,10 +298,12 @@ export function PostPage() {
         postId: post.id,
         content: newComment.trim(),
         parentId,
+        mentionedUserIds: mentionedUserIds.size > 0 ? Array.from(mentionedUserIds) : undefined,
       });
 
       if (response.success) {
         setNewComment('');
+        setMentionedUserIds(new Set());
         // 重新加载评论列表
         await loadComments(post.id);
         showSuccess('评论发表成功');
@@ -304,6 +375,8 @@ export function PostPage() {
   const [commentLiking, setCommentLiking] = useState<number | null>(null);
   const [mentionableUsers, setMentionableUsers] = useState<User[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [mentionedUserIds, setMentionedUserIds] = useState<Set<number>>(new Set());
+  const [replyMentionedUserIds, setReplyMentionedUserIds] = useState<Set<number>>(new Set());
 
   // 加载可@用户列表
   useEffect(() => {
@@ -321,6 +394,14 @@ export function PostPage() {
     } catch (error) {
       console.error('Failed to load mentionable users:', error);
     }
+  };
+
+  const handleMention = (user: User) => {
+    setMentionedUserIds(prev => new Set(prev).add(user.id));
+  };
+
+  const handleReplyMention = (user: User) => {
+    setReplyMentionedUserIds(prev => new Set(prev).add(user.id));
   };
 
   // 处理评论图片上传
@@ -401,11 +482,13 @@ export function PostPage() {
         postId: post.id,
         content: replyContent.trim(),
         parentId,
+        mentionedUserIds: replyMentionedUserIds.size > 0 ? Array.from(replyMentionedUserIds) : undefined,
       });
 
       if (response.success) {
         setReplyContent('');
         setReplyingTo(null);
+        setReplyMentionedUserIds(new Set());
         // 重新加载评论列表
         await loadComments(post.id);
         showSuccess('回复发表成功');
@@ -509,6 +592,7 @@ export function PostPage() {
                 maxLength={500}
                 mentionableUsers={mentionableUsers}
                 onImageUpload={handleCommentImageUpload}
+                onMention={handleReplyMention}
               />
               <div className="mt-4 flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">
@@ -562,6 +646,94 @@ export function PostPage() {
           </button>
         </div>
       </div>
+    );
+  }
+
+  if (requiresPassword) {
+    return (
+      <>
+        <SEO
+          title={post.title}
+          description={post.summary || '这是一篇受密码保护的文章'}
+        />
+        <div className="max-w-2xl mx-auto px-4 py-12">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-gray-200 dark:border-slate-700 overflow-hidden">
+            {post.coverImage && (
+              <div className="relative h-48 overflow-hidden">
+                <img
+                  src={post.coverImage}
+                  alt={post.title}
+                  className="w-full h-full object-cover blur-sm"
+                />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-black/60"></div>
+                <div className="absolute bottom-4 left-4 right-4">
+                  <h1 className="text-2xl font-bold text-white mb-2">{post.title}</h1>
+                  {post.summary && (
+                    <p className="text-white/80 text-sm line-clamp-2">{post.summary}</p>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            <div className="p-8">
+              {!post.coverImage && (
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{post.title}</h1>
+              )}
+              
+              <div className="flex items-center gap-3 mb-6 text-gray-600 dark:text-gray-400">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <span className="text-sm">这是一篇受密码保护的文章</span>
+              </div>
+
+              <form onSubmit={handleVerifyPassword} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    请输入访问密码
+                  </label>
+                  <input
+                    type="password"
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                    placeholder="输入文章密码"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-slate-700 dark:text-white"
+                    autoFocus
+                  />
+                </div>
+
+                {passwordError && (
+                  <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
+                    {passwordError}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={passwordVerifying || !passwordInput.trim()}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  {passwordVerifying ? '验证中...' : '验证密码'}
+                </button>
+              </form>
+
+              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-slate-700">
+                <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center gap-2">
+                    {post.authorAvatar && (
+                      <img src={post.authorAvatar} alt="" className="w-5 h-5 rounded-full" />
+                    )}
+                    <span>{post.authorName || '作者'}</span>
+                  </div>
+                  {post.publishedAt && (
+                    <span>{formatDate(post.publishedAt, 'yyyy-MM-dd')}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
     );
   }
 
@@ -803,40 +975,53 @@ export function PostPage() {
         <div className="mt-16 border-t border-border pt-8">
           <h2 className="text-2xl font-bold text-foreground mb-6">评论 ({comments.length})</h2>
 
+          {/* 归档文章提示 */}
+          {post.status === 'archived' && (
+            <div className="mb-8 p-6 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg text-center">
+              <svg className="mx-auto h-12 w-12 text-orange-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+              </svg>
+              <p className="text-orange-700 dark:text-orange-300 font-medium">该文章已归档，不允许发表评论</p>
+            </div>
+          )}
+
           {/* 发表评论 */}
-          {isAuthenticated ? (
-            <form onSubmit={handleSubmitComment} className="mb-8">
-              <RichTextEditor
-                value={newComment}
-                onChange={setNewComment}
-                placeholder="写下你的评论...输入 @ 可提及用户"
-                maxLength={1000}
-                mentionableUsers={mentionableUsers}
-                onImageUpload={handleCommentImageUpload}
-              />
-              <div className="flex items-center justify-between mt-4">
-                <span className="text-sm text-muted-foreground">
-                  {uploadingImage ? '图片上传中...' : '支持富文本格式，输入 @ 可提及用户'}
-                </span>
+          {post.status !== 'archived' && (
+            isAuthenticated ? (
+              <form onSubmit={handleSubmitComment} className="mb-8">
+                <RichTextEditor
+                  value={newComment}
+                  onChange={setNewComment}
+                  placeholder="写下你的评论...输入 @ 可提及用户"
+                  maxLength={1000}
+                  mentionableUsers={mentionableUsers}
+                  onImageUpload={handleCommentImageUpload}
+                  onMention={handleMention}
+                />
+                <div className="flex items-center justify-between mt-4">
+                  <span className="text-sm text-muted-foreground">
+                    {uploadingImage ? '图片上传中...' : '支持富文本格式，输入 @ 可提及用户'}
+                  </span>
+                  <button
+                    type="submit"
+                    disabled={commentLoading || !newComment.trim() || uploadingImage}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {commentLoading ? '发表中...' : '发表评论'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="mb-8 p-6 bg-muted border border-border rounded-lg text-center">
+                <p className="text-muted-foreground mb-4">请先登录后再发表评论</p>
                 <button
-                  type="submit"
-                  disabled={commentLoading || !newComment.trim() || uploadingImage}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => navigate('/login?redirect=' + encodeURIComponent(window.location.pathname))}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
-                  {commentLoading ? '发表中...' : '发表评论'}
+                  去登录
                 </button>
               </div>
-            </form>
-          ) : (
-            <div className="mb-8 p-6 bg-muted border border-border rounded-lg text-center">
-              <p className="text-muted-foreground mb-4">请先登录后再发表评论</p>
-              <button
-                onClick={() => navigate('/login?redirect=' + encodeURIComponent(window.location.pathname))}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                去登录
-              </button>
-            </div>
+            )
           )}
 
           {/* 评论列表 */}
