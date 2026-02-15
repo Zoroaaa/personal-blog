@@ -30,7 +30,7 @@ export interface UpdateMessageSettingsRequest {
 }
 
 const DEFAULT_MESSAGE_SETTINGS: Omit<MessageSettings, 'userId'> = {
-  emailNotification: true,
+  emailNotification: false,
   respectDnd: true,
   allowStrangers: true,
 };
