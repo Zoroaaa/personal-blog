@@ -28,7 +28,7 @@ import type { Category, Column, Tag } from '../types';
 export function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { config } = useSiteConfig();
+  const { config, isReady } = useSiteConfig();
 
   // 文章相关状态
   const [posts, setPosts] = useState<PostListItem[]>([]);
@@ -89,8 +89,9 @@ export function HomePage() {
 
   // 加载文章
   useEffect(() => {
+    if (!isReady) return;
     loadPosts();
-  }, [page, selectedCategory, selectedColumn, selectedTag, postsPerPage]);
+  }, [page, selectedCategory, selectedColumn, selectedTag, postsPerPage, isReady]);
 
   // 同步URL参数
   useEffect(() => {
