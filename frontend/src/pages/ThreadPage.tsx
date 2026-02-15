@@ -250,12 +250,14 @@ export default function ThreadPage() {
     setShowRecallMenu(null);
     
     if (message.attachmentUrl) {
+      const isImageType = message.messageType === 'image' || 
+                          message.messageType === 'mixed' && message.attachmentMimeType?.startsWith('image/');
       setAttachmentPreview({
         url: message.attachmentUrl,
         filename: message.attachmentFilename || 'file',
         size: message.attachmentSize || 0,
         mimeType: message.attachmentMimeType || '',
-        type: message.messageType === 'image' ? 'image' : 'file',
+        type: isImageType ? 'image' : 'file',
       });
     } else {
       setAttachmentPreview(null);
@@ -510,13 +512,17 @@ export default function ThreadPage() {
       );
     }
 
+    const isImageAttachment = message.attachmentUrl && 
+      (message.messageType === 'image' || 
+       (message.attachmentMimeType?.startsWith('image/')));
+
     return (
       <>
         {message.content && (
           <p className="whitespace-pre-wrap break-words">{message.content}</p>
         )}
         
-        {message.messageType === 'image' && message.attachmentUrl && (
+        {isImageAttachment && message.attachmentUrl && (
           <div className="mt-2">
             <img 
               src={message.attachmentUrl} 
@@ -536,7 +542,7 @@ export default function ThreadPage() {
           </div>
         )}
         
-        {(message.messageType === 'attachment' || message.messageType === 'mixed') && message.attachmentUrl && (
+        {!isImageAttachment && (message.messageType === 'attachment' || message.messageType === 'mixed') && message.attachmentUrl && (
           <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
             <div className="flex items-center gap-3">
               <div className="flex-shrink-0">
