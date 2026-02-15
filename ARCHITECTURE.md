@@ -2,7 +2,7 @@
 
 本文档详细介绍个人博客系统的架构设计、技术选型和实现细节。
 
-**版本**: v1.3.1 | **更新日期**: 2026-02-14
+**版本**: v1.3.2 | **更新日期**: 2026-02-15
 
 ---
 
@@ -261,12 +261,21 @@ CREATE TABLE notifications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
   type TEXT NOT NULL CHECK(type IN ('system', 'interaction')),
+  subtype TEXT CHECK(subtype IN (
+    'maintenance', 'update', 'announcement',
+    'comment', 'like', 'favorite', 'mention', 'reply'
+  )),
   title TEXT NOT NULL,
   content TEXT,
-  data TEXT,
-  is_read BOOLEAN DEFAULT 0,
-  is_announcement BOOLEAN DEFAULT 0,
+  related_data TEXT,
+  is_read INTEGER DEFAULT 0,
+  read_at DATETIME,
+  deleted_at DATETIME,
+  is_in_app_sent INTEGER DEFAULT 1,
+  is_email_sent INTEGER DEFAULT 0,
+  is_active INTEGER DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 ```
@@ -277,11 +286,24 @@ CREATE TABLE notifications (
 CREATE TABLE notification_settings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL UNIQUE,
-  notify_comments BOOLEAN DEFAULT 1,
-  notify_likes BOOLEAN DEFAULT 1,
-  notify_favorites BOOLEAN DEFAULT 1,
-  notify_system BOOLEAN DEFAULT 1,
-  dnd_enabled BOOLEAN DEFAULT 0,
+  system_in_app INTEGER DEFAULT 1,
+  system_email INTEGER DEFAULT 1,
+  system_frequency TEXT DEFAULT 'realtime' CHECK(system_frequency IN ('realtime', 'daily', 'weekly', 'off')),
+  interaction_in_app INTEGER DEFAULT 1,
+  interaction_email INTEGER DEFAULT 1,
+  interaction_frequency TEXT DEFAULT 'realtime' CHECK(interaction_frequency IN ('realtime', 'daily', 'weekly', 'off')),
+  interaction_comment INTEGER DEFAULT 1,
+  interaction_like INTEGER DEFAULT 1,
+  interaction_favorite INTEGER DEFAULT 1,
+  interaction_mention INTEGER DEFAULT 1,
+  interaction_reply INTEGER DEFAULT 1,
+  dnd_enabled INTEGER DEFAULT 0,
+  dnd_start TEXT DEFAULT '22:00',
+  dnd_end TEXT DEFAULT '08:00',
+  dnd_timezone TEXT DEFAULT 'Asia/Shanghai',
+  digest_daily_time TEXT DEFAULT '08:00',
+  digest_weekly_day INTEGER DEFAULT 1,
+  digest_weekly_time TEXT DEFAULT '09:00',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -294,12 +316,56 @@ CREATE TABLE notification_settings (
 CREATE TABLE messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   sender_id INTEGER NOT NULL,
-  receiver_id INTEGER NOT NULL,
+  recipient_id INTEGER NOT NULL,
+  subject TEXT,
   content TEXT NOT NULL,
-  status TEXT DEFAULT 'sent' CHECK(status IN ('sent', 'delivered', 'read', 'recalled')),
+  thread_id TEXT,
+  reply_to_id INTEGER,
+  is_read INTEGER DEFAULT 0,
+  read_at DATETIME,
+  sender_deleted INTEGER DEFAULT 0,
+  sender_deleted_at DATETIME,
+  recipient_deleted INTEGER DEFAULT 0,
+  recipient_deleted_at DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (sender_id) REFERENCES users(id),
-  FOREIGN KEY (receiver_id) REFERENCES users(id)
+  FOREIGN KEY (recipient_id) REFERENCES users(id),
+  FOREIGN KEY (reply_to_id) REFERENCES messages(id) ON DELETE SET NULL
+);
+```
+
+#### 私信设置表 (message_settings)
+
+```sql
+CREATE TABLE message_settings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL UNIQUE,
+  email_notification INTEGER DEFAULT 1,
+  respect_dnd INTEGER DEFAULT 1,
+  allow_strangers INTEGER DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+```
+
+#### 邮件汇总队列表 (email_digest_queue)
+
+```sql
+CREATE TABLE email_digest_queue (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  notification_id INTEGER NOT NULL,
+  digest_type TEXT NOT NULL CHECK(digest_type IN ('daily', 'weekly')),
+  scheduled_at DATETIME NOT NULL,
+  is_sent INTEGER DEFAULT 0,
+  sent_at DATETIME,
+  error_message TEXT,
+  retry_count INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (notification_id) REFERENCES notifications(id) ON DELETE CASCADE,
+  UNIQUE(user_id, notification_id, digest_type)
 );
 ```
 
