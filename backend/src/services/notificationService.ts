@@ -228,38 +228,38 @@ export async function getNotifications(
     const isReadFilter = params.isRead;
 
     const systemConditions: string[] = [
-      'sn.user_id = 0',
-      'sn.type = \'system\'',
-      'sn.is_active = 1',
-      'sn.deleted_at IS NULL'
+      "sn.user_id = 0",
+      "sn.type = 'system'",
+      "sn.is_active = 1",
+      "sn.deleted_at IS NULL"
     ];
     const systemBindings: any[] = [];
 
     const interactionConditions: string[] = [
-      'in.user_id = ?',
-      'in.deleted_at IS NULL'
+      "inot.user_id = ?",
+      "inot.deleted_at IS NULL"
     ];
     const interactionBindings: any[] = [userId];
 
     if (typeFilter) {
-      systemConditions.push('sn.type = ?');
+      systemConditions.push("sn.type = ?");
       systemBindings.push(typeFilter);
-      interactionConditions.push('in.type = ?');
+      interactionConditions.push("inot.type = ?");
       interactionBindings.push(typeFilter);
     }
 
     if (isReadFilter !== undefined) {
       if (isReadFilter) {
-        systemConditions.push('COALESCE(nr.is_read, 0) = 1');
+        systemConditions.push("COALESCE(nr.is_read, 0) = 1");
       } else {
-        systemConditions.push('COALESCE(nr.is_read, 0) = 0');
+        systemConditions.push("COALESCE(nr.is_read, 0) = 0");
       }
-      interactionConditions.push('in.is_read = ?');
+      interactionConditions.push("inot.is_read = ?");
       interactionBindings.push(isReadFilter ? 1 : 0);
     }
 
-    const systemWhere = systemConditions.join(' AND ');
-    const interactionWhere = interactionConditions.join(' AND ');
+    const systemWhere = systemConditions.join(" AND ");
+    const interactionWhere = interactionConditions.join(" AND ");
 
     const countQuery = `
       SELECT COUNT(*) as total FROM (
@@ -268,8 +268,8 @@ export async function getNotifications(
         LEFT JOIN notification_reads nr ON sn.id = nr.notification_id AND nr.user_id = ?
         WHERE ${systemWhere}
         UNION ALL
-        SELECT in.id
-        FROM notifications in
+        SELECT inot.id
+        FROM notifications inot
         WHERE ${interactionWhere}
       )
     `;
@@ -301,20 +301,20 @@ export async function getNotifications(
         WHERE ${systemWhere}
         UNION ALL
         SELECT 
-          in.id,
-          in.user_id,
-          in.type,
-          in.subtype,
-          in.title,
-          in.content,
-          in.related_data,
-          in.is_in_app_sent,
-          in.is_email_sent,
-          in.is_read,
-          in.read_at,
-          in.deleted_at,
-          in.created_at
-        FROM notifications in
+          inot.id,
+          inot.user_id,
+          inot.type,
+          inot.subtype,
+          inot.title,
+          inot.content,
+          inot.related_data,
+          inot.is_in_app_sent,
+          inot.is_email_sent,
+          inot.is_read,
+          inot.read_at,
+          inot.deleted_at,
+          inot.created_at
+        FROM notifications inot
         WHERE ${interactionWhere}
       )
       ORDER BY created_at DESC
