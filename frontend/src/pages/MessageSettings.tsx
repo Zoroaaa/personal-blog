@@ -168,7 +168,7 @@ export default function MessageSettings({ onClose }: MessageSettingsProps) {
           description="收到新私信时发送邮件通知"
         >
           <ToggleSwitch
-            checked={settings?.emailNotification ?? true}
+            checked={settings?.emailNotification ?? false}
             onChange={(checked) => handleUpdateSettings({ emailNotification: checked })}
             disabled={saving}
           />
