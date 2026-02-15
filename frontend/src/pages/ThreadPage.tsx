@@ -401,14 +401,33 @@ export default function ThreadPage() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const handleDownload = (url: string, filename: string) => {
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.target = '_blank';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  const handleDownload = async (url: string, filename: string) => {
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        mode: 'cors',
+      });
+      
+      if (!response.ok) {
+        throw new Error('下载失败');
+      }
+      
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      
+      window.URL.revokeObjectURL(blobUrl);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Download failed:', error);
+      showError('文件下载失败，请重试');
+    }
   };
 
   const renderMessageContent = (message: Message) => {
