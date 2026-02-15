@@ -218,7 +218,7 @@ function mapSettingsFromRow(row: any, userId: number): NotificationSettings {
     id: row.id,
     userId,
     system: {
-      inApp: row.system_in_app === 1,
+      inApp: true,
       email: row.system_email === 1,
       frequency: row.system_frequency,
     },
@@ -270,7 +270,7 @@ function mergeSettings(
   return {
     ...current,
     system: updates.system
-      ? { ...current.system, ...updates.system }
+      ? { ...current.system, ...updates.system, inApp: true }
       : current.system,
     interaction: updates.interaction
       ? {

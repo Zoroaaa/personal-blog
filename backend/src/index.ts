@@ -446,7 +446,38 @@ app.onError((err, c) => {
 // 导入响应工具函数
 import { successResponse, errorResponse } from './utils/response';
 
+// 导入邮件汇总服务
+import { processDigestQueue, cleanupSentDigestItems } from './services/digestService';
+
 export default app;
+
+export const scheduled: ExportedHandlerScheduledHandler<Env> = async (event, env, ctx) => {
+  console.log('Scheduled task triggered at:', new Date().toISOString());
+  console.log('Cron:', event.cron);
+  
+  try {
+    if (event.cron === '0 8 * * *') {
+      console.log('Processing daily digest...');
+      const result = await processDigestQueue(env.DB, env, 'daily');
+      console.log('Daily digest result:', result);
+      
+      await cleanupSentDigestItems(env.DB, 30);
+    } else if (event.cron === '0 9 * * 1') {
+      console.log('Processing weekly digest...');
+      const result = await processDigestQueue(env.DB, env, 'weekly');
+      console.log('Weekly digest result:', result);
+      
+      await cleanupSentDigestItems(env.DB, 30);
+    } else {
+      console.log('Unknown cron schedule, processing both digests...');
+      const dailyResult = await processDigestQueue(env.DB, env, 'daily');
+      const weeklyResult = await processDigestQueue(env.DB, env, 'weekly');
+      console.log('Digest results:', { daily: dailyResult, weekly: weeklyResult });
+    }
+  } catch (error) {
+    console.error('Scheduled task error:', error);
+  }
+};
 
 // 重新导出响应工具函数，保持向后兼容
 export { successResponse, errorResponse };

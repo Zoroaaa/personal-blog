@@ -33,6 +33,10 @@ head_sampling_rate = 1
 persist = true
 invocation_logs = true
 
+# 定时任务触发器
+[triggers]
+crons = ["0 8 * * *", "0 9 * * 1"]
+
 # 环境变量（公开的配置）
 [vars]
 ENVIRONMENT = "production"

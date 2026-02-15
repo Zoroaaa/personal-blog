@@ -70,13 +70,16 @@ export async function createNotification(
     }
 
     const frequency = typeSettings.frequency;
-    const shouldSendEmailNow = !options.skipEmail &&
+    
+    const shouldSendInApp = type === 'system' 
+      ? true 
+      : (!options.skipInApp && typeSettings.inApp);
+
+    const shouldSendEmail = !options.skipEmail &&
       typeSettings.email &&
       shouldSendNow(settings.doNotDisturb, 'email');
 
-    const shouldSendInApp = !options.skipInApp && typeSettings.inApp;
-
-    if (!shouldSendInApp && !shouldSendEmailNow && frequency === 'realtime') {
+    if (!shouldSendInApp && !shouldSendEmail) {
       return null;
     }
 
@@ -108,7 +111,7 @@ export async function createNotification(
       return null;
     }
 
-    if (frequency === 'realtime' && shouldSendEmailNow && env) {
+    if (frequency === 'realtime' && shouldSendEmail && env) {
       try {
         const user = await db.prepare(
           'SELECT display_name, email FROM users WHERE id = ?'
@@ -127,7 +130,7 @@ export async function createNotification(
       } catch (error) {
         console.error('Failed to send notification email:', error);
       }
-    } else if (frequency === 'daily' || frequency === 'weekly') {
+    } else if ((frequency === 'daily' || frequency === 'weekly') && shouldSendEmail) {
       await queueNotificationForDigest(db, notificationId, userId, frequency, settings);
     }
 
