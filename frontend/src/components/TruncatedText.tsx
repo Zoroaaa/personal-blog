@@ -67,7 +67,8 @@ export function TruncatedText({ text, className = '', lines = 2 }: TruncatedText
       left: `${left}px`,
       width: 'max-content',
       maxWidth: `${tooltipWidth}px`,
-      zIndex: 9999,
+      zIndex: 99999,
+      pointerEvents: 'auto',
     });
   }, []);
 
@@ -127,6 +128,8 @@ export function TruncatedText({ text, className = '', lines = 2 }: TruncatedText
           WebkitLineClamp: lines,
           WebkitBoxOrient: 'vertical',
           overflow: 'hidden',
+          position: 'relative',
+          zIndex: 1,
         }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}

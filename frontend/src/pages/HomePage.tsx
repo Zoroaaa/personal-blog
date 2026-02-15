@@ -710,7 +710,7 @@ export function HomePage() {
                       <article
                         key={post.id}
                         className="group bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-xl shadow-md border border-gray-200/60 dark:border-slate-700/60 overflow-hidden hover:shadow-xl transition-all duration-300 animate-fade-in flex flex-col"
-                        style={{ animationDelay: `${index * 50}ms` }}
+                        style={{ animationDelay: `${index * 50}ms`, isolation: 'auto' }}
                       >
                         {/* 封面图 */}
                         {post.coverImage && (
