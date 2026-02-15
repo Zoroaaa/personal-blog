@@ -221,8 +221,22 @@ export default function ThreadPage() {
     }
     
     try {
-      const createdAt = new Date(message.createdAt);
-      console.log('4. 解析后的时间:', createdAt.toISOString());
+      let createdAt: Date;
+      
+      // 处理数据库返回的时间格式 "2026-02-15 12:37:00"
+      // 这是本地时间，需要特殊处理，不能直接用 new Date() 否则会被当成UTC
+      if (typeof message.createdAt === 'string' && message.createdAt.includes(' ') && !message.createdAt.includes('T')) {
+        // 格式: "2026-02-15 12:37:00" - 本地时间格式
+        // 将空格替换为T，然后添加本地时区
+        const localTimeStr = message.createdAt.replace(' ', 'T');
+        createdAt = new Date(localTimeStr);
+        console.log('4. 检测到本地时间格式，转换为:', localTimeStr);
+      } else {
+        // ISO格式或其他格式
+        createdAt = new Date(message.createdAt);
+      }
+      
+      console.log('5. 解析后的时间:', createdAt.toISOString());
       
       if (isNaN(createdAt.getTime())) {
         console.log('⚠️ 无效的日期格式，默认允许撤回');
@@ -234,7 +248,7 @@ export default function ThreadPage() {
       const timeDiff = now.getTime() - createdAt.getTime();
       const timeLimit = RECALL_TIME_LIMIT_MS;
       
-      console.log('5. 时间检查:', {
+      console.log('6. 时间检查:', {
         现在: now.toISOString(),
         创建时间: createdAt.toISOString(),
         时间差秒: (timeDiff / 1000).toFixed(1),
