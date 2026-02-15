@@ -90,7 +90,7 @@ export function HomePage() {
   // 加载文章
   useEffect(() => {
     loadPosts();
-  }, [page, selectedCategory, selectedColumn, selectedTag]);
+  }, [page, selectedCategory, selectedColumn, selectedTag, postsPerPage]);
 
   // 同步URL参数
   useEffect(() => {
