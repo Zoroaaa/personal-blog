@@ -139,7 +139,16 @@ export async function updateNotificationSettings(
 export function getNotificationIcon(type: string, subtype?: string): string {
   switch (type) {
     case 'system':
-      return '🔔';
+      switch (subtype) {
+        case 'maintenance':
+          return '🔧';
+        case 'update':
+          return '🚀';
+        case 'announcement':
+          return '📢';
+        default:
+          return '🔔';
+      }
     case 'interaction':
       switch (subtype) {
         case 'comment':
