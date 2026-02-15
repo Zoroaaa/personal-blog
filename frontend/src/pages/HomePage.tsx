@@ -23,6 +23,7 @@ import { transformPostList, transformCategoryList, transformColumnList, transfor
 import { useSiteConfig } from '../hooks/useSiteConfig';
 import { SEO } from '../components/SEO';
 import { NotificationCarousel } from '../components/NotificationCarousel';
+import { TruncatedText } from '../components/TruncatedText';
 import type { Category, Column, Tag } from '../types';
 
 export function HomePage() {
@@ -754,9 +755,11 @@ export function HomePage() {
 
                           {/* 摘要 */}
                           {post.summary && (
-                            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2 flex-1 leading-relaxed">
-                              {post.summary}
-                            </p>
+                            <TruncatedText
+                              text={post.summary}
+                              className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-3 flex-1 leading-relaxed"
+                              lines={2}
+                            />
                           )}
 
                           {/* 元信息 */}
