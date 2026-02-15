@@ -37,7 +37,6 @@ export default function NewMessagePage() {
   const [sending, setSending] = useState(false);
 
   const recipientId = searchParams.get('recipientId');
-  const recipientName = searchParams.get('recipientName');
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -55,6 +54,7 @@ export default function NewMessagePage() {
   }, [recipientId, isAuthenticated]);
 
   const loadRecipientInfo = async () => {
+    if (!recipientId) return;
     try {
       setLoading(true);
       const response = await api.getUserProfile(parseInt(recipientId));

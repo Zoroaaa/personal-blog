@@ -73,7 +73,6 @@ export function RichTextEditor({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [textLength, setTextLength] = useState(0);
   const [mentionQuery, setMentionQuery] = useState('');
-  const [mentionPosition, setMentionPosition] = useState<{ start: number; end: number } | null>(null);
   const [popupPosition, setPopupPosition] = useState<{ top: number; left: number } | null>(null);
   const isUpdatingRef = useRef(false);
   const lastSelectionRef = useRef<Range | null>(null);
@@ -259,7 +258,6 @@ export function RichTextEditor({
     
     if (lastAtIndex === -1) {
       setShowMentions(false);
-      setMentionPosition(null);
       return;
     }
 
@@ -267,18 +265,15 @@ export function RichTextEditor({
     
     if (afterAt.includes(' ') || afterAt.includes('\n')) {
       setShowMentions(false);
-      setMentionPosition(null);
       return;
     }
 
     if (afterAt.length > 15) {
       setShowMentions(false);
-      setMentionPosition(null);
       return;
     }
 
     setMentionQuery(afterAt);
-    setMentionPosition({ start: lastAtIndex, end: textBeforeCursor.length });
     setShowMentions(true);
   }, []);
 
@@ -326,7 +321,6 @@ export function RichTextEditor({
 
     setShowMentions(false);
     setMentionQuery('');
-    setMentionPosition(null);
 
     if (onMention) {
       onMention(user);

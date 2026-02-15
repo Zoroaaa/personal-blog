@@ -42,9 +42,8 @@ import type {
 
 // ============= 配置 =============
 
-// 支持Vite环境变量和Node.js环境变量
-const API_URL = (import.meta?.env?.VITE_API_URL || process.env.VITE_API_URL) || '/api';
-const isDevelopment = (import.meta?.env?.DEV || process.env.NODE_ENV === 'development');
+const API_URL = import.meta?.env?.VITE_API_URL || '/api';
+const isDevelopment = import.meta?.env?.DEV;
 
 
 // ============= 核心请求函数 =============
