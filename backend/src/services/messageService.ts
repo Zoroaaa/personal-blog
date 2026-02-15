@@ -5,14 +5,18 @@
  * - 发送/接收私信
  * - 会话管理
  * - 未读消息统计
- * - 消息软删除
+ * - 消息撤回功能
+ * - 图片/附件消息支持
  *
  * @author 博客系统
- * @version 1.0.0
+ * @version 2.0.0
  * @created 2026-02-13
+ * @updated 2026-02-15
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
+
+export type MessageType = 'text' | 'image' | 'attachment' | 'mixed';
 
 export interface Message {
   id: number;
@@ -24,10 +28,13 @@ export interface Message {
   replyToId?: number;
   isRead: boolean;
   readAt?: string;
-  senderDeleted: boolean;
-  senderDeletedAt?: string;
-  recipientDeleted: boolean;
-  recipientDeletedAt?: string;
+  isRecalled: boolean;
+  recalledAt?: string;
+  messageType: MessageType;
+  attachmentUrl?: string;
+  attachmentFilename?: string;
+  attachmentSize?: number;
+  attachmentMimeType?: string;
   createdAt: string;
   senderUsername?: string;
   senderName?: string;
@@ -54,6 +61,11 @@ export interface SendMessageRequest {
   subject?: string;
   content: string;
   replyToId?: number;
+  messageType?: MessageType;
+  attachmentUrl?: string;
+  attachmentFilename?: string;
+  attachmentSize?: number;
+  attachmentMimeType?: string;
 }
 
 export interface MessageListParams {
@@ -75,6 +87,7 @@ export interface MessageListResponse {
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
+const RECALL_TIME_LIMIT_MS = 3 * 60 * 1000;
 
 export function generateThreadId(userId1: number, userId2: number): string {
   const min = Math.min(userId1, userId2);
@@ -88,7 +101,17 @@ export async function sendMessage(
   data: SendMessageRequest
 ): Promise<Message | null> {
   try {
-    const { recipientId, subject, content, replyToId } = data;
+    const {
+      recipientId,
+      subject,
+      content,
+      replyToId,
+      messageType = 'text',
+      attachmentUrl,
+      attachmentFilename,
+      attachmentSize,
+      attachmentMimeType
+    } = data;
 
     const recipient = await db.prepare(
       'SELECT id, username FROM users WHERE id = ? AND deleted_at IS NULL'
@@ -116,15 +139,22 @@ export async function sendMessage(
 
     const result = await db.prepare(`
       INSERT INTO messages (
-        sender_id, recipient_id, subject, content, thread_id, reply_to_id, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        sender_id, recipient_id, subject, content, thread_id, reply_to_id,
+        message_type, attachment_url, attachment_filename, attachment_size, attachment_mime_type,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `).bind(
       senderId,
       recipientId,
       subject || null,
       content,
       threadId,
-      replyToId || null
+      replyToId || null,
+      messageType,
+      attachmentUrl || null,
+      attachmentFilename || null,
+      attachmentSize || null,
+      attachmentMimeType || null
     ).run();
 
     if (!result.success) {
@@ -162,11 +192,7 @@ export async function getMessageById(
       LEFT JOIN users recipient ON m.recipient_id = recipient.id
       WHERE m.id = ?
         AND (m.sender_id = ? OR m.recipient_id = ?)
-        AND (
-          (m.sender_id = ? AND m.sender_deleted = 0) OR
-          (m.recipient_id = ? AND m.recipient_deleted = 0)
-        )
-    `).bind(messageId, userId, userId, userId, userId).first();
+    `).bind(messageId, userId, userId).first();
 
     if (!row) return null;
 
@@ -187,7 +213,7 @@ export async function getInbox(
     const limit = Math.min(MAX_LIMIT, Math.max(1, params.limit || DEFAULT_LIMIT));
     const offset = (page - 1) * limit;
 
-    let whereClause = 'm.recipient_id = ? AND m.recipient_deleted = 0';
+    let whereClause = 'm.recipient_id = ? AND m.is_recalled = 0';
     const bindings: any[] = [userId];
 
     if (params.threadId) {
@@ -248,7 +274,7 @@ export async function getOutbox(
     const limit = Math.min(MAX_LIMIT, Math.max(1, params.limit || DEFAULT_LIMIT));
     const offset = (page - 1) * limit;
 
-    let whereClause = 'm.sender_id = ? AND m.sender_deleted = 0';
+    let whereClause = 'm.sender_id = ?';
     const bindings: any[] = [userId];
 
     if (params.threadId) {
@@ -317,16 +343,21 @@ export async function getThreads(
           m.created_at as last_message_at,
           m.sender_id,
           m.recipient_id,
+          m.is_recalled,
+          m.message_type,
+          m.attachment_filename,
           ROW_NUMBER() OVER (PARTITION BY m.thread_id ORDER BY m.created_at DESC) as rn
         FROM messages m
         WHERE (m.sender_id = ? OR m.recipient_id = ?)
-          AND ((m.sender_id = ? AND m.sender_deleted = 0) OR (m.recipient_id = ? AND m.recipient_deleted = 0))
       ),
       thread_info AS (
         SELECT 
           thread_id,
           last_message,
           last_message_at,
+          is_recalled,
+          message_type,
+          attachment_filename,
           CASE 
             WHEN sender_id = ? THEN recipient_id
             ELSE sender_id
@@ -339,7 +370,7 @@ export async function getThreads(
           thread_id,
           COUNT(*) as unread_count
         FROM messages
-        WHERE recipient_id = ? AND is_read = 0 AND recipient_deleted = 0
+        WHERE recipient_id = ? AND is_read = 0 AND is_recalled = 0
         GROUP BY thread_id
       ),
       message_counts AS (
@@ -348,13 +379,15 @@ export async function getThreads(
           COUNT(*) as total_messages
         FROM messages
         WHERE (sender_id = ? OR recipient_id = ?)
-          AND ((sender_id = ? AND sender_deleted = 0) OR (recipient_id = ? AND recipient_deleted = 0))
         GROUP BY thread_id
       )
       SELECT 
         ti.thread_id,
         ti.last_message,
         ti.last_message_at,
+        ti.is_recalled,
+        ti.message_type,
+        ti.attachment_filename,
         ti.other_user_id,
         u.username as other_username,
         u.display_name as other_name,
@@ -368,30 +401,43 @@ export async function getThreads(
       ORDER BY ti.last_message_at DESC
       LIMIT ? OFFSET ?
     `).bind(
-      userId, userId, userId, userId, userId,
+      userId, userId, userId,
       userId,
-      userId, userId, userId, userId,
+      userId, userId,
       limit, offset
     ).all();
 
-    const threads: MessageThread[] = (rows.results || []).map((row: any) => ({
-      threadId: row.thread_id,
-      otherUserId: row.other_user_id,
-      otherUsername: row.other_username,
-      otherName: row.other_name,
-      otherAvatar: row.other_avatar,
-      lastMessage: row.last_message,
-      lastMessageAt: row.last_message_at,
-      unreadCount: row.unread_count,
-      totalMessages: row.total_messages,
-    }));
+    const threads: MessageThread[] = (rows.results || []).map((row: any) => {
+      let lastMessage = row.last_message || '';
+      
+      if (row.is_recalled === 1) {
+        lastMessage = '[消息已撤回]';
+      } else if (row.message_type === 'image') {
+        lastMessage = '[图片]';
+      } else if (row.message_type === 'attachment') {
+        lastMessage = `[附件] ${row.attachment_filename || '文件'}`;
+      } else if (row.message_type === 'mixed' && row.attachment_filename) {
+        lastMessage = `${lastMessage.substring(0, 20)}... [附件]`;
+      }
+      
+      return {
+        threadId: row.thread_id,
+        otherUserId: row.other_user_id,
+        otherUsername: row.other_username,
+        otherName: row.other_name,
+        otherAvatar: row.other_avatar,
+        lastMessage,
+        lastMessageAt: row.last_message_at,
+        unreadCount: row.unread_count,
+        totalMessages: row.total_messages,
+      };
+    });
 
     const countResult = await db.prepare(`
       SELECT COUNT(DISTINCT thread_id) as total
       FROM messages
       WHERE (sender_id = ? OR recipient_id = ?)
-        AND ((sender_id = ? AND sender_deleted = 0) OR (recipient_id = ? AND recipient_deleted = 0))
-    `).bind(userId, userId, userId, userId).first();
+    `).bind(userId, userId).first();
 
     const total = (countResult?.total as number) || 0;
 
@@ -451,59 +497,79 @@ export async function markThreadAsRead(
   }
 }
 
-export async function deleteMessage(
+export async function recallMessage(
+  db: D1Database,
+  messageId: number,
+  userId: number
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const message = await db.prepare(`
+      SELECT id, sender_id, created_at, is_recalled
+      FROM messages 
+      WHERE id = ?
+    `).bind(messageId).first() as any;
+
+    if (!message) {
+      return { success: false, error: '消息不存在' };
+    }
+
+    if (message.sender_id !== userId) {
+      return { success: false, error: '只能撤回自己发送的消息' };
+    }
+
+    if (message.is_recalled === 1) {
+      return { success: false, error: '消息已被撤回' };
+    }
+
+    const createdAt = new Date(message.created_at);
+    const now = new Date();
+    const timeDiff = now.getTime() - createdAt.getTime();
+
+    if (timeDiff > RECALL_TIME_LIMIT_MS) {
+      return { success: false, error: '消息发送超过3分钟，无法撤回' };
+    }
+
+    const result = await db.prepare(`
+      UPDATE messages 
+      SET is_recalled = 1, recalled_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND sender_id = ? AND is_recalled = 0
+    `).bind(messageId, userId).run();
+
+    if (result.success && (result.meta?.changes || 0) > 0) {
+      return { success: true };
+    }
+
+    return { success: false, error: '撤回失败' };
+  } catch (error) {
+    console.error('Recall message error:', error);
+    return { success: false, error: '撤回消息时发生错误' };
+  }
+}
+
+export async function canRecallMessage(
   db: D1Database,
   messageId: number,
   userId: number
 ): Promise<boolean> {
   try {
-    const message = await db.prepare(
-      'SELECT sender_id, recipient_id FROM messages WHERE id = ?'
-    ).bind(messageId).first() as any;
+    const message = await db.prepare(`
+      SELECT sender_id, created_at, is_recalled
+      FROM messages 
+      WHERE id = ?
+    `).bind(messageId).first() as any;
 
     if (!message) return false;
+    if (message.sender_id !== userId) return false;
+    if (message.is_recalled === 1) return false;
 
-    let column: string;
-    if (message.sender_id === userId) {
-      column = 'sender_deleted = 1, sender_deleted_at = CURRENT_TIMESTAMP';
-    } else if (message.recipient_id === userId) {
-      column = 'recipient_deleted = 1, recipient_deleted_at = CURRENT_TIMESTAMP';
-    } else {
-      return false;
-    }
+    const createdAt = new Date(message.created_at);
+    const now = new Date();
+    const timeDiff = now.getTime() - createdAt.getTime();
 
-    const result = await db.prepare(
-      `UPDATE messages SET ${column} WHERE id = ?`
-    ).bind(messageId).run();
-
-    return result.success && (result.meta?.changes || 0) > 0;
+    return timeDiff <= RECALL_TIME_LIMIT_MS;
   } catch (error) {
-    console.error('Delete message error:', error);
+    console.error('Check recall status error:', error);
     return false;
-  }
-}
-
-export async function deleteThread(
-  db: D1Database,
-  threadId: string,
-  userId: number
-): Promise<number> {
-  try {
-    const result = await db.prepare(`
-      UPDATE messages 
-      SET 
-        sender_deleted = CASE WHEN sender_id = ? THEN 1 ELSE sender_deleted END,
-        sender_deleted_at = CASE WHEN sender_id = ? THEN CURRENT_TIMESTAMP ELSE sender_deleted_at END,
-        recipient_deleted = CASE WHEN recipient_id = ? THEN 1 ELSE recipient_deleted END,
-        recipient_deleted_at = CASE WHEN recipient_id = ? THEN CURRENT_TIMESTAMP ELSE recipient_deleted_at END
-      WHERE thread_id = ?
-        AND (sender_id = ? OR recipient_id = ?)
-    `).bind(userId, userId, userId, userId, threadId, userId, userId).run();
-
-    return result.meta?.changes || 0;
-  } catch (error) {
-    console.error('Delete thread error:', error);
-    return 0;
   }
 }
 
@@ -515,7 +581,7 @@ export async function getUnreadCount(
     const result = await db.prepare(`
       SELECT COUNT(*) as count
       FROM messages
-      WHERE recipient_id = ? AND is_read = 0 AND recipient_deleted = 0
+      WHERE recipient_id = ? AND is_read = 0 AND is_recalled = 0
     `).bind(userId).first();
 
     return (result?.count as number) || 0;
@@ -539,9 +605,8 @@ export async function getThreadMessages(
     const whereClause = `
       m.thread_id = ? 
       AND (m.sender_id = ? OR m.recipient_id = ?)
-      AND ((m.sender_id = ? AND m.sender_deleted = 0) OR (m.recipient_id = ? AND m.recipient_deleted = 0))
     `;
-    const bindings: any[] = [threadId, userId, userId, userId, userId];
+    const bindings: any[] = [threadId, userId, userId];
 
     const countResult = await db.prepare(
       `SELECT COUNT(*) as total FROM messages m WHERE ${whereClause}`
@@ -597,10 +662,13 @@ function mapMessageFromRow(row: any): Message {
     replyToId: row.reply_to_id,
     isRead: row.is_read === 1,
     readAt: row.read_at,
-    senderDeleted: row.sender_deleted === 1,
-    senderDeletedAt: row.sender_deleted_at,
-    recipientDeleted: row.recipient_deleted === 1,
-    recipientDeletedAt: row.recipient_deleted_at,
+    isRecalled: row.is_recalled === 1,
+    recalledAt: row.recalled_at,
+    messageType: row.message_type || 'text',
+    attachmentUrl: row.attachment_url,
+    attachmentFilename: row.attachment_filename,
+    attachmentSize: row.attachment_size,
+    attachmentMimeType: row.attachment_mime_type,
     createdAt: row.created_at,
     senderUsername: row.sender_username,
     senderName: row.sender_name,

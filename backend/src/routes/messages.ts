@@ -5,11 +5,13 @@
  * - 发送私信
  * - 查看收件箱/发件箱
  * - 会话管理
- * - 标记已读/删除
+ * - 标记已读/撤回消息
+ * - 图片/附件消息支持
  *
  * @author 博客系统
- * @version 1.0.0
+ * @version 2.0.0
  * @created 2026-02-13
+ * @updated 2026-02-15
  */
 
 import { Hono } from 'hono';
@@ -27,12 +29,12 @@ import {
   getMessageById,
   markAsRead,
   markThreadAsRead,
-  deleteMessage,
-  deleteThread,
+  recallMessage,
   getUnreadCount,
   generateThreadId,
   getThreadMessages,
   type SendMessageRequest,
+  type MessageType,
 } from '../services/messageService';
 
 export const messageRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -40,6 +42,7 @@ export const messageRoutes = new Hono<{ Bindings: Env; Variables: Variables }>()
 const MIN_MESSAGE_LENGTH = 1;
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_SUBJECT_LENGTH = 100;
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 
 messageRoutes.post('/', requireAuth, rateLimit({
   windowMs: 60 * 1000,
@@ -51,12 +54,22 @@ messageRoutes.post('/', requireAuth, rateLimit({
   try {
     const user = c.get('user') as any;
     const body = await c.req.json();
-    let { recipientId, subject, content, replyToId } = body;
+    let { 
+      recipientId, 
+      subject, 
+      content, 
+      replyToId,
+      messageType,
+      attachmentUrl,
+      attachmentFilename,
+      attachmentSize,
+      attachmentMimeType
+    } = body;
 
-    if (!recipientId || !content) {
+    if (!recipientId) {
       return c.json(errorResponse(
         'Missing required fields',
-        'recipientId and content are required'
+        'recipientId is required'
       ), 400);
     }
 
@@ -67,10 +80,35 @@ messageRoutes.post('/', requireAuth, rateLimit({
       ), 400);
     }
 
-    content = sanitizeInput(content);
-    const contentError = validateLength(content, MIN_MESSAGE_LENGTH, MAX_MESSAGE_LENGTH, 'Message content');
-    if (contentError) {
-      return c.json(errorResponse('Invalid message content', contentError), 400);
+    if (attachmentSize && attachmentSize > MAX_ATTACHMENT_SIZE) {
+      return c.json(errorResponse(
+        'Attachment too large',
+        'Attachment size cannot exceed 10MB'
+      ), 400);
+    }
+
+    const finalMessageType: MessageType = messageType || 'text';
+    
+    if (finalMessageType === 'text' && !content) {
+      return c.json(errorResponse(
+        'Missing content',
+        'Message content is required for text messages'
+      ), 400);
+    }
+
+    if ((finalMessageType === 'image' || finalMessageType === 'attachment') && !attachmentUrl) {
+      return c.json(errorResponse(
+        'Missing attachment',
+        'Attachment URL is required for image/attachment messages'
+      ), 400);
+    }
+
+    if (content) {
+      content = sanitizeInput(content);
+      const contentError = validateLength(content, MIN_MESSAGE_LENGTH, MAX_MESSAGE_LENGTH, 'Message content');
+      if (contentError) {
+        return c.json(errorResponse('Invalid message content', contentError), 400);
+      }
     }
 
     if (subject) {
@@ -83,9 +121,14 @@ messageRoutes.post('/', requireAuth, rateLimit({
 
     const messageData: SendMessageRequest = {
       recipientId,
-      content,
+      content: content || '',
       subject: subject || undefined,
       replyToId: replyToId || undefined,
+      messageType: finalMessageType,
+      attachmentUrl: attachmentUrl || undefined,
+      attachmentFilename: attachmentFilename || undefined,
+      attachmentSize: attachmentSize || undefined,
+      attachmentMimeType: attachmentMimeType || undefined,
     };
 
     const message = await sendMessage(c.env.DB, user.userId, messageData);
@@ -101,6 +144,7 @@ messageRoutes.post('/', requireAuth, rateLimit({
       messageId: message.id,
       senderId: user.userId,
       recipientId,
+      messageType: finalMessageType,
     });
 
     return c.json(successResponse(message, 'Message sent successfully'), 201);
@@ -333,7 +377,7 @@ messageRoutes.patch('/threads/:threadId/read', requireAuth, async (c) => {
   }
 });
 
-messageRoutes.delete('/:id', requireAuth, async (c) => {
+messageRoutes.post('/:id/recall', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
@@ -344,54 +388,24 @@ messageRoutes.delete('/:id', requireAuth, async (c) => {
       return c.json(errorResponse('Invalid message ID'), 400);
     }
 
-    const success = await deleteMessage(c.env.DB, messageId, user.userId);
+    const result = await recallMessage(c.env.DB, messageId, user.userId);
 
-    if (!success) {
+    if (!result.success) {
       return c.json(errorResponse(
-        'Failed to delete message',
-        'Message not found or already deleted'
+        'Failed to recall message',
+        result.error || 'Unable to recall the message'
       ), 400);
     }
 
-    logger.info('Message deleted', { messageId, userId: user.userId });
+    logger.info('Message recalled', { messageId, userId: user.userId });
 
-    return c.json(successResponse({ deleted: true }));
-
-  } catch (error) {
-    logger.error('Delete message error', error);
-    return c.json(errorResponse(
-      'Failed to delete message',
-      'An error occurred while deleting the message'
-    ), 500);
-  }
-});
-
-messageRoutes.delete('/threads/:threadId', requireAuth, async (c) => {
-  const logger = createLogger(c);
-  
-  try {
-    const user = c.get('user') as any;
-    const threadId = c.req.param('threadId');
-
-    if (!threadId) {
-      return c.json(errorResponse('Invalid thread ID'), 400);
-    }
-
-    const count = await deleteThread(c.env.DB, threadId, user.userId);
-
-    logger.info('Thread deleted', {
-      threadId,
-      userId: user.userId,
-      count,
-    });
-
-    return c.json(successResponse({ count }));
+    return c.json(successResponse({ recalled: true }));
 
   } catch (error) {
-    logger.error('Delete thread error', error);
+    logger.error('Recall message error', error);
     return c.json(errorResponse(
-      'Failed to delete conversation',
-      'An error occurred while deleting the conversation'
+      'Failed to recall message',
+      'An error occurred while recalling the message'
     ), 500);
   }
 });
