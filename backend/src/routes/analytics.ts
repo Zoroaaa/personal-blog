@@ -40,46 +40,46 @@ analyticsRoutes.get('/', requireAdmin, async (c) => {
   try {
     // 直接查询，不使用缓存（统计数据变化频繁）
     
-    // 1. 总文章数
+    // 1. 总文章数（排除软删除）
     const totalPostsResult = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM posts WHERE status = ?'
+      'SELECT COUNT(*) as count FROM posts WHERE status = ? AND deleted_at IS NULL'
     ).bind('published').first() as any;
     const totalPosts = totalPostsResult?.count || 0;
     
-    // 2. 总用户数
+    // 2. 总用户数（排除软删除）
     const totalUsersResult = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM users WHERE status = ?'
+      'SELECT COUNT(*) as count FROM users WHERE status = ? AND deleted_at IS NULL'
     ).bind('active').first() as any;
     const totalUsers = totalUsersResult?.count || 0;
     
-    // 3. 总评论数
+    // 3. 总评论数（排除软删除）
     const totalCommentsResult = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM comments WHERE status = ?'
+      'SELECT COUNT(*) as count FROM comments WHERE status = ? AND deleted_at IS NULL'
     ).bind('approved').first() as any;
     const totalComments = totalCommentsResult?.count || 0;
     
-    // 4. 总浏览量
+    // 4. 总浏览量（排除软删除文章）
     const totalViewsResult = await c.env.DB.prepare(
-      'SELECT SUM(view_count) as total FROM posts'
+      'SELECT SUM(view_count) as total FROM posts WHERE deleted_at IS NULL'
     ).first() as any;
     const totalViews = totalViewsResult?.total || 0;
     
-    // 5. 最近文章
+    // 5. 最近文章（排除软删除）
     const { results: recentPosts } = await c.env.DB.prepare(`
       SELECT id, title, slug, published_at as createdAt
       FROM posts 
-      WHERE status = 'published' 
+      WHERE status = 'published' AND deleted_at IS NULL
       ORDER BY published_at DESC 
       LIMIT 5
     `).all();
     
-    // 6. 最近评论
+    // 6. 最近评论（排除软删除）
     const { results: recentComments } = await c.env.DB.prepare(`
       SELECT c.id, c.content, c.created_at as createdAt,
              u.username, u.display_name as displayName, u.avatar_url as avatarUrl
       FROM comments c
       LEFT JOIN users u ON c.user_id = u.id
-      WHERE c.status = 'approved'
+      WHERE c.status = 'approved' AND c.deleted_at IS NULL AND u.deleted_at IS NULL
       ORDER BY c.created_at DESC
       LIMIT 5
     `).all();
@@ -156,14 +156,14 @@ analyticsRoutes.get('/hot-posts', async (c) => {
     const timeRange = new Date();
     timeRange.setDate(timeRange.getDate() - days);
     
-    // 查询热门文章（按浏览量排序）- 直接从数据库读取，不使用缓存
+    // 查询热门文章（按浏览量排序，排除软删除的文章和用户）
     const { results } = await c.env.DB.prepare(`
       SELECT p.id, p.title, p.slug, p.view_count, p.like_count, p.comment_count,
              p.published_at, p.cover_image,
              u.username as author_name, u.display_name as author_display_name
       FROM posts p
       LEFT JOIN users u ON p.author_id = u.id
-      WHERE p.status = 'published' AND p.visibility = 'public'
+      WHERE p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
         AND p.published_at >= ?
       ORDER BY p.view_count DESC, p.like_count DESC
       LIMIT ?
@@ -200,27 +200,27 @@ analyticsRoutes.get('/stats', requireAdmin, async (c) => {
   try {
     // 直接查询，不使用缓存（统计数据变化频繁）
     
-    // 1. 总文章数
+    // 1. 总文章数（排除软删除）
     const totalPostsResult = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM posts WHERE status = ?'
+      'SELECT COUNT(*) as count FROM posts WHERE status = ? AND deleted_at IS NULL'
     ).bind('published').first() as any;
     const totalPosts = totalPostsResult?.count || 0;
     
-    // 2. 总用户数
+    // 2. 总用户数（排除软删除）
     const totalUsersResult = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM users WHERE status = ?'
+      'SELECT COUNT(*) as count FROM users WHERE status = ? AND deleted_at IS NULL'
     ).bind('active').first() as any;
     const totalUsers = totalUsersResult?.count || 0;
     
-    // 3. 总评论数
+    // 3. 总评论数（排除软删除）
     const totalCommentsResult = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM comments WHERE status = ?'
+      'SELECT COUNT(*) as count FROM comments WHERE status = ? AND deleted_at IS NULL'
     ).bind('approved').first() as any;
     const totalComments = totalCommentsResult?.count || 0;
     
-    // 4. 总浏览量
+    // 4. 总浏览量（排除软删除文章）
     const totalViewsResult = await c.env.DB.prepare(
-      'SELECT SUM(view_count) as total FROM posts'
+      'SELECT SUM(view_count) as total FROM posts WHERE deleted_at IS NULL'
     ).first() as any;
     const totalViews = totalViewsResult?.total || 0;
     
@@ -254,17 +254,19 @@ analyticsRoutes.get('/stats', requireAdmin, async (c) => {
       });
     }
     
-    // 7. 分类统计
+    // 7. 分类统计（排除软删除）
     const { results: categoryStats } = await c.env.DB.prepare(`
       SELECT c.name, c.slug, c.post_count
       FROM categories c
+      WHERE c.deleted_at IS NULL
       ORDER BY c.post_count DESC
     `).all();
     
-    // 8. 标签统计（前10个）
+    // 8. 标签统计（前10个，排除软删除）
     const { results: tagStats } = await c.env.DB.prepare(`
       SELECT t.name, t.slug, t.post_count
       FROM tags t
+      WHERE t.deleted_at IS NULL
       ORDER BY t.post_count DESC
       LIMIT 10
     `).all();
@@ -313,9 +315,9 @@ analyticsRoutes.get('/post/:id', requireAdmin, async (c) => {
       return c.json(errorResponse('Invalid post ID'), 400);
     }
     
-    // 检查文章是否存在
+    // 检查文章是否存在（排除软删除）
     const post = await c.env.DB.prepare(
-      'SELECT id, title, slug FROM posts WHERE id = ?'
+      'SELECT id, title, slug FROM posts WHERE id = ? AND deleted_at IS NULL'
     ).bind(postId).first() as any;
     
     if (!post) {
@@ -419,12 +421,12 @@ analyticsRoutes.get('/users', requireAdmin, async (c) => {
     
     // 直接查询，不使用缓存（用户数据变化频繁）
     
-    // 获取活跃用户（按文章数和评论数排序）
+    // 获取活跃用户（按文章数和评论数排序，排除软删除）
     const { results } = await c.env.DB.prepare(`
       SELECT u.id, u.username, u.display_name, u.email, u.avatar_url,
              u.post_count, u.comment_count, u.created_at, u.last_login_at
       FROM users u
-      WHERE u.status = 'active'
+      WHERE u.status = 'active' AND u.deleted_at IS NULL
       ORDER BY (u.post_count + u.comment_count) DESC
       LIMIT ?
     `).bind(limit).all();
@@ -475,9 +477,9 @@ analyticsRoutes.post('/track', async (c) => {
       ), 400);
     }
     
-    // 检查文章是否存在
+    // 检查文章是否存在（排除软删除）
     const post = await c.env.DB.prepare(
-      'SELECT id FROM posts WHERE id = ?'
+      'SELECT id FROM posts WHERE id = ? AND deleted_at IS NULL'
     ).bind(postId).first();
     
     if (!post) {

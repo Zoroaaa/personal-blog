@@ -67,7 +67,7 @@ columnRoutes.get('/', async (c) => {
 
     logger.info('Fetching columns', { page, limit, author, sortBy });
 
-    // 构建查询
+    // 构建查询（排除软删除的专栏）
     let query = `
       SELECT 
         col.id, col.name, col.slug, col.description, col.cover_image,
@@ -77,7 +77,7 @@ columnRoutes.get('/', async (c) => {
         u.username as author_username, u.display_name as author_name, u.avatar_url as author_avatar
       FROM columns col
       LEFT JOIN users u ON col.author_id = u.id
-      WHERE col.status = 'active'
+      WHERE col.status = 'active' AND col.deleted_at IS NULL
     `;
     
     const params: any[] = [];
@@ -95,12 +95,12 @@ columnRoutes.get('/', async (c) => {
     // 执行查询
     const { results } = await c.env.DB.prepare(query).bind(...params).all();
 
-    // 获取总数
+    // 获取总数（排除软删除的专栏）
     let countQuery = `
       SELECT COUNT(*) as total 
       FROM columns col
       LEFT JOIN users u ON col.author_id = u.id
-      WHERE col.status = 'active'
+      WHERE col.status = 'active' AND col.deleted_at IS NULL
     `;
     const countParams: any[] = [];
     
@@ -150,7 +150,7 @@ columnRoutes.get('/:slug', async (c) => {
       return c.json(errorResponse('Invalid slug'), 400);
     }
 
-    // 获取专栏详情
+    // 获取专栏详情（排除软删除的专栏）
     const column = await c.env.DB.prepare(`
       SELECT 
         col.*,
@@ -160,7 +160,7 @@ columnRoutes.get('/:slug', async (c) => {
         u.bio as author_bio
       FROM columns col
       LEFT JOIN users u ON col.author_id = u.id
-      WHERE col.slug = ? AND col.status = 'active'
+      WHERE col.slug = ? AND col.status = 'active' AND col.deleted_at IS NULL
     `).bind(slug).first() as any;
 
     if (!column) {
@@ -217,15 +217,16 @@ columnRoutes.get('/:slug/posts', async (c) => {
     const finalSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'published_at';
 
     // 先获取专栏ID
+    // 获取专栏ID（排除软删除的专栏）
     const column = await c.env.DB.prepare(
-      'SELECT id FROM columns WHERE slug = ? AND status = ?'
+      'SELECT id FROM columns WHERE slug = ? AND status = ? AND deleted_at IS NULL'
     ).bind(slug, 'active').first() as any;
 
     if (!column) {
       return c.json(errorResponse('Column not found'), 404);
     }
 
-    // 获取文章列表
+    // 获取文章列表（排除软删除的文章和用户）
     let query = `
       SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
              p.view_count, p.like_count, p.comment_count, p.reading_time,
@@ -236,18 +237,19 @@ columnRoutes.get('/:slug/posts', async (c) => {
       FROM posts p
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
-      WHERE p.column_id = ? AND p.status = 'published' AND p.visibility = 'public'
+      WHERE p.column_id = ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
     `;
     
     query += ` ORDER BY p.${finalSortBy} ${order} LIMIT ? OFFSET ?`;
 
     const { results } = await c.env.DB.prepare(query).bind(column.id, limit, offset).all();
 
-    // 获取总数
+    // 获取总数（排除软删除的文章）
     const countResult = await c.env.DB.prepare(`
       SELECT COUNT(*) as total 
-      FROM posts 
-      WHERE column_id = ? AND status = 'published' AND visibility = 'public'
+      FROM posts p
+      LEFT JOIN users u ON p.author_id = u.id
+      WHERE p.column_id = ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
     `).bind(column.id).first() as any;
     const total = countResult?.total || 0;
 
