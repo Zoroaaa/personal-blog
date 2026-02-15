@@ -140,10 +140,13 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
   if (isLoading) {
     return (
       <div className={`relative ${className}`}>
-        <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl rounded-3xl border border-gray-200/50 dark:border-slate-700/50 p-8 shadow-xl">
-          <div className="animate-pulse flex flex-col items-center">
-            <div className="h-10 bg-gray-200 dark:bg-slate-700 rounded-2xl w-64 mb-4"></div>
-            <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded-xl w-96"></div>
+        <div className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl rounded-2xl border border-gray-200/50 dark:border-slate-700/50 p-4 shadow-lg">
+          <div className="animate-pulse flex items-center gap-3">
+            <div className="w-10 h-10 bg-gray-200 dark:bg-slate-700 rounded-xl flex-shrink-0"></div>
+            <div className="flex-1 space-y-2">
+              <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded-lg w-48"></div>
+              <div className="h-3 bg-gray-200 dark:bg-slate-700 rounded w-64"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -158,118 +161,114 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
-      {/* 主卡片容器 */}
+      {/* 主卡片容器 - 紧凑设计 */}
       <motion.div
         key={currentIndex}
-        initial={{ opacity: 0, y: 20, scale: 0.98 }}
+        initial={{ opacity: 0, y: 10, scale: 0.99 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -20, scale: 0.98 }}
-        transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+        exit={{ opacity: 0, y: -10, scale: 0.99 }}
+        transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
         className={`
           relative overflow-hidden
-          bg-white/80 dark:bg-slate-800/80
-          backdrop-blur-2xl
-          rounded-3xl
+          bg-white/85 dark:bg-slate-800/85
+          backdrop-blur-xl
+          rounded-2xl
           border ${config.borderColor}
-          shadow-2xl shadow-black/5 dark:shadow-black/20
-          transition-all duration-500
-          ${displayNotification.link ? 'cursor-pointer' : ''}
+          shadow-lg shadow-black/5 dark:shadow-black/15
+          transition-all duration-300
+          ${displayNotification.link ? 'cursor-pointer hover:shadow-xl' : ''}
         `}
         onClick={() => displayNotification.link && handleClick(displayNotification)}
       >
         {/* 背景渐变装饰 */}
         <div className={`
           absolute inset-0 bg-gradient-to-br ${config.gradient}
-          opacity-60 dark:opacity-40
-          transition-opacity duration-500
+          opacity-50 dark:opacity-30
+          transition-opacity duration-300
         `} />
 
-        {/* 顶部装饰线 */}
+        {/* 左侧装饰条 */}
         <div className={`
-          absolute top-0 left-0 right-0 h-1
-          bg-gradient-to-r ${config.gradient.replace('/20', '').replace('/10', '')}
-          opacity-80
+          absolute top-0 left-0 bottom-0 w-1
+          bg-gradient-to-b ${config.gradient.replace('/20', '').replace('/10', '')}
+          opacity-90
         `} />
 
-        {/* 内容区域 */}
-        <div className="relative p-6 sm:p-8 lg:p-10">
-          {/* 类型图标 */}
+        {/* 内容区域 - 横向紧凑布局 */}
+        <div className="relative px-4 py-3 sm:px-5 sm:py-4 flex items-center gap-3 sm:gap-4">
+          {/* 类型图标 - 更小 */}
           <motion.div
-            initial={{ scale: 0, rotate: -180 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.1, duration: 0.2 }}
             className={`
+              flex-shrink-0
               inline-flex items-center justify-center
-              w-12 h-12 rounded-2xl mb-6
+              w-9 h-9 sm:w-10 sm:h-10 rounded-xl
               ${config.iconBg}
-              shadow-lg shadow-current/20
             `}
           >
             {config.icon}
           </motion.div>
 
-          {/* 标题 */}
-          <motion.h1
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="
-              text-2xl sm:text-3xl lg:text-4xl
-              font-bold
-              bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700
-              dark:from-white dark:via-gray-200 dark:to-gray-300
-              bg-clip-text text-transparent
-              mb-4
-              leading-tight
-              tracking-tight
-            "
-          >
-            {displayNotification.title}
-          </motion.h1>
+          {/* 文本内容 - 紧凑排列 */}
+          <div className="flex-1 min-w-0">
+            {/* 标题 */}
+            <motion.h2
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.05, duration: 0.2 }}
+              className="
+                text-base sm:text-lg
+                font-semibold
+                text-gray-900 dark:text-white
+                truncate
+              "
+            >
+              {displayNotification.title}
+            </motion.h2>
 
-          {/* 内容区域 */}
-          <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="
-              text-base sm:text-lg
-              text-gray-600 dark:text-gray-400
-              leading-relaxed
-            "
-          >
-            {displayNotification.content}
-          </motion.p>
+            {/* 内容 */}
+            <motion.p
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1, duration: 0.2 }}
+              className="
+                text-sm text-gray-600 dark:text-gray-400
+                truncate
+                mt-0.5
+              "
+            >
+              {displayNotification.content}
+            </motion.p>
+          </div>
 
-          {/* 底部元信息 */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="mt-6 flex items-center gap-4 text-sm text-gray-500 dark:text-gray-500"
-          >
-            {displayNotification.createdAt && (
-              <span className="flex items-center gap-1.5">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          {/* 右侧操作区 */}
+          <div className="flex-shrink-0 flex items-center gap-2">
+            {displayNotification.link && (
+              <motion.span
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                className="hidden sm:flex items-center gap-1 text-xs text-blue-500 dark:text-blue-400 font-medium"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
+                查看
+              </motion.span>
+            )}
+            {displayNotification.createdAt && (
+              <span className="hidden md:flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
                 {new Date(displayNotification.createdAt).toLocaleDateString('zh-CN')}
               </span>
             )}
-            {displayNotification.link && (
-              <span className="flex items-center gap-1.5 text-blue-500">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-                点击查看
-              </span>
-            )}
-          </motion.div>
+          </div>
         </div>
 
         {/* 进度条 */}
         {notifications.length > 1 && !isPaused && (
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-100 dark:bg-slate-700/50 overflow-hidden">
+          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-100 dark:bg-slate-700/50 overflow-hidden">
             <motion.div
               className={`h-full ${config.accent}`}
               initial={{ width: '0%' }}
@@ -281,44 +280,43 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
         )}
       </motion.div>
 
-      {/* 导航控制 */}
+      {/* 导航控制 - 紧凑设计 */}
       {notifications.length > 1 && (
-        <div className="mt-6 flex items-center justify-center gap-4">
+        <div className="mt-3 flex items-center justify-center gap-3">
           {/* 上一页按钮 */}
           <motion.button
-            whileHover={{ scale: 1.1 }}
+            whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={prev}
             className="
-              p-3 rounded-full
-              bg-white/80 dark:bg-slate-800/80
+              p-2 rounded-lg
+              bg-white/70 dark:bg-slate-800/70
               backdrop-blur-sm
               border border-gray-200/50 dark:border-slate-700/50
-              text-gray-600 dark:text-gray-400
-              shadow-lg shadow-black/5
+              text-gray-500 dark:text-gray-400
               hover:text-blue-500 dark:hover:text-blue-400
               hover:border-blue-300 dark:hover:border-blue-700
-              transition-all duration-300
+              transition-all duration-200
             "
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </motion.button>
 
           {/* 指示器 */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {notifications.map((_, index) => (
               <motion.button
                 key={index}
                 onClick={() => goTo(index)}
-                whileHover={{ scale: 1.2 }}
+                whileHover={{ scale: 1.15 }}
                 whileTap={{ scale: 0.9 }}
                 className={`
-                  rounded-full transition-all duration-300
+                  rounded-full transition-all duration-200
                   ${index === currentIndex
-                    ? 'w-8 h-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 shadow-lg shadow-blue-500/30'
-                    : 'w-2.5 h-2.5 bg-gray-300 dark:bg-slate-600 hover:bg-gray-400 dark:hover:bg-slate-500'
+                    ? 'w-5 h-1.5 bg-gradient-to-r from-blue-500 to-indigo-500'
+                    : 'w-1.5 h-1.5 bg-gray-300 dark:bg-slate-600 hover:bg-gray-400 dark:hover:bg-slate-500'
                   }
                 `}
                 aria-label={`切换到第 ${index + 1} 条通知`}
@@ -328,22 +326,21 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
 
           {/* 下一页按钮 */}
           <motion.button
-            whileHover={{ scale: 1.1 }}
+            whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={next}
             className="
-              p-3 rounded-full
-              bg-white/80 dark:bg-slate-800/80
+              p-2 rounded-lg
+              bg-white/70 dark:bg-slate-800/70
               backdrop-blur-sm
               border border-gray-200/50 dark:border-slate-700/50
-              text-gray-600 dark:text-gray-400
-              shadow-lg shadow-black/5
+              text-gray-500 dark:text-gray-400
               hover:text-blue-500 dark:hover:text-blue-400
               hover:border-blue-300 dark:hover:border-blue-700
-              transition-all duration-300
+              transition-all duration-200
             "
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </motion.button>
