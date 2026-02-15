@@ -193,83 +193,30 @@ export default function ThreadPage() {
   };
 
   const canRecall = useCallback((message: Message) => {
-    console.group(`🔍 检查消息 #${message.id} 是否可撤回`);
+    if (message.senderId !== user?.id) return false;
+    if (message.isRecalled) return false;
     
-    // 检查是否是自己发送的
-    const isMine = message.senderId === user?.id;
-    console.log('1. 是否是自己发送:', isMine, { messageSenderId: message.senderId, userId: user?.id });
-    if (!isMine) {
-      console.log('❌ 不是自己发送的消息');
-      console.groupEnd();
-      return false;
-    }
-    
-    // 检查是否已撤回
-    console.log('2. 是否已撤回:', message.isRecalled);
-    if (message.isRecalled) {
-      console.log('❌ 消息已被撤回');
-      console.groupEnd();
-      return false;
-    }
-    
-    // 检查创建时间
-    console.log('3. createdAt:', message.createdAt, typeof message.createdAt);
-    if (!message.createdAt) {
-      console.log('⚠️ 没有createdAt，默认允许撤回');
-      console.groupEnd();
-      return true;
-    }
+    if (!message.createdAt) return true;
     
     try {
       let createdAt: Date;
       
-      // 处理数据库返回的时间格式 "2026-02-15 12:37:00"
+      // 处理SQLite返回的UTC时间格式 "2026-02-15 12:37:00"
       if (typeof message.createdAt === 'string' && message.createdAt.includes(' ') && !message.createdAt.includes('T')) {
-        // SQLite的CURRENT_TIMESTAMP返回的是UTC时间，格式为 "2026-02-15 12:37:00"
-        // 我们需要把它当作UTC时间来解析
-        console.log('4. 检测到SQLite时间格式，作为UTC时间解析');
-        
-        // 方法1：添加Z后缀表示UTC时间
+        // 添加Z后缀表示UTC时间
         const utcTimeStr = message.createdAt.replace(' ', 'T') + 'Z';
         createdAt = new Date(utcTimeStr);
-        console.log('   转换为UTC格式:', utcTimeStr);
       } else {
-        // ISO格式或其他格式
         createdAt = new Date(message.createdAt);
       }
       
-      console.log('5. 解析后的时间（本地）:', createdAt.toLocaleString());
-      console.log('   解析后的时间（UTC）:', createdAt.toUTCString());
-      console.log('   解析后的时间（ISO）:', createdAt.toISOString());
-      
-      if (isNaN(createdAt.getTime())) {
-        console.log('⚠️ 无效的日期格式，默认允许撤回');
-        console.groupEnd();
-        return true;
-      }
+      if (isNaN(createdAt.getTime())) return true;
       
       const now = new Date();
       const timeDiff = now.getTime() - createdAt.getTime();
-      const timeLimit = RECALL_TIME_LIMIT_MS;
       
-      console.log('6. 时间检查:', {
-        现在本地: now.toLocaleString(),
-        创建本地: createdAt.toLocaleString(),
-        现在UTC: now.toUTCString(),
-        创建UTC: createdAt.toUTCString(),
-        时间差秒: (timeDiff / 1000).toFixed(1),
-        时间差分钟: (timeDiff / 60000).toFixed(1),
-        限制秒: timeLimit / 1000,
-        可撤回: timeDiff <= timeLimit
-      });
-      
-      const result = timeDiff <= timeLimit;
-      console.log(result ? '✅ 可以撤回' : '❌ 超时无法撤回');
-      console.groupEnd();
-      return result;
+      return timeDiff <= RECALL_TIME_LIMIT_MS;
     } catch (error) {
-      console.error('⚠️ 解析时间出错:', error);
-      console.groupEnd();
       return true;
     }
   }, [user?.id]);
@@ -397,8 +344,6 @@ export default function ThreadPage() {
         }
       }
 
-      console.log('🚀 发送消息...', { recipientId: threadInfo.otherUserId, messageType });
-
       const response = await api.sendMessage({
         recipientId: threadInfo.otherUserId,
         content: newMessage.trim() || (attachmentPreview ? `[${attachmentPreview.type === 'image' ? '图片' : '附件'}]` : ''),
@@ -409,9 +354,6 @@ export default function ThreadPage() {
         attachmentMimeType: attachmentPreview?.mimeType,
       });
 
-      console.log('📥 API响应:', response);
-      console.log('📦 响应数据:', response.data);
-
       if (response.success && response.data) {
         // 确保消息有正确的创建时间戳和必要字段
         const messageWithTime = {
@@ -420,17 +362,6 @@ export default function ThreadPage() {
           isRecalled: response.data.isRecalled ?? false,
           isRead: response.data.isRead ?? false,
         };
-        
-        console.log('🔧 处理后的消息:', {
-          id: messageWithTime.id,
-          senderId: messageWithTime.senderId,
-          createdAt: messageWithTime.createdAt,
-          isRecalled: messageWithTime.isRecalled,
-        });
-
-        // 测试 canRecall
-        const testCanRecall = canRecall(messageWithTime);
-        console.log('🧪 canRecall测试:', testCanRecall);
         
         setMessages(prev => [...prev, messageWithTime]);
         setNewMessage('');
