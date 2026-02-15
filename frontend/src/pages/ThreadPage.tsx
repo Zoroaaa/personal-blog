@@ -193,11 +193,35 @@ export default function ThreadPage() {
   };
 
   const canRecall = useCallback((message: Message) => {
+    // 必须是自己发送的消息
     if (message.senderId !== user?.id) return false;
+    
+    // 已经撤回的消息不能再次撤回
     if (message.isRecalled) return false;
-    const createdAt = new Date(message.createdAt);
-    const now = new Date();
-    return now.getTime() - createdAt.getTime() <= RECALL_TIME_LIMIT_MS;
+    
+    // 如果没有 createdAt，说明是刚发送的消息，允许撤回
+    if (!message.createdAt) {
+      console.warn('Message missing createdAt, allowing recall:', message.id);
+      return true;
+    }
+    
+    try {
+      const createdAt = new Date(message.createdAt);
+      
+      // 检查日期是否有效
+      if (isNaN(createdAt.getTime())) {
+        console.warn('Invalid createdAt date, allowing recall:', message.id, message.createdAt);
+        return true;
+      }
+      
+      const now = new Date();
+      const timeDiff = now.getTime() - createdAt.getTime();
+      
+      return timeDiff <= RECALL_TIME_LIMIT_MS;
+    } catch (error) {
+      console.error('Error parsing createdAt, allowing recall:', error);
+      return true; // 解析失败，默认允许撤回
+    }
   }, [user?.id]);
 
   const handleRecallMessage = async (messageId: number) => {
@@ -334,7 +358,15 @@ export default function ThreadPage() {
       });
 
       if (response.success && response.data) {
-        setMessages(prev => [...prev, response.data]);
+        // 确保消息有正确的创建时间戳和必要字段
+        const messageWithTime = {
+          ...response.data,
+          createdAt: response.data.createdAt || new Date().toISOString(),
+          isRecalled: response.data.isRecalled ?? false,
+          isRead: response.data.isRead ?? false,
+        };
+        
+        setMessages(prev => [...prev, messageWithTime]);
         setNewMessage('');
         setAttachmentPreview(null);
         setEditingMessage(null);
