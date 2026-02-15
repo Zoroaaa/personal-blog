@@ -841,7 +841,7 @@ export const api = {
   /**
    * 更新评论状态
    */
-  updateCommentStatus: (id: number, status: 'approved' | 'pending' | 'spam') =>
+  updateCommentStatus: (id: number, status: 'approved' | 'pending' | 'rejected' | 'deleted') =>
     apiRequest<{ updated: boolean }>(`/admin/comments/${id}/status`, {
       method: 'PUT',
       body: JSON.stringify({ status }),
@@ -872,7 +872,16 @@ export const api = {
     }),
   
   /**
-   * 删除用户
+   * 更新用户状态
+   */
+  updateUserStatus: (id: number, status: 'active' | 'suspended' | 'deleted') =>
+    apiRequest<{ updated: boolean }>(`/admin/users/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    }),
+  
+  /**
+   * 删除用户（软删除）
    */
   deleteUser: (id: number) =>
     apiRequest<{ deleted: boolean }>(`/admin/users/${id}`, {

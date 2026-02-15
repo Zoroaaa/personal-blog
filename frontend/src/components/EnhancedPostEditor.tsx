@@ -64,7 +64,7 @@ interface PostData {
   categoryId: number | null;
   columnId: number | null;
   tags: number[];
-  status: 'draft' | 'published';
+  status: 'draft' | 'published' | 'archived';
   visibility: 'public' | 'private' | 'password';
   password?: string;
 }
@@ -75,7 +75,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   const [content, setContent] = useState('');
   const [summary, setSummary] = useState('');
   const [coverImage, setCoverImage] = useState('');
-  const [status, setStatus] = useState<'draft' | 'published'>('draft');
+  const [status, setStatus] = useState<'draft' | 'published' | 'archived'>('draft');
   const [visibility, setVisibility] = useState<'public' | 'private' | 'password'>('public');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -1357,32 +1357,56 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             发布状态
           </label>
-          <div className="flex gap-4 mb-2">
-            <label className="flex items-center gap-2 cursor-pointer">
+          <div className="flex flex-wrap gap-4 mb-2">
+            <label className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border-2 transition-all ${
+              status === 'draft'
+                ? 'border-gray-500 bg-gray-50 dark:bg-gray-900/30'
+                : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
+            }`}>
               <input
                 type="radio"
                 value="draft"
                 checked={status === 'draft'}
                 onChange={(e) => setStatus(e.target.value as 'draft')}
-                className="w-4 h-4 text-blue-600"
+                className="w-4 h-4 text-gray-600"
               />
-              <span className="text-gray-700 dark:text-gray-300">草稿</span>
+              <span className="text-gray-700 dark:text-gray-300 font-medium">草稿</span>
             </label>
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border-2 transition-all ${
+              status === 'published'
+                ? 'border-green-500 bg-green-50 dark:bg-green-900/30'
+                : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
+            }`}>
               <input
                 type="radio"
                 value="published"
                 checked={status === 'published'}
                 onChange={(e) => setStatus(e.target.value as 'published')}
-                className="w-4 h-4 text-blue-600"
+                className="w-4 h-4 text-green-600"
               />
-              <span className="text-gray-700 dark:text-gray-300">发布</span>
+              <span className="text-gray-700 dark:text-gray-300 font-medium">发布</span>
+            </label>
+            <label className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border-2 transition-all ${
+              status === 'archived'
+                ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/30'
+                : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
+            }`}>
+              <input
+                type="radio"
+                value="archived"
+                checked={status === 'archived'}
+                onChange={(e) => setStatus(e.target.value as 'archived')}
+                className="w-4 h-4 text-orange-600"
+              />
+              <span className="text-gray-700 dark:text-gray-300 font-medium">归档</span>
             </label>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {status === 'draft' 
               ? '草稿状态：文章会保存在文章管理中，但前端页面不可见。更新为"发布"状态后前端才能看到。' 
-              : '发布状态：文章将立即在前端页面显示。'}
+              : status === 'published'
+              ? '发布状态：文章将立即在前端页面显示。'
+              : '归档状态：文章将不再允许接收新评论。选择此状态后，文章将不再允许接收新评论。'}
           </p>
         </div>
 

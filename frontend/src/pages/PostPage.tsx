@@ -975,41 +975,53 @@ export function PostPage() {
         <div className="mt-16 border-t border-border pt-8">
           <h2 className="text-2xl font-bold text-foreground mb-6">评论 ({comments.length})</h2>
 
+          {/* 归档文章提示 */}
+          {post.status === 'archived' && (
+            <div className="mb-8 p-6 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg text-center">
+              <svg className="mx-auto h-12 w-12 text-orange-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+              </svg>
+              <p className="text-orange-700 dark:text-orange-300 font-medium">该文章已归档，不允许发表评论</p>
+            </div>
+          )}
+
           {/* 发表评论 */}
-          {isAuthenticated ? (
-            <form onSubmit={handleSubmitComment} className="mb-8">
-              <RichTextEditor
-                value={newComment}
-                onChange={setNewComment}
-                placeholder="写下你的评论...输入 @ 可提及用户"
-                maxLength={1000}
-                mentionableUsers={mentionableUsers}
-                onImageUpload={handleCommentImageUpload}
-                onMention={handleMention}
-              />
-              <div className="flex items-center justify-between mt-4">
-                <span className="text-sm text-muted-foreground">
-                  {uploadingImage ? '图片上传中...' : '支持富文本格式，输入 @ 可提及用户'}
-                </span>
+          {post.status !== 'archived' && (
+            isAuthenticated ? (
+              <form onSubmit={handleSubmitComment} className="mb-8">
+                <RichTextEditor
+                  value={newComment}
+                  onChange={setNewComment}
+                  placeholder="写下你的评论...输入 @ 可提及用户"
+                  maxLength={1000}
+                  mentionableUsers={mentionableUsers}
+                  onImageUpload={handleCommentImageUpload}
+                  onMention={handleMention}
+                />
+                <div className="flex items-center justify-between mt-4">
+                  <span className="text-sm text-muted-foreground">
+                    {uploadingImage ? '图片上传中...' : '支持富文本格式，输入 @ 可提及用户'}
+                  </span>
+                  <button
+                    type="submit"
+                    disabled={commentLoading || !newComment.trim() || uploadingImage}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {commentLoading ? '发表中...' : '发表评论'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="mb-8 p-6 bg-muted border border-border rounded-lg text-center">
+                <p className="text-muted-foreground mb-4">请先登录后再发表评论</p>
                 <button
-                  type="submit"
-                  disabled={commentLoading || !newComment.trim() || uploadingImage}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => navigate('/login?redirect=' + encodeURIComponent(window.location.pathname))}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
-                  {commentLoading ? '发表中...' : '发表评论'}
+                  去登录
                 </button>
               </div>
-            </form>
-          ) : (
-            <div className="mb-8 p-6 bg-muted border border-border rounded-lg text-center">
-              <p className="text-muted-foreground mb-4">请先登录后再发表评论</p>
-              <button
-                onClick={() => navigate('/login?redirect=' + encodeURIComponent(window.location.pathname))}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                去登录
-              </button>
-            </div>
+            )
           )}
 
           {/* 评论列表 */}

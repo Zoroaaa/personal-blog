@@ -34,7 +34,8 @@ export function ColumnManager() {
     slug: '',
     description: '',
     coverImage: '',
-    displayOrder: 0
+    displayOrder: 0,
+    status: 'active' as 'active' | 'hidden' | 'archived'
   });
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -65,7 +66,8 @@ export function ColumnManager() {
       slug: '',
       description: '',
       coverImage: '',
-      displayOrder: 0
+      displayOrder: 0,
+      status: 'active'
     });
     setShowForm(true);
     setFormError('');
@@ -78,7 +80,8 @@ export function ColumnManager() {
       slug: column.slug,
       description: column.description || '',
       coverImage: column.coverImage || '',
-      displayOrder: column.displayOrder || 0
+      displayOrder: column.displayOrder || 0,
+      status: column.status || 'active'
     });
     setShowForm(true);
     setFormError('');
@@ -291,6 +294,65 @@ export function ColumnManager() {
                     className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
                     placeholder="数字越小越靠前"
                   />
+                </div>
+
+                {/* 专栏状态 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    专栏状态
+                  </label>
+                  <div className="flex flex-wrap gap-3">
+                    <label className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border-2 transition-all ${
+                      formData.status === 'active'
+                        ? 'border-green-500 bg-green-50 dark:bg-green-900/30'
+                        : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="status"
+                        value="active"
+                        checked={formData.status === 'active'}
+                        onChange={(e) => setFormData({ ...formData, status: e.target.value as 'active' })}
+                        className="w-4 h-4 text-green-600"
+                      />
+                      <span className="text-gray-700 dark:text-gray-300 font-medium">正常</span>
+                    </label>
+                    <label className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border-2 transition-all ${
+                      formData.status === 'hidden'
+                        ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30'
+                        : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="status"
+                        value="hidden"
+                        checked={formData.status === 'hidden'}
+                        onChange={(e) => setFormData({ ...formData, status: e.target.value as 'hidden' })}
+                        className="w-4 h-4 text-yellow-600"
+                      />
+                      <span className="text-gray-700 dark:text-gray-300 font-medium">隐藏</span>
+                    </label>
+                    <label className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border-2 transition-all ${
+                      formData.status === 'archived'
+                        ? 'border-gray-500 bg-gray-50 dark:bg-gray-900/30'
+                        : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="status"
+                        value="archived"
+                        checked={formData.status === 'archived'}
+                        onChange={(e) => setFormData({ ...formData, status: e.target.value as 'archived' })}
+                        className="w-4 h-4 text-gray-600"
+                      />
+                      <span className="text-gray-700 dark:text-gray-300 font-medium">归档</span>
+                    </label>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    {formData.status === 'active' && '正常：专栏在首页正常展示，可以新建文章'}
+                    {formData.status === 'hidden' && '隐藏：专栏不在首页展示，禁止新建文章，关联文章同步隐藏'}
+                    {formData.status === 'archived' && '归档：专栏在首页展示，但禁止新建文章'}
+                  </p>
                 </div>
 
                 {/* 按钮 */}
