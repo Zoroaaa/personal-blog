@@ -1021,6 +1021,33 @@ export const api = {
 
   getThreadId: (userId: number) =>
     apiRequest<{ threadId: string }>(`/messages/thread-id/${userId}`),
+
+  getMessageSettings: () =>
+    apiRequest<{
+      id?: number;
+      userId: number;
+      emailNotification: boolean;
+      respectDnd: boolean;
+      allowStrangers: boolean;
+      createdAt?: string;
+      updatedAt?: string;
+    }>('/users/message-settings'),
+
+  updateMessageSettings: (data: {
+    emailNotification?: boolean;
+    respectDnd?: boolean;
+    allowStrangers?: boolean;
+  }) =>
+    apiRequest<{
+      id?: number;
+      userId: number;
+      emailNotification: boolean;
+      respectDnd: boolean;
+      allowStrangers: boolean;
+    }>('/users/message-settings', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
 };
 
 // ============= 辅助函数 =============
