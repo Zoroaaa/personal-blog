@@ -649,7 +649,7 @@ export function HomePage() {
 
               {/* 文章列表 */}
               {loading ? (
-                <div className="grid grid-cols-1 xs:grid-cols-2 tb:grid-cols-3 lt:grid-cols-4 gap-4 sm:gap-5">
+                <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lt:grid-cols-4 gap-4 sm:gap-5">
                   {[...Array(8)].map((_, i) => (
                     <div key={i} className="bg-white/80 dark:bg-slate-800/80 rounded-xl shadow-md p-4 animate-pulse">
                       <div className="h-32 sm:h-36 bg-gray-200 dark:bg-slate-700 rounded-lg mb-3" />
@@ -704,7 +704,7 @@ export function HomePage() {
               ) : (
                 <>
                   {/* 文章网格 - 响应式列数：手机1列、平板2列、笔记本3列、台式4列 */}
-                  <div className="grid grid-cols-1 xs:grid-cols-2 tb:grid-cols-3 lt:grid-cols-4 gap-4 sm:gap-5">
+                  <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lt:grid-cols-4 gap-4 sm:gap-5">
                     {posts.map((post, index) => (
                       <article
                         key={post.id}

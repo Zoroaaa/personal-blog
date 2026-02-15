@@ -194,9 +194,9 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
           opacity-90
         `} />
 
-        {/* 内容区域 - 横向紧凑布局 */}
-        <div className="relative px-4 py-3 sm:px-5 sm:py-4 flex items-center gap-3 sm:gap-4">
-          {/* 类型图标 - 更小 */}
+        {/* 内容区域 - 横向布局，内容保留3行高度 */}
+        <div className="relative px-4 py-3 sm:px-5 sm:py-4 flex items-start gap-3 sm:gap-4">
+          {/* 类型图标 */}
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -204,14 +204,14 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
             className={`
               flex-shrink-0
               inline-flex items-center justify-center
-              w-9 h-9 sm:w-10 sm:h-10 rounded-xl
+              w-9 h-9 sm:w-10 sm:h-10 rounded-xl mt-0.5
               ${config.iconBg}
             `}
           >
             {config.icon}
           </motion.div>
 
-          {/* 文本内容 - 紧凑排列 */}
+          {/* 文本内容 - 内容保留3行高度 */}
           <div className="flex-1 min-w-0">
             {/* 标题 */}
             <motion.h2
@@ -222,21 +222,21 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
                 text-base sm:text-lg
                 font-semibold
                 text-gray-900 dark:text-white
-                truncate
               "
             >
               {displayNotification.title}
             </motion.h2>
 
-            {/* 内容 */}
+            {/* 内容 - 保留3行高度 */}
             <motion.p
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1, duration: 0.2 }}
               className="
                 text-sm text-gray-600 dark:text-gray-400
-                truncate
-                mt-0.5
+                mt-1
+                line-clamp-3
+                leading-relaxed
               "
             >
               {displayNotification.content}
@@ -244,7 +244,7 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
           </div>
 
           {/* 右侧操作区 */}
-          <div className="flex-shrink-0 flex items-center gap-2">
+          <div className="flex-shrink-0 flex flex-col items-end gap-2">
             {displayNotification.link && (
               <motion.span
                 initial={{ opacity: 0 }}
