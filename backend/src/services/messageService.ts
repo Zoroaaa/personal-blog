@@ -546,6 +546,87 @@ export async function recallMessage(
   }
 }
 
+export interface ResendMessageRequest {
+  content: string;
+  messageType?: MessageType;
+  attachmentUrl?: string;
+  attachmentFilename?: string;
+  attachmentSize?: number;
+  attachmentMimeType?: string;
+}
+
+export async function resendMessage(
+  db: D1Database,
+  messageId: number,
+  userId: number,
+  data: ResendMessageRequest
+): Promise<{ success: boolean; message?: Message; error?: string }> {
+  try {
+    const message = await db.prepare(`
+      SELECT id, sender_id, is_recalled, thread_id
+      FROM messages 
+      WHERE id = ?
+    `).bind(messageId).first() as any;
+
+    if (!message) {
+      return { success: false, error: '消息不存在' };
+    }
+
+    if (message.sender_id !== userId) {
+      return { success: false, error: '只能重新发送自己发送的消息' };
+    }
+
+    if (!message.is_recalled) {
+      return { success: false, error: '只能重新发送已撤回的消息' };
+    }
+
+    const {
+      content,
+      messageType = 'text',
+      attachmentUrl,
+      attachmentFilename,
+      attachmentSize,
+      attachmentMimeType
+    } = data;
+
+    const result = await db.prepare(`
+      UPDATE messages 
+      SET 
+        content = ?,
+        message_type = ?,
+        attachment_url = ?,
+        attachment_filename = ?,
+        attachment_size = ?,
+        attachment_mime_type = ?,
+        is_recalled = 0,
+        recalled_at = NULL,
+        created_at = CURRENT_TIMESTAMP,
+        is_read = 0,
+        read_at = NULL
+      WHERE id = ? AND sender_id = ? AND is_recalled = 1
+    `).bind(
+      content,
+      messageType,
+      attachmentUrl || null,
+      attachmentFilename || null,
+      attachmentSize || null,
+      attachmentMimeType || null,
+      messageId,
+      userId
+    ).run();
+
+    if (result.success && (result.meta?.changes || 0) > 0) {
+      const updatedMessage = await getMessageById(db, messageId, userId);
+      return { success: true, message: updatedMessage || undefined };
+    }
+
+    return { success: false, error: '重新发送失败' };
+  } catch (error) {
+    console.error('Resend message error:', error);
+    return { success: false, error: '重新发送消息时发生错误' };
+  }
+}
+
 export async function canRecallMessage(
   db: D1Database,
   messageId: number,

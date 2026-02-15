@@ -33,6 +33,7 @@ import {
   getUnreadCount,
   generateThreadId,
   getThreadMessages,
+  resendMessage,
   type SendMessageRequest,
   type MessageType,
 } from '../services/messageService';
@@ -406,6 +407,66 @@ messageRoutes.post('/:id/recall', requireAuth, async (c) => {
     return c.json(errorResponse(
       'Failed to recall message',
       'An error occurred while recalling the message'
+    ), 500);
+  }
+});
+
+messageRoutes.post('/:id/resend', requireAuth, async (c) => {
+  const logger = createLogger(c);
+  
+  try {
+    const user = c.get('user') as any;
+    const messageId = safeParseInt(c.req.param('id'));
+
+    if (!messageId) {
+      return c.json(errorResponse('Invalid message ID'), 400);
+    }
+
+    const body = await c.req.json();
+    let { 
+      content, 
+      messageType,
+      attachmentUrl,
+      attachmentFilename,
+      attachmentSize,
+      attachmentMimeType
+    } = body;
+
+    if (content) {
+      content = sanitizeInput(content);
+      const contentError = validateLength(content, 0, MAX_MESSAGE_LENGTH, 'Message content');
+      if (contentError) {
+        return c.json(errorResponse('Invalid message content', contentError), 400);
+      }
+    }
+
+    const finalMessageType: MessageType = messageType || 'text';
+
+    const result = await resendMessage(c.env.DB, messageId, user.userId, {
+      content: content || '',
+      messageType: finalMessageType,
+      attachmentUrl: attachmentUrl || undefined,
+      attachmentFilename: attachmentFilename || undefined,
+      attachmentSize: attachmentSize || undefined,
+      attachmentMimeType: attachmentMimeType || undefined,
+    });
+
+    if (!result.success) {
+      return c.json(errorResponse(
+        'Failed to resend message',
+        result.error || 'Unable to resend the message'
+      ), 400);
+    }
+
+    logger.info('Message resent', { messageId, userId: user.userId });
+
+    return c.json(successResponse(result.message, 'Message resent successfully'));
+
+  } catch (error) {
+    logger.error('Resend message error', error);
+    return c.json(errorResponse(
+      'Failed to resend message',
+      'An error occurred while resending the message'
     ), 500);
   }
 });
