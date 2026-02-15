@@ -108,10 +108,13 @@ CREATE TABLE IF NOT EXISTS messages (
     reply_to_id INTEGER,
     is_read INTEGER DEFAULT 0,
     read_at DATETIME,
-    sender_deleted INTEGER DEFAULT 0,
-    sender_deleted_at DATETIME,
-    recipient_deleted INTEGER DEFAULT 0,
-    recipient_deleted_at DATETIME,
+    is_recalled INTEGER DEFAULT 0,
+    recalled_at DATETIME,
+    message_type TEXT DEFAULT 'text' CHECK(message_type IN ('text', 'image', 'attachment', 'mixed')),
+    attachment_url TEXT,
+    attachment_filename TEXT,
+    attachment_size INTEGER,
+    attachment_mime_type TEXT,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
     FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -124,9 +127,11 @@ CREATE INDEX IF NOT EXISTS idx_messages_recipient_id ON messages(recipient_id);
 CREATE INDEX IF NOT EXISTS idx_messages_thread_id ON messages(thread_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_is_read ON messages(recipient_id, is_read);
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_messages_inbox ON messages(recipient_id, created_at DESC) WHERE recipient_deleted = 0;
-CREATE INDEX IF NOT EXISTS idx_messages_outbox ON messages(sender_id, created_at DESC) WHERE sender_deleted = 0;
-CREATE INDEX IF NOT EXISTS idx_messages_unread ON messages(recipient_id, is_read, created_at DESC) WHERE is_read = 0 AND recipient_deleted = 0;
+CREATE INDEX IF NOT EXISTS idx_messages_inbox ON messages(recipient_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_outbox ON messages(sender_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_unread ON messages(recipient_id, is_read, created_at DESC) WHERE is_read = 0;
+CREATE INDEX IF NOT EXISTS idx_messages_recalled ON messages(is_recalled, recalled_at) WHERE is_recalled = 1;
+CREATE INDEX IF NOT EXISTS idx_messages_type ON messages(message_type);
 
 -- ============= 私信设置表 =============
 
@@ -183,7 +188,7 @@ SELECT
     recipient_id as user_id,
     COUNT(*) as unread_count
 FROM messages
-WHERE is_read = 0 AND recipient_deleted = 0
+WHERE is_read = 0 AND is_recalled = 0
 GROUP BY recipient_id;
 
 CREATE VIEW IF NOT EXISTS vw_message_threads AS
