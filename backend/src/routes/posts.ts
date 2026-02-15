@@ -135,6 +135,7 @@ postRoutes.get('/', async (c) => {
     logger.info('Fetching posts from D1', { page, limit, category, tag, author, search });
     
     // ===== 3. 构建查询 =====
+    // 隐藏专栏的文章不在首页显示
     let query = `
       SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
              p.view_count, p.like_count, p.comment_count, p.reading_time,
@@ -148,6 +149,7 @@ postRoutes.get('/', async (c) => {
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN columns col ON p.column_id = col.id
       WHERE p.status = 'published' AND p.visibility IN ('public', 'password') AND p.deleted_at IS NULL AND u.deleted_at IS NULL
+      AND (col.status IS NULL OR col.status != 'hidden')
     `;
     
     const params: any[] = [];
@@ -189,10 +191,13 @@ postRoutes.get('/', async (c) => {
     const { results } = await c.env.DB.prepare(query).bind(...params).all();
     
     // ===== 5. 获取总数 =====
+    // 隐藏专栏的文章不在首页显示
     let countQuery = `SELECT COUNT(*) as total FROM posts p
                       LEFT JOIN categories c ON p.category_id = c.id
                       LEFT JOIN users u ON p.author_id = u.id
-                      WHERE p.status = 'published' AND p.visibility IN ('public', 'password') AND p.deleted_at IS NULL AND u.deleted_at IS NULL`;
+                      LEFT JOIN columns col ON p.column_id = col.id
+                      WHERE p.status = 'published' AND p.visibility IN ('public', 'password') AND p.deleted_at IS NULL AND u.deleted_at IS NULL
+                      AND (col.status IS NULL OR col.status != 'hidden')`;
     const countParams: any[] = [];
     
     if (category) {

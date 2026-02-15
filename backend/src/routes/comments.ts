@@ -300,6 +300,14 @@ commentRoutes.post('/', requireAuth, rateLimit({
       return c.json(errorResponse('Post not found'), 404);
     }
     
+    // 检查文章是否已归档
+    if (post.status === 'archived') {
+      return c.json(errorResponse(
+        'Cannot comment',
+        '该文章已归档，不允许发表评论'
+      ), 403);
+    }
+    
     if (post.status !== 'published') {
       return c.json(errorResponse(
         'Cannot comment',

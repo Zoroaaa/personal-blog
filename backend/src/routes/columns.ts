@@ -68,6 +68,7 @@ columnRoutes.get('/', async (c) => {
     logger.info('Fetching columns', { page, limit, author, sortBy });
 
     // 构建查询（排除软删除的专栏）
+    // 首页展示 active 和 archived 状态的专栏，不展示 hidden 状态
     let query = `
       SELECT 
         col.id, col.name, col.slug, col.description, col.cover_image,
@@ -77,7 +78,7 @@ columnRoutes.get('/', async (c) => {
         u.username as author_username, u.display_name as author_name, u.avatar_url as author_avatar
       FROM columns col
       LEFT JOIN users u ON col.author_id = u.id
-      WHERE col.status = 'active' AND col.deleted_at IS NULL
+      WHERE col.status IN ('active', 'archived') AND col.deleted_at IS NULL
     `;
     
     const params: any[] = [];
@@ -96,11 +97,12 @@ columnRoutes.get('/', async (c) => {
     const { results } = await c.env.DB.prepare(query).bind(...params).all();
 
     // 获取总数（排除软删除的专栏）
+    // 首页展示 active 和 archived 状态的专栏
     let countQuery = `
       SELECT COUNT(*) as total 
       FROM columns col
       LEFT JOIN users u ON col.author_id = u.id
-      WHERE col.status = 'active' AND col.deleted_at IS NULL
+      WHERE col.status IN ('active', 'archived') AND col.deleted_at IS NULL
     `;
     const countParams: any[] = [];
     
@@ -151,6 +153,7 @@ columnRoutes.get('/:slug', async (c) => {
     }
 
     // 获取专栏详情（排除软删除的专栏）
+    // 支持 active 和 archived 状态的专栏详情查看
     const column = await c.env.DB.prepare(`
       SELECT 
         col.*,
@@ -160,7 +163,7 @@ columnRoutes.get('/:slug', async (c) => {
         u.bio as author_bio
       FROM columns col
       LEFT JOIN users u ON col.author_id = u.id
-      WHERE col.slug = ? AND col.status = 'active' AND col.deleted_at IS NULL
+      WHERE col.slug = ? AND col.status IN ('active', 'archived') AND col.deleted_at IS NULL
     `).bind(slug).first() as any;
 
     if (!column) {
@@ -217,13 +220,21 @@ columnRoutes.get('/:slug/posts', async (c) => {
     const finalSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'published_at';
 
     // 先获取专栏ID
-    // 获取专栏ID（排除软删除的专栏）
+    // 获取专栏ID（排除软删除的专栏，只允许 active 状态的专栏查看文章列表）
     const column = await c.env.DB.prepare(
-      'SELECT id FROM columns WHERE slug = ? AND status = ? AND deleted_at IS NULL'
-    ).bind(slug, 'active').first() as any;
+      'SELECT id, status FROM columns WHERE slug = ? AND deleted_at IS NULL'
+    ).bind(slug).first() as any;
 
     if (!column) {
       return c.json(errorResponse('Column not found'), 404);
+    }
+
+    // hidden 状态的专栏不允许查看文章列表
+    if (column.status === 'hidden') {
+      return c.json(errorResponse(
+        'Column not available',
+        '该专栏已隐藏'
+      ), 403);
     }
 
     // 获取文章列表（排除软删除的文章和用户）
