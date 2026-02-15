@@ -8,16 +8,16 @@
  * - 会话管理
  *
  * @author 博客系统
- * @version 1.1.0
+ * @version 2.0.0
  * @created 2024-01-01
+ * @updated 2026-02-15
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
 import { useAuthStore } from '../stores/authStore';
 import { useToast } from '../components/Toast';
-import { useMessageUnread } from '../hooks/useMessageUnread';
 
 interface MessageThread {
   threadId: string;
@@ -43,7 +43,6 @@ export default function MessagesPage() {
   const navigate = useNavigate();
   const { showSuccess, showError } = useToast();
   const { user } = useAuthStore();
-  const { refresh: refreshUnreadCount } = useMessageUnread();
 
   useEffect(() => {
     loadThreads();
@@ -51,7 +50,7 @@ export default function MessagesPage() {
 
   const loadThreads = async () => {
     try {
-      const response = await api.get('/messages/threads');
+      const response = await api.getThreads();
       if (response.success && response.data) {
         setThreads(response.data.threads || []);
       }
@@ -101,7 +100,7 @@ export default function MessagesPage() {
 
     setSending(true);
     try {
-      const response = await api.post('/messages', {
+      const response = await api.sendMessage({
         recipientId: foundUser.id,
         content: newMessageContent.trim(),
       });
@@ -139,26 +138,6 @@ export default function MessagesPage() {
     if (days < 7) return `${days}天前`;
 
     return date.toLocaleDateString('zh-CN');
-  };
-
-  const handleDeleteThread = async (threadId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (!confirm('确定要删除这个会话吗？所有消息将被删除。')) {
-      return;
-    }
-
-    try {
-      const response = await api.delete(`/messages/threads/${threadId}`);
-      if (response.success) {
-        showSuccess('会话已删除');
-        setThreads(prev => prev.filter(t => t.threadId !== threadId));
-        refreshUnreadCount();
-      }
-    } catch (error) {
-      console.error('Delete thread error:', error);
-      showError('删除会话失败');
-    }
   };
 
   if (loading) {
@@ -226,19 +205,13 @@ export default function MessagesPage() {
                       {formatTime(thread.lastMessageAt)}
                     </span>
                   </div>
-                  <p className="text-muted-foreground truncate mt-2">
+                  <p className={`text-muted-foreground truncate mt-2 ${thread.lastMessage === '[消息已撤回]' ? 'italic' : ''}`}>
                     {thread.lastMessage}
                   </p>
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-xs text-muted-foreground">
                       共 {thread.totalMessages} 条消息
                     </span>
-                    <button
-                      onClick={(e) => handleDeleteThread(thread.threadId, e)}
-                      className="opacity-0 group-hover:opacity-100 text-xs text-red-500 hover:text-red-600 transition-opacity"
-                    >
-                      删除会话
-                    </button>
                   </div>
                 </div>
               </div>

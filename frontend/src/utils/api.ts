@@ -943,6 +943,71 @@ export const api = {
 
   getUserProfile: (userId: number) =>
     apiRequest<{ user: { id: number; username: string; displayName: string; avatarUrl?: string; bio?: string; createdAt: string; postCount: number; commentCount: number } }>(`/users/${userId}`),
+
+  // ============= 私信相关 =============
+
+  getThreads: (page?: number, limit?: number) => {
+    const params = new URLSearchParams();
+    if (page) params.append('page', String(page));
+    if (limit) params.append('limit', String(limit));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return apiRequest<{
+      threads: Array<{
+        threadId: string;
+        otherUserId: number;
+        otherUsername: string;
+        otherName: string;
+        otherAvatar?: string;
+        lastMessage: string;
+        lastMessageAt: string;
+        unreadCount: number;
+        totalMessages: number;
+      }>;
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>(`/messages/threads${query}`);
+  },
+
+  getThreadMessages: (threadId: string, page?: number, limit?: number) => {
+    const params = new URLSearchParams();
+    params.append('page', String(page || 1));
+    params.append('limit', String(limit || 20));
+    return apiRequest<{
+      messages: any[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>(`/messages/thread/${threadId}?${params.toString()}`);
+  },
+
+  sendMessage: (data: {
+    recipientId: number;
+    content: string;
+    subject?: string;
+    replyToId?: number;
+    messageType?: 'text' | 'image' | 'attachment' | 'mixed';
+    attachmentUrl?: string;
+    attachmentFilename?: string;
+    attachmentSize?: number;
+    attachmentMimeType?: string;
+  }) =>
+    apiRequest<any>('/messages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  recallMessage: (messageId: number) =>
+    apiRequest<{ recalled: boolean }>(`/messages/${messageId}/recall`, {
+      method: 'POST',
+    }),
+
+  markThreadAsRead: (threadId: string) =>
+    apiRequest<{ count: number }>(`/messages/threads/${threadId}/read`, {
+      method: 'PATCH',
+    }),
+
+  getUnreadMessageCount: () =>
+    apiRequest<{ count: number }>('/messages/unread/count'),
+
+  getThreadId: (userId: number) =>
+    apiRequest<{ threadId: string }>(`/messages/thread-id/${userId}`),
 };
 
 // ============= 辅助函数 =============
