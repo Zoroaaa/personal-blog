@@ -1310,11 +1310,12 @@ postRoutes.post('/', requireAuth, async (c) => {
     
     const postId = result.meta.last_row_id;
     
-    // ===== 7. 添加标签 =====
+    // ===== 7. 添加标签（去重处理）=====
     if (tags && Array.isArray(tags) && tags.length > 0) {
-      for (const tagId of tags) {
+      const uniqueTagIds = [...new Set(tags.filter(id => id != null))];
+      for (const tagId of uniqueTagIds) {
         await c.env.DB.prepare(
-          'INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)'
+          'INSERT OR IGNORE INTO post_tags (post_id, tag_id) VALUES (?, ?)'
         ).bind(postId, tagId).run();
       }
     }
@@ -1451,15 +1452,27 @@ postRoutes.put('/:id', requireAuth, async (c) => {
       id
     ).run();
     
-    // ===== 6. 更新标签 =====
+    // ===== 6. 更新标签（增量更新，避免不必要的计数变化）=====
     if (tags && Array.isArray(tags)) {
-      // 删除旧标签
-      await c.env.DB.prepare('DELETE FROM post_tags WHERE post_id = ?').bind(id).run();
+      const newTagIds = [...new Set(tags.filter(id => id != null))];
       
-      // 添加新标签
-      for (const tagId of tags) {
+      const { results: existingTags } = await c.env.DB.prepare(
+        'SELECT tag_id FROM post_tags WHERE post_id = ?'
+      ).bind(id).all() as any;
+      const existingTagIds = existingTags.map((t: any) => t.tag_id);
+      
+      const tagsToAdd = newTagIds.filter(id => !existingTagIds.includes(id));
+      const tagsToRemove = existingTagIds.filter((id: number) => !newTagIds.includes(id));
+      
+      for (const tagId of tagsToRemove) {
         await c.env.DB.prepare(
-          'INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)'
+          'DELETE FROM post_tags WHERE post_id = ? AND tag_id = ?'
+        ).bind(id, tagId).run();
+      }
+      
+      for (const tagId of tagsToAdd) {
+        await c.env.DB.prepare(
+          'INSERT OR IGNORE INTO post_tags (post_id, tag_id) VALUES (?, ?)'
         ).bind(id, tagId).run();
       }
     }
