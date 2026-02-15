@@ -2,7 +2,7 @@
 
 本文档详细介绍如何将个人博客系统部署到 Cloudflare 平台。
 
-**版本**: v1.3.2 | **更新日期**: 2026-02-15
+**版本**: v1.3.3 | **更新日期**: 2026-02-16
 
 ---
 
@@ -182,8 +182,16 @@ ENVIRONMENT = "production"
 cd backend
 
 # 执行数据库迁移（需按顺序执行）
-wrangler d1 execute personal-blog-db --file=./database/schema-v1.1-base.sql
-wrangler d1 execute personal-blog-db --file=./database/schema-v1.3-notification-messaging.sql
+# 注意：数据库文件在项目根目录的 database/ 文件夹中
+wrangler d1 execute personal-blog-db --file=../database/schema-v1.1-base.sql
+wrangler d1 execute personal-blog-db --file=../database/schema-v1.3-notification-messaging.sql
+
+# 可选：执行增量迁移以获得最新功能
+wrangler d1 execute personal-blog-db --file=../database/migration-v1.4-message-recall.sql
+wrangler d1 execute personal-blog-db --file=../database/migration-v1.5-notification-reads.sql
+wrangler d1 execute personal-blog-db --file=../database/migration-v1.6-email-default-off.sql
+wrangler d1 execute personal-blog-db --file=../database/migration-v1.7-message-email-default-off.sql
+wrangler d1 execute personal-blog-db --file=../database/migration-v1.8-remove-push-notification-field.sql
 
 # 验证表创建成功
 wrangler d1 execute personal-blog-db --command="SELECT name FROM sqlite_master WHERE type='table';"
@@ -307,8 +315,8 @@ curl https://your-worker.workers.dev/health
   "success": true,
   "data": {
     "status": "healthy",
-    "version": "1.3.2",
-    "timestamp": "2026-02-15T10:00:00.000Z",
+    "version": "1.3.3",
+    "timestamp": "2026-02-16T10:00:00.000Z",
     "services": {
       "database": "healthy",
       "cache": "healthy",
@@ -464,9 +472,9 @@ wrangler pages deploy dist
 如需更新数据库架构：
 
 ```bash
-# 执行迁移
+# 执行迁移（从 backend 目录执行）
 cd backend
-wrangler d1 execute personal-blog-db --file=./database/migrations/xxx.sql
+wrangler d1 execute personal-blog-db --file=../database/migration-v1.4-message-recall.sql
 
 # 验证迁移结果
 wrangler d1 execute personal-blog-db --command="SELECT name FROM sqlite_master WHERE type='table';"

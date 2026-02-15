@@ -196,15 +196,12 @@ export default function NotificationSettings() {
 
           <SettingItem
             title="站内通知"
-            description="在网站内显示通知"
+            description="系统通知必须通过站内展示，无法关闭"
           >
             <ToggleSwitch
-              checked={settings?.system.inApp ?? true}
-              onChange={(checked) =>
-                handleUpdateSettings({
-                  system: { ...settings?.system, inApp: checked },
-                })
-              }
+              checked={true}
+              disabled={true}
+              onChange={() => {}}
             />
           </SettingItem>
 

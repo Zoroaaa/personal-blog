@@ -59,11 +59,11 @@ CREATE TABLE IF NOT EXISTS notification_settings (
     user_id INTEGER NOT NULL UNIQUE,
     
     system_in_app INTEGER DEFAULT 1,
-    system_email INTEGER DEFAULT 1,
+    system_email INTEGER DEFAULT 0,
     system_frequency TEXT DEFAULT 'realtime' CHECK(system_frequency IN ('realtime', 'daily', 'weekly', 'off')),
     
     interaction_in_app INTEGER DEFAULT 1,
-    interaction_email INTEGER DEFAULT 1,
+    interaction_email INTEGER DEFAULT 0,
     interaction_frequency TEXT DEFAULT 'realtime' CHECK(interaction_frequency IN ('realtime', 'daily', 'weekly', 'off')),
     
     interaction_comment INTEGER DEFAULT 1,
@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS message_settings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL UNIQUE,
     
-    email_notification INTEGER DEFAULT 1,
+    email_notification INTEGER DEFAULT 0,
     respect_dnd INTEGER DEFAULT 1,
     allow_strangers INTEGER DEFAULT 1,
     

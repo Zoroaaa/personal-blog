@@ -15,6 +15,7 @@
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
+import { isStrangerMessageAllowed } from './messageSettingsService';
 
 export type MessageType = 'text' | 'image' | 'attachment' | 'mixed';
 
@@ -123,6 +124,23 @@ export async function sendMessage(
 
     if (senderId === recipientId) {
       throw new Error('Cannot send message to yourself');
+    }
+
+    const allowStrangers = await isStrangerMessageAllowed(db, recipientId);
+    if (!allowStrangers) {
+      const existingThread = await db.prepare(`
+        SELECT thread_id FROM messages 
+        WHERE thread_id = ? AND (sender_id = ? OR recipient_id = ?)
+        LIMIT 1
+      `).bind(
+        generateThreadId(senderId, recipientId),
+        recipientId,
+        recipientId
+      ).first();
+
+      if (!existingThread) {
+        throw new Error('Recipient does not accept messages from strangers');
+      }
     }
 
     const threadId = generateThreadId(senderId, recipientId);

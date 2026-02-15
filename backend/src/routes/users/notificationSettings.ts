@@ -75,7 +75,7 @@ userNotificationSettingsRoutes.put('/', requireAuth, async (c) => {
 
     if (body.system) {
       updates.system = {
-        inApp: body.system.inApp,
+        inApp: true,
         email: body.system.email,
         frequency: body.system.frequency,
       };

@@ -2,7 +2,7 @@
 
 本文档详细描述个人博客系统的所有 API 接口。
 
-**版本**: v1.3.2 | **更新日期**: 2026-02-15
+**版本**: v1.3.3 | **更新日期**: 2026-02-16
 
 ---
 
@@ -108,7 +108,7 @@ Authorization: Bearer <token>
     "username": "john",
     "email": "john@example.com",
     "role": "user",
-    "createdAt": "2026-02-14T10:00:00Z"
+    "createdAt": "2026-02-16T10:00:00Z"
   }
 }
 ```
@@ -161,7 +161,7 @@ Authorization: Bearer <token>
     "bio": "个人简介",
     "role": "user",
     "emailVerified": true,
-    "createdAt": "2026-02-14T10:00:00Z"
+    "createdAt": "2026-02-16T10:00:00Z"
   }
 }
 ```
@@ -301,7 +301,7 @@ GitHub OAuth 回调
       "viewCount": 100,
       "likeCount": 20,
       "commentCount": 5,
-      "createdAt": "2026-02-14T10:00:00Z"
+      "createdAt": "2026-02-16T10:00:00Z"
     }
   ],
   "meta": {
@@ -367,8 +367,8 @@ GitHub OAuth 回调
     "isLiked": false,
     "isFavorited": false,
     "visibility": "public",
-    "createdAt": "2026-02-14T10:00:00Z",
-    "updatedAt": "2026-02-14T10:00:00Z"
+    "createdAt": "2026-02-16T10:00:00Z",
+    "updatedAt": "2026-02-16T10:00:00Z"
   }
 }
 ```
@@ -384,6 +384,17 @@ GitHub OAuth 回调
 ### GET /posts/by-slug/:slug
 
 通过 slug 获取文章
+
+### GET /posts/search
+
+搜索文章（FTS5全文搜索）
+
+**查询参数:**
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| q | string | 搜索关键词（必填） |
+| page | number | 页码 |
+| limit | number | 每页数量 |
 
 ### GET /posts/:id/comments
 
@@ -434,16 +445,49 @@ GitHub OAuth 回调
 }
 ```
 
-### GET /posts/search
+### GET /posts/reading-history
 
-搜索文章（FTS5全文搜索）
+获取阅读历史（需要认证）
 
 **查询参数:**
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| q | string | 搜索关键词（必填） |
 | page | number | 页码 |
 | limit | number | 每页数量 |
+
+### GET /posts/:id/reading-progress
+
+获取文章阅读进度（需要认证）
+
+### POST /posts/:id/reading-progress
+
+保存文章阅读进度（需要认证）
+
+**请求参数:**
+```json
+{
+  "progress": 0.5,
+  "scrollPosition": 1000
+}
+```
+
+### GET /posts/:id/mentionable-users
+
+获取可@提及的用户列表（需要认证）
+
+**响应:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "username": "john",
+      "avatar": "https://..."
+    }
+  ]
+}
+```
 
 ---
 
@@ -477,7 +521,7 @@ GitHub OAuth 回调
       "postCount": 10,
       "viewCount": 1000,
       "likeCount": 50,
-      "createdAt": "2026-02-14T10:00:00Z"
+      "createdAt": "2026-02-16T10:00:00Z"
     }
   ],
   "meta": {
@@ -523,6 +567,17 @@ GitHub OAuth 回调
 ### GET /columns/by-slug/:slug
 
 通过 slug 获取专栏
+
+### GET /columns/:id/posts
+
+获取专栏下的文章列表
+
+**查询参数:**
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| page | number | 页码 |
+| limit | number | 每页数量 |
+| sort | string | 排序方式 |
 
 ---
 
@@ -588,7 +643,7 @@ GitHub OAuth 回调
       "slug": "tech",
       "description": "技术文章",
       "postCount": 50,
-      "createdAt": "2026-02-14T10:00:00Z"
+      "createdAt": "2026-02-16T10:00:00Z"
     }
   ]
 }
@@ -615,6 +670,57 @@ GitHub OAuth 回调
 
 删除分类（需要管理员权限）
 
+### GET /categories/:id/posts
+
+获取分类下的文章列表
+
+**查询参数:**
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| page | number | 页码 |
+| limit | number | 每页数量 |
+
+### GET /tags
+
+获取标签列表
+
+**响应:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "React",
+      "slug": "react",
+      "postCount": 30
+    }
+  ]
+}
+```
+
+### POST /tags
+
+创建标签（需要管理员权限）
+
+**请求参数:**
+```json
+{
+  "name": "string",
+  "slug": "string"
+}
+```
+
+### GET /tags/:id/posts
+
+获取标签下的文章列表
+
+**查询参数:**
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| page | number | 页码 |
+| limit | number | 每页数量 |
+
 ---
 
 ## 通知模块
@@ -639,19 +745,34 @@ GitHub OAuth 回调
     {
       "id": 1,
       "type": "interaction",
+      "subtype": "comment",
       "title": "新评论",
       "content": "用户 @john 评论了你的文章",
-      "data": {
+      "relatedData": {
         "postId": 1,
         "commentId": 5
       },
       "isRead": false,
       "isAnnouncement": false,
-      "createdAt": "2026-02-14T10:00:00Z"
+      "createdAt": "2026-02-16T10:00:00Z"
     }
   ],
   "meta": {
     "unreadCount": 5
+  }
+}
+```
+
+### GET /notifications/unread-count
+
+获取未读通知数量（需要认证）
+
+**响应:**
+```json
+{
+  "success": true,
+  "data": {
+    "count": 5
   }
 }
 ```
@@ -671,6 +792,25 @@ GitHub OAuth 回调
 ### DELETE /notifications/clear-all
 
 清空所有通知（需要认证）
+
+### GET /notifications/carousel
+
+获取首页轮播通知
+
+**响应:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "title": "系统公告",
+      "content": "公告内容...",
+      "createdAt": "2026-02-16T10:00:00Z"
+    }
+  ]
+}
+```
 
 ---
 
@@ -693,7 +833,8 @@ GitHub OAuth 回调
       },
       "lastMessage": {
         "content": "你好！",
-        "createdAt": "2026-02-14T10:00:00Z"
+        "createdAt": "2026-02-16T10:00:00Z",
+        "isRead": true
       },
       "unreadCount": 2
     }
@@ -722,7 +863,7 @@ GitHub OAuth 回调
       "receiverId": 1,
       "content": "你好！",
       "status": "read",
-      "createdAt": "2026-02-14T10:00:00Z"
+      "createdAt": "2026-02-16T10:00:00Z"
     }
   ]
 }
@@ -747,6 +888,30 @@ GitHub OAuth 回调
 ### DELETE /messages/:id
 
 删除消息（需要认证）
+
+### GET /messages/inbox
+
+获取收件箱（需要认证）
+
+**查询参数:**
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| page | number | 页码 |
+| limit | number | 每页数量 |
+
+### GET /messages/sent
+
+获取发件箱（需要认证）
+
+**查询参数:**
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| page | number | 页码 |
+| limit | number | 每页数量 |
+
+### POST /messages/:id/retry
+
+重发失败的消息（需要认证）
 
 ---
 
@@ -790,6 +955,30 @@ GitHub OAuth 回调
 
 获取通知设置（需要认证）
 
+**响应:**
+```json
+{
+  "success": true,
+  "data": {
+    "systemInApp": true,
+    "systemEmail": true,
+    "systemFrequency": "realtime",
+    "interactionInApp": true,
+    "interactionEmail": true,
+    "interactionFrequency": "realtime",
+    "interactionComment": true,
+    "interactionLike": true,
+    "interactionFavorite": true,
+    "interactionMention": true,
+    "interactionReply": true,
+    "dndEnabled": false,
+    "dndStart": "22:00",
+    "dndEnd": "08:00",
+    "dndTimezone": "Asia/Shanghai"
+  }
+}
+```
+
 ### PUT /users/notification-settings
 
 更新通知设置（需要认证）
@@ -797,11 +986,50 @@ GitHub OAuth 回调
 **请求参数:**
 ```json
 {
-  "notifyComments": true,
-  "notifyLikes": true,
-  "notifyFavorites": true,
-  "notifySystem": true,
-  "dndEnabled": false
+  "systemInApp": true,
+  "systemEmail": true,
+  "systemFrequency": "realtime",
+  "interactionInApp": true,
+  "interactionEmail": true,
+  "interactionFrequency": "realtime",
+  "interactionComment": true,
+  "interactionLike": true,
+  "interactionFavorite": true,
+  "interactionMention": true,
+  "interactionReply": true,
+  "dndEnabled": false,
+  "dndStart": "22:00",
+  "dndEnd": "08:00",
+  "dndTimezone": "Asia/Shanghai"
+}
+```
+
+### GET /users/message-settings
+
+获取私信设置（需要认证）
+
+**响应:**
+```json
+{
+  "success": true,
+  "data": {
+    "emailNotification": true,
+    "respectDnd": true,
+    "allowStrangers": true
+  }
+}
+```
+
+### PUT /users/message-settings
+
+更新私信设置（需要认证）
+
+**请求参数:**
+```json
+{
+  "emailNotification": true,
+  "respectDnd": true,
+  "allowStrangers": true
 }
 ```
 
@@ -846,6 +1074,7 @@ GitHub OAuth 回调
 | limit | number | 每页数量 |
 | role | string | 角色: admin/user |
 | status | string | 状态: active/banned |
+| search | string | 搜索关键词 |
 
 ### PUT /admin/users/:id/status
 
@@ -873,6 +1102,14 @@ GitHub OAuth 回调
 
 获取文章列表（需要管理员权限）
 
+**查询参数:**
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| page | number | 页码 |
+| limit | number | 每页数量 |
+| status | string | 状态 |
+| search | string | 搜索关键词 |
+
 ### PUT /admin/posts/:id/status
 
 更新文章状态（需要管理员权限）
@@ -899,6 +1136,16 @@ GitHub OAuth 回调
 }
 ```
 
+### GET /admin/notifications
+
+获取系统通知列表（需要管理员权限）
+
+**查询参数:**
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| page | number | 页码 |
+| limit | number | 每页数量 |
+
 ### POST /admin/notifications
 
 发送系统通知（需要管理员权限）
@@ -908,9 +1155,32 @@ GitHub OAuth 回调
 {
   "title": "string",
   "content": "string",
+  "type": "system",
+  "subtype": "announcement",
   "isAnnouncement": false
 }
 ```
+
+### GET /admin/notifications/:id
+
+获取系统通知详情（需要管理员权限）
+
+### PUT /admin/notifications/:id
+
+更新系统通知（需要管理员权限）
+
+**请求参数:**
+```json
+{
+  "title": "string",
+  "content": "string",
+  "isAnnouncement": false
+}
+```
+
+### DELETE /admin/notifications/:id
+
+删除系统通知（需要管理员权限）
 
 ---
 
@@ -933,8 +1203,10 @@ file: <binary>
   "success": true,
   "data": {
     "url": "https://...",
+    "key": "images/xxx.jpg",
     "filename": "image.jpg",
-    "size": 1024
+    "size": 1024,
+    "mimeType": "image/jpeg"
   }
 }
 ```
@@ -944,13 +1216,60 @@ file: <binary>
 - 支持格式: JPEG, PNG, GIF, WebP
 - 安全验证: 魔数验证
 
+### POST /upload/file
+
+上传通用文件（需要认证）
+
+**请求:**
+```http
+Content-Type: multipart/form-data
+
+file: <binary>
+```
+
+**响应:**
+```json
+{
+  "success": true,
+  "data": {
+    "url": "https://...",
+    "key": "files/xxx.pdf",
+    "filename": "document.pdf",
+    "size": 10240,
+    "mimeType": "application/pdf"
+  }
+}
+```
+
+### GET /upload/:key
+
+获取文件信息
+
+**响应:**
+```json
+{
+  "success": true,
+  "data": {
+    "url": "https://...",
+    "key": "images/xxx.jpg",
+    "size": 1024,
+    "mimeType": "image/jpeg",
+    "createdAt": "2026-02-16T10:00:00Z"
+  }
+}
+```
+
+### DELETE /upload/:key
+
+删除文件（需要认证）
+
 ---
 
 ## 配置模块
 
 ### GET /config
 
-获取站点配置
+获取站点公开配置
 
 **响应:**
 ```json
@@ -988,6 +1307,42 @@ file: <binary>
     "github": "string",
     "twitter": "string"
   }
+}
+```
+
+### GET /config/admin
+
+获取管理员配置（需要管理员权限）
+
+**响应:**
+```json
+{
+  "success": true,
+  "data": {
+    "adminEmail": "admin@example.com",
+    "emailEnabled": true,
+    "githubAuthEnabled": true
+  }
+}
+```
+
+### PUT /config/batch
+
+批量更新配置（需要管理员权限）
+
+**请求参数:**
+```json
+{
+  "configs": [
+    {
+      "key": "siteName",
+      "value": "新站点名称"
+    },
+    {
+      "key": "siteDescription",
+      "value": "新站点描述"
+    }
+  ]
 }
 ```
 
@@ -1034,6 +1389,86 @@ file: <binary>
 
 获取流量统计（需要管理员权限）
 
+### GET /analytics/popular-posts
+
+获取热门文章（需要管理员权限）
+
+**查询参数:**
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| limit | number | 返回数量 |
+| period | string | 时间范围: day/week/month |
+
+**响应:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "title": "热门文章",
+      "viewCount": 1000,
+      "likeCount": 50
+    }
+  ]
+}
+```
+
+### GET /analytics/post/:id
+
+获取单篇文章分析（需要管理员权限）
+
+**响应:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "title": "文章标题",
+    "viewCount": 1000,
+    "likeCount": 50,
+    "commentCount": 20,
+    "favoriteCount": 30,
+    "dailyViews": [
+      {"date": "2026-02-16", "views": 100}
+    ]
+  }
+}
+```
+
+### GET /analytics/user/:id
+
+获取单用户分析（需要管理员权限）
+
+**响应:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "username": "john",
+    "postCount": 10,
+    "commentCount": 50,
+    "likeReceived": 100,
+    "activityTimeline": [...]
+  }
+}
+```
+
+### POST /analytics/track
+
+记录访问数据
+
+**请求参数:**
+```json
+{
+  "type": "page_view",
+  "path": "/posts/1",
+  "referrer": "https://...",
+  "userAgent": "Mozilla/5.0..."
+}
+```
+
 ---
 
 ## 健康检查
@@ -1048,8 +1483,8 @@ file: <binary>
   "success": true,
   "data": {
     "status": "healthy",
-    "version": "1.3.2",
-    "timestamp": "2026-02-15T10:00:00.000Z",
+    "version": "1.3.3",
+    "timestamp": "2026-02-16T10:00:00.000Z",
     "services": {
       "database": "healthy",
       "cache": "healthy",
@@ -1075,6 +1510,10 @@ file: <binary>
 | `INVALID_PASSWORD` | 密码错误 |
 | `ACCOUNT_DELETED` | 账号已删除 |
 | `EMAIL_NOT_VERIFIED` | 邮箱未验证 |
+| `INVALID_TOKEN` | 无效令牌 |
+| `TOKEN_EXPIRED` | 令牌过期 |
+| `FILE_TOO_LARGE` | 文件过大 |
+| `INVALID_FILE_TYPE` | 无效文件类型 |
 
 ---
 
@@ -1086,6 +1525,7 @@ file: <binary>
 | 发送验证码 | 1次/分钟 |
 | 发表评论 | 10次/分钟 |
 | 上传文件 | 5次/分钟 |
+| 发送私信 | 20次/分钟 |
 | 其他接口 | 100次/分钟 |
 
 ---
