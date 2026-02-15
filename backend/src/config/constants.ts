@@ -165,15 +165,13 @@ export function getEnvConfig<T>(
  * @returns 允许的源列表
  */
 export function getAllowedOrigins(env: Record<string, any>): string[] {
-  const allowedOriginsEnv = getEnvConfig(env, 'ALLOWED_ORIGINS', '');
+  const allowedOriginsEnv = getEnvConfig<string>(env, 'ALLOWED_ORIGINS', '');
 
   if (!allowedOriginsEnv) {
-    // 如果没有明确配置，使用 FRONTEND_URL 作为默认
     const frontendUrl = getFrontendUrl(env);
     return [frontendUrl];
   }
 
-  // 从环境变量分割，去掉空白
   return allowedOriginsEnv.split(',').map((origin: string) => origin.trim());
 }
 

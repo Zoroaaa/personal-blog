@@ -90,7 +90,7 @@ export class SoftDeleteHelper {
    * @param id 记录ID
    * @returns 删除是否成功
    */
-  static async softDelete(db: any, table: string, id: number): Promise<boolean> {
+  static async softDelete(db: any, table: string, id: number | string): Promise<boolean> {
     try {
       const result = await db
         .prepare(`UPDATE ${table} SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?`)
@@ -113,7 +113,7 @@ export class SoftDeleteHelper {
    * @param id 记录ID
    * @returns 删除是否成功
    */
-  static async hardDelete(db: any, table: string, id: number): Promise<boolean> {
+  static async hardDelete(db: any, table: string, id: number | string): Promise<boolean> {
     try {
       const result = await db
         .prepare(`DELETE FROM ${table} WHERE id = ?`)
@@ -135,7 +135,7 @@ export class SoftDeleteHelper {
    * @param id 记录ID
    * @returns 恢复是否成功
    */
-  static async restore(db: any, table: string, id: number): Promise<boolean> {
+  static async restore(db: any, table: string, id: number | string): Promise<boolean> {
     try {
       const result = await db
         .prepare(`UPDATE ${table} SET deleted_at = NULL WHERE id = ?`)
@@ -157,7 +157,7 @@ export class SoftDeleteHelper {
    * @param id 记录ID
    * @returns 是否已删除
    */
-  static async isDeleted(db: any, table: string, id: number): Promise<boolean> {
+  static async isDeleted(db: any, table: string, id: number | string): Promise<boolean> {
     try {
       const result = await db
         .prepare(`SELECT deleted_at FROM ${table} WHERE id = ?`)

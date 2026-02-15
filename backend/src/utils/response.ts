@@ -37,11 +37,12 @@ export function successResponse<T>(data: T, message?: string): ApiResponse<T> {
  * @param message 错误描述
  * @returns 标准化的错误响应对象
  */
-export function errorResponse(error: string, message?: string): ApiResponse {
+export function errorResponse(error: string, message?: string, code?: string): ApiResponse {
   return {
     success: false,
     error,
     message,
+    code,
     timestamp: new Date().toISOString()
   };
 }

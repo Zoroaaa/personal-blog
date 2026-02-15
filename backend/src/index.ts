@@ -438,7 +438,7 @@ app.onError((err, c) => {
   }
 
   // 返回错误响应
-  return c.json<ApiResponse>(responseData, statusCode);
+  return c.json<ApiResponse>(responseData, statusCode as 400 | 401 | 403 | 404 | 409 | 429 | 500);
 });
 
 // ============= 导出 =============

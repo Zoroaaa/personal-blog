@@ -113,7 +113,7 @@ export class EmailVerificationService {
 
       // 存储到缓存
       const kvKey = `email_verify:${type}:${normalizedEmail}`;
-      await safePutCache(cache, kvKey, code, AUTH_CONSTANTS.VERIFICATION_CODE_TTL);
+      await safePutCache(cache, kvKey, code, { expirationTtl: AUTH_CONSTANTS.VERIFICATION_CODE_TTL });
 
       // 更新速率限制计数
       const newRateCount = rateCount + 1;
@@ -121,7 +121,7 @@ export class EmailVerificationService {
         cache,
         rateKey,
         String(newRateCount),
-        AUTH_CONSTANTS.EMAIL_VERIFY_RATE_WINDOW
+        { expirationTtl: AUTH_CONSTANTS.EMAIL_VERIFY_RATE_WINDOW }
       );
 
       return {
@@ -304,4 +304,4 @@ export class EmailVerificationService {
 /**
  * 导出类型供其他模块使用
  */
-export type { VerificationEmailType, VerificationCodeOptions, VerificationResult };
+

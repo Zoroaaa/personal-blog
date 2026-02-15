@@ -176,5 +176,3 @@ export function skipLocalhost(c: Context): boolean {
 
   return ['127.0.0.1', 'localhost', '::1'].includes(ip);
 }
-
-export type { RateLimitOptions };
