@@ -193,34 +193,63 @@ export default function ThreadPage() {
   };
 
   const canRecall = useCallback((message: Message) => {
-    // 必须是自己发送的消息
-    if (message.senderId !== user?.id) return false;
+    console.group(`🔍 检查消息 #${message.id} 是否可撤回`);
     
-    // 已经撤回的消息不能再次撤回
-    if (message.isRecalled) return false;
+    // 检查是否是自己发送的
+    const isMine = message.senderId === user?.id;
+    console.log('1. 是否是自己发送:', isMine, { messageSenderId: message.senderId, userId: user?.id });
+    if (!isMine) {
+      console.log('❌ 不是自己发送的消息');
+      console.groupEnd();
+      return false;
+    }
     
-    // 如果没有 createdAt，说明是刚发送的消息，允许撤回
+    // 检查是否已撤回
+    console.log('2. 是否已撤回:', message.isRecalled);
+    if (message.isRecalled) {
+      console.log('❌ 消息已被撤回');
+      console.groupEnd();
+      return false;
+    }
+    
+    // 检查创建时间
+    console.log('3. createdAt:', message.createdAt, typeof message.createdAt);
     if (!message.createdAt) {
-      console.warn('Message missing createdAt, allowing recall:', message.id);
+      console.log('⚠️ 没有createdAt，默认允许撤回');
+      console.groupEnd();
       return true;
     }
     
     try {
       const createdAt = new Date(message.createdAt);
+      console.log('4. 解析后的时间:', createdAt.toISOString());
       
-      // 检查日期是否有效
       if (isNaN(createdAt.getTime())) {
-        console.warn('Invalid createdAt date, allowing recall:', message.id, message.createdAt);
+        console.log('⚠️ 无效的日期格式，默认允许撤回');
+        console.groupEnd();
         return true;
       }
       
       const now = new Date();
       const timeDiff = now.getTime() - createdAt.getTime();
+      const timeLimit = RECALL_TIME_LIMIT_MS;
       
-      return timeDiff <= RECALL_TIME_LIMIT_MS;
+      console.log('5. 时间检查:', {
+        现在: now.toISOString(),
+        创建时间: createdAt.toISOString(),
+        时间差秒: (timeDiff / 1000).toFixed(1),
+        限制秒: timeLimit / 1000,
+        可撤回: timeDiff <= timeLimit
+      });
+      
+      const result = timeDiff <= timeLimit;
+      console.log(result ? '✅ 可以撤回' : '❌ 超时无法撤回');
+      console.groupEnd();
+      return result;
     } catch (error) {
-      console.error('Error parsing createdAt, allowing recall:', error);
-      return true; // 解析失败，默认允许撤回
+      console.error('⚠️ 解析时间出错:', error);
+      console.groupEnd();
+      return true;
     }
   }, [user?.id]);
 
@@ -347,6 +376,8 @@ export default function ThreadPage() {
         }
       }
 
+      console.log('🚀 发送消息...', { recipientId: threadInfo.otherUserId, messageType });
+
       const response = await api.sendMessage({
         recipientId: threadInfo.otherUserId,
         content: newMessage.trim() || (attachmentPreview ? `[${attachmentPreview.type === 'image' ? '图片' : '附件'}]` : ''),
@@ -357,6 +388,9 @@ export default function ThreadPage() {
         attachmentMimeType: attachmentPreview?.mimeType,
       });
 
+      console.log('📥 API响应:', response);
+      console.log('📦 响应数据:', response.data);
+
       if (response.success && response.data) {
         // 确保消息有正确的创建时间戳和必要字段
         const messageWithTime = {
@@ -365,6 +399,17 @@ export default function ThreadPage() {
           isRecalled: response.data.isRecalled ?? false,
           isRead: response.data.isRead ?? false,
         };
+        
+        console.log('🔧 处理后的消息:', {
+          id: messageWithTime.id,
+          senderId: messageWithTime.senderId,
+          createdAt: messageWithTime.createdAt,
+          isRecalled: messageWithTime.isRecalled,
+        });
+
+        // 测试 canRecall
+        const testCanRecall = canRecall(messageWithTime);
+        console.log('🧪 canRecall测试:', testCanRecall);
         
         setMessages(prev => [...prev, messageWithTime]);
         setNewMessage('');
