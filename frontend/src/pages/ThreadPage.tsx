@@ -193,34 +193,29 @@ export default function ThreadPage() {
   };
 
   const canRecall = useCallback((message: Message) => {
-    // 必须是自己发送的消息
     if (message.senderId !== user?.id) return false;
-    
-    // 已经撤回的消息不能再次撤回
     if (message.isRecalled) return false;
     
-    // 如果没有 createdAt，说明是刚发送的消息，允许撤回
-    if (!message.createdAt) {
-      console.warn('Message missing createdAt, allowing recall:', message.id);
-      return true;
-    }
+    if (!message.createdAt) return true;
     
     try {
-      const createdAt = new Date(message.createdAt);
+      let createdAt: Date;
       
-      // 检查日期是否有效
-      if (isNaN(createdAt.getTime())) {
-        console.warn('Invalid createdAt date, allowing recall:', message.id, message.createdAt);
-        return true;
+      if (typeof message.createdAt === 'string' && message.createdAt.includes(' ') && !message.createdAt.includes('T')) {
+        const utcTimeStr = message.createdAt.replace(' ', 'T') + 'Z';
+        createdAt = new Date(utcTimeStr);
+      } else {
+        createdAt = new Date(message.createdAt);
       }
+      
+      if (isNaN(createdAt.getTime())) return true;
       
       const now = new Date();
       const timeDiff = now.getTime() - createdAt.getTime();
       
       return timeDiff <= RECALL_TIME_LIMIT_MS;
     } catch (error) {
-      console.error('Error parsing createdAt, allowing recall:', error);
-      return true; // 解析失败，默认允许撤回
+      return true;
     }
   }, [user?.id]);
 
