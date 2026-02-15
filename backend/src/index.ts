@@ -31,6 +31,7 @@ import { messageRoutes } from './routes/messages';
 import { userRoutes } from './routes/users';
 // 用户资源路由
 import { userNotificationSettingsRoutes } from './routes/users/notificationSettings';
+import { messageSettingsRoutes } from './routes/users/messageSettings';
 
 // 导入中间件
 import { requestLogger } from './middleware/requestLogger';
@@ -336,6 +337,11 @@ app.route('/api/messages', messageRoutes);
  * 注意：必须在 userRoutes 之前注册，否则 /:id 会匹配 /notification-settings
  */
 app.route('/api/users/notification-settings', userNotificationSettingsRoutes);
+
+/**
+ * 用户私信设置路由
+ */
+app.route('/api/users/message-settings', messageSettingsRoutes);
 
 app.route('/api/users', userRoutes);
 

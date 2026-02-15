@@ -152,6 +152,16 @@ messageRoutes.post('/', requireAuth, rateLimit({
 
   } catch (error) {
     logger.error('Send message error', error);
+    
+    if (error instanceof Error) {
+      if (error.message === 'Recipient does not accept messages from strangers') {
+        return c.json(errorResponse(
+          'Message rejected',
+          '对方设置了不接受陌生人私信'
+        ), 403);
+      }
+    }
+    
     return c.json(errorResponse(
       'Failed to send message',
       'An error occurred while sending the message'
