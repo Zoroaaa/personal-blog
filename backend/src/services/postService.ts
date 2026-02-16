@@ -58,6 +58,8 @@ export interface CreatePostRequest {
   status?: 'draft' | 'published';
   visibility?: 'public' | 'private' | 'password';
   password?: string;
+  isPinned?: boolean;
+  pinOrder?: number;
 }
 
 export interface UpdatePostRequest {
@@ -71,6 +73,8 @@ export interface UpdatePostRequest {
   status?: 'draft' | 'published';
   visibility?: 'public' | 'private' | 'password';
   password?: string;
+  isPinned?: boolean;
+  pinOrder?: number;
 }
 
 export interface SearchResult {
@@ -150,7 +154,7 @@ export class PostService {
     let sql = `
       SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
              p.view_count, p.like_count, p.comment_count, p.reading_time,
-             p.published_at, p.created_at, p.visibility,
+             p.published_at, p.created_at, p.visibility, p.is_pinned, p.pin_order,
              u.username as author_name, u.display_name as author_display_name,
              u.avatar_url as author_avatar,
              c.name as category_name, c.slug as category_slug, c.color as category_color,
@@ -190,7 +194,7 @@ export class PostService {
       params.push(searchTerm, searchTerm, searchTerm);
     }
 
-    sql += ` ORDER BY p.${finalSortBy} ${order} LIMIT ? OFFSET ?`;
+    sql += ` ORDER BY p.is_pinned DESC, p.pin_order ASC, p.${finalSortBy} ${order} LIMIT ? OFFSET ?`;
     params.push(limit, offset);
 
     const { results } = await db.prepare(sql).bind(...params).all();
@@ -789,7 +793,7 @@ export class PostService {
     userId: number,
     body: CreatePostRequest
   ): Promise<{ success: boolean; postId?: number; slug?: string; message?: string; statusCode?: 200 | 201 | 400 | 401 | 403 | 404 | 409 | 500 | 503 }> {
-    let { title, content, summary, categoryId, columnId, tags, coverImage, status, visibility, password } = body;
+    let { title, content, summary, categoryId, columnId, tags, coverImage, status, visibility, password, isPinned, pinOrder } = body;
 
     if (!title || !content) {
       return {
@@ -853,13 +857,16 @@ export class PostService {
     }
 
     const finalStatus = status || 'draft';
+    const finalIsPinned = isPinned ? 1 : 0;
+    const finalPinOrder = pinOrder || 0;
+    
     const result = await db.prepare(`
       INSERT INTO posts (
         title, slug, content, summary, author_id, category_id, column_id,
         cover_image, status, visibility, password_hash, reading_time,
-        published_at, created_at, updated_at
+        published_at, created_at, updated_at, is_pinned, pin_order
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?)
     `).bind(
       title,
       slug,
@@ -873,7 +880,9 @@ export class PostService {
       finalVisibility,
       passwordHash,
       readingTime,
-      finalStatus === 'published' ? new Date().toISOString() : null
+      finalStatus === 'published' ? new Date().toISOString() : null,
+      finalIsPinned,
+      finalPinOrder
     ).run();
 
     if (!result.success) {
@@ -909,7 +918,7 @@ export class PostService {
     postId: string,
     body: UpdatePostRequest
   ): Promise<{ success: boolean; message?: string; statusCode?: 200 | 201 | 400 | 401 | 403 | 404 | 409 | 500 | 503 }> {
-    let { title, content, summary, categoryId, columnId, tags, coverImage, status, visibility, password } = body;
+    let { title, content, summary, categoryId, columnId, tags, coverImage, status, visibility, password, isPinned, pinOrder } = body;
 
     const post = await db.prepare(
       'SELECT * FROM posts WHERE id = ? AND deleted_at IS NULL'
@@ -990,11 +999,15 @@ export class PostService {
       passwordHash = null;
     }
 
+    const finalIsPinned = isPinned !== undefined ? (isPinned ? 1 : 0) : post.is_pinned;
+    const finalPinOrder = pinOrder !== undefined ? pinOrder : (post.pin_order || 0);
+
     await db.prepare(`
       UPDATE posts
       SET title = ?, content = ?, summary = ?, category_id = ?, column_id = ?,
           cover_image = ?, status = ?, visibility = ?, password_hash = ?,
-          reading_time = ?, published_at = ?, updated_at = CURRENT_TIMESTAMP
+          reading_time = ?, published_at = ?, updated_at = CURRENT_TIMESTAMP,
+          is_pinned = ?, pin_order = ?
       WHERE id = ?
     `).bind(
       title || post.title,
@@ -1008,6 +1021,8 @@ export class PostService {
       passwordHash,
       readingTime,
       (status === 'published' && !post.published_at) ? new Date().toISOString() : post.published_at,
+      finalIsPinned,
+      finalPinOrder,
       postId
     ).run();
 
@@ -1477,6 +1492,125 @@ export class PostService {
     return {
       success: true,
       users: formattedUsers
+    };
+  }
+
+  static async getAdjacentPosts(
+    db: any,
+    postId: number
+  ): Promise<{ success: boolean; prevPost?: any; nextPost?: any }> {
+    const currentPost = await db.prepare(
+      'SELECT id, published_at FROM posts WHERE id = ? AND status = ? AND visibility = ? AND deleted_at IS NULL'
+    ).bind(postId, 'published', 'public').first() as any;
+
+    if (!currentPost) {
+      return { success: false };
+    }
+
+    const prevPost = await db.prepare(`
+      SELECT id, title, slug, cover_image
+      FROM posts
+      WHERE status = 'published' AND visibility = 'public' AND deleted_at IS NULL
+        AND published_at < ?
+      ORDER BY published_at DESC
+      LIMIT 1
+    `).bind(currentPost.published_at).first() as any;
+
+    const nextPost = await db.prepare(`
+      SELECT id, title, slug, cover_image
+      FROM posts
+      WHERE status = 'published' AND visibility = 'public' AND deleted_at IS NULL
+        AND published_at > ?
+      ORDER BY published_at ASC
+      LIMIT 1
+    `).bind(currentPost.published_at).first() as any;
+
+    return {
+      success: true,
+      prevPost: prevPost || null,
+      nextPost: nextPost || null
+    };
+  }
+
+  static async getRecommendedPosts(
+    db: any,
+    postId: number,
+    limit: number = 5
+  ): Promise<{ success: boolean; posts?: any[] }> {
+    const currentPost = await db.prepare(`
+      SELECT id, category_id, column_id
+      FROM posts
+      WHERE id = ? AND status = 'published' AND visibility = 'public' AND deleted_at IS NULL
+    `).bind(postId).first() as any;
+
+    if (!currentPost) {
+      return { success: false };
+    }
+
+    const tagResult = await db.prepare(`
+      SELECT tag_id FROM post_tags WHERE post_id = ?
+    `).bind(postId).all() as any;
+    const tagIds = (tagResult.results || []).map((t: any) => t.tag_id);
+
+    let candidates: any[] = [];
+
+    if (currentPost.column_id) {
+      const columnPosts = await db.prepare(`
+        SELECT id, title, slug, summary, cover_image, view_count, like_count, published_at
+        FROM posts
+        WHERE column_id = ? AND id != ? AND status = 'published' AND visibility = 'public' AND deleted_at IS NULL
+        ORDER BY RAND() LIMIT ?
+      `).bind(currentPost.column_id, postId, limit).all() as any;
+      candidates = candidates.concat(columnPosts.results || []);
+    }
+
+    if (tagIds.length > 0 && candidates.length < limit) {
+      const tagPosts = await db.prepare(`
+        SELECT DISTINCT p.id, p.title, p.slug, p.summary, p.cover_image, p.view_count, p.like_count, p.published_at
+        FROM posts p
+        JOIN post_tags pt ON p.id = pt.post_id
+        WHERE pt.tag_id IN (${tagIds.map(() => '?').join(',')})
+          AND p.id != ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL
+        ORDER BY RAND() LIMIT ?
+      `).bind(...tagIds, postId, limit - candidates.length).all() as any;
+      candidates = candidates.concat(tagPosts.results || []);
+    }
+
+    if (currentPost.category_id && candidates.length < limit) {
+      const categoryPosts = await db.prepare(`
+        SELECT id, title, slug, summary, cover_image, view_count, like_count, published_at
+        FROM posts
+        WHERE category_id = ? AND id != ? AND status = 'published' AND visibility = 'public' AND deleted_at IS NULL
+        ORDER BY RAND() LIMIT ?
+      `).bind(currentPost.category_id, postId, limit - candidates.length).all() as any;
+      candidates = candidates.concat(categoryPosts.results || []);
+    }
+
+    const uniquePosts = candidates.filter((post, index, self) =>
+      index === self.findIndex(p => p.id === post.id)
+    ).slice(0, limit);
+
+    return {
+      success: true,
+      posts: uniquePosts
+    };
+  }
+
+  static async getHotPosts(
+    db: any,
+    limit: number = 10
+  ): Promise<{ success: boolean; posts?: any[] }> {
+    const { results } = await db.prepare(`
+      SELECT id, title, slug, summary, cover_image, view_count, like_count, comment_count, published_at
+      FROM posts
+      WHERE status = 'published' AND visibility = 'public' AND deleted_at IS NULL
+      ORDER BY (view_count * 1 + like_count * 3 + comment_count * 5) DESC, published_at DESC
+      LIMIT ?
+    `).bind(limit).all();
+
+    return {
+      success: true,
+      posts: results || []
     };
   }
 

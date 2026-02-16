@@ -428,6 +428,63 @@ postRoutes.get('/:id/mentionable-users', async (c) => {
   }
 });
 
+postRoutes.get('/:id/adjacent', async (c) => {
+  const logger = createLogger(c);
+
+  try {
+    const postId = parseInt(c.req.param('id'));
+
+    const result = await PostService.getAdjacentPosts(c.env.DB, postId);
+
+    if (!result.success) {
+      return c.json(errorResponse('Failed to get adjacent posts', 'Error'), 404);
+    }
+
+    return c.json(successResponse({
+      prevPost: result.prevPost,
+      nextPost: result.nextPost
+    }));
+  } catch (error) {
+    logger.error('Get adjacent posts error', error);
+    return c.json(errorResponse('Failed to get adjacent posts', 'An error occurred'), 500);
+  }
+});
+
+postRoutes.get('/:id/recommended', async (c) => {
+  const logger = createLogger(c);
+
+  try {
+    const postId = parseInt(c.req.param('id'));
+    const limit = parseInt(c.req.query('limit') || '5');
+
+    const result = await PostService.getRecommendedPosts(c.env.DB, postId, limit);
+
+    if (!result.success) {
+      return c.json(errorResponse('Failed to get recommended posts', 'Error'), 404);
+    }
+
+    return c.json(successResponse({ posts: result.posts }));
+  } catch (error) {
+    logger.error('Get recommended posts error', error);
+    return c.json(errorResponse('Failed to get recommended posts', 'An error occurred'), 500);
+  }
+});
+
+postRoutes.get('/hot/list', async (c) => {
+  const logger = createLogger(c);
+
+  try {
+    const limit = parseInt(c.req.query('limit') || '10');
+
+    const result = await PostService.getHotPosts(c.env.DB, limit);
+
+    return c.json(successResponse({ posts: result.posts }));
+  } catch (error) {
+    logger.error('Get hot posts error', error);
+    return c.json(errorResponse('Failed to get hot posts', 'An error occurred'), 500);
+  }
+});
+
 postRoutes.post('/:id/verify-password', async (c) => {
   const logger = createLogger(c);
 
