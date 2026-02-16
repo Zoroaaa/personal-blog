@@ -2,33 +2,24 @@
  * 个人中心页面
  * 
  * 功能：
- * - 用户信息展示和编辑
  * - 查看和管理自己的评论
  * - 查看自己的点赞文章
- * - 账号设置（密码修改、用户名修改）
- * - 账号删除
- * - 头像上传
+ * - 查看阅读历史
+ * - 查看收藏文章
  * 
  * @author 博客系统
- * @version 2.0.0
- * @created 2024-01-01
+ * @version 2.1.0
  */
 
 import { useState, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../utils/api';
-import { useVerificationCountdown } from '../hooks/useVerificationCountdown';
 import { transformCommentList, transformPostListItem, transformReadingHistoryList } from '../utils/apiTransformer';
 import type { User, Comment, PostListItem, ReadingHistoryItem } from '../types';
 import { format } from 'date-fns';
 import { useToast } from '../components/Toast';
 
-// ============= 辅助函数 =============
-
-/**
- * 安全的日期格式化函数
- */
 function formatDate(date: any, formatStr: string = 'yyyy-MM-dd HH:mm'): string {
   if (!date) return '未知时间';
   
@@ -47,34 +38,22 @@ function formatDate(date: any, formatStr: string = 'yyyy-MM-dd HH:mm'): string {
   }
 }
 
-/**
- * 生成随机头像URL（当用户没有头像时使用）
- */
-function getRandomAvatar(username: string): string {
-  const hash = username.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const colors = ['blue', 'green', 'red', 'purple', 'orange'];
-  const color = colors[hash % colors.length];
-  const initial = username.charAt(0).toUpperCase();
-  return `https://ui-avatars.com/api/?name=${initial}&background=${color}&color=fff&size=128`;
-}
-
 // ============= 组件 =============
 
 export function ProfilePage() {
-  const { user, logout, setUser } = useAuthStore();
-  const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const { showSuccess, showError } = useToast();
 
-  // 从URL参数获取当前标签页，默认为'info'
-  const getTabFromUrl = (): 'info' | 'comments' | 'likes' | 'history' | 'favorites' | 'settings' => {
+  // 从URL参数获取当前标签页，默认为'comments'
+  const getTabFromUrl = (): 'comments' | 'likes' | 'history' | 'favorites' => {
     const tab = searchParams.get('tab');
-    const validTabs: Array<'info' | 'comments' | 'likes' | 'history' | 'favorites' | 'settings'> = ['info', 'comments', 'likes', 'history', 'favorites', 'settings'];
-    return validTabs.includes(tab as typeof validTabs[number]) ? (tab as typeof validTabs[number]) : 'info';
+    const validTabs: Array<'comments' | 'likes' | 'history' | 'favorites'> = ['comments', 'likes', 'history', 'favorites'];
+    return validTabs.includes(tab as typeof validTabs[number]) ? (tab as typeof validTabs[number]) : 'comments';
   };
 
   // 状态管理
-  const [activeTab, setActiveTab] = useState<'info' | 'comments' | 'likes' | 'history' | 'favorites' | 'settings'>(getTabFromUrl());
+  const [activeTab, setActiveTab] = useState<'comments' | 'likes' | 'history' | 'favorites'>(getTabFromUrl());
   const [userInfo, setUserInfo] = useState<User | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [likedPosts, setLikedPosts] = useState<PostListItem[]>([]);
@@ -85,37 +64,15 @@ export function ProfilePage() {
     comments: false,
     likes: false,
     history: false,
-    favorites: false,
-    update: false,
-    delete: false
+    favorites: false
   });
   const [error, setError] = useState<string | null>(null);
-  
-  // 表单状态
-  const [formData, setFormData] = useState({
-    displayName: '',
-    bio: '',
-    password: '',
-    newPassword: '',
-    confirmPassword: '',
-    emailVerificationCode: ''
-  });
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string>('');
-  const [codeSending, setCodeSending] = useState(false);
-  const [deleteVerificationCode, setDeleteVerificationCode] = useState('');
-  const [deletePassword, setDeletePassword] = useState('');
-  const [deleteConfirmation, setDeleteConfirmation] = useState('');
-  
-  // 验证码倒计时 hooks
-  const { countdown: passwordCountdown, isCounting: isPasswordCounting, startCountdown: startPasswordCountdown } = useVerificationCountdown('password');
-  const { countdown: deleteCountdown, isCounting: isDeleteCounting, startCountdown: startDeleteCountdown } = useVerificationCountdown('delete');
   
   // 初始化数据
   useEffect(() => {
     if (user) {
       loadUserInfo();
-      loadLikedPosts(); // 同时加载点赞数据，确保统计信息准确
+      loadLikedPosts();
     }
   }, [user]);
 
@@ -136,15 +93,6 @@ export function ProfilePage() {
       const response = await api.getMe();
       if (response.success && response.data) {
         setUserInfo(response.data.user);
-        setFormData({
-          displayName: response.data.user.displayName,
-          bio: response.data.user.bio || '',
-          password: '',
-          newPassword: '',
-          confirmPassword: '',
-          emailVerificationCode: ''
-        });
-        setAvatarPreview(response.data.user.avatarUrl || getRandomAvatar(response.data.user.username));
       }
     } catch (error) {
       console.error('Failed to load user info:', error);
@@ -236,130 +184,6 @@ export function ProfilePage() {
     else if (activeTab === 'favorites') loadFavoritePosts();
   }, [activeTab]);
   
-  // 处理表单输入变化
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-  
-  // 处理头像文件选择
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setAvatarFile(file);
-      setAvatarPreview(URL.createObjectURL(file));
-    }
-  };
-  
-  // 更新用户资料
-  const handleUpdateProfile = async () => {
-    try {
-      setLoading(prev => ({ ...prev, update: true }));
-      setError(null);
-      
-      // 先上传头像（如果有）
-      let avatarUrl = userInfo?.avatarUrl;
-      if (avatarFile) {
-        const uploadResponse = await api.uploadImage(avatarFile);
-        if (uploadResponse.success && uploadResponse.data) {
-          avatarUrl = uploadResponse.data.url;
-        }
-      }
-      
-      // 更新用户资料
-      const response = await api.updateProfile({
-        displayName: formData.displayName,
-        bio: formData.bio,
-        avatarUrl
-      });
-      
-      if (response.success && response.data) {
-        showSuccess('资料更新成功');
-        await loadUserInfo(); // 重新加载用户信息
-        // 更新authStore中的用户信息，确保页面上方的头像也能更新
-        if (response.data.user) {
-          setUser(response.data.user);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to update profile:', error);
-      setError('更新资料失败');
-      showError('更新资料失败');
-    } finally {
-      setLoading(prev => ({ ...prev, update: false }));
-    }
-  };
-  
-  const handleSendCode = async (type: 'password' | 'delete') => {
-    // 检查是否在倒计时中
-    if (type === 'password' && isPasswordCounting) {
-      showError(`请等待 ${passwordCountdown} 秒后重试`);
-      return;
-    }
-    if (type === 'delete' && isDeleteCounting) {
-      showError(`请等待 ${deleteCountdown} 秒后重试`);
-      return;
-    }
-    
-    try {
-      setCodeSending(true);
-      setError(null);
-      const response = await api.sendVerificationCode({ type });
-      if (response.success) {
-        // 根据类型启动对应的倒计时
-        if (type === 'password') {
-          startPasswordCountdown();
-        } else {
-          startDeleteCountdown();
-        }
-        showSuccess('验证码已发送到您的邮箱，请查收');
-      } else {
-        setError(response.message || response.error || '发送失败');
-        showError(response.message || response.error || '发送失败');
-      }
-    } catch (e: any) {
-      setError(e.message || '发送验证码失败');
-      showError(e.message || '发送验证码失败');
-    } finally {
-      setCodeSending(false);
-    }
-  };
-  
-  // 修改密码
-  const handleChangePassword = async () => {
-    try {
-      setLoading(prev => ({ ...prev, update: true }));
-      setError(null);
-      
-      if (formData.newPassword !== formData.confirmPassword) {
-        showError('两次输入的密码不一致');
-        return;
-      }
-      
-      const response = await api.changePassword({
-        currentPassword: formData.password,
-        newPassword: formData.newPassword,
-        emailVerificationCode: formData.emailVerificationCode || undefined
-      });
-      
-      if (response.success) {
-        showSuccess('密码修改成功');
-        setFormData(prev => ({
-          ...prev,
-          password: '',
-          newPassword: '',
-          confirmPassword: '',
-          emailVerificationCode: ''
-        }));
-      }
-    } catch (error: any) {
-      setError(error.message || '修改密码失败');
-      showError(error.message || '修改密码失败');
-    } finally {
-      setLoading(prev => ({ ...prev, update: false }));
-    }
-  };
-  
   // 删除评论
   const handleDeleteComment = async (commentId: number) => {
     if (!confirm('确定要删除这条评论吗？')) {
@@ -377,147 +201,6 @@ export function ProfilePage() {
       setError('删除评论失败');
       showError('删除评论失败');
     }
-  };
-  
-  // 删除账号
-  const handleDeleteAccount = async () => {
-    if (!deleteConfirmation || deleteConfirmation !== 'DELETE') {
-      showError('请在下方输入 DELETE 确认删除');
-      return;
-    }
-    
-    try {
-      setLoading(prev => ({ ...prev, delete: true }));
-      setError(null);
-      
-      const response = await api.deleteAccount(deletePassword, deleteVerificationCode);
-      if (response.success) {
-        showSuccess('账号删除成功');
-        logout();
-        navigate('/');
-      }
-    } catch (error: any) {
-      setError(error.message || '删除账号失败，请检查密码和验证码');
-      showError(error.message || '删除账号失败，请检查密码和验证码');
-    } finally {
-      setLoading(prev => ({ ...prev, delete: false }));
-    }
-  };
-  
-  // 渲染用户信息标签页
-  const renderInfoTab = () => {
-    if (loading.user) {
-      return (
-        <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-muted-foreground">加载中...</p>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="space-y-8">
-        {/* 头像和基本信息 */}
-        <div className="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8">
-          {/* 头像 */}
-          <div className="flex flex-col items-center">
-            <div className="relative mb-4">
-              <img 
-                src={avatarPreview || userInfo?.avatarUrl || getRandomAvatar(userInfo?.username || '')} 
-                alt="用户头像" 
-                className="w-32 h-32 rounded-full object-cover border-4 border-card shadow-lg"
-              />
-              <label 
-                htmlFor="avatar-upload" 
-                className="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <input 
-                  id="avatar-upload" 
-                  type="file" 
-                  accept="image/*" 
-                  className="hidden" 
-                  onChange={handleAvatarChange}
-                />
-              </label>
-            </div>
-            <h2 className="text-2xl font-bold text-foreground">{formData.displayName || userInfo?.displayName}</h2>
-            <p className="text-muted-foreground">@{userInfo?.username}</p>
-            <p className="text-muted-foreground text-sm mt-1">{userInfo?.email}</p>
-          </div>
-          
-          {/* 个人资料编辑 */}
-          <div className="flex-1 w-full">
-            <h3 className="text-xl font-semibold text-foreground mb-4">个人资料</h3>
-            <form className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  显示名称
-                </label>
-                <input
-                  type="text"
-                  name="displayName"
-                  value={formData.displayName}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  个人简介
-                </label>
-                <textarea
-                  name="bio"
-                  value={formData.bio}
-                  onChange={handleInputChange}
-                  rows={4}
-                  className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="介绍一下自己..."
-                />
-                <p className="text-xs text-muted-foreground mt-1">个人简介会显示在您的公开资料页面，让其他用户了解您</p>
-              </div>
-              
-              <div>
-                <button
-                  type="button"
-                  onClick={handleUpdateProfile}
-                  disabled={loading.update}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {loading.update ? '更新中...' : '更新资料'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-        
-        {/* 用户统计信息 */}
-        <div className="bg-card rounded-lg shadow-sm border border-border p-6">
-          <h3 className="text-xl font-semibold text-foreground mb-4">统计信息</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-muted rounded-lg">
-              <p className="text-2xl font-bold text-blue-600">{userInfo?.postCount || 0}</p>
-              <p className="text-muted-foreground text-sm">发布文章</p>
-            </div>
-            <div className="text-center p-4 bg-muted rounded-lg">
-              <p className="text-2xl font-bold text-green-600">{userInfo?.commentCount || 0}</p>
-              <p className="text-muted-foreground text-sm">发表评论</p>
-            </div>
-            <div className="text-center p-4 bg-muted rounded-lg">
-              <p className="text-2xl font-bold text-red-600">{likedPosts.length}</p>
-              <p className="text-muted-foreground text-sm">点赞文章</p>
-            </div>
-            <div className="text-center p-4 bg-muted rounded-lg">
-              <p className="text-2xl font-bold text-purple-600">{userInfo ? 1 : 0}</p>
-              <p className="text-muted-foreground text-sm">账号等级</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
   };
   
   // 渲染评论标签页
@@ -796,144 +479,13 @@ export function ProfilePage() {
     );
   };
   
-  // 渲染设置标签页
-  const renderSettingsTab = () => {
-    return (
-      <div className="space-y-8">
-        {/* 密码修改 */}
-        <div className="bg-card rounded-lg shadow-sm border border-border p-6">
-          <h3 className="text-xl font-semibold text-foreground mb-4">密码修改</h3>
-          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleChangePassword(); }}>
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-foreground mb-1">邮箱验证码</label>
-                <input
-                  type="text"
-                  maxLength={6}
-                  placeholder="6 位验证码"
-                  value={formData.emailVerificationCode}
-                  onChange={(e) => setFormData(prev => ({ ...prev, emailVerificationCode: e.target.value.replace(/\D/g, '') }))}
-                  className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => handleSendCode('password')}
-                disabled={codeSending || isPasswordCounting}
-                className="px-4 py-2 border border-border rounded-lg hover:bg-muted disabled:opacity-50 whitespace-nowrap min-w-[100px]"
-              >
-                {codeSending ? '发送中...' : isPasswordCounting ? `${passwordCountdown}秒后重试` : '获取验证码'}
-              </button>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">当前密码</label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">新密码</label>
-              <input
-                type="password"
-                name="newPassword"
-                value={formData.newPassword}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">确认新密码</label>
-              <input
-                type="password"
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading.update}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading.update ? '修改中...' : '修改密码'}
-            </button>
-          </form>
-        </div>
-        
-        {/* 账号删除 */}
-        <div className="bg-card rounded-lg shadow-sm border border-border p-6">
-          <h3 className="text-xl font-semibold text-foreground mb-4">账号管理</h3>
-          <div className="p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg space-y-4">
-            <h4 className="text-lg font-medium text-red-800 dark:text-red-200 mb-2">删除账号</h4>
-            <p className="text-red-700 dark:text-red-300 text-sm">
-              一旦删除账号，所有数据将被永久删除，无法恢复。请先获取邮箱验证码并输入密码确认。
-            </p>
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-foreground mb-1">邮箱验证码</label>
-                <input
-                  type="text"
-                  maxLength={6}
-                  placeholder="6 位验证码"
-                  value={deleteVerificationCode}
-                  onChange={(e) => setDeleteVerificationCode(e.target.value.replace(/\D/g, ''))}
-                  className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-red-500"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => handleSendCode('delete')}
-                disabled={codeSending || isDeleteCounting}
-                className="px-4 py-2 border border-border rounded-lg hover:bg-muted disabled:opacity-50 whitespace-nowrap min-w-[100px]"
-              >
-                {codeSending ? '发送中...' : isDeleteCounting ? `${deleteCountdown}秒后重试` : '获取验证码'}
-              </button>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">当前密码</label>
-              <input
-                type="password"
-                value={deletePassword}
-                onChange={(e) => setDeletePassword(e.target.value)}
-                placeholder="请输入密码以确认身份"
-                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-red-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">确认删除（输入 DELETE）</label>
-              <input
-                type="text"
-                value={deleteConfirmation}
-                onChange={(e) => setDeleteConfirmation(e.target.value)}
-                placeholder="输入 DELETE 确认删除"
-                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-red-500"
-              />
-            </div>
-            <button
-              onClick={handleDeleteAccount}
-              disabled={loading.delete || deleteConfirmation !== 'DELETE'}
-              className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading.delete ? '删除中...' : '删除账号'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-  
   // 渲染主内容
   return (
     <div className="max-w-6xl mx-auto px-4 py-12">
       {/* 页面标题 */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-2">个人中心</h1>
-        <p className="text-muted-foreground">管理您的个人信息和账号设置</p>
+        <p className="text-muted-foreground">查看您的评论、点赞、阅读历史和收藏</p>
       </div>
       
       {/* 错误消息 */}
@@ -946,15 +498,6 @@ export function ProfilePage() {
       {/* 标签页导航 */}
       <div className="border-b border-border mb-6">
         <nav className="flex space-x-8">
-          <button
-            onClick={() => {
-              setActiveTab('info');
-              setSearchParams({ tab: 'info' });
-            }}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'info' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
-          >
-            个人信息
-          </button>
           <button
             onClick={() => {
               setActiveTab('comments');
@@ -991,26 +534,15 @@ export function ProfilePage() {
           >
             我的收藏
           </button>
-          <button
-            onClick={() => {
-              setActiveTab('settings');
-              setSearchParams({ tab: 'settings' });
-            }}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'settings' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
-          >
-            账号设置
-          </button>
         </nav>
       </div>
       
       {/* 标签页内容 */}
       <div className="bg-card rounded-lg shadow-sm border border-border p-6">
-        {activeTab === 'info' && renderInfoTab()}
         {activeTab === 'comments' && renderCommentsTab()}
         {activeTab === 'likes' && renderLikesTab()}
         {activeTab === 'history' && renderHistoryTab()}
         {activeTab === 'favorites' && renderFavoritesTab()}
-        {activeTab === 'settings' && renderSettingsTab()}
       </div>
     </div>
   );
