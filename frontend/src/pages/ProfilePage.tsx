@@ -4,19 +4,18 @@
  * 功能：
  * - 查看和管理自己的评论
  * - 查看自己的点赞文章
- * - 查看阅读历史
  * - 查看收藏文章
  * 
  * @author 博客系统
- * @version 2.1.0
+ * @version 2.2.0
  */
 
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../utils/api';
-import { transformCommentList, transformPostListItem, transformReadingHistoryList } from '../utils/apiTransformer';
-import type { User, Comment, PostListItem, ReadingHistoryItem } from '../types';
+import { transformCommentList, transformPostListItem } from '../utils/apiTransformer';
+import type { Comment, PostListItem } from '../types';
 import { format } from 'date-fns';
 import { useToast } from '../components/Toast';
 
@@ -46,32 +45,25 @@ export function ProfilePage() {
   const { showSuccess, showError } = useToast();
 
   // 从URL参数获取当前标签页，默认为'comments'
-  const getTabFromUrl = (): 'comments' | 'likes' | 'history' | 'favorites' => {
+  const getTabFromUrl = (): 'comments' | 'likes' | 'favorites' => {
     const tab = searchParams.get('tab');
-    const validTabs: Array<'comments' | 'likes' | 'history' | 'favorites'> = ['comments', 'likes', 'history', 'favorites'];
+    const validTabs: Array<'comments' | 'likes' | 'favorites'> = ['comments', 'likes', 'favorites'];
     return validTabs.includes(tab as typeof validTabs[number]) ? (tab as typeof validTabs[number]) : 'comments';
   };
 
-  // 状态管理
-  const [activeTab, setActiveTab] = useState<'comments' | 'likes' | 'history' | 'favorites'>(getTabFromUrl());
-  const [userInfo, setUserInfo] = useState<User | null>(null);
+  const [activeTab, setActiveTab] = useState<'comments' | 'likes' | 'favorites'>(getTabFromUrl());
   const [comments, setComments] = useState<Comment[]>([]);
   const [likedPosts, setLikedPosts] = useState<PostListItem[]>([]);
-  const [readingHistory, setReadingHistory] = useState<ReadingHistoryItem[]>([]);
   const [favoritePosts, setFavoritePosts] = useState<PostListItem[]>([]);
   const [loading, setLoading] = useState({
-    user: true,
     comments: false,
     likes: false,
-    history: false,
     favorites: false
   });
   const [error, setError] = useState<string | null>(null);
   
-  // 初始化数据
   useEffect(() => {
     if (user) {
-      loadUserInfo();
       loadLikedPosts();
     }
   }, [user]);
@@ -84,25 +76,6 @@ export function ProfilePage() {
     }
   }, [searchParams]);
   
-  // 加载用户信息
-  const loadUserInfo = async () => {
-    try {
-      setLoading(prev => ({ ...prev, user: true }));
-      setError(null);
-      
-      const response = await api.getMe();
-      if (response.success && response.data) {
-        setUserInfo(response.data.user);
-      }
-    } catch (error) {
-      console.error('Failed to load user info:', error);
-      setError('加载用户信息失败');
-    } finally {
-      setLoading(prev => ({ ...prev, user: false }));
-    }
-  };
-  
-  // 加载用户评论
   const loadUserComments = async () => {
     try {
       setLoading(prev => ({ ...prev, comments: true }));
@@ -143,23 +116,6 @@ export function ProfilePage() {
     }
   };
   
-  const loadReadingHistory = async () => {
-    try {
-      setLoading(prev => ({ ...prev, history: true }));
-      setError(null);
-      const response = await api.getReadingHistory({ page: '1', limit: '20' });
-      if (response.success && response.data) {
-        const items = transformReadingHistoryList(response.data.items || []);
-        setReadingHistory(items);
-      }
-    } catch (error) {
-      console.error('Failed to load reading history:', error);
-      setError('加载阅读历史失败');
-    } finally {
-      setLoading(prev => ({ ...prev, history: false }));
-    }
-  };
-  
   const loadFavoritePosts = async () => {
     try {
       setLoading(prev => ({ ...prev, favorites: true }));
@@ -180,7 +136,6 @@ export function ProfilePage() {
   useEffect(() => {
     if (activeTab === 'comments') loadUserComments();
     else if (activeTab === 'likes') loadLikedPosts();
-    else if (activeTab === 'history') loadReadingHistory();
     else if (activeTab === 'favorites') loadFavoritePosts();
   }, [activeTab]);
   
@@ -291,58 +246,6 @@ export function ProfilePage() {
     );
   };
   
-  const formatDuration = (seconds: number) => {
-    if (seconds < 60) return `${seconds} 秒`;
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return s ? `${m} 分 ${s} 秒` : `${m} 分钟`;
-  };
-  
-  const renderHistoryTab = () => {
-    if (loading.history) {
-      return (
-        <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-muted-foreground">加载中...</p>
-        </div>
-      );
-    }
-    if (readingHistory.length === 0) {
-      return (
-        <div className="text-center py-16 bg-muted rounded-lg">
-          <svg className="mx-auto h-16 w-16 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <h3 className="mt-4 text-lg font-medium text-foreground">暂无阅读历史</h3>
-          <p className="mt-2 text-muted-foreground">阅读过的文章会出现在这里</p>
-        </div>
-      );
-    }
-    return (
-      <div className="space-y-4">
-        {readingHistory.map((item) => (
-          <Link
-            key={item.postId ?? item.id}
-            to={`/posts/${item.slug || item.id}`}
-            className="block border border-border rounded-lg p-4 hover:shadow-md transition-shadow"
-          >
-            <h3 className="font-semibold text-foreground">{item.title}</h3>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-muted-foreground">
-              <span>{formatDate(item.lastReadAt)}</span>
-              {item.readDurationSeconds != null && item.readDurationSeconds > 0 && (
-                <span>阅读时长 {formatDuration(item.readDurationSeconds)}</span>
-              )}
-              {item.readPercentage != null && (
-                <span>阅读进度 {item.readPercentage}%</span>
-              )}
-            </div>
-          </Link>
-        ))}
-      </div>
-    );
-  };
-  
-  // 取消收藏
   const handleUnfavorite = async (postId: number, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -485,7 +388,7 @@ export function ProfilePage() {
       {/* 页面标题 */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-2">个人中心</h1>
-        <p className="text-muted-foreground">查看您的评论、点赞、阅读历史和收藏</p>
+        <p className="text-muted-foreground">查看您的评论、点赞、和收藏</p>
       </div>
       
       {/* 错误消息 */}
@@ -518,15 +421,6 @@ export function ProfilePage() {
           </button>
           <button
             onClick={() => {
-              setActiveTab('history');
-              setSearchParams({ tab: 'history' });
-            }}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'history' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
-          >
-            阅读历史
-          </button>
-          <button
-            onClick={() => {
               setActiveTab('favorites');
               setSearchParams({ tab: 'favorites' });
             }}
@@ -541,7 +435,6 @@ export function ProfilePage() {
       <div className="bg-card rounded-lg shadow-sm border border-border p-6">
         {activeTab === 'comments' && renderCommentsTab()}
         {activeTab === 'likes' && renderLikesTab()}
-        {activeTab === 'history' && renderHistoryTab()}
         {activeTab === 'favorites' && renderFavoritesTab()}
       </div>
     </div>

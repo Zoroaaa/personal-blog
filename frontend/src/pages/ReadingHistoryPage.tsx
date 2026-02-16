@@ -4,10 +4,9 @@
  * 功能：
  * - 显示用户的阅读历史记录
  * - 支持分页加载
- * - 支持清空历史记录
  * 
  * @author 博客系统
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 import { useState, useEffect } from 'react';
@@ -36,13 +35,19 @@ function formatDate(date: any, formatStr: string = 'yyyy-MM-dd HH:mm'): string {
   }
 }
 
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds} 秒`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s ? `${m} 分 ${s} 秒` : `${m} 分钟`;
+}
+
 export function ReadingHistoryPage() {
   const { user } = useAuthStore();
-  const { showSuccess, showError } = useToast();
+  const { showError } = useToast();
   
   const [history, setHistory] = useState<ReadingHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [clearing, setClearing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const limit = 20;
@@ -85,26 +90,6 @@ export function ReadingHistoryPage() {
     }
   };
 
-  const handleClearHistory = async () => {
-    if (!window.confirm('确定要清空所有阅读历史吗？此操作不可恢复。')) {
-      return;
-    }
-
-    try {
-      setClearing(true);
-      const response = await api.clearReadingHistory();
-      if (response.success) {
-        setHistory([]);
-        showSuccess('阅读历史已清空');
-      }
-    } catch (error) {
-      console.error('Failed to clear reading history:', error);
-      showError('清空阅读历史失败');
-    } finally {
-      setClearing(false);
-    }
-  };
-
   if (!user) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -128,20 +113,9 @@ export function ReadingHistoryPage() {
       <div className="min-h-screen bg-background">
         <div className="max-w-4xl mx-auto px-4 py-8">
           {/* 页面标题 */}
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">阅读历史</h1>
-              <p className="text-muted-foreground mt-1">您浏览过的文章记录</p>
-            </div>
-            {history.length > 0 && (
-              <button
-                onClick={handleClearHistory}
-                disabled={clearing}
-                className="px-4 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
-              >
-                {clearing ? '清空中...' : '清空历史'}
-              </button>
-            )}
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold text-foreground">阅读历史</h1>
+            <p className="text-muted-foreground mt-1">您浏览过的文章记录</p>
           </div>
 
           {/* 历史列表 */}
@@ -194,6 +168,14 @@ export function ReadingHistoryPage() {
                             </svg>
                             阅读于 {formatDate(item.lastReadAt)}
                           </span>
+                          {item.readDurationSeconds != null && item.readDurationSeconds > 0 && (
+                            <span className="flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              时长 {formatDuration(item.readDurationSeconds)}
+                            </span>
+                          )}
                           {item.readPercentage && item.readPercentage > 0 && (
                             <span className="flex items-center gap-1">
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
