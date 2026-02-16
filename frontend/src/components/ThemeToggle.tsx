@@ -32,16 +32,19 @@ export function ThemeToggle() {
   // 切换主题模式
   const handleThemeModeChange = (mode: ThemeMode) => {
     setThemeMode(mode);
+    setIsOpen(false);
   };
   
   // 选择主色调
   const handleColorChange = (color: string) => {
     setPrimaryColor(color);
+    setIsOpen(false);
   };
   
   // 调整字体大小
   const handleFontSizeChange = (size: 'small' | 'medium' | 'large') => {
     setFontSize(size);
+    setIsOpen(false);
   };
   
   // 渲染主题模式图标
@@ -77,7 +80,7 @@ export function ThemeToggle() {
       
       {/* 主题设置菜单 */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-3 z-50">
+        <div className="absolute left-1/2 -translate-x-1/2 sm:left-auto sm:translate-x-0 sm:right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-3 z-50 max-w-[calc(100vw-2rem)]">
           {/* 主题模式 */}
           <div className="px-4 mb-4">
             <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">主题模式</h3>

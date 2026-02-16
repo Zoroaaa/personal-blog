@@ -64,6 +64,25 @@ export function Header() {
     return location.pathname === path;
   };
 
+  const handleNavClick = (path: string, e: React.MouseEvent) => {
+    if (location.pathname === path) {
+      e.preventDefault();
+      if (path === '/') {
+        window.location.reload();
+      } else {
+        navigate('/');
+      }
+    }
+  };
+
+  const handleButtonClick = (path: string) => {
+    if (location.pathname === path) {
+      navigate('/');
+    } else {
+      navigate(path);
+    }
+  };
+
   const navLinks = [
     { path: '/', label: '首页' },
     { path: '/reading-history', label: '阅读历史' },
@@ -111,6 +130,7 @@ export function Header() {
               <Link
                 key={link.path}
                 to={link.path}
+                onClick={(e) => handleNavClick(link.path, e)}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                   isActive(link.path)
                     ? 'bg-primary/10 text-primary'
@@ -151,12 +171,12 @@ export function Header() {
             <ThemeToggle />
 
             {/* 通知角标 */}
-            <NotificationBadge />
+            <NotificationBadge onNavigate={handleButtonClick} />
 
             {/* 私信图标（独立） */}
             {user && (
-              <Link
-                to="/messages"
+              <button
+                onClick={() => handleButtonClick('/messages')}
                 className="relative p-2 rounded-md hover:bg-accent transition-colors"
                 aria-label={`私信 ${messageUnreadCount > 0 ? `(${messageUnreadCount}条未读)` : ''}`}
               >
@@ -168,7 +188,7 @@ export function Header() {
                     {messageUnreadCount > 99 ? '99+' : messageUnreadCount}
                   </span>
                 )}
-              </Link>
+              </button>
             )}
 
             {/* 用户菜单 */}
@@ -294,6 +314,7 @@ export function Header() {
                 <Link
                   key={link.path}
                   to={link.path}
+                  onClick={(e) => handleNavClick(link.path, e)}
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                     isActive(link.path)
                       ? 'bg-primary/10 text-primary'

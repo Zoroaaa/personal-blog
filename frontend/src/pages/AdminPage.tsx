@@ -788,16 +788,6 @@ export function AdminPage() {
         <div className="bg-card rounded-lg shadow-sm p-6">
           {renderTabContent()}
         </div>
-        
-        {/* 底部操作 */}
-        <div className="flex justify-end">
-          <button
-            onClick={() => navigate('/')}
-            className="px-6 py-2 border border-border rounded-lg hover:bg-muted"
-          >
-            返回首页
-          </button>
-        </div>
       </div>
     </div>
   );
