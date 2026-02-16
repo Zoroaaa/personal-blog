@@ -1559,7 +1559,7 @@ export class PostService {
         SELECT id, title, slug, summary, cover_image, view_count, like_count, published_at
         FROM posts
         WHERE column_id = ? AND id != ? AND status = 'published' AND visibility = 'public' AND deleted_at IS NULL
-        ORDER BY RAND() LIMIT ?
+        ORDER BY RANDOM() LIMIT ?
       `).bind(currentPost.column_id, postId, limit).all() as any;
       candidates = candidates.concat(columnPosts.results || []);
     }
@@ -1571,7 +1571,7 @@ export class PostService {
         JOIN post_tags pt ON p.id = pt.post_id
         WHERE pt.tag_id IN (${tagIds.map(() => '?').join(',')})
           AND p.id != ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL
-        ORDER BY RAND() LIMIT ?
+        ORDER BY RANDOM() LIMIT ?
       `).bind(...tagIds, postId, limit - candidates.length).all() as any;
       candidates = candidates.concat(tagPosts.results || []);
     }
@@ -1581,7 +1581,7 @@ export class PostService {
         SELECT id, title, slug, summary, cover_image, view_count, like_count, published_at
         FROM posts
         WHERE category_id = ? AND id != ? AND status = 'published' AND visibility = 'public' AND deleted_at IS NULL
-        ORDER BY RAND() LIMIT ?
+        ORDER BY RANDOM() LIMIT ?
       `).bind(currentPost.category_id, postId, limit - candidates.length).all() as any;
       candidates = candidates.concat(categoryPosts.results || []);
     }
