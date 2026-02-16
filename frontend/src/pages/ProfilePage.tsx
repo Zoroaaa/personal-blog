@@ -19,7 +19,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../utils/api';
 import { useVerificationCountdown } from '../hooks/useVerificationCountdown';
-import { transformCommentList } from '../utils/apiTransformer';
+import { transformCommentList, transformPostListItem, transformReadingHistoryList } from '../utils/apiTransformer';
 import type { User, Comment, PostListItem, ReadingHistoryItem } from '../types';
 import { format } from 'date-fns';
 import { useToast } from '../components/Toast';
@@ -184,7 +184,8 @@ export function ProfilePage() {
       setError(null);
       const response = await api.getLikedPosts({ page: '1', limit: '20' });
       if (response.success && response.data) {
-        setLikedPosts(response.data.posts || []);
+        const posts = (response.data.posts || []).map(transformPostListItem);
+        setLikedPosts(posts);
       }
     } catch (error) {
       console.error('Failed to load liked posts:', error);
@@ -200,7 +201,8 @@ export function ProfilePage() {
       setError(null);
       const response = await api.getReadingHistory({ page: '1', limit: '20' });
       if (response.success && response.data) {
-        setReadingHistory(response.data.items || []);
+        const items = transformReadingHistoryList(response.data.items || []);
+        setReadingHistory(items);
       }
     } catch (error) {
       console.error('Failed to load reading history:', error);
@@ -216,7 +218,8 @@ export function ProfilePage() {
       setError(null);
       const response = await api.getFavorites({ page: '1', limit: '20' });
       if (response.success && response.data) {
-        setFavoritePosts(response.data.posts || []);
+        const posts = (response.data.posts || []).map(transformPostListItem);
+        setFavoritePosts(posts);
       }
     } catch (error) {
       console.error('Failed to load favorites:', error);
