@@ -1,536 +1,226 @@
 /**
- * 管理后台相关路由
- * 
+ * 管理后台相关路由（重构版）
+ *
  * 功能：
  * - 评论管理（审核/删除）
  * - 用户列表管理
  * - 系统设置
- * 
- * @version 2.0.0
+ *
+ * @version 2.1.0
  * @author 博客系统
  * @created 2024-01-01
+ * @refactored 2026-02-16
  */
 
 import { Hono } from 'hono';
 import { Env, Variables } from '../types';
-import { successResponse, errorResponse } from '../utils/response';
+import { successResponse, errorResponse, getStatus } from '../utils/response';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { safeParseInt } from '../utils/validation';
-import { SoftDeleteHelper } from '../utils/softDeleteHelper';
+import { AdminService, ADMIN_CONSTANTS } from '../services/adminService';
 
 export const adminRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
-// 应用认证中间件到所有管理路由
 adminRoutes.use('*', requireAuth);
 
-// ============= 常量配置 =============
-
-const DEFAULT_PAGE_SIZE = 20;
-const MAX_PAGE_SIZE = 100;
-
-// ============= 评论管理 =============
-
-/**
- * GET /api/admin/comments
- * 获取评论列表（需要管理员权限）
- * 
- * 查询参数：
- * - page: 页码（默认1）
- * - limit: 每页数量（默认20，最大100）
- * - status: 状态筛选（all, approved, pending, rejected, deleted）
- * - postId: 文章ID筛选
- * - includeDeleted: 是否包含软删除的评论（默认false）
- */
 adminRoutes.get('/comments', requireAdmin, async (c) => {
   const logger = createLogger(c);
-  
+
   try {
-    const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
-    const status = c.req.query('status') || 'all';
-    const postId = c.req.query('postId');
-    const includeDeleted = c.req.query('includeDeleted') === 'true';
-    const offset = (page - 1) * limit;
-    
-    // 构建查询（默认排除软删除的评论和用户）
-    let query = `
-      SELECT c.*, 
-             u.username, u.display_name, u.avatar_url,
-             p.title as post_title, p.slug as post_slug
-      FROM comments c
-      JOIN users u ON c.user_id = u.id
-      LEFT JOIN posts p ON c.post_id = p.id
-      WHERE 1=1
-    `;
-    
-    const params: any[] = [];
-    
-    // 软删除过滤（默认不显示软删除的评论）
-    if (!includeDeleted) {
-      query += ' AND c.deleted_at IS NULL AND u.deleted_at IS NULL';
+    const result = await AdminService.getComments(c.env.DB, {
+      page: safeParseInt(c.req.query('page'), 1),
+      limit: safeParseInt(c.req.query('limit'), ADMIN_CONSTANTS.DEFAULT_PAGE_SIZE),
+      status: c.req.query('status'),
+      postId: c.req.query('postId'),
+      includeDeleted: c.req.query('includeDeleted') === 'true'
+    });
+
+    if (!result.success) {
+      return c.json(errorResponse(result.message || 'Error'), getStatus(result.statusCode, 500));
     }
-    
-    // 状态筛选
-    if (status !== 'all') {
-      query += ' AND c.status = ?';
-      params.push(status);
-    }
-    
-    // 文章筛选
-    if (postId) {
-      query += ' AND c.post_id = ?';
-      params.push(postId);
-    }
-    
-    // 排序和分页
-    query += ' ORDER BY c.created_at DESC LIMIT ? OFFSET ?';
-    params.push(limit, offset);
-    
-    // 执行查询
-    const { results } = await c.env.DB.prepare(query).bind(...params).all();
-    
-    // 获取总数
-    let countQuery = `
-      SELECT COUNT(*) as total FROM comments c
-      JOIN users u ON c.user_id = u.id
-      WHERE 1=1
-    `;
-    const countParams: any[] = [];
-    
-    // 软删除过滤
-    if (!includeDeleted) {
-      countQuery += ' AND c.deleted_at IS NULL AND u.deleted_at IS NULL';
-    }
-    
-    if (status !== 'all') {
-      countQuery += ' AND c.status = ?';
-      countParams.push(status);
-    }
-    
-    if (postId) {
-      countQuery += ' AND c.post_id = ?';
-      countParams.push(postId);
-    }
-    
-    const countResult = await c.env.DB.prepare(countQuery).bind(...countParams).first() as any;
-    const total = countResult?.total || 0;
-    
-    logger.info('Admin comments fetched', { count: results.length, page, status, postId, includeDeleted });
-    
-    return c.json(successResponse({
-      comments: results,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
-      }
-    }));
-    
+
+    logger.info('Admin comments fetched', {
+      count: result.data?.comments?.length,
+      page: result.data?.pagination?.page
+    });
+
+    return c.json(successResponse(result.data));
   } catch (error) {
     logger.error('Get admin comments error', error);
-    return c.json(errorResponse(
-      'Failed to fetch comments',
-      'An error occurred while fetching comments'
-    ), 500);
+    return c.json(errorResponse('Failed to fetch comments', 'An error occurred while fetching comments'), 500);
   }
 });
 
-/**
- * PUT /api/admin/comments/:id/status
- * 更新评论状态（需要管理员权限）
- * 
- * 请求体：
- * {
- *   status: 'approved' | 'pending' | 'rejected' | 'deleted'
- * }
- */
 adminRoutes.put('/comments/:id/status', requireAdmin, async (c) => {
   const logger = createLogger(c);
-  
+
   try {
     const commentId = c.req.param('id');
     const { status } = await c.req.json();
-    
+
     if (!commentId) {
       return c.json(errorResponse('Invalid comment ID'), 400);
     }
-    
-    if (!status || !['approved', 'pending', 'rejected', 'deleted'].includes(status)) {
-      return c.json(errorResponse(
-        'Invalid status',
-        'Status must be one of: approved, pending, rejected, deleted'
-      ), 400);
+
+    const result = await AdminService.updateCommentStatus(c.env.DB, commentId, status);
+
+    if (!result.success) {
+      return c.json(errorResponse(result.message || 'Error'), getStatus(result.statusCode, 400));
     }
-    
-    // 检查评论是否存在
-    const comment = await c.env.DB.prepare(
-      'SELECT id, post_id FROM comments WHERE id = ?'
-    ).bind(commentId).first() as any;
-    
-    if (!comment) {
-      return c.json(errorResponse('Comment not found'), 404);
-    }
-    
-    // 更新状态
-    await c.env.DB.prepare(
-      'UPDATE comments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-    ).bind(status, commentId).run();
-    
+
     logger.info('Comment status updated', { commentId, status });
-    
-    return c.json(successResponse({ updated: true }));
-    
+
+    return c.json(successResponse(result.data));
   } catch (error) {
     logger.error('Update comment status error', error);
-    return c.json(errorResponse(
-      'Failed to update comment status',
-      'An error occurred while updating comment status'
-    ), 500);
+    return c.json(errorResponse('Failed to update comment status', 'An error occurred while updating comment status'), 500);
   }
 });
 
-/**
- * DELETE /api/admin/comments/:id
- * 删除评论（需要管理员权限）
- */
 adminRoutes.delete('/comments/:id', requireAdmin, async (c) => {
   const logger = createLogger(c);
-  
+
   try {
     const commentId = c.req.param('id');
-    
+
     if (!commentId) {
       return c.json(errorResponse('Invalid comment ID'), 400);
     }
-    
-    // 检查评论是否存在
-    const comment = await c.env.DB.prepare(
-      'SELECT id, post_id FROM comments WHERE id = ?'
-    ).bind(commentId).first() as any;
-    
-    if (!comment) {
-      return c.json(errorResponse('Comment not found'), 404);
+
+    const result = await AdminService.deleteComment(c.env.DB, commentId);
+
+    if (!result.success) {
+      return c.json(errorResponse(result.message || 'Error'), getStatus(result.statusCode, 404));
     }
-    
-    // 软删除评论（保留数据以支持审计和恢复）
-    await SoftDeleteHelper.softDelete(c.env.DB, 'comments', commentId);
-    
-    logger.info('Comment deleted by admin', { commentId, postId: comment.post_id });
-    
-    return c.json(successResponse({ deleted: true }));
-    
+
+    logger.info('Comment deleted by admin', { commentId, postId: result.data?.postId });
+
+    return c.json(successResponse(result.data));
   } catch (error) {
     logger.error('Delete comment error', error);
-    return c.json(errorResponse(
-      'Failed to delete comment',
-      'An error occurred while deleting comment'
-    ), 500);
+    return c.json(errorResponse('Failed to delete comment', 'An error occurred while deleting comment'), 500);
   }
 });
 
-// ============= 用户管理 =============
-
-/**
- * GET /api/admin/users
- * 获取用户列表（需要管理员权限）
- * 
- * 查询参数：
- * - page: 页码（默认1）
- * - limit: 每页数量（默认20，最大100）
- * - role: 角色筛选（all, admin, user, moderator）
- * - status: 状态筛选（all, active, suspended, deleted）
- * - includeDeleted: 是否包含软删除的用户（默认false）
- */
 adminRoutes.get('/users', requireAdmin, async (c) => {
   const logger = createLogger(c);
-  
+
   try {
-    const page = Math.max(1, safeParseInt(c.req.query('page'), 1));
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, safeParseInt(c.req.query('limit'), DEFAULT_PAGE_SIZE)));
-    const role = c.req.query('role') || 'all';
-    const status = c.req.query('status') || 'all';
-    const includeDeleted = c.req.query('includeDeleted') === 'true';
-    const offset = (page - 1) * limit;
-    
-    // 构建查询（默认排除软删除的用户）
-    let query = `
-      SELECT u.*
-      FROM users u
-      WHERE 1=1
-    `;
-    
-    const params: any[] = [];
-    
-    // 软删除过滤（默认不显示软删除的用户）
-    if (!includeDeleted) {
-      query += ' AND u.deleted_at IS NULL';
+    const result = await AdminService.getUsers(c.env.DB, {
+      page: safeParseInt(c.req.query('page'), 1),
+      limit: safeParseInt(c.req.query('limit'), ADMIN_CONSTANTS.DEFAULT_PAGE_SIZE),
+      role: c.req.query('role'),
+      status: c.req.query('status'),
+      includeDeleted: c.req.query('includeDeleted') === 'true'
+    });
+
+    if (!result.success) {
+      return c.json(errorResponse(result.message || 'Error'), getStatus(result.statusCode, 500));
     }
-    
-    // 角色筛选
-    if (role !== 'all') {
-      query += ' AND u.role = ?';
-      params.push(role);
-    }
-    
-    // 状态筛选
-    if (status !== 'all') {
-      query += ' AND u.status = ?';
-      params.push(status);
-    }
-    
-    // 排序和分页
-    query += ' ORDER BY u.created_at DESC LIMIT ? OFFSET ?';
-    params.push(limit, offset);
-    
-    // 执行查询
-    const { results } = await c.env.DB.prepare(query).bind(...params).all();
-    
-    // 获取总数
-    let countQuery = `
-      SELECT COUNT(*) as total FROM users u
-      WHERE 1=1
-    `;
-    const countParams: any[] = [];
-    
-    // 软删除过滤
-    if (!includeDeleted) {
-      countQuery += ' AND u.deleted_at IS NULL';
-    }
-    
-    if (role !== 'all') {
-      countQuery += ' AND u.role = ?';
-      countParams.push(role);
-    }
-    
-    if (status !== 'all') {
-      countQuery += ' AND u.status = ?';
-      countParams.push(status);
-    }
-    
-    const countResult = await c.env.DB.prepare(countQuery).bind(...countParams).first() as any;
-    const total = countResult?.total || 0;
-    
-    logger.info('Admin users fetched', { count: results.length, page, role, status, includeDeleted });
-    
-    return c.json(successResponse({
-      users: results,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
-      }
-    }));
-    
+
+    logger.info('Admin users fetched', {
+      count: result.data?.users?.length,
+      page: result.data?.pagination?.page
+    });
+
+    return c.json(successResponse(result.data));
   } catch (error) {
     logger.error('Get admin users error', error);
-    return c.json(errorResponse(
-      'Failed to fetch users',
-      'An error occurred while fetching users'
-    ), 500);
+    return c.json(errorResponse('Failed to fetch users', 'An error occurred while fetching users'), 500);
   }
 });
 
-/**
- * PUT /api/admin/users/:id/status
- * 更新用户状态（需要管理员权限）
- * 
- * 请求体：
- * {
- *   status: 'active' | 'suspended' | 'deleted'
- * }
- */
 adminRoutes.put('/users/:id/status', requireAdmin, async (c) => {
   const logger = createLogger(c);
-  
+
   try {
     const userId = c.req.param('id');
     const { status } = await c.req.json();
-    
+    const currentUser = c.get('user') as any;
+
     if (!userId) {
       return c.json(errorResponse('Invalid user ID'), 400);
     }
-    
-    if (!status || !['active', 'suspended', 'deleted'].includes(status)) {
-      return c.json(errorResponse(
-        'Invalid status',
-        'Status must be one of: active, suspended, deleted'
-      ), 400);
+
+    const result = await AdminService.updateUserStatus(c.env.DB, userId, status, currentUser.userId);
+
+    if (!result.success) {
+      return c.json(errorResponse(result.message || 'Error'), getStatus(result.statusCode, 400));
     }
-    
-    // 检查用户是否存在
-    const user = await c.env.DB.prepare(
-      'SELECT id, username FROM users WHERE id = ?'
-    ).bind(userId).first() as any;
-    
-    if (!user) {
-      return c.json(errorResponse('User not found'), 404);
-    }
-    
-    // 不允许禁用自己的账号
-    const currentUser = c.get('user') as any;
-    if (userId === currentUser.userId.toString()) {
-      return c.json(errorResponse(
-        'Cannot modify own account',
-        'You cannot change your own account status'
-      ), 403);
-    }
-    
-    // 更新状态
-    await c.env.DB.prepare(
-      'UPDATE users SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-    ).bind(status, userId).run();
-    
-    logger.info('User status updated', { userId, username: user.username, status });
-    
-    return c.json(successResponse({ updated: true }));
-    
+
+    logger.info('User status updated', { userId, username: result.data?.username, status });
+
+    return c.json(successResponse(result.data));
   } catch (error) {
     logger.error('Update user status error', error);
-    return c.json(errorResponse(
-      'Failed to update user status',
-      'An error occurred while updating user status'
-    ), 500);
+    return c.json(errorResponse('Failed to update user status', 'An error occurred while updating user status'), 500);
   }
 });
 
-/**
- * PUT /api/admin/users/:id/role
- * 更新用户角色（需要管理员权限）
- * 
- * 请求体：
- * {
- *   role: 'admin' | 'user' | 'moderator'
- * }
- */
 adminRoutes.put('/users/:id/role', requireAdmin, async (c) => {
   const logger = createLogger(c);
-  
+
   try {
     const userId = c.req.param('id');
     const { role } = await c.req.json();
-    
+
     if (!userId) {
       return c.json(errorResponse('Invalid user ID'), 400);
     }
-    
-    if (!role || !['admin', 'user', 'moderator'].includes(role)) {
-      return c.json(errorResponse(
-        'Invalid role',
-        'Role must be one of: admin, user, moderator'
-      ), 400);
+
+    const result = await AdminService.updateUserRole(c.env.DB, userId, role);
+
+    if (!result.success) {
+      return c.json(errorResponse(result.message || 'Error'), getStatus(result.statusCode, 400));
     }
-    
-    // 检查用户是否存在
-    const user = await c.env.DB.prepare(
-      'SELECT id, username FROM users WHERE id = ?'
-    ).bind(userId).first() as any;
-    
-    if (!user) {
-      return c.json(errorResponse('User not found'), 404);
-    }
-    
-    // 更新角色
-    await c.env.DB.prepare(
-      'UPDATE users SET role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-    ).bind(role, userId).run();
-    
-    logger.info('User role updated', { userId, username: user.username, role });
-    
-    return c.json(successResponse({ updated: true }));
-    
+
+    logger.info('User role updated', { userId, username: result.data?.username, role });
+
+    return c.json(successResponse(result.data));
   } catch (error) {
     logger.error('Update user role error', error);
-    return c.json(errorResponse(
-      'Failed to update user role',
-      'An error occurred while updating user role'
-    ), 500);
+    return c.json(errorResponse('Failed to update user role', 'An error occurred while updating user role'), 500);
   }
 });
 
-/**
- * DELETE /api/admin/users/:id
- * 删除用户（需要管理员权限）
- */
 adminRoutes.delete('/users/:id', requireAdmin, async (c) => {
   const logger = createLogger(c);
-  
+
   try {
     const userId = c.req.param('id');
-    
+    const currentUser = c.get('user') as any;
+
     if (!userId) {
       return c.json(errorResponse('Invalid user ID'), 400);
     }
-    
-    // 检查用户是否存在
-    const user = await c.env.DB.prepare(
-      'SELECT id, username FROM users WHERE id = ?'
-    ).bind(userId).first() as any;
-    
-    if (!user) {
-      return c.json(errorResponse('User not found'), 404);
+
+    const result = await AdminService.deleteUser(c.env.DB, userId, currentUser.userId);
+
+    if (!result.success) {
+      return c.json(errorResponse(result.message || 'Error'), getStatus(result.statusCode, 404));
     }
-    
-    // 不允许删除自己的账号
-    const currentUser = c.get('user') as any;
-    if (userId === currentUser.userId.toString()) {
-      return c.json(errorResponse(
-        'Cannot delete own account',
-        'You cannot delete your own account'
-      ), 403);
-    }
-    
-    // 软删除用户（保留数据以支持审计和恢复）
-    await SoftDeleteHelper.softDelete(c.env.DB, 'users', userId);
-    
-    logger.info('User deleted by admin', { userId, username: user.username });
-    
-    return c.json(successResponse({ deleted: true }));
-    
+
+    logger.info('User deleted by admin', { userId, username: result.data?.username });
+
+    return c.json(successResponse(result.data));
   } catch (error) {
     logger.error('Delete user error', error);
-    return c.json(errorResponse(
-      'Failed to delete user',
-      'An error occurred while deleting user'
-    ), 500);
+    return c.json(errorResponse('Failed to delete user', 'An error occurred while deleting user'), 500);
   }
 });
 
-// ============= 系统设置 =============
-
-/**
- * GET /api/admin/settings
- * 获取系统设置（需要管理员权限）
- */
 adminRoutes.get('/settings', requireAdmin, async (c) => {
   const logger = createLogger(c);
-  
+
   try {
-    // 这里可以从数据库或环境变量中获取系统设置
-    // 暂时返回基本信息
-    const settings = {
-      siteName: 'Personal Blog',
-      environment: c.env.ENVIRONMENT || 'development',
-      apiVersion: '2.0.0',
-      features: {
-        analytics: true,
-        comments: true,
-        search: true,
-        media: true
-      }
-    };
-    
+    const result = await AdminService.getSettings(c.env);
+
     logger.info('System settings fetched');
-    
-    return c.json(successResponse({ settings }));
-    
+
+    return c.json(successResponse(result.data));
   } catch (error) {
     logger.error('Get settings error', error);
-    return c.json(errorResponse(
-      'Failed to fetch settings',
-      'An error occurred while fetching settings'
-    ), 500);
+    return c.json(errorResponse('Failed to fetch settings', 'An error occurred while fetching settings'), 500);
   }
 });

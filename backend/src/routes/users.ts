@@ -1,19 +1,23 @@
 /**
- * 用户相关路由
+ * 用户相关路由（重构版）
  *
  * 功能：
  * - 用户搜索（用于私信）
  * - 获取用户公开资料
+ * - 获取用户文章列表
  *
  * @author 博客系统
- * @version 1.0.0
+ * @version 2.1.0
  * @created 2026-02-14
+ * @refactored 2026-02-16
  */
 
 import { Hono } from 'hono';
 import { Env, Variables } from '../types';
-import { successResponse, errorResponse } from '../utils/response';
+import { successResponse, errorResponse, getStatus } from '../utils/response';
 import { createLogger } from '../middleware/requestLogger';
+import { safeParseInt } from '../utils/validation';
+import { UserService, USER_CONSTANTS } from '../services/userService';
 
 export const userRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -23,35 +27,15 @@ userRoutes.get('/search', async (c) => {
   try {
     const username = c.req.query('username');
 
-    if (!username || username.trim().length === 0) {
-      return c.json(errorResponse('用户名不能为空'), 400);
+    const result = await UserService.searchUser(c.env.DB, { username: username || '' });
+
+    if (!result.success) {
+      return c.json(errorResponse(result.message || 'Error'), getStatus(result.statusCode, 400));
     }
 
-    const sanitizedUsername = username.trim().toLowerCase();
+    logger.info('User search completed', { username, found: !!result.user });
 
-    const user = await c.env.DB.prepare(`
-      SELECT id, username, display_name, avatar_url, bio
-      FROM users
-      WHERE LOWER(username) = ? AND deleted_at IS NULL
-      LIMIT 1
-    `).bind(sanitizedUsername).first();
-
-    if (!user) {
-      return c.json(successResponse({ user: null }, '未找到用户'));
-    }
-
-    logger.info('User search completed', { username: sanitizedUsername, found: true });
-
-    return c.json(successResponse({
-      user: {
-        id: user.id,
-        username: user.username,
-        displayName: user.display_name,
-        avatarUrl: user.avatar_url,
-        bio: user.bio,
-      }
-    }));
-
+    return c.json(successResponse({ user: result.user }, result.message));
   } catch (error) {
     logger.error('User search error:', error);
     return c.json(errorResponse('搜索用户失败'), 500);
@@ -64,39 +48,45 @@ userRoutes.get('/:id', async (c) => {
   try {
     const userId = parseInt(c.req.param('id'));
 
-    if (isNaN(userId) || userId <= 0) {
-      return c.json(errorResponse('无效的用户ID'), 400);
-    }
+    const result = await UserService.getUserProfile(c.env.DB, { userId });
 
-    const user = await c.env.DB.prepare(`
-      SELECT id, username, display_name, avatar_url, bio, created_at,
-             (SELECT COUNT(*) FROM posts WHERE author_id = users.id AND status = 'published') as post_count,
-             (SELECT COUNT(*) FROM comments WHERE user_id = users.id AND deleted_at IS NULL) as comment_count
-      FROM users
-      WHERE id = ? AND deleted_at IS NULL
-    `).bind(userId).first();
-
-    if (!user) {
-      return c.json(errorResponse('用户不存在'), 404);
+    if (!result.success) {
+      return c.json(errorResponse(result.message || 'Error'), getStatus(result.statusCode, 404));
     }
 
     logger.info('User profile fetched', { userId });
 
-    return c.json(successResponse({
-      user: {
-        id: user.id,
-        username: user.username,
-        displayName: user.display_name,
-        avatarUrl: user.avatar_url,
-        bio: user.bio,
-        createdAt: user.created_at,
-        postCount: user.post_count,
-        commentCount: user.comment_count,
-      }
-    }));
-
+    return c.json(successResponse({ user: result.user }));
   } catch (error) {
     logger.error('Get user profile error:', error);
     return c.json(errorResponse('获取用户资料失败'), 500);
+  }
+});
+
+userRoutes.get('/:id/posts', async (c) => {
+  const logger = createLogger(c);
+
+  try {
+    const userId = parseInt(c.req.param('id'));
+
+    const result = await UserService.getUserPosts(c.env.DB, {
+      userId,
+      page: safeParseInt(c.req.query('page'), 1),
+      limit: safeParseInt(c.req.query('limit'), USER_CONSTANTS.DEFAULT_PAGE_SIZE)
+    });
+
+    if (!result.success) {
+      return c.json(errorResponse(result.message || 'Error'), getStatus(result.statusCode, 404));
+    }
+
+    logger.info('User posts fetched', { userId, count: result.posts?.length });
+
+    return c.json(successResponse({
+      posts: result.posts,
+      pagination: result.pagination
+    }));
+  } catch (error) {
+    logger.error('Get user posts error:', error);
+    return c.json(errorResponse('获取用户文章失败'), 500);
   }
 });

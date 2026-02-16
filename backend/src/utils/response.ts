@@ -10,6 +10,8 @@
 
 import type { ApiResponse } from '../types';
 
+export type StatusCode = 200 | 201 | 400 | 401 | 403 | 404 | 409 | 500 | 503;
+
 /**
  * 创建成功响应
  * 
@@ -45,4 +47,15 @@ export function errorResponse(error: string, message?: string, code?: string): A
     code,
     timestamp: new Date().toISOString()
   };
+}
+
+/**
+ * 获取状态码（类型安全）
+ * 
+ * @param statusCode 可选的状态码
+ * @param fallback 默认状态码
+ * @returns 类型安全的状态码
+ */
+export function getStatus(statusCode: StatusCode | undefined, fallback: StatusCode): StatusCode {
+  return statusCode ?? fallback;
 }
