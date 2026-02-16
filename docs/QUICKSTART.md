@@ -146,13 +146,28 @@ wrangler kv:namespace create "CACHE"
 wrangler d1 execute personal-blog-dev --file=../database/schema-v1.1-base.sql
 wrangler d1 execute personal-blog-dev --file=../database/schema-v1.3-notification-messaging.sql
 
-# 可选：执行增量迁移以获得最新功能
-wrangler d1 execute personal-blog-dev --file=../database/migration-v1.4-message-recall.sql
-wrangler d1 execute personal-blog-dev --file=../database/migration-v1.5-notification-reads.sql
-
 # 验证表创建成功
 wrangler d1 execute personal-blog-dev --command="SELECT name FROM sqlite_master WHERE type='table';"
 ```
+
+数据库包含以下表：
+- `users` - 用户信息
+- `posts` - 文章数据
+- `posts_fts` - 全文搜索虚拟表
+- `columns` - 专栏数据
+- `comments` - 评论数据
+- `categories` - 文章分类
+- `tags` - 文章标签
+- `post_tags` - 文章标签关联
+- `likes` - 点赞记录
+- `reading_history` - 阅读历史
+- `favorites` - 收藏记录
+- `notifications` - 通知数据
+- `notification_settings` - 通知设置
+- `messages` - 私信数据
+- `message_settings` - 私信设置
+- `email_digest_queue` - 邮件汇总队列
+- `site_config` - 站点配置
 
 #### 7. 配置 wrangler.toml
 
@@ -292,10 +307,10 @@ pnpm dev
 
 ```
 personal-blog/
-├── backend/                 # 后端服务
+├── backend/                 # 后端服务 (37个TypeScript文件)
 │   ├── src/
 │   │   ├── index.ts        # 应用入口
-│   │   ├── routes/         # API 路由
+│   │   ├── routes/         # API 路由 (13个路由文件)
 │   │   │   ├── auth.ts     # 认证相关
 │   │   │   ├── posts.ts    # 文章管理
 │   │   │   ├── columns.ts  # 专栏管理
@@ -313,21 +328,17 @@ personal-blog/
 │   │   │       ├── notificationSettings.ts # 通知设置
 │   │   │       └── messageSettings.ts # 私信设置
 │   │   ├── middleware/     # 中间件
-│   │   ├── services/       # 业务服务
+│   │   ├── services/       # 业务服务 (8个服务)
 │   │   ├── utils/          # 工具函数
 │   │   └── types/          # 类型定义
 │   ├── .env                # 环境变量
 │   └── wrangler.toml       # Workers 配置
-├── database/               # 数据库文件（项目根目录）
+├── database/               # 数据库文件
 │   ├── schema-v1.1-base.sql          # 基础数据库架构
-│   ├── schema-v1.3-notification-messaging.sql # 通知私信架构
-│   ├── migration-v1.3-notification-cleanup.sql # 通知系统清理迁移
-│   ├── migration-v1.3-remove-password-field.sql # 密码字段迁移
-│   ├── migration-v1.4-message-recall.sql # 消息撤回迁移
-│   └── migration-v1.5-notification-reads.sql # 通知已读迁移
-├── frontend/               # 前端应用
+│   └── schema-v1.3-notification-messaging.sql # 通知私信架构
+├── frontend/               # 前端应用 (64个TypeScript文件)
 │   ├── src/
-│   │   ├── pages/          # 页面组件
+│   │   ├── pages/          # 页面组件 (20个页面)
 │   │   ├── components/     # 可复用组件
 │   │   ├── stores/         # 状态管理
 │   │   ├── hooks/          # 自定义 Hooks
@@ -335,12 +346,13 @@ personal-blog/
 │   │   └── types/          # 类型定义
 │   ├── .env                # 环境变量
 │   └── index.html
-├── CHANGELOG_v1.3.2.md     # v1.3.2 更新日志
-├── CHANGELOG_v1.3.3.md     # v1.3.3 更新日志
-├── DEPLOYMENT.md           # 部署指南
-├── API.md                  # API 文档
-├── ARCHITECTURE.md         # 架构文档
-└── QUICKSTART.md           # 快速开始
+├── docs/                   # 文档目录
+│   ├── QUICKSTART.md       # 快速开始
+│   ├── DEPLOYMENT.md       # 部署指南
+│   ├── API.md              # API 文档
+│   ├── ARCHITECTURE.md     # 架构文档
+│   └── changelog/          # 更新日志
+└── scripts/                # 工具脚本
 ```
 
 ---
@@ -359,7 +371,7 @@ pnpm dev
 pnpm deploy
 
 # 查看日志
-pnpm logs
+pnpm tail
 
 # 数据库操作
 wrangler d1 execute personal-blog-dev --command="SELECT * FROM users;"
@@ -424,7 +436,7 @@ wrangler d1 list
 
 ```bash
 # 确认 schema 文件存在（在项目根目录的 database/ 文件夹）
-ls database/
+ls ../database/
 
 # 重新执行迁移（按顺序，从 backend 目录执行）
 wrangler d1 execute personal-blog-dev --file=../database/schema-v1.1-base.sql
@@ -499,6 +511,16 @@ wrangler d1 execute personal-blog-dev --command="
 2. 点击"新私信"发送消息
 3. 消息支持已读状态追踪
 4. 会话按时间倒序排列
+
+### Q: 全文搜索如何工作？
+
+**A**:
+
+项目使用 SQLite FTS5 全文搜索引擎：
+1. 支持中英文混合搜索
+2. 自动分词和索引
+3. 搜索文章标题、摘要和内容
+4. 按相关度排序结果
 
 ---
 
