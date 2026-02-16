@@ -67,6 +67,8 @@ interface PostData {
   status: 'draft' | 'published' | 'archived';
   visibility: 'public' | 'private' | 'password';
   password?: string;
+  isPinned: boolean;
+  pinOrder: number;
 }
 
 export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps) {
@@ -79,6 +81,8 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
   const [visibility, setVisibility] = useState<'public' | 'private' | 'password'>('public');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
+  const [pinOrder, setPinOrder] = useState(0);
 
   // 为每个新建文章会话生成唯一的 sessionId
   const [sessionId] = useState(() => {
@@ -140,7 +144,9 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     tags: selectedTagIds,
     status,
     visibility,
-    password: visibility === 'password' ? password : undefined
+    password: visibility === 'password' ? password : undefined,
+    isPinned,
+    pinOrder
   };
   
   const { lastSaved, isSaving, hasDraft, saveNow, clearLocalStorage } = useAutoSave({
@@ -238,7 +244,6 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
 
   // 处理选择草稿
   const handleSelectDraft = useCallback((draft: any) => {
-    // 恢复草稿数据
     setTitle(draft.data.title || '');
     setContent(draft.data.content || '');
     setSummary(draft.data.summary || '');
@@ -247,11 +252,11 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
     setSelectedCategoryId(draft.data.categoryId || null);
     setSelectedColumnId(draft.data.columnId || null);
     setSelectedTagIds(draft.data.tags || []);
+    setIsPinned(draft.data.isPinned || false);
+    setPinOrder(draft.data.pinOrder || 0);
 
-    // 删除已恢复的草稿，避免重复
     localStorage.removeItem(draft.key);
 
-    // 从可用草稿列表中移除
     setAvailableDrafts(prev => prev.filter(d => d.key !== draft.key));
 
     setDraftSelectorOpen(false);
@@ -337,6 +342,8 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
         setSelectedCategoryId(post.categoryId || null);
         setSelectedColumnId(post.columnId || null);
         setSelectedTagIds(post.tags?.map((t: any) => t.id) || []);
+        setIsPinned(post.isPinned || false);
+        setPinOrder(post.pinOrder || 0);
       }
     } catch (err: any) {
       setError(err.message || '加载文章失败');
@@ -376,7 +383,9 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
         columnId: selectedColumnId ?? undefined,
         tags: selectedTagIds,
         status,
-        visibility
+        visibility,
+        isPinned,
+        pinOrder
       };
 
       if (visibility === 'password' && password.trim()) {
@@ -1407,6 +1416,57 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
               : status === 'published'
               ? '发布状态：文章将立即在前端页面显示。'
               : '归档状态：文章将不再允许接收新评论。选择此状态后，文章将不再允许接收新评论。'}
+          </p>
+        </div>
+
+        {/* 文章置顶 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            文章置顶
+          </label>
+          <div className="flex flex-wrap items-center gap-4">
+            <label className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border-2 transition-all ${
+              isPinned
+                ? 'border-red-500 bg-red-50 dark:bg-red-900/30'
+                : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
+            }`}>
+              <input
+                type="checkbox"
+                checked={isPinned}
+                onChange={(e) => {
+                  setIsPinned(e.target.checked);
+                  if (!e.target.checked) {
+                    setPinOrder(0);
+                  }
+                }}
+                className="w-4 h-4 text-red-600 rounded focus:ring-red-500"
+              />
+              <svg className={`w-5 h-5 ${isPinned ? 'text-red-500' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9.828.722a.5.5 0 0 1 .354.146l4.95 4.95a.5.5 0 0 1 0 .707c-.48.48-1.072.588-1.503.588-.177 0-.335-.018-.46-.039l-3.134 3.134a5.927 5.927 0 0 1 .16 1.013c.046.702-.032 1.687-.72 2.375a.5.5 0 0 1-.707 0l-2.829-2.828-3.182 3.182c-.195.195-1.219.902-1.414.707-.195-.195.512-1.22.707-1.414l3.182-3.182-2.828-2.829a.5.5 0 0 1 0-.707c.688-.688 1.673-.767 2.375-.72a5.922 5.922 0 0 1 1.013.16l3.134-3.133a2.772 2.772 0 0 1-.04-.461c0-.43.108-1.022.589-1.503a.5.5 0 0 1 .353-.146z"/>
+              </svg>
+              <span className={`font-medium ${isPinned ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                置顶此文章
+              </span>
+            </label>
+            {isPinned && (
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600 dark:text-gray-400">排序:</label>
+                <input
+                  type="number"
+                  value={pinOrder}
+                  onChange={(e) => setPinOrder(parseInt(e.target.value) || 0)}
+                  min="0"
+                  className="w-20 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-red-500 dark:bg-slate-700 dark:text-white text-sm"
+                  placeholder="0"
+                />
+                <span className="text-xs text-gray-500 dark:text-gray-400">数字越小越靠前</span>
+              </div>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            {isPinned 
+              ? '置顶的文章将在文章列表顶部优先显示，可设置排序值控制置顶文章的显示顺序。' 
+              : '勾选后将此文章置顶，置顶文章会在列表顶部优先显示。'}
           </p>
         </div>
 
