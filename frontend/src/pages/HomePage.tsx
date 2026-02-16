@@ -157,7 +157,7 @@ export function HomePage() {
     try {
       const response = await api.getHotPosts(10);
       if (response.success && response.data) {
-        setHotPosts(response.data);
+        setHotPosts(response.data.posts || []);
       }
     } catch (error) {
       console.error('Failed to load hot posts:', error);
