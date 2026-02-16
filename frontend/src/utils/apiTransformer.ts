@@ -23,7 +23,8 @@ import type {
   Column,
   Tag,
   User,
-  UserPublicProfile
+  UserPublicProfile,
+  ReadingHistoryItem
 } from '../types';
 
 // ============= 文章相关转换 =============
@@ -53,7 +54,9 @@ export function transformPostListItem(post: any): PostListItem {
     readingTime: post.reading_time,
     publishedAt: post.published_at,
     createdAt: post.created_at,
-    tags: post.tags ? post.tags.map(transformTag) : undefined
+    tags: post.tags ? post.tags.map(transformTag) : undefined,
+    isPinned: post.is_pinned === 1 || post.is_pinned === true,
+    pinOrder: post.pin_order
   };
 }
 
@@ -83,6 +86,8 @@ export function transformPost(post: any): Post {
     publishedAt: post.published_at,
     createdAt: post.created_at,
     updatedAt: post.updated_at,
+    isPinned: post.is_pinned === 1 || post.is_pinned === true,
+    pinOrder: post.pin_order,
     // 关联数据
     author: post.author ? transformUserPublicProfile(post.author) : undefined,
     authorName: post.author_name,
@@ -294,4 +299,27 @@ export function transformTagList(tags: any[]): Tag[] {
  */
 export function transformUserList(users: any[]): User[] {
   return users.map(transformUser);
+}
+
+// ============= 阅读历史相关转换 =============
+
+/**
+ * 转换阅读历史项
+ */
+export function transformReadingHistoryItem(item: any): ReadingHistoryItem {
+  return {
+    ...transformPostListItem(item),
+    postId: item.post_id,
+    firstReadAt: item.first_read_at,
+    lastReadAt: item.last_read_at,
+    readDurationSeconds: item.read_duration_seconds,
+    readPercentage: item.read_percentage
+  };
+}
+
+/**
+ * 批量转换阅读历史列表
+ */
+export function transformReadingHistoryList(items: any[]): ReadingHistoryItem[] {
+  return items.map(transformReadingHistoryItem);
 }

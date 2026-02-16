@@ -36,7 +36,7 @@
 3. **Wrangler CLI**
    ```bash
    npm install -g wrangler
-   wrangler --version  # 需要 v3.x 或更高
+   wrangler --version  # 需要 v4.x 或更高
    ```
 
 4. **Git** (可选，用于版本控制)
@@ -102,7 +102,7 @@ wrangler kv:namespace create "CACHE"
 
 ### 1. 配置后端环境变量
 
-编辑 `backend/.env`：
+编辑 `backend/.env.production`：
 
 ```env
 # D1 数据库 ID（从创建数据库时获取）
@@ -186,13 +186,6 @@ cd backend
 wrangler d1 execute personal-blog-db --file=../database/schema-v1.1-base.sql
 wrangler d1 execute personal-blog-db --file=../database/schema-v1.3-notification-messaging.sql
 
-# 可选：执行增量迁移以获得最新功能
-wrangler d1 execute personal-blog-db --file=../database/migration-v1.4-message-recall.sql
-wrangler d1 execute personal-blog-db --file=../database/migration-v1.5-notification-reads.sql
-wrangler d1 execute personal-blog-db --file=../database/migration-v1.6-email-default-off.sql
-wrangler d1 execute personal-blog-db --file=../database/migration-v1.7-message-email-default-off.sql
-wrangler d1 execute personal-blog-db --file=../database/migration-v1.8-remove-push-notification-field.sql
-
 # 验证表创建成功
 wrangler d1 execute personal-blog-db --command="SELECT name FROM sqlite_master WHERE type='table';"
 ```
@@ -200,6 +193,7 @@ wrangler d1 execute personal-blog-db --command="SELECT name FROM sqlite_master W
 数据库架构包含以下表：
 - `users` - 用户信息（支持OAuth、邮箱验证、软删除）
 - `posts` - 文章数据（支持专栏、SEO、密码保护）
+- `posts_fts` - 全文搜索虚拟表（FTS5引擎）
 - `columns` - 专栏数据
 - `comments` - 评论数据（支持嵌套、@提及）
 - `categories` - 文章分类
@@ -214,7 +208,6 @@ wrangler d1 execute personal-blog-db --command="SELECT name FROM sqlite_master W
 - `message_settings` - 私信设置
 - `email_digest_queue` - 邮件汇总队列
 - `site_config` - 站点配置
-- `posts_fts` - 全文搜索虚拟表
 
 ### 第二步：部署后端
 
@@ -257,9 +250,10 @@ wrangler pages deploy dist --project-name=personal-blog
 1. 在 Cloudflare Dashboard 创建 Pages 项目
 2. 连接 Git 仓库
 3. 构建设置：
-   - Build command: `pnpm build`
-   - Build output directory: `dist`
-   - Root directory: `frontend`
+   - Build command: `cd frontend && pnpm install && pnpm build`
+   - Build output directory: `frontend/dist`
+   - Root directory: `/`
+   - Node.js version: `20`
 
 ### 第四步：配置自定义域名（可选）
 
@@ -438,6 +432,22 @@ wrangler d1 execute personal-blog-db --command="SELECT COUNT(*) FROM users;"
 3. 检查会话查询是否正确
 4. 确认用户 ID 有效
 
+### 全文搜索不工作
+
+**症状**: 搜索返回空结果或错误
+
+**解决**:
+1. 确认 `posts_fts` 虚拟表已创建
+2. 检查 FTS5 触发器是否正常工作
+3. 手动重建搜索索引：
+   ```bash
+   wrangler d1 execute personal-blog-db --command="
+     DELETE FROM posts_fts;
+     INSERT INTO posts_fts (rowid, title, excerpt, content)
+     SELECT id, title, excerpt, content FROM posts WHERE deleted_at IS NULL;
+   "
+   ```
+
 ---
 
 ## 更新部署
@@ -469,12 +479,16 @@ wrangler pages deploy dist
 
 ### 数据库迁移
 
-如需更新数据库架构：
+如需更新数据库架构，请按顺序执行迁移文件：
 
 ```bash
-# 执行迁移（从 backend 目录执行）
 cd backend
-wrangler d1 execute personal-blog-db --file=../database/migration-v1.4-message-recall.sql
+
+# 查看可用的迁移文件
+ls ../database/
+
+# 执行新的迁移文件（如果有）
+wrangler d1 execute personal-blog-db --file=../database/migration-xxx.sql
 
 # 验证迁移结果
 wrangler d1 execute personal-blog-db --command="SELECT name FROM sqlite_master WHERE type='table';"
@@ -502,6 +516,12 @@ routes = [
    - 静态资源：缓存 1 天
    - API 响应：根据 Cache-Control 头
 
+### R2 公开访问优化
+
+1. 配置自定义域名用于 R2 访问
+2. 启用 Cloudflare CDN 加速图片访问
+3. 设置合理的缓存策略
+
 ---
 
 ## 安全建议
@@ -513,6 +533,56 @@ routes = [
 5. **限制访问**: 使用 Cloudflare Access 保护管理后台
 6. **密钥管理**: 使用 wrangler secret 管理敏感信息
 7. **文件上传安全**: 已实现魔数验证，防止恶意文件上传
+8. **软删除机制**: 用户和文章采用软删除，可恢复数据
+
+---
+
+## 监控和维护
+
+### 日志查看
+
+```bash
+# 查看 Workers 日志
+wrangler tail
+
+# 过滤特定请求
+wrangler tail --grep "POST /api/posts"
+
+# 查看最近的错误
+wrangler tail --grep "error"
+```
+
+### 数据库维护
+
+```bash
+# 查看数据库大小
+wrangler d1 execute personal-blog-db --command="
+  SELECT 
+    page_count * page_size as size 
+  FROM pragma_page_count(), pragma_page_size();
+"
+
+# 优化数据库
+wrangler d1 execute personal-blog-db --command="VACUUM;"
+
+# 分析查询性能
+wrangler d1 execute personal-blog-db --command="
+  EXPLAIN QUERY PLAN 
+  SELECT * FROM posts WHERE status = 'published';
+"
+```
+
+### 备份策略
+
+```bash
+# 导出数据库（需要本地工具）
+wrangler d1 export personal-blog-db > backup.sql
+
+# 定期备份重要表
+wrangler d1 execute personal-blog-db --command="
+  SELECT * FROM posts WHERE deleted_at IS NULL;
+" > posts_backup.json
+```
 
 ---
 
@@ -524,6 +594,7 @@ routes = [
 - [Cloudflare R2 文档](https://developers.cloudflare.com/r2/)
 - [Wrangler CLI 文档](https://developers.cloudflare.com/workers/wrangler/)
 - [Resend 文档](https://resend.com/docs)
+- [Hono 框架文档](https://hono.dev/)
 
 ---
 

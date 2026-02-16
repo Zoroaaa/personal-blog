@@ -26,7 +26,7 @@
 
 ## 项目概述
 
-这是一个功能丰富、性能卓越的个人博客系统，采用前后端分离架构，基于 Cloudflare 边缘计算平台构建。系统支持 Markdown 写作、代码高亮、评论互动、用户管理、数据分析等完整功能，适合技术博主和内容创作者使用。
+这是一个功能丰富、性能卓越的个人博客系统，采用前后端分离架构，基于 Cloudflare 边缘计算平台构建。系统支持 Markdown 写作、代码高亮、评论互动、用户管理、数据分析等完整功能,适合技术博主和内容创作者使用。
 
 ### 核心特性
 
@@ -52,26 +52,26 @@
 
 | 技术 | 版本 | 用途 |
 |------|------|------|
-| React | 18.x | UI 框架 |
-| TypeScript | 5.x | 类型安全 |
-| Tailwind CSS | 3.x | 样式框架 |
-| Zustand | 4.x | 状态管理 |
-| React Router | 6.x | 路由管理 |
-| React Markdown | 9.x | Markdown 渲染 |
-| Framer Motion | 12.x | 动画效果 |
-| date-fns | 3.x | 日期处理 |
+| React | 18.2.0 | UI 框架 |
+| TypeScript | 5.2.2 | 类型安全 |
+| Vite | 7.3.1 | 构建工具 |
+| Tailwind CSS | 3.4.0 | 样式框架 |
+| Zustand | 4.4.7 | 状态管理 |
+| React Router | 6.21.0 | 路由管理 |
+| React Markdown | 9.0.1 | Markdown 渲染 |
+| Framer Motion | 12.34.0 | 动画效果 |
+| date-fns | 3.0.6 | 日期处理 |
 
 ### 后端技术栈
 
 | 技术 | 版本 | 用途 |
 |------|------|------|
-| Hono | 4.x | Web 框架 |
+| Hono | 4.11.9 | Web 框架 |
 | Cloudflare Workers | - | 边缘计算运行时 |
 | Cloudflare D1 | - | SQLite 数据库 |
 | Cloudflare KV | - | 键值存储 |
 | Cloudflare R2 | - | 对象存储 |
-| bcryptjs | 3.x | 密码哈希 |
-| zod | 3.x | 数据验证 |
+| bcryptjs | 3.0.3 | 密码哈希 |
 
 ---
 
@@ -115,9 +115,6 @@
    # 执行数据库迁移（需按顺序执行）
    wrangler d1 execute personal-blog-dev --file=../database/schema-v1.1-base.sql
    wrangler d1 execute personal-blog-dev --file=../database/schema-v1.3-notification-messaging.sql
-   # 可选：执行增量迁移
-   wrangler d1 execute personal-blog-dev --file=../database/migration-v1.4-message-recall.sql
-   wrangler d1 execute personal-blog-dev --file=../database/migration-v1.5-notification-reads.sql
    ```
 
 5. **创建 R2 存储桶**
@@ -134,7 +131,7 @@
    cd frontend && pnpm dev
    ```
 
-详细配置请参考 [QUICKSTART.md](./QUICKSTART.md)。
+详细配置请参考 [docs/QUICKSTART.md](./docs/QUICKSTART.md)。
 
 ---
 
@@ -142,7 +139,7 @@
 
 ```
 personal-blog/
-├── backend/                 # 后端服务
+├── backend/                 # 后端服务 (37个TypeScript文件)
 │   ├── src/
 │   │   ├── index.ts        # 应用入口
 │   │   ├── routes/         # API 路由
@@ -188,17 +185,10 @@ personal-blog/
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── wrangler.toml       # Workers 配置
-├── database/               # 数据库文件（项目根目录）
+├── database/               # 数据库文件
 │   ├── schema-v1.1-base.sql          # 基础数据库架构
-│   ├── schema-v1.3-notification-messaging.sql # 通知私信架构
-│   ├── migration-v1.3-notification-cleanup.sql # 通知系统清理迁移
-│   ├── migration-v1.3-remove-password-field.sql # 密码字段迁移
-│   ├── migration-v1.4-message-recall.sql # 消息撤回迁移
-│   ├── migration-v1.5-notification-reads.sql # 通知已读迁移
-│   ├── migration-v1.6-email-default-off.sql # 邮件默认关闭迁移
-│   ├── migration-v1.7-message-email-default-off.sql # 私信邮件默认关闭
-│   └── migration-v1.8-remove-push-notification-field.sql # 移除推送字段
-├── frontend/               # 前端应用
+│   └── schema-v1.3-notification-messaging.sql # 通知私信架构
+├── frontend/               # 前端应用 (64个TypeScript文件)
 │   ├── src/
 │   │   ├── pages/          # 页面组件
 │   │   │   ├── HomePage.tsx      # 首页
@@ -229,12 +219,22 @@ personal-blog/
 │   │   └── types/          # 类型定义
 │   └── index.html
 ├── docs/                   # 文档目录
-├── CHANGELOG_v1.3.2.md     # v1.3.2 更新日志
-├── CHANGELOG_v1.3.3.md     # v1.3.3 更新日志
-├── DEPLOYMENT.md           # 部署指南
-├── API.md                  # API 文档
-├── ARCHITECTURE.md         # 架构文档
-└── QUICKSTART.md           # 快速开始
+│   ├── QUICKSTART.md       # 快速开始
+│   ├── DEPLOYMENT.md       # 部署指南
+│   ├── API.md              # API 文档
+│   ├── ARCHITECTURE.md     # 架构文档
+│   └── changelog/          # 更新日志
+│       ├── CHANGELOG_v1.2.0.md
+│       ├── CHANGELOG_v1.3.0.md
+│       ├── CHANGELOG_v1.3.1.md
+│       ├── CHANGELOG_v1.3.2.md
+│       └── CHANGELOG_v1.3.3.md
+├── scripts/                # 工具脚本
+│   ├── init.sh             # 初始化脚本
+│   └── migrate.sh          # 迁移脚本
+├── package.json            # 根项目配置
+├── LICENSE                 # MIT开源协议
+└── README.md               # 本文件
 ```
 
 ---
@@ -319,7 +319,7 @@ personal-blog/
 
 ## API 文档
 
-完整的 API 文档请参考 [API.md](./API.md)。
+完整的 API 文档请参考 [docs/API.md](./docs/API.md)。
 
 主要 API 模块：
 - **认证模块**: `/api/auth/*` - 登录、注册、OAuth、邮箱验证码、密码重置
@@ -350,7 +350,7 @@ personal-blog/
 - **存储**: Cloudflare R2
 - **邮件**: Resend
 
-详细部署步骤请参考 [DEPLOYMENT.md](./DEPLOYMENT.md)。
+详细部署步骤请参考 [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)。
 
 ### 快速部署
 
@@ -414,10 +414,10 @@ wrangler pages deploy dist
 
 ## 相关文档
 
-- [快速开始](./QUICKSTART.md) - 5分钟上手教程
-- [部署指南](./DEPLOYMENT.md) - 详细部署说明
-- [API 文档](./API.md) - 完整接口参考
-- [架构文档](./ARCHITECTURE.md) - 系统设计说明
+- [快速开始](./docs/QUICKSTART.md) - 5分钟上手教程
+- [部署指南](./docs/DEPLOYMENT.md) - 详细部署说明
+- [API 文档](./docs/API.md) - 完整接口参考
+- [架构文档](./docs/ARCHITECTURE.md) - 系统设计说明
 
 ---
 

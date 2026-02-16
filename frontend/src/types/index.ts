@@ -174,6 +174,8 @@ export interface Post {
   publishedAt?: string;
   createdAt: string;
   updatedAt: string;
+  isPinned?: boolean;
+  pinOrder?: number;
   
   // 关联数据
   author?: UserPublicProfile;
@@ -218,6 +220,8 @@ export interface PostListItem {
   publishedAt?: string;
   createdAt?: string;
   tags?: Tag[];
+  isPinned?: boolean;
+  pinOrder?: number;
 }
 
 /**

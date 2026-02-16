@@ -40,6 +40,8 @@ import MessagesPage from './pages/MessagesPage';
 import ThreadPage from './pages/ThreadPage';
 import NewMessagePage from './pages/NewMessagePage';
 import { SystemNotificationPage } from './pages/admin/SystemNotificationPage';
+import { ReadingHistoryPage } from './pages/ReadingHistoryPage';
+import { AccountSettingsPage } from './pages/AccountSettingsPage';
 import { useSiteConfig } from './hooks/useSiteConfig';
 import { ToastProvider } from './components/Toast';
 
@@ -94,6 +96,8 @@ function AppRoutes() {
       <Route path="/admin/config" element={<PageTransition><ConfigPage /></PageTransition>} />
       <Route path="/search" element={<PageTransition><SearchPage /></PageTransition>} />
       <Route path="/profile" element={<PageTransition><ProfilePage /></PageTransition>} />
+      <Route path="/reading-history" element={<PageTransition><ReadingHistoryPage /></PageTransition>} />
+      <Route path="/account-settings" element={<PageTransition><AccountSettingsPage /></PageTransition>} />
       <Route path="/columns/:slug" element={<PageTransition><ColumnPage /></PageTransition>} />
       <Route path="/categories/:slug" element={<PageTransition><CategoryPage /></PageTransition>} />
       <Route path="/tags/:slug" element={<PageTransition><TagPage /></PageTransition>} />
