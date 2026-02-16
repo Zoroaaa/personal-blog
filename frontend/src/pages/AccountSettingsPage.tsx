@@ -2,13 +2,14 @@
  * 账号设置页面
  * 
  * 功能：
- * - 用户信息编辑
+ * - 用户信息展示和编辑
+ * - 头像上传
  * - 密码修改
  * - 账号删除
- * - 头像上传
+ * - 统计信息展示
  * 
  * @author 博客系统
- * @version 1.0.0
+ * @version 2.0.0
  */
 
 import { useState, useEffect } from 'react';
@@ -16,7 +17,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../utils/api';
 import { useVerificationCountdown } from '../hooks/useVerificationCountdown';
-import type { User } from '../types';
+import { transformPostListItem } from '../utils/apiTransformer';
+import type { User, PostListItem } from '../types';
 import { useToast } from '../components/Toast';
 import { SEO } from '../components/SEO';
 
@@ -34,6 +36,7 @@ export function AccountSettingsPage() {
   const { showSuccess, showError } = useToast();
 
   const [userInfo, setUserInfo] = useState<User | null>(null);
+  const [likedPosts, setLikedPosts] = useState<PostListItem[]>([]);
   const [loading, setLoading] = useState({
     user: true,
     update: false,
@@ -61,6 +64,7 @@ export function AccountSettingsPage() {
   useEffect(() => {
     if (user) {
       loadUserInfo();
+      loadLikedPosts();
     }
   }, [user]);
 
@@ -85,6 +89,18 @@ export function AccountSettingsPage() {
       showError('加载用户信息失败');
     } finally {
       setLoading(prev => ({ ...prev, user: false }));
+    }
+  };
+
+  const loadLikedPosts = async () => {
+    try {
+      const response = await api.getLikedPosts({ page: '1', limit: '20' });
+      if (response.success && response.data) {
+        const posts = (response.data.posts || []).map(transformPostListItem);
+        setLikedPosts(posts);
+      }
+    } catch (error) {
+      console.error('Failed to load liked posts:', error);
     }
   };
 
@@ -146,31 +162,27 @@ export function AccountSettingsPage() {
 
     try {
       setCodeSending(true);
-      const response = await api.sendVerificationCode(userInfo?.email || '', 'password');
+      const response = await api.sendVerificationCode({ type });
       if (response.success) {
-        showSuccess('验证码已发送到您的邮箱');
+        showSuccess('验证码已发送到您的邮箱，请查收');
         if (type === 'password') {
           startPasswordCountdown();
         } else {
           startDeleteCountdown();
         }
+      } else {
+        showError(response.message || response.error || '发送失败');
       }
-    } catch (error) {
-      console.error('Failed to send code:', error);
-      showError('发送验证码失败');
+    } catch (error: any) {
+      showError(error.message || '发送验证码失败');
     } finally {
       setCodeSending(false);
     }
   };
 
   const handleChangePassword = async () => {
-    if (!formData.password || !formData.newPassword || !formData.confirmPassword) {
-      showError('请填写完整的密码信息');
-      return;
-    }
-
     if (formData.newPassword !== formData.confirmPassword) {
-      showError('两次输入的新密码不一致');
+      showError('两次输入的密码不一致');
       return;
     }
 
@@ -179,65 +191,47 @@ export function AccountSettingsPage() {
       return;
     }
 
-    if (!formData.emailVerificationCode) {
-      showError('请输入邮箱验证码');
-      return;
-    }
-
     try {
       setLoading(prev => ({ ...prev, update: true }));
       const response = await api.changePassword({
         currentPassword: formData.password,
         newPassword: formData.newPassword,
-        verificationCode: formData.emailVerificationCode
+        emailVerificationCode: formData.emailVerificationCode || undefined
       });
 
       if (response.success) {
-        showSuccess('密码修改成功，请重新登录');
-        setTimeout(() => {
-          logout();
-          navigate('/login');
-        }, 1500);
+        showSuccess('密码修改成功');
+        setFormData(prev => ({
+          ...prev,
+          password: '',
+          newPassword: '',
+          confirmPassword: '',
+          emailVerificationCode: ''
+        }));
       }
-    } catch (error) {
-      console.error('Failed to change password:', error);
-      showError('密码修改失败');
+    } catch (error: any) {
+      showError(error.message || '密码修改失败');
     } finally {
       setLoading(prev => ({ ...prev, update: false }));
     }
   };
 
   const handleDeleteAccount = async () => {
-    if (!deleteVerificationCode) {
-      showError('请输入邮箱验证码');
-      return;
-    }
-
-    if (!deletePassword) {
-      showError('请输入当前密码');
-      return;
-    }
-
-    if (deleteConfirmation !== 'DELETE') {
+    if (!deleteConfirmation || deleteConfirmation !== 'DELETE') {
       showError('请输入 DELETE 确认删除');
       return;
     }
 
     try {
       setLoading(prev => ({ ...prev, delete: true }));
-      const response = await api.deleteAccount({
-        password: deletePassword,
-        verificationCode: deleteVerificationCode
-      });
-
+      const response = await api.deleteAccount(deletePassword, deleteVerificationCode);
       if (response.success) {
-        showSuccess('账号已删除');
+        showSuccess('账号删除成功');
         logout();
         navigate('/');
       }
-    } catch (error) {
-      console.error('Failed to delete account:', error);
-      showError('删除账号失败');
+    } catch (error: any) {
+      showError(error.message || '删除账号失败，请检查密码和验证码');
     } finally {
       setLoading(prev => ({ ...prev, delete: false }));
     }
@@ -259,7 +253,10 @@ export function AccountSettingsPage() {
   if (loading.user) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="mt-2 text-muted-foreground">加载中...</p>
+        </div>
       </div>
     );
   }
@@ -271,207 +268,237 @@ export function AccountSettingsPage() {
         description="管理您的账号信息和安全设置"
       />
       
-      <div className="min-h-screen bg-background">
-        <div className="max-w-2xl mx-auto px-4 py-8">
-          {/* 页面标题 */}
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-foreground">账号设置</h1>
-            <p className="text-muted-foreground mt-1">管理您的个人信息和安全设置</p>
-          </div>
+      <div className="max-w-6xl mx-auto px-4 py-12">
+        {/* 页面标题 */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-foreground mb-2">账号设置</h1>
+          <p className="text-muted-foreground">管理您的个人信息和账号安全</p>
+        </div>
 
-          {/* 个人资料设置 */}
-          <div className="bg-card border border-border rounded-lg p-6 mb-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">个人资料</h2>
-            
+        {/* 个人资料区域 */}
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
+          <h2 className="text-xl font-semibold text-foreground mb-6">个人资料</h2>
+          
+          <div className="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8">
             {/* 头像 */}
-            <div className="flex items-center gap-4 mb-6">
-              <img
-                src={avatarPreview}
-                alt="头像"
-                className="w-20 h-20 rounded-full object-cover"
-              />
-              <div>
-                <label className="cursor-pointer px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity inline-block">
-                  更换头像
-                  <input
-                    type="file"
-                    accept="image/*"
+            <div className="flex flex-col items-center">
+              <div className="relative mb-4">
+                <img 
+                  src={avatarPreview || userInfo?.avatarUrl || getRandomAvatar(userInfo?.username || '')} 
+                  alt="用户头像" 
+                  className="w-32 h-32 rounded-full object-cover border-4 border-card shadow-lg"
+                />
+                <label 
+                  htmlFor="avatar-upload" 
+                  className="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <input 
+                    id="avatar-upload" 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
                     onChange={handleAvatarChange}
-                    className="hidden"
                   />
                 </label>
-                <p className="text-xs text-muted-foreground mt-1">支持 JPG、PNG 格式</p>
               </div>
+              <h3 className="text-xl font-bold text-foreground">{formData.displayName || userInfo?.displayName}</h3>
+              <p className="text-muted-foreground">@{userInfo?.username}</p>
+              <p className="text-muted-foreground text-sm mt-1">{userInfo?.email}</p>
             </div>
-
-            {/* 显示名称 */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-foreground mb-1">显示名称</label>
-              <input
-                type="text"
-                name="displayName"
-                value={formData.displayName}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-            </div>
-
-            {/* 个人简介 */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-foreground mb-1">个人简介</label>
-              <textarea
-                name="bio"
-                value={formData.bio}
-                onChange={handleInputChange}
-                rows={3}
-                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
-                placeholder="介绍一下自己..."
-              />
-            </div>
-
-            {/* 邮箱（只读） */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-foreground mb-1">邮箱地址</label>
-              <input
-                type="email"
-                value={userInfo?.email || ''}
-                disabled
-                className="w-full px-4 py-2 border border-border rounded-lg bg-muted text-muted-foreground cursor-not-allowed"
-              />
-              <p className="text-xs text-muted-foreground mt-1">邮箱地址不可修改</p>
-            </div>
-
-            {/* 保存按钮 */}
-            <button
-              onClick={handleUpdateProfile}
-              disabled={loading.update}
-              className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
-            >
-              {loading.update ? '保存中...' : '保存修改'}
-            </button>
-          </div>
-
-          {/* 密码修改 */}
-          <div className="bg-card border border-border rounded-lg p-6 mb-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">密码修改</h2>
-            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleChangePassword(); }}>
-              <div className="flex items-end gap-2">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-foreground mb-1">邮箱验证码</label>
+            
+            {/* 个人资料编辑 */}
+            <div className="flex-1 w-full">
+              <form className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    显示名称
+                  </label>
                   <input
                     type="text"
-                    maxLength={6}
-                    placeholder="6 位验证码"
-                    value={formData.emailVerificationCode}
-                    onChange={(e) => setFormData(prev => ({ ...prev, emailVerificationCode: e.target.value.replace(/\D/g, '') }))}
-                    className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-primary focus:border-transparent"
+                    name="displayName"
+                    value={formData.displayName}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleSendCode('password')}
-                  disabled={codeSending || isPasswordCounting}
-                  className="px-4 py-2 border border-border rounded-lg hover:bg-muted disabled:opacity-50 whitespace-nowrap min-w-[100px]"
-                >
-                  {codeSending ? '发送中...' : isPasswordCounting ? `${passwordCountdown}秒后重试` : '获取验证码'}
-                </button>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">当前密码</label>
-                <input
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-primary focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">新密码</label>
-                <input
-                  type="password"
-                  name="newPassword"
-                  value={formData.newPassword}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-primary focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">确认新密码</label>
-                <input
-                  type="password"
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-primary focus:border-transparent"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loading.update}
-                className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
-              >
-                {loading.update ? '修改中...' : '修改密码'}
-              </button>
-            </form>
+                
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    个人简介
+                  </label>
+                  <textarea
+                    name="bio"
+                    value={formData.bio}
+                    onChange={handleInputChange}
+                    rows={4}
+                    className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="介绍一下自己..."
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">个人简介会显示在您的公开资料页面，让其他用户了解您</p>
+                </div>
+                
+                <div>
+                  <button
+                    type="button"
+                    onClick={handleUpdateProfile}
+                    disabled={loading.update}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {loading.update ? '更新中...' : '更新资料'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
+        </div>
 
-          {/* 危险区域 */}
-          <div className="bg-card border border-red-200 dark:border-red-800 rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-4">危险区域</h2>
-            <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg space-y-4">
-              <h4 className="text-lg font-medium text-red-800 dark:text-red-200">删除账号</h4>
-              <p className="text-red-700 dark:text-red-300 text-sm">
-                一旦删除账号，所有数据将被永久删除，无法恢复。请先获取邮箱验证码并输入密码确认。
-              </p>
-              <div className="flex items-end gap-2">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-foreground mb-1">邮箱验证码</label>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    placeholder="6 位验证码"
-                    value={deleteVerificationCode}
-                    onChange={(e) => setDeleteVerificationCode(e.target.value.replace(/\D/g, ''))}
-                    className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-red-500"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleSendCode('delete')}
-                  disabled={codeSending || isDeleteCounting}
-                  className="px-4 py-2 border border-border rounded-lg hover:bg-muted disabled:opacity-50 whitespace-nowrap min-w-[100px]"
-                >
-                  {codeSending ? '发送中...' : isDeleteCounting ? `${deleteCountdown}秒后重试` : '获取验证码'}
-                </button>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">当前密码</label>
-                <input
-                  type="password"
-                  value={deletePassword}
-                  onChange={(e) => setDeletePassword(e.target.value)}
-                  className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-red-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">输入 DELETE 确认</label>
+        {/* 用户统计信息 */}
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
+          <h2 className="text-xl font-semibold text-foreground mb-4">统计信息</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center p-4 bg-muted rounded-lg">
+              <p className="text-2xl font-bold text-blue-600">{userInfo?.postCount || 0}</p>
+              <p className="text-muted-foreground text-sm">发布文章</p>
+            </div>
+            <div className="text-center p-4 bg-muted rounded-lg">
+              <p className="text-2xl font-bold text-green-600">{userInfo?.commentCount || 0}</p>
+              <p className="text-muted-foreground text-sm">发表评论</p>
+            </div>
+            <div className="text-center p-4 bg-muted rounded-lg">
+              <p className="text-2xl font-bold text-red-600">{likedPosts.length}</p>
+              <p className="text-muted-foreground text-sm">点赞文章</p>
+            </div>
+            <div className="text-center p-4 bg-muted rounded-lg">
+              <p className="text-2xl font-bold text-purple-600">{userInfo ? 1 : 0}</p>
+              <p className="text-muted-foreground text-sm">账号等级</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 密码修改 */}
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-6">
+          <h2 className="text-xl font-semibold text-foreground mb-4">密码修改</h2>
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleChangePassword(); }}>
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-foreground mb-1">邮箱验证码</label>
                 <input
                   type="text"
-                  value={deleteConfirmation}
-                  onChange={(e) => setDeleteConfirmation(e.target.value)}
-                  placeholder="输入 DELETE"
+                  maxLength={6}
+                  placeholder="6 位验证码"
+                  value={formData.emailVerificationCode}
+                  onChange={(e) => setFormData(prev => ({ ...prev, emailVerificationCode: e.target.value.replace(/\D/g, '') }))}
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => handleSendCode('password')}
+                disabled={codeSending || isPasswordCounting}
+                className="px-4 py-2 border border-border rounded-lg hover:bg-muted disabled:opacity-50 whitespace-nowrap min-w-[100px]"
+              >
+                {codeSending ? '发送中...' : isPasswordCounting ? `${passwordCountdown}秒后重试` : '获取验证码'}
+              </button>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">当前密码</label>
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleInputChange}
+                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">新密码</label>
+              <input
+                type="password"
+                name="newPassword"
+                value={formData.newPassword}
+                onChange={handleInputChange}
+                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">确认新密码</label>
+              <input
+                type="password"
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleInputChange}
+                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading.update}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading.update ? '修改中...' : '修改密码'}
+            </button>
+          </form>
+        </div>
+        
+        {/* 账号删除 */}
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6">
+          <h2 className="text-xl font-semibold text-foreground mb-4">账号管理</h2>
+          <div className="p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg space-y-4">
+            <h4 className="text-lg font-medium text-red-800 dark:text-red-200 mb-2">删除账号</h4>
+            <p className="text-red-700 dark:text-red-300 text-sm">
+              一旦删除账号，所有数据将被永久删除，无法恢复。请先获取邮箱验证码并输入密码确认。
+            </p>
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-foreground mb-1">邮箱验证码</label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  placeholder="6 位验证码"
+                  value={deleteVerificationCode}
+                  onChange={(e) => setDeleteVerificationCode(e.target.value.replace(/\D/g, ''))}
                   className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-red-500"
                 />
               </div>
               <button
-                onClick={handleDeleteAccount}
-                disabled={loading.delete}
-                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                type="button"
+                onClick={() => handleSendCode('delete')}
+                disabled={codeSending || isDeleteCounting}
+                className="px-4 py-2 border border-border rounded-lg hover:bg-muted disabled:opacity-50 whitespace-nowrap min-w-[100px]"
               >
-                {loading.delete ? '删除中...' : '永久删除账号'}
+                {codeSending ? '发送中...' : isDeleteCounting ? `${deleteCountdown}秒后重试` : '获取验证码'}
               </button>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">当前密码</label>
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                placeholder="请输入密码以确认身份"
+                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">确认删除（输入 DELETE）</label>
+              <input
+                type="text"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                placeholder="输入 DELETE 确认删除"
+                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+            <button
+              onClick={handleDeleteAccount}
+              disabled={loading.delete || deleteConfirmation !== 'DELETE'}
+              className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading.delete ? '删除中...' : '删除账号'}
+            </button>
           </div>
         </div>
       </div>
