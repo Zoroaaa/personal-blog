@@ -165,26 +165,26 @@ export function ReadingHistoryPage() {
                 {history.map((item) => (
                   <Link
                     key={item.id}
-                    to={`/posts/${item.post?.slug || item.postId}`}
+                    to={`/posts/${item.slug}`}
                     className="block bg-card border border-border rounded-lg p-4 hover:shadow-md transition-all group"
                   >
                     <div className="flex gap-4">
-                      {item.post?.coverImage && (
+                      {item.coverImage && (
                         <div className="flex-shrink-0 w-24 h-16 rounded overflow-hidden">
                           <img
-                            src={item.post.coverImage}
-                            alt={item.post.title}
+                            src={item.coverImage}
+                            alt={item.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
                         <h3 className="font-medium text-foreground group-hover:text-primary transition-colors line-clamp-1">
-                          {item.post?.title || '文章已删除'}
+                          {item.title || '文章已删除'}
                         </h3>
-                        {item.post?.summary && (
+                        {item.summary && (
                           <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                            {item.post.summary}
+                            {item.summary}
                           </p>
                         )}
                         <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
@@ -192,14 +192,14 @@ export function ReadingHistoryPage() {
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            阅读于 {formatDate(item.readAt)}
+                            阅读于 {formatDate(item.lastReadAt)}
                           </span>
-                          {item.readingProgress && item.readingProgress > 0 && (
+                          {item.readPercentage && item.readPercentage > 0 && (
                             <span className="flex items-center gap-1">
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                               </svg>
-                              进度 {Math.round(item.readingProgress)}%
+                              进度 {Math.round(item.readPercentage)}%
                             </span>
                           )}
                         </div>

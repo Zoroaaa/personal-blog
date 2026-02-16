@@ -602,14 +602,14 @@ export function HomePage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6">
 
             {/* 左侧: 分类和标签 - 桌面端显示 */}
-            <div className="hidden lg:block lg:col-span-3 xl:col-span-2.5">
+            <div className="hidden lg:block lg:col-span-3">
               <div className="sticky top-20">
                 <SidebarContent />
               </div>
             </div>
 
             {/* 中间: 文章列表 */}
-            <div className="lg:col-span-9 xl:col-span-7">
+            <div className="lg:col-span-9 xl:col-span-6">
 
               {/* 当前过滤标签 */}
               {(selectedCategory || selectedColumn || selectedTag) && (
@@ -919,7 +919,7 @@ export function HomePage() {
             </div>
 
             {/* 右侧: 热门文章区域 - 大屏显示 */}
-            <div className="hidden xl:block xl:col-span-2.5">
+            <div className="hidden xl:block xl:col-span-3">
               <div className="sticky top-24 space-y-4">
                 {/* 热门文章卡片 */}
                 <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-lg rounded-xl shadow-md border border-gray-200/50 dark:border-slate-700/50 p-4">
