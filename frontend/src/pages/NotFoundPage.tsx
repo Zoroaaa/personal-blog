@@ -19,20 +19,20 @@ import { Link } from 'react-router-dom';
  */
 export function NotFoundPage() {
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-white to-gray-100 py-16 px-4">
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-white to-gray-100 dark:from-slate-900 dark:to-slate-800 py-16 px-4">
       <div className="text-center max-w-md mx-auto">
         {/* 404大数字 */}
-        <div className="text-9xl font-bold text-gray-300 mb-4 animate-fade-in">
+        <div className="text-9xl font-bold text-gray-300 dark:text-slate-600 mb-4 animate-fade-in">
           404
         </div>
         
         {/* 标题 */}
-        <h1 className="text-3xl font-bold text-gray-900 mb-2 animate-fade-in animation-delay-100">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 animate-fade-in animation-delay-100">
           页面未找到
         </h1>
         
         {/* 描述文本 */}
-        <p className="text-gray-600 mb-8 animate-fade-in animation-delay-200">
+        <p className="text-gray-600 dark:text-gray-400 mb-8 animate-fade-in animation-delay-200">
           抱歉，您访问的页面不存在。可能是链接错误或页面已被删除。
         </p>
         
@@ -45,7 +45,7 @@ export function NotFoundPage() {
         </Link>
         
         {/* 额外提示 */}
-        <p className="mt-8 text-sm text-gray-500 animate-fade-in animation-delay-400">
+        <p className="mt-8 text-sm text-gray-500 dark:text-gray-400 animate-fade-in animation-delay-400">
           如果您认为这是一个错误，请联系网站管理员
         </p>
       </div>

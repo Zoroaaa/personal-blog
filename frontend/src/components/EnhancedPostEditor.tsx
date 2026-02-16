@@ -814,7 +814,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
         <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
           <div className="flex items-center gap-3 mb-3">
             <div className="animate-spin w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-            <span className="text-blue-700 dark:text-blue-300 font-medium">{importProgress || '正在导入...'}</span>
+            <span className="text-primary font-medium">{importProgress || '正在导入...'}</span>
           </div>
           {/* 进度条 */}
           <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2.5 overflow-hidden">
@@ -829,7 +829,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
               }}
             ></div>
           </div>
-          <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+          <p className="text-xs text-primary mt-2">
             请勿关闭页面，上传完成后会自动更新内容
           </p>
         </div>
@@ -1027,7 +1027,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
                           </span>
                         </div>
                         {selectedTagIds.includes(tag.id) && (
-                          <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
                         )}
@@ -1113,7 +1113,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
             }`}>
               <svg className={`w-8 h-8 transition-all duration-200 ${
                 isDragging
-                  ? 'text-blue-600 dark:text-blue-300 scale-110'
+                  ? 'text-primary scale-110'
                   : 'text-gray-400 dark:text-gray-500'
               }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -1122,7 +1122,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
             <p className="text-base text-gray-700 dark:text-gray-300 mb-2">
               <span className="font-semibold">拖拽文件到此处</span>
               <span className="text-gray-500 dark:text-gray-400 mx-2">或</span>
-              <label className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer font-medium underline underline-offset-2">
+              <label className="text-primary hover:text-primary/80 cursor-pointer font-medium underline underline-offset-2">
                 点击选择文件
                 <input
                   type="file"
@@ -1149,13 +1149,13 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
 
           {/* 拖拽时的遮罩提示 */}
           {isDragging && (
-            <div className="absolute inset-0 bg-blue-500/5 dark:bg-blue-900/20 rounded-xl flex items-center justify-center pointer-events-none">
-              <div className="bg-white dark:bg-slate-800 px-8 py-4 rounded-xl shadow-2xl border-2 border-blue-200 dark:border-blue-700 transform scale-110">
+            <div className="absolute inset-0 bg-primary/5 dark:bg-primary/20 rounded-xl flex items-center justify-center pointer-events-none">
+              <div className="bg-card px-8 py-4 rounded-xl shadow-2xl border-2 border-primary/50 transform scale-110">
                 <div className="flex items-center gap-3">
-                  <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <p className="text-blue-600 dark:text-blue-400 font-semibold text-lg">释放以导入文档</p>
+                  <p className="text-primary font-semibold text-lg">释放以导入文档</p>
                 </div>
               </div>
             </div>
@@ -1211,7 +1211,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
               title={isFullscreen ? '退出全屏 (F11/Esc)' : '全屏模式 (F11)'}
               className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
                 isFullscreen
-                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                  ? 'bg-primary/10 text-primary'
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
               }`}
             >
@@ -1328,7 +1328,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
                 {/* 检测到的链接提示 */}
                 {detectedLinks.length > 0 && activeTab === 'edit' && (
                   <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                    <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                    <p className="text-sm text-primary mb-2">
                       检测到 {detectedLinks.length} 个链接，点击转换为 Markdown 格式：
                     </p>
                     <div className="flex flex-wrap gap-2">
@@ -1337,7 +1337,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
                           key={index}
                           type="button"
                           onClick={() => convertDetectedLink(url)}
-                          className="text-xs px-2 py-1 bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 rounded border border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors truncate max-w-xs"
+                          className="text-xs px-2 py-1 bg-card text-primary rounded border border-primary/30 hover:bg-primary/10 transition-colors truncate max-w-xs"
                           title={url}
                         >
                           {url.length > 40 ? url.substring(0, 40) + '...' : url}

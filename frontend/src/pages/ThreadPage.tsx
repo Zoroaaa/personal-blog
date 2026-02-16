@@ -569,7 +569,7 @@ export default function ThreadPage() {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           <p className="mt-2 text-muted-foreground">加载中...</p>
         </div>
       </div>
@@ -584,7 +584,7 @@ export default function ThreadPage() {
           <p className="mt-4 text-muted-foreground">会话不存在</p>
           <button
             onClick={() => navigate('/messages')}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="mt-4 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
           >
             返回私信列表
           </button>
@@ -618,7 +618,7 @@ export default function ThreadPage() {
           </div>
           <button
             onClick={() => navigate(`/profile/${threadInfo.otherUserId}`)}
-            className="text-sm text-blue-600 hover:text-blue-700"
+            className="text-sm text-primary hover:text-primary/80"
           >
             查看资料
           </button>
@@ -633,7 +633,7 @@ export default function ThreadPage() {
               <button
                 onClick={loadMoreMessages}
                 disabled={loadingMore}
-                className="text-sm text-blue-600 hover:text-blue-700 disabled:opacity-50"
+                className="text-sm text-primary hover:text-primary/80 disabled:opacity-50"
               >
                 {loadingMore ? '加载中...' : '加载更多消息'}
               </button>
@@ -666,7 +666,7 @@ export default function ThreadPage() {
                       <div
                         className={`px-4 py-2 rounded-2xl ${
                           isMine
-                            ? 'bg-blue-600 text-white rounded-br-md'
+                            ? 'bg-primary text-white rounded-br-md'
                             : 'bg-muted text-foreground rounded-bl-md'
                         }`}
                       >
@@ -813,7 +813,7 @@ export default function ThreadPage() {
             <button
               onClick={handleSendMessage}
               disabled={(!newMessage.trim() && !attachmentPreview) || sending}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors self-end"
+              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors self-end"
             >
               {sending ? (
                 <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">

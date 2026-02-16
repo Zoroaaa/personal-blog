@@ -204,7 +204,7 @@ export function ProfilePage() {
                       />
                     )}
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-foreground text-sm line-clamp-1 group-hover:text-blue-600 transition-colors">
+                      <h4 className="font-medium text-foreground text-sm line-clamp-1 group-hover:text-primary transition-colors">
                         {comment.post?.title || '未知文章'}
                       </h4>
                       {comment.post?.categoryName && (
@@ -302,7 +302,7 @@ export function ProfilePage() {
                 </div>
               )}
               <div className="p-4">
-                <h3 className="text-lg font-semibold text-foreground group-hover:text-blue-600 transition-colors">{post.title}</h3>
+                <h3 className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors">{post.title}</h3>
                 <div className="flex items-center text-sm text-muted-foreground mt-2">
                   <span>{formatDate(post.publishedAt)}</span>
                   <span className="mx-2">•</span>
@@ -367,7 +367,7 @@ export function ProfilePage() {
               </div>
             )}
             <div className="p-4">
-              <h3 className="text-lg font-semibold text-foreground group-hover:text-blue-600 transition-colors">
+              <h3 className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors">
                 {post.title}
               </h3>
               <div className="flex items-center text-sm text-muted-foreground mt-2">
@@ -406,7 +406,7 @@ export function ProfilePage() {
               setActiveTab('comments');
               setSearchParams({ tab: 'comments' });
             }}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'comments' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'comments' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
           >
             我的评论
           </button>
@@ -415,7 +415,7 @@ export function ProfilePage() {
               setActiveTab('likes');
               setSearchParams({ tab: 'likes' });
             }}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'likes' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'likes' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
           >
             我的点赞
           </button>
@@ -424,7 +424,7 @@ export function ProfilePage() {
               setActiveTab('favorites');
               setSearchParams({ tab: 'favorites' });
             }}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'favorites' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'favorites' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
           >
             我的收藏
           </button>

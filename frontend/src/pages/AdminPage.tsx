@@ -106,7 +106,7 @@ export function AdminPage() {
           <h1 className="text-2xl font-bold mb-4">无权限访问</h1>
           <button
             onClick={() => navigate('/')}
-            className="text-blue-600 hover:underline"
+            className="text-primary hover:underline"
           >
             返回首页
           </button>
@@ -321,17 +321,14 @@ export function AdminPage() {
                 onClick={() => {
                   setShowCreateForm(true);
                   setEditingPostId(null);
-                  // setError('');
-                  // setSuccess(false);
                 }}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
               >
                 新建文章
               </button>
             </div>
             
             {showCreateForm ? (
-              // 使用增强的文章编辑器组件
               <div>
                 <div className="flex justify-end mb-4">
                   <button
@@ -339,7 +336,7 @@ export function AdminPage() {
                       setShowCreateForm(false);
                       setEditingPostId(null);
                     }}
-                    className="text-gray-500 hover:text-gray-700"
+                    className="text-muted-foreground hover:text-foreground"
                   >
                     ✕ 关闭
                   </button>
@@ -358,15 +355,14 @@ export function AdminPage() {
                 />
               </div>
             ) : (
-              // 文章列表
               <div>
                 {postsLoading ? (
                   <div className="text-center py-8">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                     <p className="mt-2 text-muted-foreground">加载中...</p>
                   </div>
                 ) : postsError ? (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
+                  <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 text-destructive">
                     {postsError}
                   </div>
                 ) : posts.length === 0 ? (
@@ -421,13 +417,13 @@ export function AdminPage() {
                           <div className="flex gap-2 ml-4">
                             <button
                               onClick={() => loadPostForEdit(post.id)}
-                              className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded"
+                              className="px-3 py-1 text-sm text-primary hover:bg-primary/10 rounded"
                             >
                               编辑
                             </button>
                             <button
                               onClick={() => handleDeletePost(post.id)}
-                              className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
+                              className="px-3 py-1 text-sm text-destructive hover:bg-destructive/10 rounded"
                             >
                               删除
                             </button>
@@ -456,7 +452,7 @@ export function AdminPage() {
             <h2 className="text-2xl font-bold mb-4">评论管理</h2>
             
             {commentsError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded">
+              <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded">
                 {commentsError}
               </div>
             )}
@@ -560,7 +556,7 @@ export function AdminPage() {
             <h2 className="text-2xl font-bold mb-4">用户管理</h2>
             
             {usersError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded">
+              <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded">
                 {usersError}
               </div>
             )}
@@ -666,7 +662,7 @@ export function AdminPage() {
             <h2 className="text-2xl font-bold mb-4">数据分析</h2>
             
             {analyticsError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded">
+              <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded">
                 {analyticsError}
               </div>
             )}
@@ -773,7 +769,7 @@ export function AdminPage() {
                   }}
                   className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                     activeTab === tab.id
-                      ? 'border-blue-600 text-blue-600'
+                      ? 'border-primary text-primary'
                       : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                   }`}
                 >

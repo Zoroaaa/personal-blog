@@ -91,8 +91,8 @@ export function ColumnPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">加载中...</p>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="mt-4 text-muted-foreground">加载中...</p>
         </div>
       </div>
     );
@@ -102,14 +102,14 @@ export function ColumnPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
         <div className="text-center">
-          <svg className="mx-auto h-16 w-16 text-gray-400 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="mx-auto h-16 w-16 text-muted-foreground mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">专栏不存在</h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">{error || '抱歉，该专栏不存在或已被删除'}</p>
+          <h2 className="text-2xl font-bold text-foreground mb-2">专栏不存在</h2>
+          <p className="text-muted-foreground mb-6">{error || '抱歉，该专栏不存在或已被删除'}</p>
           <Link
             to="/"
-            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all duration-200 font-medium shadow-md hover:shadow-lg"
+            className="px-6 py-3 bg-gradient-to-r from-primary to-indigo-600 hover:from-primary/90 hover:to-indigo-700 text-white rounded-xl transition-all duration-200 font-medium shadow-md hover:shadow-lg"
           >
             返回首页
           </Link>
@@ -199,22 +199,22 @@ export function ColumnPage() {
       {/* 文章列表 */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             文章列表
-            <span className="text-lg text-gray-500 dark:text-gray-400 font-normal">({total})</span>
+            <span className="text-lg text-muted-foreground font-normal">({total})</span>
           </h2>
         </div>
 
         {posts.length === 0 ? (
-          <div className="text-center py-16 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 dark:border-slate-700">
-            <svg className="mx-auto h-16 w-16 text-gray-400 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="text-center py-16 bg-card backdrop-blur-sm rounded-2xl shadow-lg border border-border">
+            <svg className="mx-auto h-16 w-16 text-muted-foreground mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">暂无文章</h3>
-            <p className="text-gray-600 dark:text-gray-400">该专栏下还没有发布任何文章</p>
+            <h3 className="text-xl font-bold text-foreground mb-2">暂无文章</h3>
+            <p className="text-muted-foreground">该专栏下还没有发布任何文章</p>
           </div>
         ) : (
           <>
@@ -222,7 +222,7 @@ export function ColumnPage() {
               {posts.map((post, index) => (
                 <article
                   key={post.id}
-                  className="group bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 dark:border-slate-700 overflow-hidden hover:shadow-2xl transition-all duration-300 animate-fade-in"
+                  className="group bg-card backdrop-blur-sm rounded-2xl shadow-lg border border-border overflow-hidden hover:shadow-2xl transition-all duration-300 animate-fade-in"
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
                   {post.coverImage && (
@@ -236,16 +236,16 @@ export function ColumnPage() {
                   )}
                   <div className="p-6">
                     <Link to={`/posts/${post.slug}`}>
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-2">
+                      <h3 className="text-xl font-bold text-foreground mb-2 group-hover:text-primary transition-colors line-clamp-2">
                         {post.title}
                       </h3>
                     </Link>
                     {post.summary && (
-                      <p className="text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
+                      <p className="text-muted-foreground mb-4 line-clamp-2">
                         {post.summary}
                       </p>
                     )}
-                    <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
                       <div className="flex items-center gap-4">
                         <span className="flex items-center gap-1">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -274,7 +274,7 @@ export function ColumnPage() {
                   <button
                     onClick={() => setPage(p => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="px-6 py-3 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-slate-700 transition-all shadow-md hover:shadow-lg font-medium"
+                    className="px-6 py-3 bg-card border border-border rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted transition-all shadow-md hover:shadow-lg font-medium"
                   >
                     上一页
                   </button>
@@ -298,8 +298,8 @@ export function ColumnPage() {
                           onClick={() => setPage(pageNum)}
                           className={`px-4 py-3 rounded-xl transition-all font-medium shadow-md hover:shadow-lg ${
                             page === pageNum
-                              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white'
-                              : 'bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700'
+                              ? 'bg-gradient-to-r from-primary to-indigo-600 text-white'
+                              : 'bg-card border border-border hover:bg-muted'
                           }`}
                         >
                           {pageNum}
@@ -311,12 +311,12 @@ export function ColumnPage() {
                   <button
                     onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}
-                    className="px-6 py-3 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-slate-700 transition-all shadow-md hover:shadow-lg font-medium"
+                    className="px-6 py-3 bg-card border border-border rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted transition-all shadow-md hover:shadow-lg font-medium"
                   >
                     下一页
                   </button>
                 </div>
-                <div className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                <div className="mt-4 text-center text-sm text-muted-foreground">
                   第 {page} 页,共 {totalPages} 页
                 </div>
               </div>

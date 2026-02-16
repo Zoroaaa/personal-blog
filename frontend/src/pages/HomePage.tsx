@@ -295,7 +295,7 @@ export function HomePage() {
       {/* 分类卡片 */}
       <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-lg rounded-xl shadow-md border border-gray-200/50 dark:border-slate-700/50 p-4 transition-all duration-200 hover:shadow-lg">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
             <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -306,7 +306,7 @@ export function HomePage() {
           {selectedCategory && (
             <button
               onClick={clearFilters}
-              className="text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+              className="text-xs px-2 py-1 rounded-md bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
             >
               清除
             </button>
@@ -328,7 +328,7 @@ export function HomePage() {
                   className={`group w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-150 cursor-pointer ${
                     selectedCategory === category.slug
                       ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-sm'
-                      : 'bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300'
+                      : 'bg-muted/50 hover:bg-muted text-foreground'
                   }`}
                   onClick={() => handleCategoryClick(category.slug)}
                 >
@@ -340,7 +340,7 @@ export function HomePage() {
                     <span className={`text-xs px-1.5 py-0.5 rounded ${
                       selectedCategory === category.slug
                         ? 'bg-white/20'
-                        : 'bg-gray-200 dark:bg-slate-600'
+                        : 'bg-muted'
                     }`}>
                       {category.postCount}
                     </span>
@@ -349,7 +349,7 @@ export function HomePage() {
                       className={`p-1 rounded transition-all opacity-0 group-hover:opacity-100 ${
                         selectedCategory === category.slug
                           ? 'hover:bg-white/20 text-white'
-                          : 'hover:bg-gray-300 dark:hover:bg-slate-500 text-gray-400'
+                          : 'hover:bg-muted text-muted-foreground'
                       }`}
                       title="查看分类详情"
                     >
@@ -365,7 +365,7 @@ export function HomePage() {
             {categories.length > INITIAL_CATEGORY_COUNT && (
               <button
                 onClick={() => setShowAllCategories(!showAllCategories)}
-                className="w-full mt-2.5 px-3 py-1.5 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors flex items-center justify-center gap-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                className="w-full mt-2.5 px-3 py-1.5 text-sm text-primary hover:text-primary/80 font-medium transition-colors flex items-center justify-center gap-1 rounded-lg hover:bg-primary/10"
               >
                 {showAllCategories ? '收起' : `更多 (${categories.length - INITIAL_CATEGORY_COUNT})`}
                 <svg
@@ -385,7 +385,7 @@ export function HomePage() {
       {/* 专栏卡片 */}
       <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-lg rounded-xl shadow-md border border-gray-200/50 dark:border-slate-700/50 p-4 transition-all duration-200 hover:shadow-lg">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
             <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -396,7 +396,7 @@ export function HomePage() {
           {selectedColumn && (
             <button
               onClick={clearFilters}
-              className="text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+              className="text-xs px-2 py-1 rounded-md bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
             >
               清除
             </button>
@@ -406,11 +406,11 @@ export function HomePage() {
         {columnsLoading ? (
           <div className="space-y-1.5">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-12 bg-gray-200 dark:bg-slate-700 rounded-lg animate-pulse" />
+              <div key={i} className="h-12 bg-muted rounded-lg animate-pulse" />
             ))}
           </div>
         ) : columns.length === 0 ? (
-          <div className="text-center py-3 text-gray-500 dark:text-gray-400 text-sm">
+          <div className="text-center py-3 text-muted-foreground text-sm">
             暂无专栏
           </div>
         ) : (
@@ -422,7 +422,7 @@ export function HomePage() {
                   className={`group w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 cursor-pointer ${
                     selectedColumn === column.slug
                       ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-sm'
-                      : 'bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300'
+                      : 'bg-muted/50 hover:bg-muted text-foreground'
                   }`}
                   onClick={() => handleColumnClick(column.slug)}
                 >
@@ -438,7 +438,7 @@ export function HomePage() {
                     <div className={`text-xs ${
                       selectedColumn === column.slug
                         ? 'text-white/70'
-                        : 'text-gray-500 dark:text-gray-400'
+                        : 'text-muted-foreground'
                     }`}>
                       {column.postCount} 篇
                     </div>
@@ -448,7 +448,7 @@ export function HomePage() {
                     className={`p-1 rounded transition-all opacity-0 group-hover:opacity-100 flex-shrink-0 ${
                       selectedColumn === column.slug
                         ? 'hover:bg-white/20 text-white'
-                        : 'hover:bg-gray-300 dark:hover:bg-slate-500 text-gray-400'
+                        : 'hover:bg-muted text-muted-foreground'
                     }`}
                     title="查看专栏详情"
                   >
@@ -483,7 +483,7 @@ export function HomePage() {
       {/* 标签云卡片 */}
       <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-lg rounded-xl shadow-md border border-gray-200/50 dark:border-slate-700/50 p-4 transition-all duration-200 hover:shadow-lg">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
             <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
@@ -494,7 +494,7 @@ export function HomePage() {
           {selectedTag && (
             <button
               onClick={clearFilters}
-              className="text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+              className="text-xs px-2 py-1 rounded-md bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
             >
               清除
             </button>
@@ -504,7 +504,7 @@ export function HomePage() {
         {tagsLoading ? (
           <div className="flex flex-wrap gap-1.5">
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="h-6 w-14 bg-gray-200 dark:bg-slate-700 rounded-full animate-pulse" />
+              <div key={i} className="h-6 w-14 bg-muted rounded-full animate-pulse" />
             ))}
           </div>
         ) : (
@@ -520,7 +520,7 @@ export function HomePage() {
                     className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-150 ${
                       selectedTag === tag.slug
                         ? 'shadow-sm scale-105 text-white'
-                        : 'hover:scale-105 text-gray-700 dark:text-gray-300'
+                        : 'hover:scale-105 text-foreground'
                     }`}
                     style={{
                       backgroundColor: selectedTag === tag.slug
@@ -543,10 +543,10 @@ export function HomePage() {
                   </button>
                   <button
                     onClick={(e) => handleTagNavigate(e, tag.slug)}
-                    className="absolute -top-0.5 -right-0.5 p-0.5 rounded-full bg-white dark:bg-slate-700 shadow-sm opacity-0 group-hover:opacity-100 transition-all hover:bg-gray-100 dark:hover:bg-slate-600 z-10"
+                    className="absolute -top-0.5 -right-0.5 p-0.5 rounded-full bg-card shadow-sm opacity-0 group-hover:opacity-100 transition-all hover:bg-muted z-10"
                     title="查看标签详情"
                   >
-                    <svg className="w-2.5 h-2.5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-2.5 h-2.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
                   </button>
@@ -591,7 +591,7 @@ export function HomePage() {
           <div className="lg:hidden mb-4">
             <button
               onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-              className="w-full flex items-center justify-between px-4 py-3 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md rounded-xl shadow-md border border-gray-200/60 dark:border-slate-700/60 text-gray-700 dark:text-gray-300"
+              className="w-full flex items-center justify-between px-4 py-3 bg-card/80 backdrop-blur-md rounded-xl shadow-md border border-border/60 text-foreground"
             >
               <span className="flex items-center gap-2 font-medium">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -631,8 +631,8 @@ export function HomePage() {
             <div className="lg:col-span-9 xl:col-span-6">
               {/* 手机端/平板端热门文章 - 横向滚动卡片 */}
               <div className="xl:hidden mb-6">
-                <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-lg rounded-xl shadow-md border border-gray-200/50 dark:border-slate-700/50 p-4">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                <div className="bg-card/75 backdrop-blur-lg rounded-xl shadow-md border border-border/50 p-4">
+                  <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                     <span className="w-6 h-6 rounded-lg bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center text-white">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
@@ -646,26 +646,26 @@ export function HomePage() {
                       <Link
                         key={post.id}
                         to={`/posts/${post.slug}`}
-                        className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] p-3 rounded-lg bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors group"
+                        className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
                       >
                         <div className="flex items-center gap-2 mb-2">
                           <span className={`flex-shrink-0 w-5 h-5 rounded text-xs font-bold flex items-center justify-center ${
                             index === 0 ? 'bg-red-500 text-white' :
                             index === 1 ? 'bg-orange-500 text-white' :
                             index === 2 ? 'bg-yellow-500 text-white' :
-                            'bg-gray-200 dark:bg-slate-600 text-gray-600 dark:text-gray-300'
+                            'bg-muted text-muted-foreground'
                           }`}>
                             {index + 1}
                           </span>
-                          <span className="text-xs text-gray-400 dark:text-gray-500">{post.viewCount || 0} 阅读</span>
+                          <span className="text-xs text-muted-foreground">{post.viewCount || 0} 阅读</span>
                         </div>
-                        <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors leading-snug">
+                        <p className="text-xs sm:text-sm text-foreground line-clamp-2 group-hover:text-primary transition-colors leading-snug">
                           {post.title}
                         </p>
                       </Link>
                     ))}
                     {hotPosts.length === 0 && (
-                      <div className="text-center py-4 text-gray-400 dark:text-gray-500 text-sm w-full">
+                      <div className="text-center py-4 text-muted-foreground text-sm w-full">
                         暂无文章
                       </div>
                     )}
@@ -676,11 +676,11 @@ export function HomePage() {
               {/* 当前过滤标签 */}
               {(selectedCategory || selectedColumn || selectedTag) && (
                 <div className="mb-4 flex flex-wrap items-center gap-2 animate-fade-in">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">筛选:</span>
+                  <span className="text-xs text-muted-foreground">筛选:</span>
                   {selectedCategory && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium">
                       {categories.find(c => c.slug === selectedCategory)?.name}
-                      <button onClick={clearFilters} className="hover:text-blue-900 dark:hover:text-blue-100">
+                      <button onClick={clearFilters} className="hover:text-primary/80">
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -714,32 +714,32 @@ export function HomePage() {
               {loading ? (
                 <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lt:grid-cols-4 gap-4 sm:gap-5">
                   {[...Array(8)].map((_, i) => (
-                    <div key={i} className="bg-white/80 dark:bg-slate-800/80 rounded-xl shadow-md p-4 animate-pulse">
-                      <div className="h-32 sm:h-36 bg-gray-200 dark:bg-slate-700 rounded-lg mb-3" />
-                      <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4 mb-2" />
-                      <div className="h-3 bg-gray-200 dark:bg-slate-700 rounded w-full mb-1.5" />
-                      <div className="h-3 bg-gray-200 dark:bg-slate-700 rounded w-5/6" />
+                    <div key={i} className="bg-card/80 rounded-xl shadow-md p-4 animate-pulse">
+                      <div className="h-32 sm:h-36 bg-muted rounded-lg mb-3" />
+                      <div className="h-4 bg-muted rounded w-3/4 mb-2" />
+                      <div className="h-3 bg-muted rounded w-full mb-1.5" />
+                      <div className="h-3 bg-muted rounded w-5/6" />
                     </div>
                   ))}
                 </div>
               ) : error ? (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6 text-center">
-                  <svg className="w-12 h-12 text-red-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-6 text-center">
+                  <svg className="w-12 h-12 text-destructive mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <h3 className="text-base font-semibold text-red-800 dark:text-red-200 mb-1.5">加载失败</h3>
-                  <p className="text-red-600 dark:text-red-400 mb-3 text-sm">{error}</p>
+                  <h3 className="text-base font-semibold text-destructive mb-1.5">加载失败</h3>
+                  <p className="text-destructive/80 mb-3 text-sm">{error}</p>
                   <button
                     onClick={loadPosts}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium text-sm"
+                    className="px-4 py-2 bg-destructive hover:bg-destructive/90 text-white rounded-lg transition-colors font-medium text-sm"
                   >
                     重试
                   </button>
                 </div>
               ) : posts.length === 0 ? (
-                <div className="bg-white/80 dark:bg-slate-800/80 rounded-xl shadow-md p-8 text-center">
+                <div className="bg-card/80 rounded-xl shadow-md p-8 text-center">
                   <svg
-                    className="mx-auto h-14 w-14 text-gray-400 dark:text-gray-600 mb-3"
+                    className="mx-auto h-14 w-14 text-muted-foreground mb-3"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -751,8 +751,8 @@ export function HomePage() {
                       d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1.5">暂无文章</h3>
-                  <p className="text-gray-500 dark:text-gray-400 mb-4 text-sm">
+                  <h3 className="text-lg font-semibold text-foreground mb-1.5">暂无文章</h3>
+                  <p className="text-muted-foreground mb-4 text-sm">
                     {selectedCategory || selectedColumn || selectedTag ? '该分类/专栏/标签下暂无文章' : '还没有发布任何文章'}
                   </p>
                   {(selectedCategory || selectedColumn || selectedTag) && (
@@ -771,7 +771,7 @@ export function HomePage() {
                     {posts.map((post, index) => (
                       <article
                         key={post.id}
-                        className="group bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-xl shadow-md border border-gray-200/60 dark:border-slate-700/60 overflow-hidden hover:shadow-xl transition-all duration-300 animate-fade-in flex flex-col"
+                        className="group bg-card/80 backdrop-blur-sm rounded-xl shadow-md border border-border/60 overflow-hidden hover:shadow-xl transition-all duration-300 animate-fade-in flex flex-col"
                         style={{ animationDelay: `${index * 50}ms`, isolation: 'auto' }}
                       >
                         {/* 封面图 */}
@@ -827,7 +827,7 @@ export function HomePage() {
                                 </svg>
                               </span>
                             )}
-                            <h2 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white mb-1.5 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-2 leading-snug">
+                            <h2 className="text-sm sm:text-base font-semibold text-foreground mb-1.5 group-hover:text-primary transition-colors line-clamp-2 leading-snug">
                               {post.title}
                             </h2>
                           </Link>
@@ -836,13 +836,13 @@ export function HomePage() {
                           {post.summary && (
                             <TruncatedText
                               text={post.summary}
-                              className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-3 flex-1 leading-relaxed"
+                              className="text-xs sm:text-sm text-muted-foreground mb-3 flex-1 leading-relaxed"
                               lines={2}
                             />
                           )}
 
                           {/* 元信息 */}
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400 dark:text-gray-500 mb-3">
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mb-3">
                             <span className="flex items-center gap-1 truncate">
                               {post.authorAvatar ? (
                                 <img
@@ -911,7 +911,7 @@ export function HomePage() {
                             ))}
 
                             {post.tags && post.tags.length > 2 && (
-                              <span className="text-xs text-gray-400 dark:text-gray-500">
+                              <span className="text-xs text-muted-foreground">
                                 +{post.tags.length - 2}
                               </span>
                             )}
@@ -927,7 +927,7 @@ export function HomePage() {
                       <button
                         onClick={() => setPage(p => Math.max(1, p - 1))}
                         disabled={page === 1}
-                        className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-slate-700 transition-all text-sm font-medium"
+                        className="px-3 py-1.5 bg-card border border-border rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted transition-all text-sm font-medium"
                       >
                         上一页
                       </button>
@@ -952,7 +952,7 @@ export function HomePage() {
                               className={`px-3 py-1.5 rounded-lg transition-all text-sm font-medium ${
                                 page === pageNum
                                   ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white'
-                                  : 'bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'
+                                  : 'bg-card border border-border hover:bg-muted'
                               }`}
                             >
                               {pageNum}
@@ -964,7 +964,7 @@ export function HomePage() {
                       <button
                         onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                         disabled={page === totalPages}
-                        className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-slate-700 transition-all text-sm font-medium"
+                        className="px-3 py-1.5 bg-card border border-border rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted transition-all text-sm font-medium"
                       >
                         下一页
                       </button>
@@ -972,7 +972,7 @@ export function HomePage() {
                   )}
 
                   {!loading && !error && (
-                    <div className="mt-3 text-center text-xs text-gray-400 dark:text-gray-500">
+                    <div className="mt-3 text-center text-xs text-muted-foreground">
                       第 {page} 页，共 {totalPages} 页
                     </div>
                   )}
@@ -984,8 +984,8 @@ export function HomePage() {
             <div className="hidden xl:block xl:col-span-3">
               <div className="sticky top-24 space-y-4">
                 {/* 热门文章卡片 */}
-                <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-lg rounded-xl shadow-md border border-gray-200/50 dark:border-slate-700/50 p-4">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                <div className="bg-card/75 backdrop-blur-lg rounded-xl shadow-md border border-border/50 p-4">
+                  <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                     <span className="w-6 h-6 rounded-lg bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center text-white">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
@@ -999,21 +999,21 @@ export function HomePage() {
                       <Link
                         key={post.id}
                         to={`/posts/${post.slug}`}
-                        className="flex items-start gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors group"
+                        className="flex items-start gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors group"
                       >
                         <span className={`flex-shrink-0 w-5 h-5 rounded text-xs font-bold flex items-center justify-center ${
                           index === 0 ? 'bg-red-500 text-white' :
                           index === 1 ? 'bg-orange-500 text-white' :
                           index === 2 ? 'bg-yellow-500 text-white' :
-                          'bg-gray-200 dark:bg-slate-600 text-gray-600 dark:text-gray-300'
+                          'bg-muted text-muted-foreground'
                         }`}>
                           {index + 1}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs text-gray-700 dark:text-gray-300 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                          <p className="text-xs text-foreground line-clamp-2 group-hover:text-primary transition-colors">
                             {post.title}
                           </p>
-                          <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+                          <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
                             <span>{post.viewCount || 0} 阅读</span>
                             {post.publishedAt && (
                               <>
@@ -1026,7 +1026,7 @@ export function HomePage() {
                       </Link>
                     ))}
                     {hotPosts.length === 0 && (
-                      <div className="text-center py-4 text-gray-400 dark:text-gray-500 text-sm">
+                      <div className="text-center py-4 text-muted-foreground text-sm">
                         暂无文章
                       </div>
                     )}
