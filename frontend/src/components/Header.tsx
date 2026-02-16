@@ -27,7 +27,7 @@ export function Header() {
   const location = useLocation();
   const { user, logout } = useAuthStore();
   const { config } = useSiteConfig();
-  const { unreadCount: messageUnreadCount } = useMessageUnread();
+  const { unreadCount: messageUnreadCount } = useMessageUnread(!!user);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [scrolled, setScrolled] = useState(false);
