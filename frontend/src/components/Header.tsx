@@ -66,6 +66,8 @@ export function Header() {
 
   const navLinks = [
     { path: '/', label: '首页' },
+    { path: '/reading-history', label: '阅读历史' },
+    { path: '/account-settings', label: '账号设置' },
     { path: '/about', label: '关于' },
   ];
 

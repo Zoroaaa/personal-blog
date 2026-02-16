@@ -54,7 +54,9 @@ export function transformPostListItem(post: any): PostListItem {
     readingTime: post.reading_time,
     publishedAt: post.published_at,
     createdAt: post.created_at,
-    tags: post.tags ? post.tags.map(transformTag) : undefined
+    tags: post.tags ? post.tags.map(transformTag) : undefined,
+    isPinned: post.is_pinned === 1 || post.is_pinned === true,
+    pinOrder: post.pin_order
   };
 }
 
@@ -84,6 +86,8 @@ export function transformPost(post: any): Post {
     publishedAt: post.published_at,
     createdAt: post.created_at,
     updatedAt: post.updated_at,
+    isPinned: post.is_pinned === 1 || post.is_pinned === true,
+    pinOrder: post.pin_order,
     // 关联数据
     author: post.author ? transformUserPublicProfile(post.author) : undefined,
     authorName: post.author_name,

@@ -908,7 +908,19 @@ export const api = {
    * 获取热门文章
    */
   getHotPosts: (limit?: number) =>
-    apiRequest<PostListItem[]>(`/analytics/hot-posts?limit=${limit || 5}`),
+    apiRequest<PostListItem[]>(`/posts/hot/list?limit=${limit || 5}`),
+
+  /**
+   * 获取相邻文章（上一篇/下一篇）
+   */
+  getAdjacentPosts: (postId: number) =>
+    apiRequest<{ prevPost: PostListItem | null; nextPost: PostListItem | null }>(`/posts/${postId}/adjacent`),
+
+  /**
+   * 获取推荐文章
+   */
+  getRecommendedPosts: (postId: number, limit?: number) =>
+    apiRequest<{ posts: PostListItem[] }>(`/posts/${postId}/recommended?limit=${limit || 5}`),
   
   /**
    * 获取系统设置
