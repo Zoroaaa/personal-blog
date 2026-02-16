@@ -49,6 +49,9 @@ export function HomePage() {
   const [columnsLoading, setColumnsLoading] = useState(true);
   const [tagsLoading, setTagsLoading] = useState(true);
 
+  // 热门文章状态
+  const [hotPosts, setHotPosts] = useState<PostListItem[]>([]);
+
   // 展开/收起状态
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [showAllColumns, setShowAllColumns] = useState(false);
@@ -86,6 +89,11 @@ export function HomePage() {
   // 加载标签
   useEffect(() => {
     loadTags();
+  }, []);
+
+  // 加载热门文章
+  useEffect(() => {
+    loadHotPosts();
   }, []);
 
   // 加载文章
@@ -142,6 +150,17 @@ export function HomePage() {
       console.error('Failed to load tags:', error);
     } finally {
       setTagsLoading(false);
+    }
+  };
+
+  const loadHotPosts = async () => {
+    try {
+      const response = await api.getHotPosts(10);
+      if (response.success && response.data) {
+        setHotPosts(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to load hot posts:', error);
     }
   };
 
@@ -623,7 +642,7 @@ export function HomePage() {
                     热门文章
                   </h3>
                   <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
-                    {posts.slice(0, 10).sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0)).slice(0, 5).map((post, index) => (
+                    {hotPosts.slice(0, 5).map((post, index) => (
                       <Link
                         key={post.id}
                         to={`/posts/${post.slug}`}
@@ -645,7 +664,7 @@ export function HomePage() {
                         </p>
                       </Link>
                     ))}
-                    {posts.length === 0 && (
+                    {hotPosts.length === 0 && (
                       <div className="text-center py-4 text-gray-400 dark:text-gray-500 text-sm w-full">
                         暂无文章
                       </div>
@@ -976,7 +995,7 @@ export function HomePage() {
                     热门文章排行
                   </h3>
                   <div className="space-y-2">
-                    {posts.slice(0, 10).sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0)).map((post, index) => (
+                    {hotPosts.map((post, index) => (
                       <Link
                         key={post.id}
                         to={`/posts/${post.slug}`}
@@ -1006,7 +1025,7 @@ export function HomePage() {
                         </div>
                       </Link>
                     ))}
-                    {posts.length === 0 && (
+                    {hotPosts.length === 0 && (
                       <div className="text-center py-4 text-gray-400 dark:text-gray-500 text-sm">
                         暂无文章
                       </div>
