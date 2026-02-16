@@ -610,6 +610,49 @@ export function HomePage() {
 
             {/* 中间: 文章列表 */}
             <div className="lg:col-span-9 xl:col-span-6">
+              {/* 手机端/平板端热门文章 - 横向滚动卡片 */}
+              <div className="xl:hidden mb-6">
+                <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-lg rounded-xl shadow-md border border-gray-200/50 dark:border-slate-700/50 p-4">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-lg bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center text-white">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
+                      </svg>
+                    </span>
+                    热门文章
+                  </h3>
+                  <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
+                    {posts.slice(0, 10).sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0)).slice(0, 5).map((post, index) => (
+                      <Link
+                        key={post.id}
+                        to={`/posts/${post.slug}`}
+                        className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] p-3 rounded-lg bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors group"
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`flex-shrink-0 w-5 h-5 rounded text-xs font-bold flex items-center justify-center ${
+                            index === 0 ? 'bg-red-500 text-white' :
+                            index === 1 ? 'bg-orange-500 text-white' :
+                            index === 2 ? 'bg-yellow-500 text-white' :
+                            'bg-gray-200 dark:bg-slate-600 text-gray-600 dark:text-gray-300'
+                          }`}>
+                            {index + 1}
+                          </span>
+                          <span className="text-xs text-gray-400 dark:text-gray-500">{post.viewCount || 0} 阅读</span>
+                        </div>
+                        <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors leading-snug">
+                          {post.title}
+                        </p>
+                      </Link>
+                    ))}
+                    {posts.length === 0 && (
+                      <div className="text-center py-4 text-gray-400 dark:text-gray-500 text-sm w-full">
+                        暂无文章
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
 
               {/* 当前过滤标签 */}
               {(selectedCategory || selectedColumn || selectedTag) && (
@@ -997,6 +1040,40 @@ export function HomePage() {
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
+          }
+
+          .scrollbar-thin {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+          }
+
+          .scrollbar-thin::-webkit-scrollbar {
+            height: 4px;
+          }
+
+          .scrollbar-thin::-webkit-scrollbar-track {
+            background: transparent;
+          }
+
+          .scrollbar-thin::-webkit-scrollbar-thumb {
+            background-color: rgba(156, 163, 175, 0.5);
+            border-radius: 4px;
+          }
+
+          .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(156, 163, 175, 0.7);
+          }
+
+          .dark .scrollbar-thin {
+            scrollbar-color: rgba(100, 116, 139, 0.5) transparent;
+          }
+
+          .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+            background-color: rgba(100, 116, 139, 0.5);
+          }
+
+          .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(100, 116, 139, 0.7);
           }
         `}</style>
       </div>
