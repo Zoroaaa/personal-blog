@@ -3,7 +3,7 @@
 一个基于 Cloudflare 全栈技术构建的现代化个人博客系统。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.3.3-green.svg)](https://github.com/yourusername/personal-blog)
+[![Version](https://img.shields.io/badge/version-1.4.0-green.svg)](https://github.com/yourusername/personal-blog)
 [![Cloudflare](https://img.shields.io/badge/Cloudflare-Workers-orange.svg)](https://workers.cloudflare.com/)
 
 **体验地址**: [blog.neutronx.uk](https://blog.neutronx.uk)
@@ -12,21 +12,23 @@
 
 ## 效果图
 
-<img width="1920" height="865" alt="image" src="https://github.com/user-attachments/assets/49ea0682-52ac-4ad5-acf0-0ac1de945fbf" />
-<img width="1920" height="908" alt="image" src="https://github.com/user-attachments/assets/9c520f0e-0908-4278-bb2b-aa44bb089304" />
-<img width="1920" height="865" alt="image" src="https://github.com/user-attachments/assets/4950ee6d-8fd5-4b50-ad2a-61beda741d32" />
-<img width="1920" height="865" alt="image" src="https://github.com/user-attachments/assets/01f2deea-4e3f-47e1-9c8b-7413e8bd1559" />
-<img width="1920" height="905" alt="image" src="https://github.com/user-attachments/assets/c00148ec-b423-4b66-bbfc-91ddb51d1a03" />
-<img width="1920" height="906" alt="image" src="https://github.com/user-attachments/assets/497527ad-5062-4e3f-982c-3653a649603b" />
-<img width="1920" height="1902" alt="image" src="https://github.com/user-attachments/assets/eaaf35a3-f9ec-4695-81fa-360fdad769ad" />
-<img width="1920" height="907" alt="image" src="https://github.com/user-attachments/assets/c546f122-32bc-44b8-8f5b-2a65787000d3" />
-<img width="1920" height="906" alt="image" src="https://github.com/user-attachments/assets/96308d19-68e7-4136-b247-7c0c209c6e34" />
+<img width="1920" height="869" alt="image" src="https://github.com/user-attachments/assets/a6fc5062-d7e5-42e6-92cd-a3cf7dbae454" />
+<img width="1920" height="869" alt="image" src="https://github.com/user-attachments/assets/e0dd9ccd-a209-43fe-a6e4-fa23d1e0434d" />
+<img width="1920" height="869" alt="image" src="https://github.com/user-attachments/assets/dc0539fd-104c-4cc8-bd62-73b45f0ba475" />
+<img width="1920" height="869" alt="image" src="https://github.com/user-attachments/assets/172d64f8-90bf-4bea-bb44-5dcd8e3c567b" />
+<img width="1920" height="869" alt="image" src="https://github.com/user-attachments/assets/32b31e35-15b0-4482-a16f-6f3bec8d5fb4" />
+<img width="1920" height="869" alt="image" src="https://github.com/user-attachments/assets/f0126330-ff7c-470b-9cae-2e56172298a5" />
+<img width="1920" height="869" alt="image" src="https://github.com/user-attachments/assets/d5000fbc-0073-4dda-ac34-90c4bcd5cde7" />
+<img width="1920" height="869" alt="image" src="https://github.com/user-attachments/assets/830748ad-a589-4ba2-89d8-4afe68072d7d" />
+<img width="1920" height="869" alt="image" src="https://github.com/user-attachments/assets/561172d5-1856-4d2d-b6c0-c2ae9a07da74" />
+<img width="1920" height="869" alt="image" src="https://github.com/user-attachments/assets/963bbe95-436e-4314-94a7-dfa4580b6df7" />
+<img width="1920" height="869" alt="image" src="https://github.com/user-attachments/assets/469d3bc8-1682-46bb-b2ea-025a857c63b5" />
 
 ---
 
 ## 项目概述
 
-这是一个功能丰富、性能卓越的个人博客系统，采用前后端分离架构，基于 Cloudflare 边缘计算平台构建。系统支持 Markdown 写作、代码高亮、评论互动、用户管理、数据分析等完整功能,适合技术博主和内容创作者使用。
+这是一个功能丰富、性能卓越的个人博客系统，采用前后端分离架构，基于 Cloudflare 边缘计算平台构建。系统支持 Markdown 写作、代码高亮、评论互动、用户管理、数据分析等完整功能，适合技术博主和内容创作者使用。
 
 ### 核心特性
 
@@ -37,11 +39,11 @@
 - **互动功能**: 点赞、收藏、阅读历史、嵌套评论（最多5层）、@提及
 - **全文搜索**: 支持 FTS5 全文搜索引擎，支持中英文混合搜索
 - **通知系统**: 站内通知中心、通知设置、免打扰模式、首页轮播公告
-- **私信系统**: 用户间私信、会话管理、消息已读状态
+- **私信系统**: 用户间私信、会话管理、消息已读状态、消息撤回
 - **管理后台**: 用户管理、内容审核、系统配置、数据分析、系统通知发布
 - **SEO 优化**: 动态 meta 标签、结构化数据、搜索引擎友好
 - **响应式设计**: 完美适配桌面端、平板和移动设备
-- **暗色模式**: 支持亮色/暗色主题切换
+- **主题系统**: 支持亮色/暗色主题切换、自定义主色调、字体大小调节
 - **安全增强**: 密码保护文章、文件魔数验证、软删除机制
 
 ---
@@ -115,6 +117,8 @@
    # 执行数据库迁移（需按顺序执行）
    wrangler d1 execute personal-blog-dev --file=../database/schema-v1.1-base.sql
    wrangler d1 execute personal-blog-dev --file=../database/schema-v1.3-notification-messaging.sql
+   wrangler d1 execute personal-blog-dev --file=../database/migration-v1.4-message-recall.sql
+   wrangler d1 execute personal-blog-dev --file=../database/migration-v1.9-post-pinning.sql
    ```
 
 5. **创建 R2 存储桶**
@@ -144,7 +148,7 @@ personal-blog/
 │   │   ├── index.ts        # 应用入口
 │   │   ├── routes/         # API 路由
 │   │   │   ├── auth.ts     # 认证相关（注册/登录/OAuth/邮箱验证）
-│   │   │   ├── posts.ts    # 文章管理（CRUD/搜索/点赞/收藏/阅读历史）
+│   │   │   ├── posts.ts    # 文章管理（CRUD/搜索/点赞/收藏/阅读历史/热门文章/推荐文章）
 │   │   │   ├── columns.ts  # 专栏管理
 │   │   │   ├── comments.ts # 评论系统（嵌套回复/@提及）
 │   │   │   ├── admin.ts    # 后台管理
@@ -171,7 +175,8 @@ personal-blog/
 │   │   │   ├── messageService.ts # 私信服务
 │   │   │   ├── messageSettingsService.ts # 私信设置服务
 │   │   │   ├── notificationService.ts # 通知服务
-│   │   │   └── notificationSettingsService.ts # 通知设置服务
+│   │   │   ├── notificationSettingsService.ts # 通知设置服务
+│   │   │   └── postService.ts # 文章服务
 │   │   ├── utils/          # 工具函数
 │   │   │   ├── cache.ts    # 缓存工具
 │   │   │   ├── jwt.ts      # JWT处理
@@ -187,16 +192,20 @@ personal-blog/
 │   └── wrangler.toml       # Workers 配置
 ├── database/               # 数据库文件
 │   ├── schema-v1.1-base.sql          # 基础数据库架构
-│   └── schema-v1.3-notification-messaging.sql # 通知私信架构
+│   ├── schema-v1.3-notification-messaging.sql # 通知私信架构
+│   ├── migration-v1.4-message-recall.sql # 消息撤回迁移
+│   └── migration-v1.9-post-pinning.sql # 文章置顶迁移
 ├── frontend/               # 前端应用 (64个TypeScript文件)
 │   ├── src/
 │   │   ├── pages/          # 页面组件
-│   │   │   ├── HomePage.tsx      # 首页
-│   │   │   ├── PostPage.tsx      # 文章详情
+│   │   │   ├── HomePage.tsx      # 首页（热门文章排行）
+│   │   │   ├── PostPage.tsx      # 文章详情（上下篇导航/推荐文章）
 │   │   │   ├── LoginPage.tsx     # 登录页
 │   │   │   ├── AdminPage.tsx     # 管理后台
 │   │   │   ├── SearchPage.tsx    # 搜索页
-│   │   │   ├── ProfilePage.tsx   # 个人资料
+│   │   │   ├── ProfilePage.tsx   # 个人中心（评论/点赞/收藏）
+│   │   │   ├── ReadingHistoryPage.tsx # 阅读历史页
+│   │   │   ├── AccountSettingsPage.tsx # 账号设置页
 │   │   │   ├── ColumnPage.tsx    # 专栏详情
 │   │   │   ├── CategoryPage.tsx  # 分类页
 │   │   │   ├── TagPage.tsx       # 标签页
@@ -214,6 +223,9 @@ personal-blog/
 │   │   │       └── SystemNotificationPage.tsx # 系统通知管理
 │   │   ├── components/     # 可复用组件
 │   │   ├── stores/         # 状态管理
+│   │   │   ├── authStore.ts # 认证状态
+│   │   │   ├── themeStore.ts # 主题状态（亮暗色/主色调/字体大小）
+│   │   │   └── notificationStore.ts # 通知状态
 │   │   ├── hooks/          # 自定义 Hooks
 │   │   ├── utils/          # 工具函数
 │   │   └── types/          # 类型定义
@@ -228,7 +240,8 @@ personal-blog/
 │       ├── CHANGELOG_v1.3.0.md
 │       ├── CHANGELOG_v1.3.1.md
 │       ├── CHANGELOG_v1.3.2.md
-│       └── CHANGELOG_v1.3.3.md
+│       ├── CHANGELOG_v1.3.3.md
+│       └── CHANGELOG_v1.4.0.md
 ├── scripts/                # 工具脚本
 │   ├── init.sh             # 初始化脚本
 │   └── migrate.sh          # 迁移脚本
@@ -253,6 +266,9 @@ personal-blog/
 - ✅ 文章密码保护
 - ✅ 阅读进度追踪
 - ✅ 软删除机制
+- ✅ **文章置顶功能**（v1.4.0新增）
+- ✅ **上下篇导航**（v1.4.0新增）
+- ✅ **相关推荐文章**（v1.4.0新增）
 
 ### 专栏系统
 
@@ -283,6 +299,25 @@ personal-blog/
 - ✅ 阅读历史
 - ✅ 收藏文章
 - ✅ 账号删除（软删除）
+- ✅ **独立账号设置页面**（v1.4.0新增）
+- ✅ **个人中心整合**（v1.4.0重构）
+
+### 主题系统
+
+- ✅ 亮色/暗色模式切换
+- ✅ 跟随系统主题
+- ✅ **自定义主色调**（v1.4.0新增）
+- ✅ **字体大小调节**（v1.4.0新增）
+- ✅ **全页面主题适配**（v1.4.0优化）
+
+### 首页功能
+
+- ✅ 文章列表展示
+- ✅ 分类筛选
+- ✅ 专栏筛选
+- ✅ 标签筛选
+- ✅ 通知轮播
+- ✅ **热门文章排行**（v1.4.0新增，替换原快速导航和数据统计）
 
 ### 通知系统
 
@@ -302,6 +337,7 @@ personal-blog/
 - ✅ 消息已读状态
 - ✅ 私信设置（陌生人限制）
 - ✅ 收件箱/发件箱管理
+- ✅ 消息撤回功能
 
 ### 管理后台
 
@@ -323,7 +359,7 @@ personal-blog/
 
 主要 API 模块：
 - **认证模块**: `/api/auth/*` - 登录、注册、OAuth、邮箱验证码、密码重置
-- **文章模块**: `/api/posts/*` - 文章 CRUD、搜索、阅读历史、密码验证
+- **文章模块**: `/api/posts/*` - 文章 CRUD、搜索、阅读历史、密码验证、热门文章、推荐文章
 - **专栏模块**: `/api/columns/*` - 专栏管理、统计刷新
 - **评论模块**: `/api/comments/*` - 评论管理、点赞
 - **分类模块**: `/api/categories/*` - 分类标签
@@ -418,7 +454,8 @@ wrangler pages deploy dist
 - [部署指南](./docs/DEPLOYMENT.md) - 详细部署说明
 - [API 文档](./docs/API.md) - 完整接口参考
 - [架构文档](./docs/ARCHITECTURE.md) - 系统设计说明
+- [更新日志](./docs/changelog/CHANGELOG_v1.4.0.md) - 版本更新记录
 
 ---
 
-**版本**: v1.3.3 | **更新日期**: 2026-02-16
+**版本**: v1.4.0 | **更新日期**: 2026-02-17

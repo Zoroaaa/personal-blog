@@ -157,7 +157,7 @@ export function extractDomain(url: string): string {
  */
 export function highlightUrls(text: string): string {
   return text.replace(URL_REGEX, (url) => {
-    return `<mark class="bg-blue-100 text-blue-800 px-1 rounded">${url}</mark>`;
+    return `<mark class="bg-primary/10 text-primary px-1 rounded">${url}</mark>`;
   });
 }
 

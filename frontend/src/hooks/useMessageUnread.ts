@@ -3,7 +3,7 @@ import { api } from '../utils/api';
 
 const MESSAGE_UNREAD_STORAGE_KEY = 'message_unread_count';
 
-export function useMessageUnread() {
+export function useMessageUnread(isAuthenticated: boolean = true) {
   const [unreadCount, setUnreadCount] = useState<number>(() => {
     const stored = localStorage.getItem(MESSAGE_UNREAD_STORAGE_KEY);
     return stored ? parseInt(stored, 10) : 0;
@@ -11,6 +11,9 @@ export function useMessageUnread() {
   const [loading, setLoading] = useState(false);
 
   const fetchUnreadCount = useCallback(async () => {
+    if (!isAuthenticated) {
+      return;
+    }
     setLoading(true);
     try {
       const response = await api.get('/messages/unread/count');
@@ -24,7 +27,7 @@ export function useMessageUnread() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   const refresh = useCallback(() => {
     fetchUnreadCount();
@@ -44,6 +47,10 @@ export function useMessageUnread() {
   }, []);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+    
     fetchUnreadCount();
     
     const interval = setInterval(fetchUnreadCount, 30000);
@@ -66,7 +73,7 @@ export function useMessageUnread() {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('messageUnreadUpdated', handleCustomEvent as EventListener);
     };
-  }, [fetchUnreadCount]);
+  }, [fetchUnreadCount, isAuthenticated]);
 
   return { 
     unreadCount, 

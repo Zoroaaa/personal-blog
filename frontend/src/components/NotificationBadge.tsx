@@ -13,16 +13,15 @@
  */
 
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useAuthStore } from '../stores/authStore';
 
 interface NotificationBadgeProps {
   className?: string;
+  onNavigate?: (path: string) => void;
 }
 
-export default function NotificationBadge({ className = '' }: NotificationBadgeProps) {
-  const navigate = useNavigate();
+export default function NotificationBadge({ className = '', onNavigate }: NotificationBadgeProps) {
   const { isAuthenticated } = useAuthStore();
   const { unreadCount, fetchUnreadCount } = useNotificationStore();
 
@@ -49,8 +48,8 @@ export default function NotificationBadge({ className = '' }: NotificationBadgeP
 
   return (
     <button
-      onClick={() => navigate('/notifications')}
-      className={`relative p-2 text-gray-600 hover:text-gray-900 transition-colors ${className}`}
+      onClick={() => onNavigate ? onNavigate('/notifications') : null}
+      className={`relative p-2 text-muted-foreground hover:text-foreground transition-colors ${className}`}
       title="通知"
     >
       <svg

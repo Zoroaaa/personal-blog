@@ -908,7 +908,7 @@ export const api = {
    * 获取热门文章
    */
   getHotPosts: (limit?: number) =>
-    apiRequest<PostListItem[]>(`/posts/hot/list?limit=${limit || 5}`),
+    apiRequest<{ posts: PostListItem[] }>(`/posts/hot/list?limit=${limit || 5}`),
 
   /**
    * 获取相邻文章（上一篇/下一篇）

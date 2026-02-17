@@ -117,7 +117,7 @@ export default function NewMessagePage() {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           <p className="mt-2 text-muted-foreground">加载中...</p>
         </div>
       </div>
@@ -164,7 +164,7 @@ export default function NewMessagePage() {
               onChange={(e) => setSubject(e.target.value)}
               maxLength={100}
               placeholder="消息主题"
-              className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-primary/50 focus:border-transparent"
             />
           </div>
 
@@ -179,7 +179,7 @@ export default function NewMessagePage() {
               placeholder="输入消息内容..."
               rows={6}
               maxLength={2000}
-              className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-primary/50 focus:border-transparent resize-none"
             />
             <div className="flex justify-between items-center mt-1">
               <p className="text-xs text-muted-foreground">
@@ -201,7 +201,7 @@ export default function NewMessagePage() {
             <button
               onClick={handleSend}
               disabled={!content.trim() || sending}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {sending ? '发送中...' : '发送'}
             </button>

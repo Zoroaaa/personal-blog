@@ -74,10 +74,10 @@ export default function ApiTestPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
+    <div className="min-h-screen bg-background py-12 px-4">
       <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-6">
+        <div className="bg-card rounded-lg shadow-lg p-8">
+          <h1 className="text-3xl font-bold text-foreground mb-6">
             API 连接测试
           </h1>
 
@@ -89,7 +89,7 @@ export default function ApiTestPage() {
               <button
                 onClick={handleTestConnection}
                 disabled={loading}
-                className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
+                className="bg-primary text-white px-6 py-2 rounded hover:bg-primary/90 disabled:bg-muted"
               >
                 {loading ? '测试中...' : '测试连接'}
               </button>
@@ -119,8 +119,8 @@ export default function ApiTestPage() {
                         {testResult.message}
                       </h3>
                       {testResult.details && (
-                        <div className="mt-2 text-sm text-gray-700">
-                          <pre className="whitespace-pre-wrap bg-gray-100 p-2 rounded">
+                        <div className="mt-2 text-sm text-foreground">
+                          <pre className="whitespace-pre-wrap bg-muted p-2 rounded">
                             {JSON.stringify(testResult.details, null, 2)}
                           </pre>
                         </div>
@@ -139,7 +139,7 @@ export default function ApiTestPage() {
                 <button
                   onClick={handleTestPosts}
                   disabled={loading}
-                  className="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700 disabled:bg-gray-400"
+                  className="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-primary/90 disabled:bg-muted"
                 >
                   测试获取文章
                 </button>
@@ -147,7 +147,7 @@ export default function ApiTestPage() {
                 <button
                   onClick={handleTestCategories}
                   disabled={loading}
-                  className="bg-purple-600 text-white px-6 py-2 rounded hover:bg-purple-700 disabled:bg-gray-400"
+                  className="bg-purple-600 text-white px-6 py-2 rounded hover:bg-primary/90 disabled:bg-muted"
                 >
                   测试获取分类
                 </button>
@@ -161,9 +161,9 @@ export default function ApiTestPage() {
                 }`}>
                   <h3 className="font-semibold mb-2">{postsTest.message}</h3>
                   {postsTest.data && (
-                    <div className="text-sm text-gray-700">
+                    <div className="text-sm text-foreground">
                       <p>找到 {postsTest.data.posts?.length || 0} 篇文章</p>
-                      <pre className="mt-2 whitespace-pre-wrap bg-gray-100 p-2 rounded max-h-96 overflow-auto">
+                      <pre className="mt-2 whitespace-pre-wrap bg-muted p-2 rounded max-h-96 overflow-auto">
                         {JSON.stringify(postsTest.data, null, 2)}
                       </pre>
                     </div>
@@ -176,24 +176,24 @@ export default function ApiTestPage() {
             </div>
 
             {/* 配置信息 */}
-            <div className="border rounded-lg p-6 bg-gray-50">
+            <div className="border rounded-lg p-6 bg-background">
               <h2 className="text-xl font-semibold mb-4">当前配置</h2>
               <dl className="space-y-2 text-sm">
                 <div>
-                  <dt className="font-medium text-gray-700">API URL:</dt>
-                  <dd className="mt-1 text-gray-900 font-mono">
+                  <dt className="font-medium text-foreground">API URL:</dt>
+                  <dd className="mt-1 text-foreground font-mono">
                     {import.meta.env.VITE_API_URL || '/api'}
                   </dd>
                 </div>
                 <div>
-                  <dt className="font-medium text-gray-700">环境:</dt>
-                  <dd className="mt-1 text-gray-900">
+                  <dt className="font-medium text-foreground">环境:</dt>
+                  <dd className="mt-1 text-foreground">
                     {import.meta.env.DEV ? '开发环境' : '生产环境'}
                   </dd>
                 </div>
                 <div>
-                  <dt className="font-medium text-gray-700">模式:</dt>
-                  <dd className="mt-1 text-gray-900">
+                  <dt className="font-medium text-foreground">模式:</dt>
+                  <dd className="mt-1 text-foreground">
                     {import.meta.env.MODE}
                   </dd>
                 </div>
@@ -201,11 +201,11 @@ export default function ApiTestPage() {
             </div>
 
             {/* 故障排查指南 */}
-            <div className="border rounded-lg p-6 bg-blue-50">
-              <h2 className="text-xl font-semibold mb-4 text-blue-900">
+            <div className="border rounded-lg p-6 bg-primary/5">
+              <h2 className="text-xl font-semibold mb-4 text-foreground">
                 🔧 故障排查指南
               </h2>
-              <div className="space-y-3 text-sm text-blue-800">
+              <div className="space-y-3 text-sm text-primary">
                 <div>
                   <strong>1. 检查环境变量</strong>
                   <p>确保在 Cloudflare Pages 设置中添加了 VITE_API_URL 环境变量</p>

@@ -146,7 +146,7 @@ export default function MessagesPage() {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           <p className="mt-2 text-muted-foreground">加载中...</p>
         </div>
       </div>
@@ -171,7 +171,7 @@ export default function MessagesPage() {
           </button>
           <button
             onClick={() => setShowNewMessageModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -269,7 +269,7 @@ export default function MessagesPage() {
                       setFoundUser(null);
                     }}
                     placeholder="输入用户名搜索"
-                    className="flex-1 px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="flex-1 px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-primary/50 focus:border-transparent"
                   />
                   <button
                     onClick={searchUser}
@@ -308,7 +308,7 @@ export default function MessagesPage() {
                   placeholder="输入消息内容..."
                   rows={4}
                   maxLength={2000}
-                  className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-primary/50 focus:border-transparent resize-none"
                 />
                 <p className="text-xs text-muted-foreground text-right mt-1">
                   {newMessageContent.length}/2000
@@ -330,7 +330,7 @@ export default function MessagesPage() {
                 <button
                   onClick={handleSendNewMessage}
                   disabled={!foundUser || !newMessageContent.trim() || sending}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {sending ? '发送中...' : '发送'}
                 </button>

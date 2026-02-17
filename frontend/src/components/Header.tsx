@@ -27,7 +27,7 @@ export function Header() {
   const location = useLocation();
   const { user, logout } = useAuthStore();
   const { config } = useSiteConfig();
-  const { unreadCount: messageUnreadCount } = useMessageUnread();
+  const { unreadCount: messageUnreadCount } = useMessageUnread(!!user);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [scrolled, setScrolled] = useState(false);
@@ -62,6 +62,25 @@ export function Header() {
 
   const isActive = (path: string) => {
     return location.pathname === path;
+  };
+
+  const handleNavClick = (path: string, e: React.MouseEvent) => {
+    if (location.pathname === path) {
+      e.preventDefault();
+      if (path === '/') {
+        window.location.reload();
+      } else {
+        navigate('/');
+      }
+    }
+  };
+
+  const handleButtonClick = (path: string) => {
+    if (location.pathname === path) {
+      navigate('/');
+    } else {
+      navigate(path);
+    }
   };
 
   const navLinks = [
@@ -111,6 +130,7 @@ export function Header() {
               <Link
                 key={link.path}
                 to={link.path}
+                onClick={(e) => handleNavClick(link.path, e)}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                   isActive(link.path)
                     ? 'bg-primary/10 text-primary'
@@ -151,12 +171,12 @@ export function Header() {
             <ThemeToggle />
 
             {/* 通知角标 */}
-            <NotificationBadge />
+            <NotificationBadge onNavigate={handleButtonClick} />
 
             {/* 私信图标（独立） */}
             {user && (
-              <Link
-                to="/messages"
+              <button
+                onClick={() => handleButtonClick('/messages')}
                 className="relative p-2 rounded-md hover:bg-accent transition-colors"
                 aria-label={`私信 ${messageUnreadCount > 0 ? `(${messageUnreadCount}条未读)` : ''}`}
               >
@@ -164,11 +184,11 @@ export function Header() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
                 {messageUnreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 font-medium">
+                  <span className="absolute -top-1 -right-1 bg-primary/80 text-white text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 font-medium">
                     {messageUnreadCount > 99 ? '99+' : messageUnreadCount}
                   </span>
                 )}
-              </Link>
+              </button>
             )}
 
             {/* 用户菜单 */}
@@ -294,6 +314,7 @@ export function Header() {
                 <Link
                   key={link.path}
                   to={link.path}
+                  onClick={(e) => handleNavClick(link.path, e)}
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                     isActive(link.path)
                       ? 'bg-primary/10 text-primary'

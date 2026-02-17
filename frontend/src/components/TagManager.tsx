@@ -173,11 +173,11 @@ export function TagManager() {
     <div className="space-y-6">
       {/* 头部 */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">标签管理</h2>
+        <h2 className="text-2xl font-bold text-foreground">标签管理</h2>
         <div className="flex flex-wrap gap-3 w-full sm:w-auto">
           {/* 搜索框 */}
           <div className="relative flex-1 sm:flex-initial">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -185,7 +185,7 @@ export function TagManager() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="搜索标签..."
-              className="pl-10 pr-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white w-full sm:w-64"
+              className="pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/50 dark:bg-muted dark:text-foreground w-full sm:w-64"
             />
           </div>
           
@@ -193,7 +193,7 @@ export function TagManager() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as 'name' | 'count')}
-            className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+            className="px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/50 dark:bg-muted dark:text-foreground"
           >
             <option value="count">按使用次数</option>
             <option value="name">按名称</option>
@@ -202,7 +202,7 @@ export function TagManager() {
           {/* 新建按钮 */}
           <button
             onClick={handleCreate}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium flex items-center gap-2 whitespace-nowrap"
+            className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg transition-colors font-medium flex items-center gap-2 whitespace-nowrap"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -214,19 +214,19 @@ export function TagManager() {
       
       {/* 统计信息 */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
-          <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">总标签数</div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-white">{tags.length}</div>
+        <div className="bg-card rounded-lg border border-border p-4">
+          <div className="text-sm text-muted-foreground mb-1">总标签数</div>
+          <div className="text-2xl font-bold text-foreground">{tags.length}</div>
         </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
-          <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">使用中</div>
+        <div className="bg-card rounded-lg border border-border p-4">
+          <div className="text-sm text-muted-foreground mb-1">使用中</div>
           <div className="text-2xl font-bold text-green-600 dark:text-green-400">
             {tags.filter(t => t.postCount > 0).length}
           </div>
         </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
-          <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">未使用</div>
-          <div className="text-2xl font-bold text-gray-400">
+        <div className="bg-card rounded-lg border border-border p-4">
+          <div className="text-sm text-muted-foreground mb-1">未使用</div>
+          <div className="text-2xl font-bold text-muted-foreground">
             {tags.filter(t => t.postCount === 0).length}
           </div>
         </div>
@@ -235,15 +235,15 @@ export function TagManager() {
       {/* 表单对话框 */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-card rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                <h3 className="text-xl font-bold text-foreground">
                   {editingId ? '编辑标签' : '新建标签'}
                 </h3>
                 <button
                   onClick={() => setShowForm(false)}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  className="text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -260,14 +260,14 @@ export function TagManager() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* 标签名称 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     标签名称 *
                   </label>
                   <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/50 dark:bg-muted dark:text-foreground"
                     placeholder="例如: JavaScript, React, 算法"
                     required
                   />
@@ -275,27 +275,27 @@ export function TagManager() {
                 
                 {/* Slug */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     URL 标识 (留空自动生成)
                   </label>
                   <input
                     type="text"
                     value={formData.slug}
                     onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/50 dark:bg-muted dark:text-foreground"
                     placeholder="例如: javascript, react, algorithm"
                   />
                 </div>
                 
                 {/* 描述 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     描述
                   </label>
                   <textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/50 dark:bg-muted dark:text-foreground"
                     rows={2}
                     placeholder="标签的简短描述"
                   />
@@ -303,13 +303,13 @@ export function TagManager() {
                 
                 {/* 颜色选择 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     颜色 (用于前端显示)
                   </label>
                   
                   {/* 预览 */}
-                  <div className="mb-3 p-4 bg-gray-50 dark:bg-slate-900 rounded-lg">
-                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">预览:</div>
+                  <div className="mb-3 p-4 bg-background rounded-lg">
+                    <div className="text-sm text-muted-foreground mb-2">预览:</div>
                     <div className="flex gap-3">
                       <span
                         className="px-4 py-2 rounded-full text-sm font-medium border-2"
@@ -339,8 +339,8 @@ export function TagManager() {
                         onClick={() => setFormData({ ...formData, color: color.value })}
                         className={`group relative w-10 h-10 rounded-lg border-2 transition-all ${
                           formData.color === color.value
-                            ? 'border-gray-900 dark:border-white scale-110'
-                            : 'border-gray-300 dark:border-slate-600 hover:scale-105'
+                            ? 'border-foreground scale-110'
+                            : 'border-border hover:scale-105'
                         }`}
                         style={{ backgroundColor: color.value }}
                         title={color.name}
@@ -360,13 +360,13 @@ export function TagManager() {
                       type="color"
                       value={formData.color}
                       onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                      className="w-16 h-10 rounded-lg border border-gray-300 dark:border-slate-600 cursor-pointer"
+                      className="w-16 h-10 rounded-lg border border-border cursor-pointer"
                     />
                     <input
                       type="text"
                       value={formData.color}
                       onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                      className="flex-1 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white font-mono text-sm"
+                      className="flex-1 px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/50 dark:bg-muted dark:text-foreground font-mono text-sm"
                       placeholder="#6B7280"
                     />
                   </div>
@@ -377,14 +377,14 @@ export function TagManager() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition-colors font-medium"
+                    className="flex-1 px-4 py-2 bg-primary hover:bg-primary/90 disabled:bg-primary/60 text-white rounded-lg transition-colors font-medium"
                   >
                     {submitting ? '提交中...' : editingId ? '更新' : '创建'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowForm(false)}
-                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors font-medium"
+                    className="px-4 py-2 bg-muted hover:bg-accent text-foreground rounded-lg transition-colors font-medium"
                   >
                     取消
                   </button>
@@ -398,8 +398,8 @@ export function TagManager() {
       {/* 标签列表 */}
       {loading ? (
         <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">加载中...</p>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-2 text-muted-foreground">加载中...</p>
         </div>
       ) : error ? (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 text-center">
@@ -412,63 +412,63 @@ export function TagManager() {
           </button>
         </div>
       ) : filteredAndSortedTags.length === 0 ? (
-        <div className="bg-gray-50 dark:bg-slate-800 rounded-lg p-12 text-center">
-          <svg className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="bg-background dark:bg-card rounded-lg p-12 text-center">
+          <svg className="mx-auto h-12 w-12 text-muted-foreground mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
           </svg>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
+          <p className="text-muted-foreground mb-4">
             {searchTerm ? '没有找到匹配的标签' : '还没有创建任何标签'}
           </p>
           {!searchTerm && (
             <button
               onClick={handleCreate}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg transition-colors"
             >
               创建第一个标签
             </button>
           )}
         </div>
       ) : (
-        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
+        <div className="bg-card rounded-lg border border-border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-slate-900">
+              <thead className="bg-background">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     标签
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     描述
                   </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     颜色
                   </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     使用次数
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     操作
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
                 {filteredAndSortedTags.map((tag) => (
-                  <tr key={tag.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+                  <tr key={tag.id} className="hover:bg-background dark:hover:bg-accent/50 transition-colors">
                     <td className="px-6 py-4">
                       <div>
-                        <div className="font-medium text-gray-900 dark:text-white">#{tag.name}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{tag.slug}</div>
+                        <div className="font-medium text-foreground">#{tag.name}</div>
+                        <div className="text-xs text-muted-foreground">{tag.slug}</div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate">
+                      <div className="text-sm text-muted-foreground max-w-xs truncate">
                         {tag.description || '-'}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="flex justify-center gap-2">
                         <div
-                          className="w-8 h-8 rounded-full border-2 border-gray-300 dark:border-slate-600"
+                          className="w-8 h-8 rounded-full border-2 border-border"
                           style={{ backgroundColor: tag.color }}
                           title={tag.color}
                         />
@@ -487,7 +487,7 @@ export function TagManager() {
                       <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
                         tag.postCount > 0
                           ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                          : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-400'
+                          : 'bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground'
                       }`}>
                         {tag.postCount} 篇
                       </span>
@@ -506,7 +506,7 @@ export function TagManager() {
                         </button>
                         <button
                           onClick={() => handleEdit(tag)}
-                          className="px-3 py-1 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                          className="px-3 py-1 text-sm text-primary dark:text-primary hover:bg-primary/10 rounded transition-colors"
                         >
                           编辑
                         </button>

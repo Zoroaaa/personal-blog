@@ -596,7 +596,7 @@ export function PostPage() {
             <button
               onClick={() => handleLikeComment(comment.id)}
               disabled={commentLiking === comment.id}
-              className={`hover:text-blue-600 flex items-center ${commentLiking === comment.id ? 'opacity-50' : ''}`}
+              className={`hover:text-primary flex items-center ${commentLiking === comment.id ? 'opacity-50' : ''}`}
             >
               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -607,7 +607,7 @@ export function PostPage() {
             {level < 3 && (
               <button
                 onClick={() => handleReply(comment.id)}
-                className="hover:text-blue-600"
+                className="hover:text-primary"
               >
                 回复
               </button>
@@ -636,7 +636,7 @@ export function PostPage() {
                 <button
                   type="submit"
                   disabled={commentLoading || !replyContent.trim() || uploadingImage}
-                  className="px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="px-4 py-1 bg-primary text-white rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   {commentLoading ? '发表中...' : '发表回复'}
                 </button>
@@ -659,8 +659,8 @@ export function PostPage() {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-gray-600">加载中...</p>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-2 text-muted-foreground">加载中...</p>
         </div>
       </div>
     );
@@ -669,13 +669,13 @@ export function PostPage() {
   if (error || !post) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <h3 className="text-lg font-medium text-red-800 mb-2">
+        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6 text-center">
+          <h3 className="text-lg font-medium text-destructive mb-2">
             {error || '文章不存在'}
           </h3>
           <button
             onClick={() => navigate('/')}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="mt-4 px-4 py-2 bg-primary text-white rounded hover:bg-primary/90"
           >
             返回首页
           </button>
@@ -692,7 +692,7 @@ export function PostPage() {
           description={post.summary || '这是一篇受密码保护的文章'}
         />
         <div className="max-w-2xl mx-auto px-4 py-12">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-gray-200 dark:border-slate-700 overflow-hidden">
+          <div className="bg-card rounded-2xl shadow-xl border border-border overflow-hidden">
             {post.coverImage && (
               <div className="relative h-48 overflow-hidden">
                 <img
@@ -712,10 +712,10 @@ export function PostPage() {
             
             <div className="p-8">
               {!post.coverImage && (
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{post.title}</h1>
+                <h1 className="text-2xl font-bold text-foreground mb-2">{post.title}</h1>
               )}
               
-              <div className="flex items-center gap-3 mb-6 text-gray-600 dark:text-gray-400">
+              <div className="flex items-center gap-3 mb-6 text-muted-foreground">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
@@ -724,7 +724,7 @@ export function PostPage() {
 
               <form onSubmit={handleVerifyPassword} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     请输入访问密码
                   </label>
                   <input
@@ -732,13 +732,13 @@ export function PostPage() {
                     value={passwordInput}
                     onChange={(e) => setPasswordInput(e.target.value)}
                     placeholder="输入文章密码"
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-slate-700 dark:text-white"
+                    className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-purple-500 bg-background text-foreground"
                     autoFocus
                   />
                 </div>
 
                 {passwordError && (
-                  <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
+                  <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
                     {passwordError}
                   </div>
                 )}
@@ -752,8 +752,8 @@ export function PostPage() {
                 </button>
               </form>
 
-              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-slate-700">
-                <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+              <div className="mt-6 pt-6 border-t border-border">
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     {post.authorAvatar && (
                       <img src={post.authorAvatar} alt="" className="w-5 h-5 rounded-full" />
@@ -819,7 +819,7 @@ export function PostPage() {
           {isAuthenticated && user?.id !== post.authorId && (
             <button
               onClick={() => navigate(`/messages/new?recipientId=${post.authorId}&recipientName=${encodeURIComponent(post.author?.displayName || post.authorName || '')}`)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -844,7 +844,7 @@ export function PostPage() {
             <aside className="hidden xl:block w-64 flex-shrink-0">
               <div className="sticky top-24">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">
+                  <h4 className="text-sm font-semibold text-foreground uppercase tracking-wider">
                     目录
                   </h4>
                   <button
@@ -853,7 +853,7 @@ export function PostPage() {
                       e.stopPropagation();
                       setShowToc(!showToc);
                     }}
-                    className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                    className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors"
                   >
                     {showToc ? '收起' : '展开'}
                   </button>
@@ -870,17 +870,16 @@ export function PostPage() {
                         e.stopPropagation();
                         const element = document.getElementById(item.id);
                         if (element) {
-                          const offset = 120; // 留出顶部空间，避免被导航栏遮挡
+                          const offset = 120;
                           const elementPosition = element.getBoundingClientRect().top + window.scrollY;
                           window.scrollTo({
                             top: elementPosition - offset,
                             behavior: 'smooth'
                           });
-                          // 更新 URL hash
                           window.history.replaceState(null, '', `#${item.id}`);
                         }
                       }}
-                      className={`block w-full text-left text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors py-1 cursor-pointer bg-transparent border-none ${
+                      className={`block w-full text-left text-sm text-muted-foreground hover:text-primary transition-colors py-1 cursor-pointer bg-transparent border-none ${
                         item.level === 1 ? 'font-medium' : ''
                       }`}
                       style={{ paddingLeft: `${(item.level - 1) * 12}px` }}
@@ -996,7 +995,7 @@ export function PostPage() {
             {user && user.role === 'admin' && (
               <button
                 onClick={() => navigate(`/admin?edit=${post.id}`)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
               >
                 编辑文章
               </button>
@@ -1160,7 +1159,7 @@ export function PostPage() {
                   <button
                     type="submit"
                     disabled={commentLoading || !newComment.trim() || uploadingImage}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {commentLoading ? '发表中...' : '发表评论'}
                   </button>
@@ -1171,7 +1170,7 @@ export function PostPage() {
                 <p className="text-muted-foreground mb-4">请先登录后再发表评论</p>
                 <button
                   onClick={() => navigate('/login?redirect=' + encodeURIComponent(window.location.pathname))}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
                 >
                   去登录
                 </button>

@@ -182,6 +182,9 @@ CREATE TABLE IF NOT EXISTS posts (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at DATETIME,
     
+    is_pinned INTEGER DEFAULT 0,
+    pin_order INTEGER DEFAULT 0,
+    
     FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
     FOREIGN KEY (column_id) REFERENCES columns(id) ON DELETE SET NULL
@@ -205,6 +208,8 @@ CREATE INDEX IF NOT EXISTS idx_posts_author_status_created ON posts(author_id, s
 CREATE INDEX IF NOT EXISTS idx_posts_active ON posts(id) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_posts_published_active ON posts(status, published_at DESC) WHERE status = 'published' AND deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_posts_password_protected ON posts(id, visibility) WHERE visibility = 'password' AND password_hash IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_posts_is_pinned ON posts(is_pinned DESC);
+CREATE INDEX IF NOT EXISTS idx_posts_pinned_published ON posts(is_pinned DESC, published_at DESC) WHERE status = 'published' AND deleted_at IS NULL;
 
 -- ============= 全文搜索索引 (FTS5) =============
 
@@ -692,8 +697,9 @@ INSERT OR IGNORE INTO site_config (key, value, type, category, description) VALU
 INSERT OR REPLACE INTO schema_version (version, description) VALUES
 ('1.1.0', 'Base schema: users, posts, comments, categories, tags, columns, favorites, likes, view_history, reading_history, site_config');
 
+
 -- =============================================
 -- v1.1 基础功能数据库初始化完成
 -- 
--- 下一步：请执行 v1.2 通知与私信管理数据库文件
+-- 下一步：请执行 v1.3 通知与私信管理数据库文件
 -- =============================================

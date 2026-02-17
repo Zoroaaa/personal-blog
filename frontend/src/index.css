@@ -432,11 +432,14 @@
   }
 }
 
-/* 评论内容富文本样式 */
+/* ============================================================
+   评论内容主题适配（替换硬编码颜色为 CSS 变量）
+   ============================================================ */
 .comment-content {
   line-height: 1.6;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  color: rgb(var(--color-foreground));
 }
 
 .comment-content strong,
@@ -450,30 +453,19 @@
 }
 
 .comment-content a {
-  color: #3B82F6 !important;
+  color: var(--primary-color) !important;
   text-decoration: underline !important;
   cursor: pointer;
-  transition: color 0.2s;
+  transition: opacity 0.2s;
 }
 
 .comment-content a:hover {
-  color: #2563EB !important;
+  opacity: 0.8 !important;
 }
 
 .comment-content a:visited {
-  color: #7C3AED !important;
-}
-
-.dark .comment-content a {
-  color: #60A5FA !important;
-}
-
-.dark .comment-content a:hover {
-  color: #93C5FD !important;
-}
-
-.dark .comment-content a:visited {
-  color: #A78BFA !important;
+  color: var(--primary-700, var(--primary-color)) !important;
+  opacity: 0.9;
 }
 
 .comment-content img {
@@ -482,16 +474,46 @@
   border-radius: 0.5rem;
   margin: 0.5rem 0;
   display: block;
+  border: 1px solid rgb(var(--color-border));
 }
 
 .comment-content p {
   margin: 0.5rem 0;
+  color: rgb(var(--color-foreground));
 }
 
-.comment-content p:first-child {
-  margin-top: 0;
-}
+.comment-content p:first-child { margin-top: 0; }
+.comment-content p:last-child { margin-bottom: 0; }
 
-.comment-content p:last-child {
-  margin-bottom: 0;
+/* ============================================================
+   补充缺失的语义化工具类
+   ============================================================ */
+@layer utilities {
+  /* 状态色 - 跟随主题 */
+  .text-on-primary {
+    color: #ffffff;
+  }
+  
+  /* 玻璃拟态 - 正确使用变量 */
+  .glass-card {
+    background: rgba(var(--color-card), 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgb(var(--color-border));
+  }
+
+  /* 渐变文字 - 使用主色调 */
+  .text-gradient-primary {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-600));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  /* 强制主题过渡 */
+  .theme-transition {
+    transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+  }
 }

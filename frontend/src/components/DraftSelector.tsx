@@ -93,22 +93,22 @@ export function DraftSelector({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div 
-        className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl mx-4 overflow-hidden"
+        className="bg-card rounded-lg shadow-xl w-full max-w-2xl mx-4 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 头部 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h3 className="text-lg font-semibold text-foreground">
               恢复草稿
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               检测到 {drafts.length} 个未保存的草稿，请选择要恢复的草稿
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -119,7 +119,7 @@ export function DraftSelector({
         {/* 草稿列表 */}
         <div className="max-h-96 overflow-y-auto">
           {drafts.length === 0 ? (
-            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+            <div className="p-8 text-center text-muted-foreground">
               暂无草稿
             </div>
           ) : (
@@ -127,9 +127,9 @@ export function DraftSelector({
               {drafts.map((draft, index) => (
                 <label
                   key={draft.key}
-                  className={`flex items-start gap-4 p-4 cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50 ${
+                  className={`flex items-start gap-4 p-4 cursor-pointer transition-colors hover:bg-background dark:hover:bg-accent/50 ${
                     selectedDraftKey === draft.key 
-                      ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500' 
+                      ? 'bg-primary/10 border-l-4 border-primary' 
                       : 'border-l-4 border-transparent'
                   }`}
                 >
@@ -139,24 +139,24 @@ export function DraftSelector({
                     value={draft.key}
                     checked={selectedDraftKey === draft.key}
                     onChange={() => setSelectedDraftKey(draft.key)}
-                    className="mt-1 w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                    className="mt-1 w-4 h-4 text-primary border-border focus:ring-primary/50"
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-slate-700 px-2 py-0.5 rounded">
+                      <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded">
                         #{index + 1}
                       </span>
-                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                      <span className="text-xs text-muted-foreground">
                         {formatTime(draft.timestamp)}
                       </span>
                     </div>
-                    <h4 className="font-medium text-gray-900 dark:text-white truncate">
+                    <h4 className="font-medium text-foreground truncate">
                       {draft.data.title?.trim() || '(无标题)'}
                     </h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                       {getContentPreview(draft.data.content)}
                     </p>
-                    <div className="flex items-center gap-3 mt-2 text-xs text-gray-400 dark:text-gray-500">
+                    <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
                       {draft.data.content && (
                         <span className="flex items-center gap-1">
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -174,7 +174,7 @@ export function DraftSelector({
         </div>
 
         {/* 底部按钮 */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/30">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-border bg-background dark:bg-muted/30">
           <button
             onClick={() => {
               if (window.confirm('确定要清除所有草稿吗？此操作不可恢复。')) {
@@ -191,14 +191,14 @@ export function DraftSelector({
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg transition-colors"
+              className="px-4 py-2 text-foreground hover:bg-muted dark:hover:bg-accent rounded-lg transition-colors"
             >
               不恢复
             </button>
             <button
               onClick={handleConfirm}
               disabled={!selectedDraftKey}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+              className="px-4 py-2 bg-primary hover:bg-primary/90 disabled:bg-muted text-white rounded-lg transition-colors"
             >
               恢复选中草稿
             </button>

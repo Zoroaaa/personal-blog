@@ -487,10 +487,10 @@ export function RichTextEditor({
   return (
     <div
       className={`border rounded-lg overflow-hidden transition-all ${
-        isFocused ? 'ring-2 ring-blue-500 border-blue-500' : 'border-gray-300 dark:border-slate-600'
+        isFocused ? 'ring-2 ring-primary/50 border-primary' : 'border-border'
       }`}
     >
-      <div className="flex items-center gap-1 px-3 py-2 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex-wrap">
+      <div className="flex items-center gap-1 px-3 py-2 bg-background dark:bg-card border-b border-border flex-wrap">
         {toolbarButtons.map((btn, index) => (
           <button
             key={index}
@@ -502,8 +502,8 @@ export function RichTextEditor({
             title={btn.title}
             className={`px-2 py-1 text-sm rounded transition-colors ${
               btn.active
-                ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300'
-                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700'
+                ? 'bg-primary/15 text-primary'
+                : 'text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent'
             }`}
           >
             {btn.icon}
@@ -522,7 +522,7 @@ export function RichTextEditor({
           onBlur={handleBlur}
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
-          className="min-h-[120px] p-4 outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 dark:empty:before:text-gray-500 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100"
+          className="min-h-[120px] p-4 outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground dark:empty:before:text-muted-foreground bg-background text-foreground dark:text-foreground"
           data-placeholder={placeholder}
           style={{ wordBreak: 'break-word' }}
           suppressContentEditableWarning={true}
@@ -530,7 +530,7 @@ export function RichTextEditor({
 
         {showMentions && filteredUsers.length > 0 && popupPosition && createPortal(
           <div 
-            className="fixed w-64 max-h-48 overflow-y-auto bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg z-[9999]"
+            className="fixed w-64 max-h-48 overflow-y-auto bg-card border border-border rounded-lg shadow-lg z-[9999]"
             style={{ 
               top: popupPosition.top - 200,
               left: popupPosition.left 
@@ -548,8 +548,8 @@ export function RichTextEditor({
                 onMouseEnter={() => setSelectedIndex(index)}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors ${
                   index === selectedIndex
-                    ? 'bg-blue-50 dark:bg-blue-900/30'
-                    : 'hover:bg-gray-100 dark:hover:bg-slate-700'
+                    ? 'bg-primary/10'
+                    : 'hover:bg-accent'
                 }`}
               >
                 {user.avatarUrl ? (
@@ -559,16 +559,16 @@ export function RichTextEditor({
                     className="w-6 h-6 rounded-full"
                   />
                 ) : (
-                  <div className="w-6 h-6 rounded-full bg-gray-300 dark:bg-slate-600 flex items-center justify-center text-xs text-gray-600 dark:text-gray-300">
+                  <div className="w-6 h-6 rounded-full bg-border flex items-center justify-center text-xs text-muted-foreground dark:text-muted-foreground">
                     {(user.displayName || user.username)?.[0]?.toUpperCase()}
                   </div>
                 )}
                 <div className="flex flex-col">
-                  <span className="text-sm text-gray-700 dark:text-gray-200">
+                  <span className="text-sm text-foreground">
                     {user.displayName || user.username}
                   </span>
                   {user.displayName && (
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                    <span className="text-xs text-muted-foreground">
                       @{user.username}
                     </span>
                   )}
@@ -581,7 +581,7 @@ export function RichTextEditor({
 
         {showEmojis && popupPosition && createPortal(
           <div 
-            className="fixed w-80 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg z-[9999] p-2"
+            className="fixed w-80 bg-card border border-border rounded-lg shadow-lg z-[9999] p-2"
             style={{ 
               top: popupPosition.top - 200,
               left: popupPosition.left 
@@ -596,7 +596,7 @@ export function RichTextEditor({
                     e.preventDefault();
                     insertEmoji(emoji);
                   }}
-                  className="w-7 h-7 flex items-center justify-center text-lg hover:bg-gray-100 dark:hover:bg-slate-700 rounded transition-colors"
+                  className="w-7 h-7 flex items-center justify-center text-lg hover:bg-accent rounded transition-colors"
                 >
                   {emoji}
                 </button>
@@ -607,13 +607,13 @@ export function RichTextEditor({
         )}
       </div>
 
-      <div className="flex justify-between items-center px-3 py-1 bg-gray-50 dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700">
-        <span className="text-xs text-gray-500 dark:text-gray-400">
+      <div className="flex justify-between items-center px-3 py-1 bg-background dark:bg-card border-t border-border">
+        <span className="text-xs text-muted-foreground">
           输入 @ 提及用户
         </span>
         <span
           className={`text-xs ${
-            textLength > maxLength * 0.9 ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'
+            textLength > maxLength * 0.9 ? 'text-red-500' : 'text-muted-foreground'
           }`}
         >
           {textLength}/{maxLength}

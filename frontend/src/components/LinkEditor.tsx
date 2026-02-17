@@ -75,17 +75,17 @@ export function LinkEditor({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div 
-        className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-md mx-4 overflow-hidden"
+        className="bg-card rounded-lg shadow-xl w-full max-w-md mx-4 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 头部 */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-slate-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <h3 className="text-lg font-semibold text-foreground">
             {initialUrl ? '编辑链接' : '插入链接'}
           </h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -97,7 +97,7 @@ export function LinkEditor({
         <div className="p-4 space-y-4">
           {/* URL 输入 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               链接地址 *
             </label>
             <div className="relative">
@@ -108,9 +108,9 @@ export function LinkEditor({
                 onChange={(e) => setUrl(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="https://example.com"
-                className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white transition-colors ${
+                className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-primary/50 dark:bg-muted dark:text-foreground transition-colors ${
                   isValid 
-                    ? 'border-gray-300 dark:border-slate-600' 
+                    ? 'border-border' 
                     : 'border-red-500 focus:ring-red-500'
                 }`}
               />
@@ -130,7 +130,7 @@ export function LinkEditor({
 
           {/* 显示文本输入 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               显示文本
             </label>
             <input
@@ -139,22 +139,22 @@ export function LinkEditor({
               onChange={(e) => setDisplayText(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={url || '链接文本'}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+              className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/50 dark:bg-muted dark:text-foreground"
             />
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p className="mt-1 text-xs text-muted-foreground">
               留空将使用链接地址作为显示文本
             </p>
           </div>
 
           {/* 链接预览 */}
           {url && isValidUrl(url) && (
-            <div className="p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">预览：</p>
+            <div className="p-3 bg-background dark:bg-muted/50 rounded-lg">
+              <p className="text-xs text-muted-foreground mb-2">预览：</p>
               <a
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
+                className="flex items-center gap-2 text-primary hover:text-primary transition-colors"
               >
                 {favicon && (
                   <img src={favicon} alt="" className="w-4 h-4 rounded" />
@@ -164,13 +164,13 @@ export function LinkEditor({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
               </a>
-              <p className="mt-1 text-xs text-gray-400">{domain}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{domain}</p>
             </div>
           )}
         </div>
 
         {/* 底部按钮 */}
-        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/30">
+        <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-background dark:bg-muted/30">
           {onRemove && initialUrl && (
             <button
               onClick={() => {
@@ -185,14 +185,14 @@ export function LinkEditor({
           <div className="flex items-center gap-2 ml-auto">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              className="px-4 py-2 text-foreground hover:bg-accent rounded-lg transition-colors"
             >
               取消
             </button>
             <button
               onClick={handleConfirm}
               disabled={!isValidUrl(url)}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+              className="px-4 py-2 bg-primary hover:bg-primary/90 disabled:bg-muted text-white rounded-lg transition-colors"
             >
               确认
             </button>

@@ -254,7 +254,7 @@ export function AccountSettingsPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           <p className="mt-2 text-muted-foreground">加载中...</p>
         </div>
       </div>
@@ -290,7 +290,7 @@ export function AccountSettingsPage() {
                 />
                 <label 
                   htmlFor="avatar-upload" 
-                  className="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 transition-colors"
+                  className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full cursor-pointer hover:bg-primary/90 transition-colors"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -321,7 +321,7 @@ export function AccountSettingsPage() {
                     name="displayName"
                     value={formData.displayName}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-primary/50 focus:border-transparent"
                   />
                 </div>
                 
@@ -334,7 +334,7 @@ export function AccountSettingsPage() {
                     value={formData.bio}
                     onChange={handleInputChange}
                     rows={4}
-                    className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-primary/50 focus:border-transparent"
                     placeholder="介绍一下自己..."
                   />
                   <p className="text-xs text-muted-foreground mt-1">个人简介会显示在您的公开资料页面，让其他用户了解您</p>
@@ -345,7 +345,7 @@ export function AccountSettingsPage() {
                     type="button"
                     onClick={handleUpdateProfile}
                     disabled={loading.update}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {loading.update ? '更新中...' : '更新资料'}
                   </button>
@@ -360,7 +360,7 @@ export function AccountSettingsPage() {
           <h2 className="text-xl font-semibold text-foreground mb-4">统计信息</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center p-4 bg-muted rounded-lg">
-              <p className="text-2xl font-bold text-blue-600">{userInfo?.postCount || 0}</p>
+              <p className="text-2xl font-bold text-primary">{userInfo?.postCount || 0}</p>
               <p className="text-muted-foreground text-sm">发布文章</p>
             </div>
             <div className="text-center p-4 bg-muted rounded-lg">
@@ -391,7 +391,7 @@ export function AccountSettingsPage() {
                   placeholder="6 位验证码"
                   value={formData.emailVerificationCode}
                   onChange={(e) => setFormData(prev => ({ ...prev, emailVerificationCode: e.target.value.replace(/\D/g, '') }))}
-                  className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-primary/50 focus:border-transparent"
                 />
               </div>
               <button
@@ -410,7 +410,7 @@ export function AccountSettingsPage() {
                 name="password"
                 value={formData.password}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-primary/50 focus:border-transparent"
               />
             </div>
             <div>
@@ -420,7 +420,7 @@ export function AccountSettingsPage() {
                 name="newPassword"
                 value={formData.newPassword}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-primary/50 focus:border-transparent"
               />
             </div>
             <div>
@@ -430,13 +430,13 @@ export function AccountSettingsPage() {
                 name="confirmPassword"
                 value={formData.confirmPassword}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-primary/50 focus:border-transparent"
               />
             </div>
             <button
               type="submit"
               disabled={loading.update}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading.update ? '修改中...' : '修改密码'}
             </button>

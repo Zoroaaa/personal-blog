@@ -40,7 +40,7 @@ function ToggleSwitch({
     >
       <span
         className={`
-          inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+          inline-block h-4 w-4 transform rounded-full bg-card transition-transform
           ${checked ? 'translate-x-6' : 'translate-x-1'}
         `}
       />
@@ -281,8 +281,8 @@ export default function NotificationSettings() {
             />
           </SettingItem>
 
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">
+          <div className="mt-4 pt-4 border-t border-border">
+            <h3 className="text-sm font-medium text-foreground mb-3">
               接收以下类型的互动通知
             </h3>
             <div className="grid grid-cols-2 gap-3">

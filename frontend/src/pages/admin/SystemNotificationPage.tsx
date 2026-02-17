@@ -181,7 +181,7 @@ export function SystemNotificationPage() {
   const getSubtypeLabel = (subtype: SystemNotificationSubtype) => {
     const labels: Record<SystemNotificationSubtype, { text: string; color: string }> = {
       maintenance: { text: '维护通知', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' },
-      update: { text: '更新通知', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
+      update: { text: '更新通知', color: 'bg-primary/15 text-primary' },
       announcement: { text: '公告通知', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
     };
     return labels[subtype] || labels.announcement;
@@ -194,14 +194,14 @@ export function SystemNotificationPage() {
         {/* 页面头部 */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">系统通知管理</h1>
-            <p className="mt-2 text-gray-600 dark:text-gray-400">
+            <h1 className="text-3xl font-bold text-foreground">系统通知管理</h1>
+            <p className="mt-2 text-muted-foreground">
               管理首页轮播的系统通知
             </p>
           </div>
           <button
             onClick={openCreateModal}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -211,15 +211,15 @@ export function SystemNotificationPage() {
         </div>
 
         {/* 通知列表 */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
+        <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
           ) : notifications.length === 0 ? (
             <div className="text-center py-12">
               <svg
-                className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600 mb-4"
+                className="mx-auto h-12 w-12 text-muted-foreground mb-4"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -231,35 +231,35 @@ export function SystemNotificationPage() {
                   d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                 />
               </svg>
-              <p className="text-gray-500 dark:text-gray-400">暂无系统通知</p>
-              <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+              <p className="text-muted-foreground">暂无系统通知</p>
+              <p className="text-sm text-muted-foreground mt-1">
                 点击上方按钮创建第一条通知
               </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-slate-700/50">
+                <thead className="bg-background dark:bg-muted/50">
                   <tr>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
                       标题
                     </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
                       类型
                     </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
                       内容
                     </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
                       链接
                     </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
                       状态
                     </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
                       创建时间
                     </th>
-                    <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900 dark:text-white">
+                    <th className="px-6 py-4 text-right text-sm font-semibold text-foreground">
                       操作
                     </th>
                   </tr>
@@ -268,10 +268,10 @@ export function SystemNotificationPage() {
                   {notifications.map((notification) => (
                     <tr
                       key={notification.id}
-                      className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
+                      className="hover:bg-background dark:hover:bg-accent/50 transition-colors"
                     >
                       <td className="px-6 py-4">
-                        <div className="font-medium text-gray-900 dark:text-white">
+                        <div className="font-medium text-foreground">
                           {notification.title}
                         </div>
                       </td>
@@ -281,7 +281,7 @@ export function SystemNotificationPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-gray-600 dark:text-gray-400 max-w-xs truncate">
+                        <div className="text-muted-foreground max-w-xs truncate">
                           {notification.content}
                         </div>
                       </td>
@@ -291,14 +291,14 @@ export function SystemNotificationPage() {
                             href={notification.link}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-700 text-sm"
+                            className="text-primary hover:text-primary text-sm"
                           >
                             {notification.link.length > 30
                               ? notification.link.slice(0, 30) + '...'
                               : notification.link}
                           </a>
                         ) : (
-                          <span className="text-gray-400 text-sm">无</span>
+                          <span className="text-muted-foreground text-sm">无</span>
                         )}
                       </td>
                       <td className="px-6 py-4">
@@ -307,20 +307,20 @@ export function SystemNotificationPage() {
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors ${
                             notification.isActive
                               ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                              : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400'
+                              : 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground'
                           }`}
                         >
                           {notification.isActive ? '启用' : '禁用'}
                         </button>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-6 py-4 text-sm text-muted-foreground">
                         {formatDate(notification.createdAt)}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => openEditModal(notification)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                            className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
                             title="编辑"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -359,14 +359,14 @@ export function SystemNotificationPage() {
         {/* 创建/编辑弹窗 */}
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-            <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-xl shadow-xl">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <div className="w-full max-w-lg bg-card rounded-xl shadow-xl">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                <h3 className="text-lg font-semibold text-foreground">
                   {editingNotification ? '编辑通知' : '新建通知'}
                 </h3>
                 <button
                   onClick={closeModal}
-                  className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  className="p-1 text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -376,7 +376,7 @@ export function SystemNotificationPage() {
 
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     标题 <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -384,13 +384,13 @@ export function SystemNotificationPage() {
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     placeholder="请输入通知标题"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-muted text-foreground focus:ring-2 focus:ring-primary/50 focus:border-transparent outline-none"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     通知类型 <span className="text-red-500">*</span>
                   </label>
                   <div className="flex flex-wrap gap-3">
@@ -402,9 +402,9 @@ export function SystemNotificationPage() {
                             ? type === 'maintenance'
                               ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
                               : type === 'update'
-                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                              ? 'border-primary bg-primary/10'
                               : 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                            : 'border-gray-300 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700'
+                            : 'border-border hover:bg-background dark:hover:bg-accent'
                         }`}
                       >
                         <input
@@ -416,21 +416,21 @@ export function SystemNotificationPage() {
                           className="sr-only"
                         />
                         <span className={`w-3 h-3 rounded-full ${
-                          type === 'maintenance' ? 'bg-orange-500' : type === 'update' ? 'bg-blue-500' : 'bg-green-500'
+                          type === 'maintenance' ? 'bg-orange-500' : type === 'update' ? 'bg-primary/80' : 'bg-green-500'
                         }`}></span>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <span className="text-sm font-medium text-foreground">
                           {type === 'maintenance' ? '维护通知' : type === 'update' ? '更新通知' : '公告通知'}
                         </span>
                       </label>
                     ))}
                   </div>
-                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  <p className="mt-2 text-xs text-muted-foreground">
                     维护通知和更新通知将推送给所有用户，公告通知仅用于首页轮播展示
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     内容 <span className="text-red-500">*</span>
                   </label>
                   <textarea
@@ -438,13 +438,13 @@ export function SystemNotificationPage() {
                     onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                     placeholder="请输入通知内容"
                     rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-muted text-foreground focus:ring-2 focus:ring-primary/50 focus:border-transparent outline-none resize-none"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     链接（可选）
                   </label>
                   <input
@@ -452,7 +452,7 @@ export function SystemNotificationPage() {
                     value={formData.link}
                     onChange={(e) => setFormData({ ...formData, link: e.target.value })}
                     placeholder="https://example.com"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-muted text-foreground focus:ring-2 focus:ring-primary/50 focus:border-transparent outline-none"
                   />
                 </div>
 
@@ -462,11 +462,11 @@ export function SystemNotificationPage() {
                     id="isActive"
                     checked={formData.isActive}
                     onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    className="w-4 h-4 text-primary border-border rounded focus:ring-primary/50"
                   />
                   <label
                     htmlFor="isActive"
-                    className="ml-2 text-sm text-gray-700 dark:text-gray-300"
+                    className="ml-2 text-sm text-foreground"
                   >
                     立即启用
                   </label>
@@ -476,13 +476,13 @@ export function SystemNotificationPage() {
                   <button
                     type="button"
                     onClick={closeModal}
-                    className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                    className="px-4 py-2 text-foreground hover:bg-accent rounded-lg transition-colors"
                   >
                     取消
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
                   >
                     {editingNotification ? '保存' : '创建'}
                   </button>

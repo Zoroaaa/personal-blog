@@ -36,7 +36,7 @@ export function MarkdownPreview({ content, className = '', showToc = false }: Ma
       {showToc && toc.length > 0 && (
         <aside className="hidden lg:block w-64 flex-shrink-0">
           <div className="sticky top-20">
-            <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 uppercase tracking-wider">
+            <h4 className="text-sm font-semibold text-foreground mb-3 uppercase tracking-wider">
               目录
             </h4>
             <nav className="space-y-1 max-h-[calc(100vh-200px)] overflow-y-auto">
@@ -44,7 +44,7 @@ export function MarkdownPreview({ content, className = '', showToc = false }: Ma
                 <a
                   key={index}
                   href={`#${item.id}`}
-                  className={`block text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors ${
+                  className={`block text-sm text-muted-foreground hover:text-primary dark:hover:text-primary transition-colors ${
                     item.level === 1 ? 'font-medium' : ''
                   }`}
                   style={{ paddingLeft: `${(item.level - 1) * 12}px` }}
@@ -104,7 +104,7 @@ export function SplitPreview({ content, isVisible }: SplitPreviewProps) {
   const components = useMemo(() => getMarkdownComponents(), []);
 
   return (
-    <div className="h-full overflow-auto bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
+    <div className="h-full overflow-auto bg-card rounded-lg border border-border p-6">
       <div className="prose prose-lg dark:prose-invert max-w-none">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}

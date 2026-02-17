@@ -1,356 +1,445 @@
 # API 文档
 
-本文档详细描述个人博客系统的所有 API 接口。
+本文档详细介绍 Personal Blog 博客系统的所有 API 接口。
 
-**版本**: v1.3.3 | **更新日期**: 2026-02-16
+**版本**: v1.4.0  
+**更新日期**: 2026-02-17  
+**基础路径**: `/api`
 
 ---
 
 ## 目录
 
-- [通用规范](#通用规范)
-- [认证模块](#认证模块) (14个端点)
-- [文章模块](#文章模块) (14个端点)
-- [专栏模块](#专栏模块) (8个端点)
-- [评论模块](#评论模块) (6个端点)
-- [分类模块](#分类模块) (8个端点)
-- [通知模块](#通知模块) (7个端点)
-- [私信模块](#私信模块) (8个端点)
-- [用户模块](#用户模块) (7个端点)
-- [管理模块](#管理模块) (12个端点)
-- [管理员通知模块](#管理员通知模块) (5个端点)
-- [上传模块](#上传模块) (4个端点)
-- [配置模块](#配置模块) (4个端点)
-- [统计模块](#统计模块) (7个端点)
-
-**总计**: 104个API端点
+- [通用说明](#通用说明)
+- [认证接口](#认证接口)
+- [文章接口](#文章接口)
+- [专栏接口](#专栏接口)
+- [评论接口](#评论接口)
+- [分类接口](#分类接口)
+- [标签接口](#标签接口)
+- [用户接口](#用户接口)
+- [通知接口](#通知接口)
+- [私信接口](#私信接口)
+- [管理接口](#管理接口)
+- [配置接口](#配置接口)
+- [上传接口](#上传接口)
+- [统计接口](#统计接口)
 
 ---
 
-## 通用规范
-
-### 基础 URL
-
-```
-开发环境: http://localhost:8787/api
-生产环境: https://your-worker.workers.dev/api
-```
+## 通用说明
 
 ### 请求格式
 
-```http
-Content-Type: application/json
-Authorization: Bearer <token>
-```
+- **Content-Type**: `application/json`
+- **认证方式**: Bearer Token (JWT)
 
 ### 响应格式
 
-**成功响应:**
-```json
-{
-  "success": true,
-  "data": { ... },
-  "meta": {
-    "page": 1,
-    "limit": 20,
-    "total": 100
-  }
+所有接口统一返回以下格式：
+
+```typescript
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: {
+    code: string;
+    message: string;
+  };
 }
 ```
 
-**错误响应:**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "错误描述",
-    "details": []
-  }
+### 认证说明
+
+需要认证的接口需在请求头中携带 Token：
+
+```
+Authorization: Bearer <your_jwt_token>
+```
+
+### 分页参数
+
+```typescript
+interface PaginationParams {
+  page?: number;      // 页码，默认 1
+  limit?: number;     // 每页数量，默认 10
+  sort?: string;      // 排序字段
+  order?: 'asc' | 'desc';  // 排序方向
+}
+
+interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 ```
 
-### HTTP 状态码
+### 错误码
 
-| 状态码 | 含义 |
+| 错误码 | 说明 |
 |--------|------|
-| 200 | 请求成功 |
-| 201 | 创建成功 |
-| 400 | 请求参数错误 |
-| 401 | 未认证 |
-| 403 | 无权限 |
-| 404 | 资源不存在 |
-| 409 | 资源冲突 |
-| 422 | 验证错误 |
-| 429 | 请求过于频繁 |
-| 500 | 服务器错误 |
-
-### 限流规则
-
-| 接口类型 | 限制 |
-|---------|------|
-| 登录/注册 | 5次/分钟 |
-| 发送验证码 | 1次/分钟 |
-| 发表评论 | 10次/分钟 |
-| 上传文件 | 5次/分钟 |
-| 发送私信 | 20次/分钟 |
-| 其他接口 | 100次/分钟 |
+| `UNAUTHORIZED` | 未授权，请先登录 |
+| `FORBIDDEN` | 无权限访问 |
+| `NOT_FOUND` | 资源不存在 |
+| `VALIDATION_ERROR` | 参数验证失败 |
+| `DUPLICATE_ENTRY` | 数据重复 |
+| `RATE_LIMITED` | 请求过于频繁 |
+| `INTERNAL_ERROR` | 服务器内部错误 |
 
 ---
 
-## 认证模块
+## 认证接口
 
-### POST /auth/register
+### 用户注册
 
-用户注册
+```
+POST /api/auth/register
+```
 
-**请求参数:**
+**请求体**:
 ```json
 {
-  "username": "string (3-20字符)",
-  "email": "string (邮箱格式)",
-  "password": "string (至少8位)"
+  "email": "user@example.com",
+  "password": "password123",
+  "username": "username"
 }
 ```
 
-**响应:**
+**响应**:
 ```json
 {
   "success": true,
   "data": {
-    "id": 1,
-    "username": "john",
-    "email": "john@example.com",
-    "displayName": "John Doe",
-    "role": "user",
-    "status": "active",
-    "createdAt": "2026-02-16T10:00:00Z"
-  }
-}
-```
-
-### POST /auth/login
-
-用户登录
-
-**请求参数:**
-```json
-{
-  "username": "string",
-  "password": "string"
-}
-```
-
-**响应:**
-```json
-{
-  "success": true,
-  "data": {
-    "token": "eyJhbGciOiJIUzI1NiIs...",
     "user": {
       "id": 1,
-      "username": "john",
-      "email": "john@example.com",
-      "displayName": "John Doe",
-      "avatarUrl": "https://...",
-      "role": "user",
-      "status": "active"
-    }
+      "email": "user@example.com",
+      "username": "username"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
   }
 }
 ```
 
-### POST /auth/logout
+### 用户登录
 
-用户登出（需要认证）
+```
+POST /api/auth/login
+```
 
-**响应:**
+**请求体**:
+```json
+{
+  "email": "user@example.com",
+  "password": "password123"
+}
+```
+
+**响应**:
 ```json
 {
   "success": true,
   "data": {
-    "message": "Logged out successfully"
+    "user": {
+      "id": 1,
+      "email": "user@example.com",
+      "username": "username",
+      "avatar": "https://...",
+      "role": "user"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
   }
 }
 ```
 
-### GET /auth/me
+### GitHub OAuth 登录
 
-获取当前用户信息（需要认证）
+```
+GET /api/auth/github
+```
 
-**响应:**
+重定向到 GitHub 授权页面。
+
+### GitHub OAuth 回调
+
+```
+GET /api/auth/github/callback?code=xxx
+```
+
+**响应**: 重定向到前端并携带 Token
+
+### 发送邮箱验证码
+
+```
+POST /api/auth/send-verification-code
+```
+
+**请求体**:
+```json
+{
+  "email": "user@example.com",
+  "type": "register" | "reset_password"
+}
+```
+
+### 重置密码
+
+```
+POST /api/auth/reset-password
+```
+
+**请求体**:
+```json
+{
+  "email": "user@example.com",
+  "code": "123456",
+  "newPassword": "newpassword123"
+}
+```
+
+### 获取当前用户
+
+```
+GET /api/auth/me
+```
+
+**需要认证**: 是
+
+**响应**:
 ```json
 {
   "success": true,
   "data": {
     "id": 1,
-    "username": "john",
-    "email": "john@example.com",
-    "displayName": "John Doe",
-    "avatarUrl": "https://...",
+    "email": "user@example.com",
+    "username": "username",
+    "avatar": "https://...",
     "bio": "个人简介",
     "role": "user",
-    "status": "active",
-    "emailVerified": true,
-    "postCount": 10,
-    "commentCount": 50,
-    "createdAt": "2026-02-16T10:00:00Z",
-    "lastLoginAt": "2026-02-16T15:30:00Z"
+    "isEmailVerified": true,
+    "createdAt": "2024-01-01T00:00:00Z"
   }
 }
 ```
 
-### PUT /auth/me
+### 修改密码
 
-更新用户信息（需要认证）
-
-**请求参数:**
-```json
-{
-  "displayName": "string",
-  "avatarUrl": "string",
-  "bio": "string"
-}
+```
+PUT /api/auth/password
 ```
 
-### DELETE /auth/me
+**需要认证**: 是
 
-删除用户账号（需要认证，软删除）
-
-**响应:**
+**请求体**:
 ```json
 {
-  "success": true,
-  "data": {
-    "message": "Account deleted successfully"
-  }
+  "currentPassword": "oldpassword",
+  "newPassword": "newpassword123"
 }
 ```
-
-### POST /auth/change-password
-
-修改密码（需要认证）
-
-**请求参数:**
-```json
-{
-  "currentPassword": "string",
-  "newPassword": "string (至少8位)"
-}
-```
-
-### POST /auth/forgot-password
-
-忘记密码
-
-**请求参数:**
-```json
-{
-  "email": "string"
-}
-```
-
-**响应:**
-```json
-{
-  "success": true,
-  "data": {
-    "message": "Password reset email sent"
-  }
-}
-```
-
-### POST /auth/reset-password
-
-重置密码
-
-**请求参数:**
-```json
-{
-  "token": "string",
-  "newPassword": "string"
-}
-```
-
-### POST /auth/verify-email
-
-验证邮箱（需要认证）
-
-**请求参数:**
-```json
-{
-  "code": "string (6位数字)"
-}
-```
-
-### POST /auth/resend-verification
-
-重新发送验证邮件（需要认证）
-
-### POST /auth/send-code
-
-发送邮箱验证码
-
-**请求参数:**
-```json
-{
-  "email": "string"
-}
-```
-
-**响应:**
-```json
-{
-  "success": true,
-  "data": {
-    "message": "Verification code sent",
-    "expiresIn": 300
-  }
-}
-```
-
-### GET /auth/github
-
-GitHub OAuth 登录入口
-
-**查询参数:**
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| redirect_uri | string | 回调URL（可选） |
-
-### GET /auth/github/callback
-
-GitHub OAuth 回调处理
-
-**查询参数:**
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| code | string | GitHub授权码 |
-| state | string | 状态参数 |
 
 ---
 
-## 文章模块
+## 文章接口
 
-### GET /posts
+### 获取文章列表
 
-获取文章列表
+```
+GET /api/posts
+```
 
-**查询参数:**
+**查询参数**:
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| page | number | 页码，默认 1 |
-| limit | number | 每页数量，默认 20，最大 100 |
+| page | number | 页码 |
+| limit | number | 每页数量 |
 | category | string | 分类 slug |
+| column | string | 专栏 slug |
 | tag | string | 标签 slug |
-| column | number | 专栏 ID |
-| author | number | 作者 ID |
-| status | string | 状态: draft/published/archived |
+| status | string | 状态 (published/draft)，管理员可用 |
 | search | string | 搜索关键词 |
-| sort | string | 排序: newest/oldest/popular/trending |
-| featured | boolean | 是否精选 |
 
-**响应:**
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": 1,
+        "title": "文章标题",
+        "slug": "article-slug",
+        "excerpt": "文章摘要",
+        "coverImage": "https://...",
+        "author": {
+          "id": 1,
+          "username": "作者名",
+          "avatar": "https://..."
+        },
+        "category": {
+          "id": 1,
+          "name": "分类名",
+          "slug": "category-slug"
+        },
+        "column": {
+          "id": 1,
+          "name": "专栏名"
+        },
+        "tags": [
+          { "id": 1, "name": "标签名", "slug": "tag-slug" }
+        ],
+        "isPinned": false,
+        "isPasswordProtected": false,
+        "viewCount": 100,
+        "likeCount": 10,
+        "commentCount": 5,
+        "publishedAt": "2024-01-01T00:00:00Z",
+        "createdAt": "2024-01-01T00:00:00Z"
+      }
+    ],
+    "total": 100,
+    "page": 1,
+    "limit": 10,
+    "totalPages": 10
+  }
+}
+```
+
+### 获取单篇文章
+
+```
+GET /api/posts/:slug
+```
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "title": "文章标题",
+    "slug": "article-slug",
+    "content": "Markdown 内容",
+    "excerpt": "文章摘要",
+    "coverImage": "https://...",
+    "author": {
+      "id": 1,
+      "username": "作者名",
+      "avatar": "https://...",
+      "bio": "作者简介"
+    },
+    "category": {
+      "id": 1,
+      "name": "分类名",
+      "slug": "category-slug"
+    },
+    "column": {
+      "id": 1,
+      "name": "专栏名",
+      "description": "专栏描述"
+    },
+    "tags": [
+      { "id": 1, "name": "标签名", "slug": "tag-slug" }
+    ],
+    "isPinned": false,
+    "isPasswordProtected": false,
+    "viewCount": 100,
+    "likeCount": 10,
+    "commentCount": 5,
+    "seoTitle": "SEO 标题",
+    "seoDescription": "SEO 描述",
+    "seoKeywords": "关键词1,关键词2",
+    "publishedAt": "2024-01-01T00:00:00Z",
+    "createdAt": "2024-01-01T00:00:00Z",
+    "updatedAt": "2024-01-02T00:00:00Z"
+  }
+}
+```
+
+### 创建文章
+
+```
+POST /api/posts
+```
+
+**需要认证**: 是 (管理员)
+
+**请求体**:
+```json
+{
+  "title": "文章标题",
+  "slug": "article-slug",
+  "content": "Markdown 内容",
+  "excerpt": "文章摘要",
+  "coverImage": "https://...",
+  "categoryId": 1,
+  "columnId": 1,
+  "tagIds": [1, 2, 3],
+  "status": "published",
+  "isPinned": false,
+  "isPasswordProtected": false,
+  "password": "可选密码",
+  "seoTitle": "SEO 标题",
+  "seoDescription": "SEO 描述",
+  "seoKeywords": "关键词1,关键词2"
+}
+```
+
+### 更新文章
+
+```
+PUT /api/posts/:id
+```
+
+**需要认证**: 是 (管理员)
+
+**请求体**: 同创建文章
+
+### 删除文章
+
+```
+DELETE /api/posts/:id
+```
+
+**需要认证**: 是 (管理员)
+
+### 验证文章密码
+
+```
+POST /api/posts/:id/verify-password
+```
+
+**请求体**:
+```json
+{
+  "password": "文章密码"
+}
+```
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "valid": true,
+    "content": "文章内容"
+  }
+}
+```
+
+### 获取热门文章 🆕 v1.4.0
+
+```
+GET /api/posts/hot
+```
+
+**查询参数**:
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| limit | number | 返回数量，默认 10 |
+
+**响应**:
 ```json
 {
   "success": true,
@@ -359,436 +448,886 @@ GitHub OAuth 回调处理
       "id": 1,
       "title": "文章标题",
       "slug": "article-slug",
-      "excerpt": "文章摘要...",
-      "coverImage": "https://...",
-      "author": {
-        "id": 1,
-        "username": "john",
-        "displayName": "John Doe",
-        "avatarUrl": "https://..."
-      },
-      "category": {
-        "id": 1,
-        "name": "技术",
-        "slug": "tech"
-      },
-      "column": {
-        "id": 1,
-        "name": "专栏名称",
-        "slug": "column-slug"
-      },
-      "tags": [
-        {"id": 1, "name": "React", "slug": "react"}
-      ],
-      "status": "published",
-      "visibility": "public",
-      "viewCount": 100,
-      "likeCount": 20,
-      "commentCount": 5,
-      "featured": false,
-      "createdAt": "2026-02-16T10:00:00Z",
-      "publishedAt": "2026-02-16T10:00:00Z"
-    }
-  ],
-  "meta": {
-    "page": 1,
-    "limit": 20,
-    "total": 100,
-    "totalPages": 5
-  }
-}
-```
-
-### POST /posts
-
-创建文章（需要认证）
-
-**请求参数:**
-```json
-{
-  "title": "string (必填)",
-  "content": "string (必填, Markdown格式)",
-  "excerpt": "string (可选)",
-  "coverImage": "string (可选, URL)",
-  "categoryId": "number (可选)",
-  "columnId": "number (可选)",
-  "tags": ["string"] (可选, 标签名数组),
-  "status": "draft|published|archived (默认draft)",
-  "visibility": "public|private|password (默认public)",
-  "password": "string (visibility为password时必填)",
-  "featured": "boolean (默认false)",
-  "allowComments": "boolean (默认true)"
-}
-```
-
-**响应:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "title": "文章标题",
-    "slug": "article-slug",
-    "status": "draft",
-    "createdAt": "2026-02-16T10:00:00Z"
-  }
-}
-```
-
-### GET /posts/:id
-
-获取文章详情
-
-**路径参数:**
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| id | number | 文章ID |
-
-**响应:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "title": "文章标题",
-    "slug": "article-slug",
-    "content": "# Markdown内容...",
-    "excerpt": "文章摘要...",
-    "coverImage": "https://...",
-    "author": {
-      "id": 1,
-      "username": "john",
-      "displayName": "John Doe",
-      "avatarUrl": "https://...",
-      "bio": "个人简介"
-    },
-    "category": {
-      "id": 1,
-      "name": "技术",
-      "slug": "tech"
-    },
-    "column": {
-      "id": 1,
-      "name": "专栏名称",
-      "slug": "column-slug",
-      "description": "专栏描述"
-    },
-    "tags": [
-      {"id": 1, "name": "React", "slug": "react"}
-    ],
-    "status": "published",
-    "visibility": "public",
-    "viewCount": 100,
-    "likeCount": 20,
-    "commentCount": 5,
-    "featured": false,
-    "allowComments": true,
-    "isLiked": false,
-    "isFavorited": false,
-    "createdAt": "2026-02-16T10:00:00Z",
-    "updatedAt": "2026-02-16T11:00:00Z",
-    "publishedAt": "2026-02-16T10:00:00Z"
-  }
-}
-```
-
-### PUT /posts/:id
-
-更新文章（需要认证，作者或管理员）
-
-**路径参数:**
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| id | number | 文章ID |
-
-**请求参数:** 同创建文章
-
-### DELETE /posts/:id
-
-删除文章（需要认证，作者或管理员，软删除）
-
-**路径参数:**
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| id | number | 文章ID |
-
-**响应:**
-```json
-{
-  "success": true,
-  "data": {
-    "message": "Post deleted successfully"
-  }
-}
-```
-
-### GET /posts/by-slug/:slug
-
-通过 slug 获取文章
-
-**路径参数:**
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| slug | string | 文章slug |
-
-**响应:** 同GET /posts/:id
-
-### GET /posts/search
-
-搜索文章（FTS5全文搜索）
-
-**查询参数:**
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| q | string | 搜索关键词（必填） |
-| page | number | 页码 |
-| limit | number | 每页数量 |
-
-**响应:** 同GET /posts，但结果按相关度排序
-
-### POST /posts/:id/like
-
-点赞文章（需要认证）
-
-**路径参数:**
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| id | number | 文章ID |
-
-**响应:**
-```json
-{
-  "success": true,
-  "data": {
-    "liked": true,
-    "likeCount": 21
-  }
-}
-```
-
-### DELETE /posts/:id/like
-
-取消点赞（需要认证）
-
-**路径参数:**
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| id | number | 文章ID |
-
-**响应:**
-```json
-{
-  "success": true,
-  "data": {
-    "liked": false,
-    "likeCount": 20
-  }
-}
-```
-
-### POST /posts/:id/favorite
-
-收藏文章（需要认证）
-
-**路径参数:**
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| id | number | 文章ID |
-
-**响应:**
-```json
-{
-  "success": true,
-  "data": {
-    "favorited": true
-  }
-}
-```
-
-### DELETE /posts/:id/favorite
-
-取消收藏（需要认证）
-
-**路径参数:**
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| id | number | 文章ID |
-
-**响应:**
-```json
-{
-  "success": true,
-  "data": {
-    "favorited": false
-  }
-}
-```
-
-### POST /posts/:id/verify-password
-
-验证文章密码
-
-**路径参数:**
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| id | number | 文章ID |
-
-**请求参数:**
-```json
-{
-  "password": "string"
-}
-```
-
-**响应:**
-```json
-{
-  "success": true,
-  "data": {
-    "verified": true,
-    "content": "文章内容..."
-  }
-}
-```
-
-### GET /posts/reading-history
-
-获取阅读历史（需要认证）
-
-**查询参数:**
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| page | number | 页码，默认 1 |
-| limit | number | 每页数量，默认 20 |
-
-**响应:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "post": {
-        "id": 1,
-        "title": "文章标题",
-        "slug": "article-slug",
-        "excerpt": "摘要...",
-        "coverImage": "https://..."
-      },
-      "progress": 0.75,
-      "lastReadAt": "2026-02-16T10:00:00Z"
-    }
-  ],
-  "meta": {
-    "page": 1,
-    "limit": 20,
-    "total": 50
-  }
-}
-```
-
-### GET /posts/:id/reading-progress
-
-获取文章阅读进度（需要认证）
-
-**路径参数:**
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| id | number | 文章ID |
-
-**响应:**
-```json
-{
-  "success": true,
-  "data": {
-    "progress": 0.75,
-    "lastReadAt": "2026-02-16T10:00:00Z"
-  }
-}
-```
-
-### POST /posts/:id/reading-progress
-
-保存文章阅读进度（需要认证）
-
-**路径参数:**
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| id | number | 文章ID |
-
-**请求参数:**
-```json
-{
-  "progress": 0.75
-}
-```
-
-### GET /posts/:id/mentionable-users
-
-获取可@提及的用户列表（需要认证）
-
-**路径参数:**
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| id | number | 文章ID |
-
-**查询参数:**
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| q | string | 搜索关键词（可选） |
-
-**响应:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "username": "john",
-      "displayName": "John Doe",
-      "avatarUrl": "https://..."
+      "viewCount": 1000,
+      "likeCount": 50,
+      "coverImage": "https://..."
     }
   ]
 }
 ```
 
+### 获取相关推荐文章 🆕 v1.4.0
+
+```
+GET /api/posts/:id/related
+```
+
+**查询参数**:
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| limit | number | 返回数量，默认 5 |
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 2,
+      "title": "相关文章标题",
+      "slug": "related-slug",
+      "excerpt": "文章摘要",
+      "coverImage": "https://...",
+      "viewCount": 100,
+      "publishedAt": "2024-01-01T00:00:00Z"
+    }
+  ]
+}
+```
+
+### 获取上下篇文章 🆕 v1.4.0
+
+```
+GET /api/posts/:id/neighbors
+```
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "prev": {
+      "id": 1,
+      "title": "上一篇文章",
+      "slug": "prev-slug"
+    },
+    "next": {
+      "id": 3,
+      "title": "下一篇文章",
+      "slug": "next-slug"
+    }
+  }
+}
+```
+
+### 切换文章置顶状态 🆕 v1.4.0
+
+```
+PUT /api/posts/:id/pin
+```
+
+**需要认证**: 是 (管理员)
+
+**请求体**:
+```json
+{
+  "isPinned": true
+}
+```
+
+### 文章点赞
+
+```
+POST /api/posts/:id/like
+```
+
+**需要认证**: 是
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "liked": true,
+    "likeCount": 11
+  }
+}
+```
+
+### 取消点赞
+
+```
+DELETE /api/posts/:id/like
+```
+
+**需要认证**: 是
+
+### 收藏文章
+
+```
+POST /api/posts/:id/favorite
+```
+
+**需要认证**: 是
+
+### 取消收藏
+
+```
+DELETE /api/posts/:id/favorite
+```
+
+**需要认证**: 是
+
+### 检查点赞/收藏状态
+
+```
+GET /api/posts/:id/status
+```
+
+**需要认证**: 是
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "liked": true,
+    "favorited": false
+  }
+}
+```
+
+### 记录阅读历史
+
+```
+POST /api/posts/:id/history
+```
+
+**需要认证**: 是
+
+### 获取阅读历史
+
+```
+GET /api/posts/history
+```
+
+**需要认证**: 是
+
+**查询参数**:
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| page | number | 页码 |
+| limit | number | 每页数量 |
+
+### 搜索文章
+
+```
+GET /api/posts/search
+```
+
+**查询参数**:
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| q | string | 搜索关键词 |
+| page | number | 页码 |
+| limit | number | 每页数量 |
+
 ---
 
-**注**: 由于文档长度限制，其他模块（专栏、评论、分类等）的详细API说明与实际后端路由文件完全一致。主要包括：
+## 专栏接口
 
-- **专栏模块** (8个端点): CRUD操作、统计刷新、文章列表
-- **评论模块** (6个端点): CRUD操作、点赞功能、嵌套回复
-- **分类模块** (8个端点): 分类/标签CRUD、关联文章查询
-- **通知模块** (7个端点): 通知列表、已读管理、轮播公告
-- **私信模块** (8个端点): 会话管理、收发件箱、消息状态
-- **用户模块** (7个端点): 用户搜索、资料查看、设置管理
-- **管理模块** (12个端点): 用户管理、内容审核、数据统计
-- **管理员通知模块** (5个端点): 系统通知发布管理
-- **上传模块** (4个端点): 图片/文件上传、文件管理
-- **配置模块** (4个端点): 站点配置、批量更新
-- **统计模块** (7个端点): 数据分析、热门内容、访问追踪
+### 获取专栏列表
 
-完整API文档请参考后端源码: `backend/src/routes/` 目录下的各路由文件。
+```
+GET /api/columns
+```
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "专栏名称",
+      "slug": "column-slug",
+      "description": "专栏描述",
+      "coverImage": "https://...",
+      "postCount": 10,
+      "viewCount": 1000,
+      "likeCount": 50,
+      "status": "active"
+    }
+  ]
+}
+```
+
+### 获取专栏详情
+
+```
+GET /api/columns/:slug
+```
+
+### 获取专栏文章
+
+```
+GET /api/columns/:slug/posts
+```
+
+### 创建专栏
+
+```
+POST /api/columns
+```
+
+**需要认证**: 是 (管理员)
+
+### 更新专栏
+
+```
+PUT /api/columns/:id
+```
+
+**需要认证**: 是 (管理员)
+
+### 删除专栏
+
+```
+DELETE /api/columns/:id
+```
+
+**需要认证**: 是 (管理员)
+
+### 刷新专栏统计
+
+```
+POST /api/columns/:id/refresh-stats
+```
+
+**需要认证**: 是 (管理员)
 
 ---
 
-## 错误代码
+## 评论接口
 
-| 代码 | 说明 |
-|------|------|
-| `VALIDATION_ERROR` | 数据验证失败 |
-| `UNAUTHORIZED` | 未授权访问 |
-| `FORBIDDEN` | 无权限操作 |
-| `NOT_FOUND` | 资源不存在 |
-| `CONFLICT` | 资源冲突 |
-| `INVALID_TOKEN` | 无效令牌 |
-| `TOKEN_EXPIRED` | 令牌过期 |
-| `INVALID_CREDENTIALS` | 凭证无效 |
-| `FILE_TOO_LARGE` | 文件过大 |
-| `INVALID_FILE_TYPE` | 无效文件类型 |
-| `RATE_LIMIT_EXCEEDED` | 超出限流 |
-| `DATABASE_ERROR` | 数据库错误 |
-| `INTERNAL_ERROR` | 内部服务器错误 |
+### 获取文章评论
+
+```
+GET /api/comments/post/:postId
+```
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "content": "评论内容",
+      "user": {
+        "id": 1,
+        "username": "用户名",
+        "avatar": "https://..."
+      },
+      "isAdmin": false,
+      "likeCount": 5,
+      "replies": [
+        {
+          "id": 2,
+          "content": "回复内容",
+          "user": { "id": 2, "username": "回复者" },
+          "replyTo": { "id": 1, "username": "被回复者" },
+          "likeCount": 2
+        }
+      ],
+      "createdAt": "2024-01-01T00:00:00Z"
+    }
+  ]
+}
+```
+
+### 创建评论
+
+```
+POST /api/comments
+```
+
+**需要认证**: 是
+
+**请求体**:
+```json
+{
+  "postId": 1,
+  "content": "评论内容",
+  "parentId": null,
+  "replyToUserId": null
+}
+```
+
+### 删除评论
+
+```
+DELETE /api/comments/:id
+```
+
+**需要认证**: 是
+
+### 评论点赞
+
+```
+POST /api/comments/:id/like
+```
+
+**需要认证**: 是
 
 ---
 
-**版本**: v1.3.3 | **更新日期**: 2026-02-16
+## 分类接口
+
+### 获取分类列表
+
+```
+GET /api/categories
+```
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "分类名称",
+      "slug": "category-slug",
+      "description": "分类描述",
+      "postCount": 10
+    }
+  ]
+}
+}
+```
+
+### 创建分类
+
+```
+POST /api/categories
+```
+
+**需要认证**: 是 (管理员)
+
+### 更新分类
+
+```
+PUT /api/categories/:id
+```
+
+**需要认证**: 是 (管理员)
+
+### 删除分类
+
+```
+DELETE /api/categories/:id
+```
+
+**需要认证**: 是 (管理员)
+
+---
+
+## 标签接口
+
+### 获取标签列表
+
+```
+GET /api/tags
+```
+
+### 创建标签
+
+```
+POST /api/tags
+```
+
+**需要认证**: 是 (管理员)
+
+### 更新标签
+
+```
+PUT /api/tags/:id
+```
+
+**需要认证**: 是 (管理员)
+
+### 删除标签
+
+```
+DELETE /api/tags/:id
+```
+
+**需要认证**: 是 (管理员)
+
+---
+
+## 用户接口
+
+### 获取用户公开资料
+
+```
+GET /api/users/:id/profile
+```
+
+### 更新用户资料
+
+```
+PUT /api/users/profile
+```
+
+**需要认证**: 是
+
+**请求体**:
+```json
+{
+  "username": "新用户名",
+  "avatar": "https://...",
+  "bio": "个人简介"
+}
+```
+
+### 获取用户文章
+
+```
+GET /api/users/:id/posts
+```
+
+### 获取用户收藏
+
+```
+GET /api/users/favorites
+```
+
+**需要认证**: 是
+
+### 获取用户点赞
+
+```
+GET /api/users/likes
+```
+
+**需要认证**: 是
+
+### 获取用户评论
+
+```
+GET /api/users/comments
+```
+
+**需要认证**: 是
+
+### 搜索用户
+
+```
+GET /api/users/search
+```
+
+**查询参数**:
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| q | string | 搜索关键词 |
+
+### 删除账号
+
+```
+DELETE /api/users/account
+```
+
+**需要认证**: 是
+
+---
+
+## 通知接口
+
+### 获取通知列表
+
+```
+GET /api/notifications
+```
+
+**需要认证**: 是
+
+**查询参数**:
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| type | string | 通知类型 |
+| isRead | boolean | 是否已读 |
+| page | number | 页码 |
+| limit | number | 每页数量 |
+
+### 获取未读通知数量
+
+```
+GET /api/notifications/unread-count
+```
+
+**需要认证**: 是
+
+### 标记通知已读
+
+```
+PUT /api/notifications/:id/read
+```
+
+**需要认证**: 是
+
+### 标记全部已读
+
+```
+PUT /api/notifications/read-all
+```
+
+**需要认证**: 是
+
+### 获取通知设置
+
+```
+GET /api/users/notification-settings
+```
+
+**需要认证**: 是
+
+### 更新通知设置
+
+```
+PUT /api/users/notification-settings
+```
+
+**需要认证**: 是
+
+**请求体**:
+```json
+{
+  "commentNotification": true,
+  "likeNotification": true,
+  "followNotification": true,
+  "systemNotification": true,
+  "doNotDisturb": false,
+  "doNotDisturbStart": "22:00",
+  "doNotDisturbEnd": "08:00",
+  "digestFrequency": "daily"
+}
+```
+
+---
+
+## 私信接口
+
+### 获取会话列表
+
+```
+GET /api/messages/threads
+```
+
+**需要认证**: 是
+
+### 获取会话消息
+
+```
+GET /api/messages/threads/:threadId
+```
+
+**需要认证**: 是
+
+### 发送私信
+
+```
+POST /api/messages
+```
+
+**需要认证**: 是
+
+**请求体**:
+```json
+{
+  "recipientId": 2,
+  "content": "消息内容"
+}
+```
+
+### 标记消息已读
+
+```
+PUT /api/messages/:id/read
+```
+
+**需要认证**: 是
+
+### 撤回消息
+
+```
+DELETE /api/messages/:id
+```
+
+**需要认证**: 是
+
+### 获取私信设置
+
+```
+GET /api/users/message-settings
+```
+
+**需要认证**: 是
+
+### 更新私信设置
+
+```
+PUT /api/users/message-settings
+```
+
+**需要认证**: 是
+
+**请求体**:
+```json
+{
+  "allowStrangers": false
+}
+```
+
+---
+
+## 管理接口
+
+### 获取仪表盘统计
+
+```
+GET /api/admin/dashboard
+```
+
+**需要认证**: 是 (管理员)
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "totalPosts": 100,
+    "totalUsers": 50,
+    "totalComments": 200,
+    "totalViews": 10000,
+    "recentPosts": [...],
+    "recentComments": [...]
+  }
+}
+```
+
+### 用户管理
+
+```
+GET /api/admin/users
+PUT /api/admin/users/:id/status
+PUT /api/admin/users/:id/role
+DELETE /api/admin/users/:id
+```
+
+**需要认证**: 是 (管理员)
+
+### 评论审核
+
+```
+GET /api/admin/comments
+PUT /api/admin/comments/:id/status
+DELETE /api/admin/comments/:id
+```
+
+**需要认证**: 是 (管理员)
+
+### 系统配置
+
+```
+GET /api/admin/config
+PUT /api/admin/config
+```
+
+**需要认证**: 是 (管理员)
+
+### 发布系统通知
+
+```
+POST /api/admin/notifications
+```
+
+**需要认证**: 是 (管理员)
+
+**请求体**:
+```json
+{
+  "title": "通知标题",
+  "content": "通知内容",
+  "type": "info",
+  "isActive": true,
+  "showOnHome": true
+}
+```
+
+---
+
+## 配置接口
+
+### 获取公开配置
+
+```
+GET /api/config/public
+```
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "siteName": "博客名称",
+    "siteDescription": "博客描述",
+    "siteKeywords": "关键词",
+    "footerText": "页脚文字",
+    "socialLinks": {
+      "github": "https://github.com/...",
+      "twitter": "https://twitter.com/..."
+    }
+  }
+}
+```
+
+---
+
+## 上传接口
+
+### 上传图片
+
+```
+POST /api/upload
+```
+
+**需要认证**: 是
+
+**请求**: `multipart/form-data`
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| file | File | 图片文件 |
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "url": "https://...",
+    "filename": "image.png"
+  }
+}
+```
+
+---
+
+## 统计接口
+
+### 获取统计数据
+
+```
+GET /api/analytics
+```
+
+**需要认证**: 是 (管理员)
+
+**查询参数**:
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| range | string | 时间范围 (7d/30d/90d) |
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": {
+    "views": {
+      "total": 10000,
+      "trend": [...]
+    },
+    "visitors": {
+      "total": 5000,
+      "trend": [...]
+    },
+    "popularPosts": [...]
+  }
+}
+```
+
+---
+
+## 类型定义
+
+### User
+
+```typescript
+interface User {
+  id: number;
+  email: string;
+  username: string;
+  avatar?: string;
+  bio?: string;
+  role: 'user' | 'admin';
+  isEmailVerified: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### Post
+
+```typescript
+interface Post {
+  id: number;
+  title: string;
+  slug: string;
+  content: string;
+  excerpt?: string;
+  coverImage?: string;
+  author: User;
+  category?: Category;
+  column?: Column;
+  tags: Tag[];
+  isPinned: boolean;
+  isPasswordProtected: boolean;
+  viewCount: number;
+  likeCount: number;
+  commentCount: number;
+  seoTitle?: string;
+  seoDescription?: string;
+  seoKeywords?: string;
+  status: 'draft' | 'published';
+  publishedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### Comment
+
+```typescript
+interface Comment {
+  id: number;
+  content: string;
+  user: User;
+  postId: number;
+  parentId?: number;
+  replyToUser?: User;
+  isAdmin: boolean;
+  likeCount: number;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  replies?: Comment[];
+}
+```
+
+### Notification
+
+```typescript
+interface Notification {
+  id: number;
+  type: 'system' | 'comment' | 'like' | 'follow' | 'mention';
+  title: string;
+  content: string;
+  isRead: boolean;
+  data?: Record<string, any>;
+  createdAt: string;
+}
+```
+
+---
+
+**版本**: v1.4.0 | **更新日期**: 2026-02-17

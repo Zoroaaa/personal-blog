@@ -39,9 +39,9 @@ const typeConfig = {
       </svg>
     ),
     gradient: 'from-blue-500/20 via-indigo-500/10 to-transparent',
-    borderColor: 'border-blue-400/30',
-    iconBg: 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
-    accent: 'bg-blue-500',
+    borderColor: 'border-primary/30',
+    iconBg: 'bg-primary/10 text-primary dark:text-primary',
+    accent: 'bg-primary/80',
   },
   success: {
     icon: (
@@ -140,12 +140,12 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
   if (isLoading) {
     return (
       <div className={`relative ${className}`}>
-        <div className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl rounded-2xl border border-gray-200/50 dark:border-slate-700/50 p-4 shadow-lg">
+        <div className="bg-card/70 dark:bg-card/70 backdrop-blur-xl rounded-2xl border border-border/50 dark:border-border/50 p-4 shadow-lg">
           <div className="animate-pulse flex items-center gap-3">
-            <div className="w-10 h-10 bg-gray-200 dark:bg-slate-700 rounded-xl flex-shrink-0"></div>
+            <div className="w-10 h-10 bg-muted dark:bg-muted rounded-xl flex-shrink-0"></div>
             <div className="flex-1 space-y-2">
-              <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded-lg w-48"></div>
-              <div className="h-3 bg-gray-200 dark:bg-slate-700 rounded w-64"></div>
+              <div className="h-4 bg-muted dark:bg-muted rounded-lg w-48"></div>
+              <div className="h-3 bg-muted dark:bg-muted rounded w-64"></div>
             </div>
           </div>
         </div>
@@ -170,7 +170,7 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
         transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
         className={`
           relative overflow-hidden
-          bg-white/85 dark:bg-slate-800/85
+          bg-card/85 dark:bg-card/85
           backdrop-blur-xl
           rounded-2xl
           border ${config.borderColor}
@@ -221,7 +221,7 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
               className="
                 text-base sm:text-lg
                 font-semibold
-                text-gray-900 dark:text-white
+                text-foreground
               "
             >
               {displayNotification.title}
@@ -233,7 +233,7 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1, duration: 0.2 }}
               className="
-                text-sm text-gray-600 dark:text-gray-400
+                text-sm text-muted-foreground
                 mt-1
                 line-clamp-3
                 leading-relaxed
@@ -250,7 +250,7 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.2 }}
-                className="hidden sm:flex items-center gap-1 text-xs text-blue-500 dark:text-blue-400 font-medium"
+                className="hidden sm:flex items-center gap-1 text-xs text-primary dark:text-primary font-medium"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -259,7 +259,7 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
               </motion.span>
             )}
             {displayNotification.createdAt && (
-              <span className="hidden md:flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+              <span className="hidden md:flex items-center gap-1 text-xs text-muted-foreground">
                 {new Date(displayNotification.createdAt).toLocaleDateString('zh-CN')}
               </span>
             )}
@@ -268,7 +268,7 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
 
         {/* 进度条 */}
         {notifications.length > 1 && !isPaused && (
-          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-100 dark:bg-slate-700/50 overflow-hidden">
+          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-muted/50 overflow-hidden">
             <motion.div
               className={`h-full ${config.accent}`}
               initial={{ width: '0%' }}
@@ -290,12 +290,12 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
             onClick={prev}
             className="
               p-2 rounded-lg
-              bg-white/70 dark:bg-slate-800/70
+              bg-card/70 dark:bg-card/70
               backdrop-blur-sm
-              border border-gray-200/50 dark:border-slate-700/50
-              text-gray-500 dark:text-gray-400
-              hover:text-blue-500 dark:hover:text-blue-400
-              hover:border-blue-300 dark:hover:border-blue-700
+              border border-border/50 dark:border-border/50
+              text-muted-foreground
+              hover:text-primary dark:hover:text-primary
+              hover:border-primary/50
               transition-all duration-200
             "
           >
@@ -316,7 +316,7 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
                   rounded-full transition-all duration-200
                   ${index === currentIndex
                     ? 'w-5 h-1.5 bg-gradient-to-r from-blue-500 to-indigo-500'
-                    : 'w-1.5 h-1.5 bg-gray-300 dark:bg-slate-600 hover:bg-gray-400 dark:hover:bg-slate-500'
+                    : 'w-1.5 h-1.5 bg-border/60 hover:bg-border dark:hover:bg-border'
                   }
                 `}
                 aria-label={`切换到第 ${index + 1} 条通知`}
@@ -331,12 +331,12 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
             onClick={next}
             className="
               p-2 rounded-lg
-              bg-white/70 dark:bg-slate-800/70
+              bg-card/70 dark:bg-card/70
               backdrop-blur-sm
-              border border-gray-200/50 dark:border-slate-700/50
-              text-gray-500 dark:text-gray-400
-              hover:text-blue-500 dark:hover:text-blue-400
-              hover:border-blue-300 dark:hover:border-blue-700
+              border border-border/50 dark:border-border/50
+              text-muted-foreground
+              hover:text-primary dark:hover:text-primary
+              hover:border-primary/50
               transition-all duration-200
             "
           >

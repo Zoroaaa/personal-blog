@@ -100,7 +100,7 @@ export function TruncatedText({ text, className = '', lines = 2 }: TruncatedText
 
   const tooltipContent = showTooltip && isTruncated ? (
     <div
-      className="fixed p-3 rounded-lg shadow-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-gray-700 dark:text-gray-200 leading-relaxed"
+      className="fixed p-3 rounded-lg shadow-xl border border-border dark:border-border bg-card text-sm text-foreground leading-relaxed"
       style={{
         top: tooltipPosition.top,
         left: tooltipPosition.left,
