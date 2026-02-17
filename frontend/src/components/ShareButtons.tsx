@@ -44,7 +44,7 @@ export function ShareButtons({ title, url, description = '', className = '' }: S
         </svg>
       ),
       url: `https://twitter.com/intent/tweet?text=${shareTitle}&url=${shareUrl}`,
-      color: 'bg-primary/70 hover:bg-primary/80'
+      color: 'bg-primary hover:bg-primary/90'
     },
     {
       name: 'Facebook',
@@ -64,7 +64,7 @@ export function ShareButtons({ title, url, description = '', className = '' }: S
         </svg>
       ),
       url: `https://www.linkedin.com/sharing/share-offsite/?url=${shareUrl}`,
-      color: 'bg-primary/90 hover:bg-primary'
+      color: 'bg-primary hover:bg-primary/90'
     },
     {
       name: 'Telegram',
@@ -74,7 +74,7 @@ export function ShareButtons({ title, url, description = '', className = '' }: S
         </svg>
       ),
       url: `https://t.me/share/url?url=${shareUrl}&text=${shareTitle}`,
-      color: 'bg-primary/80 hover:bg-primary'
+      color: 'bg-primary hover:bg-primary/90'
     }
   ];
 
