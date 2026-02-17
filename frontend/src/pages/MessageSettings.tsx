@@ -50,7 +50,7 @@ function ToggleSwitch({
     >
       <span
         className={`
-          inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+          inline-block h-4 w-4 transform rounded-full bg-card transition-transform
           ${checked ? 'translate-x-6' : 'translate-x-1'}
         `}
       />
@@ -143,7 +143,7 @@ export default function MessageSettings({ onClose }: MessageSettingsProps) {
   if (loading) {
     return (
       <div className="text-center py-8">
-        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         <p className="mt-2 text-muted-foreground">加载中...</p>
       </div>
     );

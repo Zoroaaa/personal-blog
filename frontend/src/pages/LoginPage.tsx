@@ -283,12 +283,12 @@ export function LoginPage() {
   
   if (showForgotPassword) {
     return (
-      <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 bg-gray-50 dark:bg-slate-900">
+      <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 bg-background">
         <div className="max-w-md w-full">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-8">
+          <div className="bg-card rounded-lg shadow-lg p-8">
             <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-white">重置密码</h2>
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">通过邮箱验证码重置您的密码</p>
+              <h2 className="text-3xl font-bold text-foreground">重置密码</h2>
+              <p className="mt-2 text-sm text-muted-foreground">通过邮箱验证码重置您的密码</p>
             </div>
             {error && (
               <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -297,26 +297,26 @@ export function LoginPage() {
             )}
             <form onSubmit={handleResetPassword} className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">邮箱</label>
+                <label className="block text-sm font-medium text-foreground mb-1">邮箱</label>
                 <input
                   type="email"
                   value={resetEmail}
                   onChange={(e) => { setResetEmail(e.target.value); setResetCodeSent(false); }}
-                  className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-4 py-2 bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-border rounded-lg px-4 py-2 bg-muted text-foreground focus:ring-2 focus:ring-primary/50"
                   placeholder="请输入注册时使用的邮箱"
                   required
                 />
               </div>
               <div className="flex items-end gap-2">
                 <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">邮箱验证码</label>
+                  <label className="block text-sm font-medium text-foreground mb-1">邮箱验证码</label>
                   <input
                     type="text"
                     maxLength={6}
                     value={resetCode}
                     onChange={(e) => setResetCode(e.target.value.replace(/\D/g, ''))}
                     placeholder="6 位验证码"
-                    className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-4 py-2 bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-border rounded-lg px-4 py-2 bg-muted text-foreground focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
                 <button
@@ -340,29 +340,29 @@ export function LoginPage() {
                     }
                   }}
                   disabled={codeSending || isForgotCounting}
-                  className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-600 disabled:opacity-50 whitespace-nowrap text-sm min-w-[100px]"
+                  className="px-4 py-2 border border-border rounded-lg bg-muted text-foreground hover:bg-background dark:hover:bg-accent disabled:opacity-50 whitespace-nowrap text-sm min-w-[100px]"
                 >
                   {codeSending ? '发送中...' : isForgotCounting ? `${forgotCountdown}秒后重试` : '获取验证码'}
                 </button>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">新密码</label>
+                <label className="block text-sm font-medium text-foreground mb-1">新密码</label>
                 <input
                   type="password"
                   value={resetPassword}
                   onChange={(e) => setResetPassword(e.target.value)}
-                  className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-4 py-2 bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-border rounded-lg px-4 py-2 bg-muted text-foreground focus:ring-2 focus:ring-primary/50"
                   placeholder="至少8位，含大小写字母和数字"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">确认新密码</label>
+                <label className="block text-sm font-medium text-foreground mb-1">确认新密码</label>
                 <input
                   type="password"
                   value={resetConfirmPassword}
                   onChange={(e) => setResetConfirmPassword(e.target.value)}
-                  className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-4 py-2 bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-border rounded-lg px-4 py-2 bg-muted text-foreground focus:ring-2 focus:ring-primary/50"
                   placeholder="再次输入新密码"
                   required
                 />
@@ -370,7 +370,7 @@ export function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+                className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
               >
                 {loading ? '提交中...' : '重置密码'}
               </button>
@@ -378,7 +378,7 @@ export function LoginPage() {
                 <button
                   type="button"
                   onClick={() => { setShowForgotPassword(false); setError(''); }}
-                  className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium text-sm"
+                  className="text-primary dark:text-primary hover:text-primary dark:hover:text-primary font-medium text-sm"
                 >
                   返回登录
                 </button>
@@ -391,15 +391,15 @@ export function LoginPage() {
   }
   
   return (
-    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 bg-gray-50 dark:bg-slate-900">
+    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 bg-background">
       <div className="max-w-md w-full">
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-8">
+        <div className="bg-card rounded-lg shadow-lg p-8">
           {/* 标题 */}
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
+            <h2 className="text-3xl font-bold text-foreground">
               {isLogin ? '欢迎回来' : '创建账号'}
             </h2>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            <p className="mt-2 text-sm text-muted-foreground">
               {isLogin ? '登录以继续使用' : '注册一个新账号'}
             </p>
           </div>
@@ -422,7 +422,7 @@ export function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* 用户名 */}
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label htmlFor="username" className="block text-sm font-medium text-foreground mb-1">
                 用户名
               </label>
               <input
@@ -430,13 +430,13 @@ export function LoginPage() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-4 py-2 bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-border rounded-lg px-4 py-2 bg-muted text-foreground focus:ring-2 focus:ring-primary/50 focus:border-transparent"
                 placeholder="输入用户名"
                 required
                 autoComplete="username"
               />
               {!isLogin && (
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-1 text-xs text-muted-foreground">
                   3-20个字符,只能包含字母、数字、下划线和连字符
                 </p>
               )}
@@ -446,7 +446,7 @@ export function LoginPage() {
             {!isLogin && (
               <>
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1">
                     邮箱
                   </label>
                   <input
@@ -454,7 +454,7 @@ export function LoginPage() {
                     type="email"
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); setCodeSent(false); }}
-                    className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-4 py-2 bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full border border-border rounded-lg px-4 py-2 bg-muted text-foreground focus:ring-2 focus:ring-primary/50 focus:border-transparent"
                     placeholder="请使用主流邮箱（如 Gmail、QQ、163、Outlook）"
                     required
                     autoComplete="email"
@@ -462,7 +462,7 @@ export function LoginPage() {
                 </div>
                 <div className="flex items-end gap-2">
                   <div className="flex-1">
-                    <label htmlFor="emailCode" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label htmlFor="emailCode" className="block text-sm font-medium text-foreground mb-1">
                       邮箱验证码
                     </label>
                     <input
@@ -472,7 +472,7 @@ export function LoginPage() {
                       value={emailVerificationCode}
                       onChange={(e) => setEmailVerificationCode(e.target.value.replace(/\D/g, ''))}
                       placeholder="6 位验证码"
-                      className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-4 py-2 bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full border border-border rounded-lg px-4 py-2 bg-muted text-foreground focus:ring-2 focus:ring-primary/50 focus:border-transparent"
                     />
                   </div>
                   <button
@@ -499,7 +499,7 @@ export function LoginPage() {
                       }
                     }}
                     disabled={codeSending || isRegisterCounting}
-                    className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-600 disabled:opacity-50 whitespace-nowrap text-sm min-w-[100px]"
+                    className="px-4 py-2 border border-border rounded-lg bg-muted text-foreground hover:bg-background dark:hover:bg-accent disabled:opacity-50 whitespace-nowrap text-sm min-w-[100px]"
                   >
                     {codeSending ? '发送中...' : isRegisterCounting ? `${registerCountdown}秒后重试` : '获取验证码'}
                   </button>
@@ -510,19 +510,19 @@ export function LoginPage() {
             {/* 显示名称(仅注册) */}
             {!isLogin && (
               <div>
-                <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  显示名称 <span className="text-gray-400 dark:text-gray-500 text-xs">(可选)</span>
+                <label htmlFor="displayName" className="block text-sm font-medium text-foreground mb-1">
+                  显示名称 <span className="text-muted-foreground text-xs">(可选)</span>
                 </label>
                 <input
                   id="displayName"
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-4 py-2 bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full border border-border rounded-lg px-4 py-2 bg-muted text-foreground focus:ring-2 focus:ring-primary/50 focus:border-transparent"
                   placeholder="输入显示名称"
                   autoComplete="name"
                 />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-1 text-xs text-muted-foreground">
                   留空则使用用户名
                 </p>
               </div>
@@ -530,7 +530,7 @@ export function LoginPage() {
             
             {/* 密码 */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1">
                 密码
               </label>
               <input
@@ -538,7 +538,7 @@ export function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-4 py-2 bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-border rounded-lg px-4 py-2 bg-muted text-foreground focus:ring-2 focus:ring-primary/50 focus:border-transparent"
                 placeholder="输入密码"
                 required
                 autoComplete={isLogin ? 'current-password' : 'new-password'}
@@ -548,12 +548,12 @@ export function LoginPage() {
               {!isLogin && password && passwordStrength && (
                 <div className="mt-2">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-gray-600 dark:text-gray-400">密码强度:</span>
+                    <span className="text-xs text-muted-foreground">密码强度:</span>
                     <span className={`text-xs font-medium ${passwordStrength.color}`}>
                       {passwordStrength.text}
                     </span>
                   </div>
-                  <div className="h-1 bg-gray-200 dark:bg-slate-600 rounded-full overflow-hidden">
+                  <div className="h-1 bg-muted rounded-full overflow-hidden">
                     <div
                       className={`h-full transition-all ${
                         passwordStrength.level === 1 ? 'bg-red-500 w-1/4' :
@@ -563,7 +563,7 @@ export function LoginPage() {
                       }`}
                     />
                   </div>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     建议:至少8个字符,包含大小写字母和数字
                   </p>
                 </div>
@@ -571,11 +571,11 @@ export function LoginPage() {
               
               {isLogin && (
                 <div className="mt-1 flex items-center justify-between">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">至少6个字符</p>
+                  <p className="text-xs text-muted-foreground">至少6个字符</p>
                   <button
                     type="button"
                     onClick={() => { setShowForgotPassword(true); setError(''); }}
-                    className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                    className="text-xs text-primary dark:text-primary hover:text-primary dark:hover:text-primary"
                   >
                     忘记密码?
                   </button>
@@ -587,7 +587,7 @@ export function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors flex items-center justify-center"
+              className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors flex items-center justify-center"
             >
               {loading ? (
                 <>
@@ -609,17 +609,17 @@ export function LoginPage() {
               {/* 分割线 */}
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300 dark:border-slate-600"></div>
+                  <div className="w-full border-t border-border"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white dark:bg-slate-800 text-gray-500 dark:text-gray-400">或使用</span>
+                  <span className="px-2 bg-card text-muted-foreground">或使用</span>
                 </div>
               </div>
               
               <button
                 onClick={handleGitHubLogin}
                 disabled={loading || loadingConfig || !githubClientId}
-                className="w-full flex items-center justify-center space-x-2 bg-gray-800 dark:bg-gray-700 text-white py-3 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
+                className="w-full flex items-center justify-center space-x-2 bg-card dark:bg-primary text-white py-3 rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
               >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
@@ -640,7 +640,7 @@ export function LoginPage() {
                   setEmailVerificationCode('');
                   setCodeSent(false);
                 }}
-                className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
+                className="text-primary dark:text-primary hover:text-primary dark:hover:text-primary font-medium"
               >
                 {isLogin ? '还没有账号?立即注册' : '已有账号?立即登录'}
               </button>
@@ -649,8 +649,8 @@ export function LoginPage() {
           
           {/* 提示信息 */}
           {redirectParam && (
-            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <p className="text-sm text-blue-700 dark:text-blue-400">
+            <div className="mt-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
+              <p className="text-sm text-primary dark:text-primary">
                 登录后将跳转回之前的页面
               </p>
             </div>

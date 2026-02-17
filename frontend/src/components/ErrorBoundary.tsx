@@ -82,15 +82,15 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     if (this.state.hasError) {
       return (
         this.props.fallback || (
-          <div className="flex items-center justify-center min-h-screen bg-gray-100">
-            <div className="bg-white p-8 rounded-lg shadow-lg text-center max-w-md mx-auto">
+          <div className="flex items-center justify-center min-h-screen bg-muted">
+            <div className="bg-card p-8 rounded-lg shadow-lg text-center max-w-md mx-auto">
               <h1 className="text-2xl font-bold text-red-600 mb-4">出错了</h1>
-              <p className="text-gray-600 mb-6">
+              <p className="text-muted-foreground mb-6">
                 应用遇到了意外错误。请刷新页面重试。
               </p>
               <button
                 onClick={() => window.location.reload()}
-                className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors"
+                className="bg-primary text-white px-6 py-2 rounded hover:bg-primary/90 transition-colors"
               >
                 刷新页面
               </button>

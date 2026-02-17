@@ -44,7 +44,7 @@ export function ShareButtons({ title, url, description = '', className = '' }: S
         </svg>
       ),
       url: `https://twitter.com/intent/tweet?text=${shareTitle}&url=${shareUrl}`,
-      color: 'bg-blue-400 hover:bg-blue-500'
+      color: 'bg-primary/70 hover:bg-primary/80'
     },
     {
       name: 'Facebook',
@@ -54,7 +54,7 @@ export function ShareButtons({ title, url, description = '', className = '' }: S
         </svg>
       ),
       url: `https://www.facebook.com/sharer/sharer.php?u=${shareUrl}`,
-      color: 'bg-blue-600 hover:bg-blue-700'
+      color: 'bg-primary hover:bg-primary/90'
     },
     {
       name: 'LinkedIn',
@@ -64,7 +64,7 @@ export function ShareButtons({ title, url, description = '', className = '' }: S
         </svg>
       ),
       url: `https://www.linkedin.com/sharing/share-offsite/?url=${shareUrl}`,
-      color: 'bg-blue-700 hover:bg-blue-800'
+      color: 'bg-primary/90 hover:bg-primary'
     },
     {
       name: 'Telegram',
@@ -74,7 +74,7 @@ export function ShareButtons({ title, url, description = '', className = '' }: S
         </svg>
       ),
       url: `https://t.me/share/url?url=${shareUrl}&text=${shareTitle}`,
-      color: 'bg-blue-500 hover:bg-blue-600'
+      color: 'bg-primary/80 hover:bg-primary'
     }
   ];
 
@@ -133,7 +133,7 @@ export function ShareButtons({ title, url, description = '', className = '' }: S
         className={`w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-110 ${
           copied 
             ? 'bg-green-500 text-white' 
-            : 'bg-gray-500 hover:bg-gray-600 text-white'
+            : 'bg-muted-foreground hover:bg-muted-foreground/90 text-background'
         }`}
         title={copied ? '已复制!' : '复制链接'}
         aria-label={copied ? '已复制!' : '复制链接'}

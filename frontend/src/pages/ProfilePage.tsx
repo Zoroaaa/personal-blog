@@ -163,7 +163,7 @@ export function ProfilePage() {
     if (loading.comments) {
       return (
         <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           <p className="mt-2 text-muted-foreground">加载中...</p>
         </div>
       );
@@ -272,7 +272,7 @@ export function ProfilePage() {
     if (loading.favorites) {
       return (
         <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           <p className="mt-2 text-muted-foreground">加载中...</p>
         </div>
       );
@@ -313,7 +313,7 @@ export function ProfilePage() {
             {/* 取消收藏按钮 */}
             <button
               onClick={(e) => handleUnfavorite(post.id, e)}
-              className="absolute top-2 right-2 p-2 bg-white/90 dark:bg-gray-800/90 rounded-full shadow-sm hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 transition-colors"
+              className="absolute top-2 right-2 p-2 bg-card/90 dark:bg-card/90 rounded-full shadow-sm hover:bg-red-50 dark:hover:bg-red-900/30 text-muted-foreground hover:text-red-500 transition-colors"
               title="取消收藏"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -331,7 +331,7 @@ export function ProfilePage() {
     if (loading.likes) {
       return (
         <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           <p className="mt-2 text-muted-foreground">加载中...</p>
         </div>
       );

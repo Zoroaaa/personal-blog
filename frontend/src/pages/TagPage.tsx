@@ -129,7 +129,7 @@ export function TagPage() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
             {/* 标签图标 */}
-            <div className="w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-4xl md:text-5xl font-bold shadow-lg">
+            <div className="w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-card/20 backdrop-blur-sm flex items-center justify-center text-4xl md:text-5xl font-bold shadow-lg">
               #{tag.name.slice(0, 2)}
             </div>
 

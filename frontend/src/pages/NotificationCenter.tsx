@@ -34,9 +34,9 @@ function getSystemNotificationStyle(subtype?: string): { bg: string; border: str
       };
     case 'update':
       return {
-        bg: 'bg-blue-50 dark:bg-blue-900/10',
-        border: 'border-l-4 border-blue-500',
-        badge: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+        bg: 'bg-primary/5',
+        border: 'border-l-4 border-primary',
+        badge: 'bg-primary/15 text-primary',
       };
     case 'announcement':
       return {
@@ -122,7 +122,7 @@ function NotificationItem({
               </span>
             )}
             {!notification.isRead && (
-              <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></span>
+              <span className="w-2 h-2 bg-primary/80 rounded-full flex-shrink-0"></span>
             )}
           </div>
           {notification.content && (
@@ -373,7 +373,7 @@ export default function NotificationCenter() {
                   <button
                     onClick={loadMore}
                     disabled={isLoadingMore}
-                    className="text-sm text-blue-500 hover:text-blue-600 font-medium disabled:opacity-50"
+                    className="text-sm text-primary hover:text-primary font-medium disabled:opacity-50"
                   >
                     {isLoadingMore ? '加载中...' : '加载更多'}
                   </button>

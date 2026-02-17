@@ -503,7 +503,7 @@ export default function ThreadPage() {
   const renderMessageContent = (message: Message) => {
     if (message.isRecalled) {
       return (
-        <p className="text-gray-400 italic text-sm">此消息已撤回</p>
+        <p className="text-muted-foreground italic text-sm">此消息已撤回</p>
       );
     }
 
@@ -527,7 +527,7 @@ export default function ThreadPage() {
             />
             <button
               onClick={() => handleDownload(message.attachmentUrl!, message.attachmentFilename || 'image.jpg')}
-              className="mt-2 text-xs text-blue-500 hover:text-blue-600 flex items-center gap-1"
+              className="mt-2 text-xs text-primary hover:text-primary flex items-center gap-1"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -538,20 +538,20 @@ export default function ThreadPage() {
         )}
         
         {!isImageAttachment && (message.messageType === 'attachment' || message.messageType === 'mixed') && message.attachmentUrl && (
-          <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
+          <div className="mt-2 p-3 bg-muted dark:bg-muted rounded-lg">
             <div className="flex items-center gap-3">
               <div className="flex-shrink-0">
-                <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{message.attachmentFilename}</p>
-                <p className="text-xs text-gray-500">{formatFileSize(message.attachmentSize || 0)}</p>
+                <p className="text-xs text-muted-foreground">{formatFileSize(message.attachmentSize || 0)}</p>
               </div>
               <button
                 onClick={() => handleDownload(message.attachmentUrl!, message.attachmentFilename || 'file')}
-                className="flex-shrink-0 p-2 text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                className="flex-shrink-0 p-2 text-primary hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                 title="下载文件"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -677,12 +677,12 @@ export default function ThreadPage() {
                           {formatTime(message.createdAt)}
                         </p>
                         {isMine && message.isRead && !message.isRecalled && (
-                          <span className="text-xs text-blue-500">已读</span>
+                          <span className="text-xs text-primary">已读</span>
                         )}
                         {isMine && message.isRecalled && (
                           <button
                             onClick={() => handleEditMessage(message)}
-                            className="text-xs text-blue-500 hover:text-blue-600"
+                            className="text-xs text-primary hover:text-primary"
                           >
                             编辑重新发送
                           </button>
@@ -691,15 +691,15 @@ export default function ThreadPage() {
                           <div className="relative">
                             <button
                               onClick={() => setShowRecallMenu(showRecallMenu === message.id ? null : message.id)}
-                              className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                              className="text-xs text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground"
                             >
                               更多
                             </button>
                             {showRecallMenu === message.id && (
-                              <div className="absolute bottom-full right-0 mb-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-[100px] z-10">
+                              <div className="absolute bottom-full right-0 mb-1 bg-card border border-border rounded-lg shadow-lg py-1 min-w-[100px] z-10">
                                 <button
                                   onClick={() => handleRecallMessage(message.id)}
-                                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                                  className="w-full px-3 py-2 text-left text-sm hover:bg-accent"
                                 >
                                   撤回
                                 </button>
@@ -718,24 +718,24 @@ export default function ThreadPage() {
         </div>
 
         {attachmentPreview && (
-          <div className="px-4 py-2 border-t border-border bg-gray-50 dark:bg-gray-800">
+          <div className="px-4 py-2 border-t border-border bg-background dark:bg-card">
             <div className="flex items-center gap-3">
               {attachmentPreview.type === 'image' ? (
                 <img src={attachmentPreview.url} alt="预览" className="w-16 h-16 object-cover rounded" />
               ) : (
-                <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center">
-                  <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-16 h-16 bg-muted dark:bg-muted rounded flex items-center justify-center">
+                  <svg className="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
               )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{attachmentPreview.filename}</p>
-                <p className="text-xs text-gray-500">{formatFileSize(attachmentPreview.size)}</p>
+                <p className="text-xs text-muted-foreground">{formatFileSize(attachmentPreview.size)}</p>
               </div>
               <button
                 onClick={() => setAttachmentPreview(null)}
-                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                className="p-1 text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -747,7 +747,7 @@ export default function ThreadPage() {
 
         <div className="p-4 border-t border-border">
           {editingMessage && (
-            <div className="mb-2 text-sm text-blue-600 flex items-center gap-2">
+            <div className="mb-2 text-sm text-primary flex items-center gap-2">
               <span>正在编辑已撤回的消息，发送后将重新发送</span>
               <button
                 onClick={() => {
@@ -755,7 +755,7 @@ export default function ThreadPage() {
                   setNewMessage('');
                   setAttachmentPreview(null);
                 }}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-muted-foreground hover:text-muted-foreground"
               >
                 取消
               </button>
@@ -766,7 +766,7 @@ export default function ThreadPage() {
             <button
               ref={emojiButtonRef}
               onClick={() => setShowEmojis(!showEmojis)}
-              className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className="p-2 text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground hover:bg-accent rounded-lg transition-colors"
               title="表情"
             >
               <span className="text-xl">😀</span>
@@ -782,7 +782,7 @@ export default function ThreadPage() {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingAttachment}
-              className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+              className="p-2 text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
               title="上传附件"
             >
               {uploadingAttachment ? (
@@ -808,7 +808,7 @@ export default function ThreadPage() {
               placeholder="输入消息... 可直接粘贴图片"
               rows={2}
               maxLength={2000}
-              className="flex-1 px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              className="flex-1 px-4 py-2 border border-border rounded-lg bg-card focus:ring-2 focus:ring-primary/50 focus:border-transparent resize-none"
             />
             <button
               onClick={handleSendMessage}
@@ -835,7 +835,7 @@ export default function ThreadPage() {
 
       {showEmojis && createPortal(
         <div 
-          className="fixed bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg z-[9999] p-2 w-72"
+          className="fixed bg-card border border-border rounded-lg shadow-lg z-[9999] p-2 w-72"
           style={{
             top: emojiButtonRef.current 
               ? emojiButtonRef.current.getBoundingClientRect().bottom + 8 
@@ -851,7 +851,7 @@ export default function ThreadPage() {
                 key={index}
                 type="button"
                 onClick={() => insertEmoji(emoji)}
-                className="w-8 h-8 flex items-center justify-center text-lg hover:bg-gray-100 dark:hover:bg-slate-700 rounded transition-colors"
+                className="w-8 h-8 flex items-center justify-center text-lg hover:bg-accent rounded transition-colors"
               >
                 {emoji}
               </button>

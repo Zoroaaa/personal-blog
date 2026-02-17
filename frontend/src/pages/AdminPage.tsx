@@ -390,7 +390,7 @@ export function AdminPage() {
                               <span className={`px-2 py-1 rounded ${
                                 post.status === 'published' 
                                   ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
-                                  : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'
+                                  : 'bg-muted text-foreground dark:bg-card dark:text-muted-foreground'
                               }`}>
                                 {post.status === 'published' ? '已发布' : '草稿'}
                               </span>

@@ -122,8 +122,8 @@ export function SearchPage() {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">搜索中...</p>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-2 text-muted-foreground">搜索中...</p>
         </div>
       </div>
     );
@@ -133,8 +133,8 @@ export function SearchPage() {
     <div className="max-w-4xl mx-auto px-4 py-12">
       {/* 搜索头部 */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">搜索结果</h1>
-        <p className="text-gray-600 dark:text-gray-400">
+        <h1 className="text-3xl font-bold text-foreground mb-2">搜索结果</h1>
+        <p className="text-muted-foreground">
           {query ? `关键词: "${query}"` : ''}
           {query && categoryParam ? ' · ' : ''}
           {categoryParam ? `分类: ${categoryParam}` : ''}
@@ -153,22 +153,22 @@ export function SearchPage() {
 
       {/* 无搜索词提示 */}
       {!query && !categoryParam && !tagParam && (
-        <div className="text-center py-16 bg-gray-50 dark:bg-slate-800 rounded-lg">
-          <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="text-center py-16 bg-background dark:bg-card rounded-lg">
+          <svg className="mx-auto h-16 w-16 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
-          <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">请输入搜索关键词</h3>
-          <p className="mt-2 text-gray-500 dark:text-gray-400">在顶部搜索框中输入关键词来查找相关文章</p>
+          <h3 className="mt-4 text-lg font-medium text-foreground">请输入搜索关键词</h3>
+          <p className="mt-2 text-muted-foreground">在顶部搜索框中输入关键词来查找相关文章</p>
 
           {/* FTS5搜索语法提示 */}
           <div className="mt-6 text-left max-w-md mx-auto px-6">
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">高级搜索语法：</p>
-            <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-              <li><code className="bg-gray-200 dark:bg-slate-700 px-1 rounded">React AND TypeScript</code> - 同时包含两个词</li>
-              <li><code className="bg-gray-200 dark:bg-slate-700 px-1 rounded">React OR Vue</code> - 包含任一关键词</li>
-              <li><code className="bg-gray-200 dark:bg-slate-700 px-1 rounded">&quot;完整短语&quot;</code> - 精确匹配短语</li>
-              <li><code className="bg-gray-200 dark:bg-slate-700 px-1 rounded">React*</code> - 前缀匹配</li>
-              <li><code className="bg-gray-200 dark:bg-slate-700 px-1 rounded">React -Vue</code> - 包含React但不包含Vue</li>
+            <p className="text-sm text-muted-foreground mb-2">高级搜索语法：</p>
+            <ul className="text-xs text-muted-foreground space-y-1">
+              <li><code className="bg-muted dark:bg-muted px-1 rounded">React AND TypeScript</code> - 同时包含两个词</li>
+              <li><code className="bg-muted dark:bg-muted px-1 rounded">React OR Vue</code> - 包含任一关键词</li>
+              <li><code className="bg-muted dark:bg-muted px-1 rounded">&quot;完整短语&quot;</code> - 精确匹配短语</li>
+              <li><code className="bg-muted dark:bg-muted px-1 rounded">React*</code> - 前缀匹配</li>
+              <li><code className="bg-muted dark:bg-muted px-1 rounded">React -Vue</code> - 包含React但不包含Vue</li>
             </ul>
           </div>
         </div>
@@ -176,12 +176,12 @@ export function SearchPage() {
 
       {/* 无结果提示 */}
       {query && posts.length === 0 && !loading && (
-        <div className="text-center py-16 bg-gray-50 dark:bg-slate-800 rounded-lg">
-          <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="text-center py-16 bg-background dark:bg-card rounded-lg">
+          <svg className="mx-auto h-16 w-16 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">未找到相关文章</h3>
-          <p className="mt-2 text-gray-500 dark:text-gray-400">尝试使用其他关键词或检查拼写</p>
+          <h3 className="mt-4 text-lg font-medium text-foreground">未找到相关文章</h3>
+          <p className="mt-2 text-muted-foreground">尝试使用其他关键词或检查拼写</p>
         </div>
       )}
 
@@ -189,16 +189,16 @@ export function SearchPage() {
       {posts.length > 0 && (
         <div className="space-y-6">
           {posts.map((post) => (
-            <article key={post.id} className="border border-gray-200 dark:border-slate-700 rounded-lg overflow-hidden hover:shadow-md transition-shadow bg-white dark:bg-slate-800">
+            <article key={post.id} className="border border-border rounded-lg overflow-hidden hover:shadow-md transition-shadow bg-card">
               <div className="p-6">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                      <Link to={`/posts/${post.slug}`} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                    <h2 className="text-xl font-bold text-foreground mb-2">
+                      <Link to={`/posts/${post.slug}`} className="hover:text-primary dark:hover:text-primary transition-colors">
                         {post.title}
                       </Link>
                     </h2>
-                    <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 space-x-4">
+                    <div className="flex items-center text-sm text-muted-foreground space-x-4">
                       <span className="flex items-center">
                         {post.authorAvatar ? (
                           <img
@@ -207,7 +207,7 @@ export function SearchPage() {
                             className="w-5 h-5 rounded-full mr-1"
                           />
                         ) : (
-                          <div className="w-5 h-5 rounded-full bg-gray-300 dark:bg-slate-600 mr-1"></div>
+                          <div className="w-5 h-5 rounded-full bg-border mr-1"></div>
                         )}
                         {post.authorName || 'Unknown'}
                       </span>
@@ -221,7 +221,7 @@ export function SearchPage() {
                 </div>
 
                 {post.summary && (
-                  <p className="text-gray-600 dark:text-gray-300 mb-4 line-clamp-3">{post.summary}</p>
+                  <p className="text-muted-foreground dark:text-muted-foreground mb-4 line-clamp-3">{post.summary}</p>
                 )}
 
                 <div className="flex flex-wrap items-center justify-between gap-4">
@@ -232,7 +232,7 @@ export function SearchPage() {
                         <Link
                           key={tag.id}
                           to={`/search?tag=${tag.slug}`}
-                          className="px-2 py-1 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-full text-xs hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+                          className="px-2 py-1 bg-muted text-foreground rounded-full text-xs hover:bg-muted dark:hover:bg-accent transition-colors"
                         >
                           #{tag.name}
                         </Link>
@@ -244,7 +244,7 @@ export function SearchPage() {
                   {post.categoryName && (
                     <Link
                       to={`/search?category=${post.categorySlug}`}
-                      className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full text-xs hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+                      className="px-3 py-1 bg-primary/15 text-primary dark:text-primary rounded-full text-xs hover:bg-primary/20 dark:hover:bg-primary/20 transition-colors"
                     >
                       {post.categoryName}
                     </Link>
@@ -260,7 +260,7 @@ export function SearchPage() {
               <button
                 onClick={loadMore}
                 disabled={loading}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? '加载中...' : '加载更多'}
               </button>
@@ -269,7 +269,7 @@ export function SearchPage() {
 
           {/* 无更多结果 */}
           {!hasMore && posts.length > 0 && (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            <div className="text-center py-8 text-muted-foreground">
               没有更多结果了
             </div>
           )}

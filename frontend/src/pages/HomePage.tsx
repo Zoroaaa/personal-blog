@@ -293,7 +293,7 @@ export function HomePage() {
   const SidebarContent = () => (
     <div className="space-y-4">
       {/* 分类卡片 */}
-      <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-lg rounded-xl shadow-md border border-gray-200/50 dark:border-slate-700/50 p-4 transition-all duration-200 hover:shadow-lg">
+      <div className="bg-card/75 dark:bg-card/75 backdrop-blur-lg rounded-xl shadow-md border border-border/50 dark:border-border/50 p-4 transition-all duration-200 hover:shadow-lg">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
             <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white">
@@ -316,7 +316,7 @@ export function HomePage() {
         {categoriesLoading ? (
           <div className="space-y-1.5">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-9 bg-gray-200 dark:bg-slate-700 rounded-lg animate-pulse" />
+              <div key={i} className="h-9 bg-muted dark:bg-muted rounded-lg animate-pulse" />
             ))}
           </div>
         ) : (
@@ -339,7 +339,7 @@ export function HomePage() {
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <span className={`text-xs px-1.5 py-0.5 rounded ${
                       selectedCategory === category.slug
-                        ? 'bg-white/20'
+                        ? 'bg-card/20'
                         : 'bg-muted'
                     }`}>
                       {category.postCount}
@@ -348,7 +348,7 @@ export function HomePage() {
                       onClick={(e) => handleCategoryNavigate(e, category.slug)}
                       className={`p-1 rounded transition-all opacity-0 group-hover:opacity-100 ${
                         selectedCategory === category.slug
-                          ? 'hover:bg-white/20 text-white'
+                          ? 'hover:bg-card/20 text-white'
                           : 'hover:bg-muted text-muted-foreground'
                       }`}
                       title="查看分类详情"
@@ -383,7 +383,7 @@ export function HomePage() {
       </div>
 
       {/* 专栏卡片 */}
-      <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-lg rounded-xl shadow-md border border-gray-200/50 dark:border-slate-700/50 p-4 transition-all duration-200 hover:shadow-lg">
+      <div className="bg-card/75 dark:bg-card/75 backdrop-blur-lg rounded-xl shadow-md border border-border/50 dark:border-border/50 p-4 transition-all duration-200 hover:shadow-lg">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
             <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white">
@@ -428,7 +428,7 @@ export function HomePage() {
                 >
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${
                     selectedColumn === column.slug
-                      ? 'bg-white/20'
+                      ? 'bg-card/20'
                       : 'bg-gradient-to-br from-purple-500 to-indigo-600'
                   }`}>
                     {column.name.slice(0, 2)}
@@ -447,7 +447,7 @@ export function HomePage() {
                     onClick={(e) => handleColumnNavigate(e, column.slug)}
                     className={`p-1 rounded transition-all opacity-0 group-hover:opacity-100 flex-shrink-0 ${
                       selectedColumn === column.slug
-                        ? 'hover:bg-white/20 text-white'
+                        ? 'hover:bg-card/20 text-white'
                         : 'hover:bg-muted text-muted-foreground'
                     }`}
                     title="查看专栏详情"
@@ -481,7 +481,7 @@ export function HomePage() {
       </div>
 
       {/* 标签云卡片 */}
-      <div className="bg-white/75 dark:bg-slate-800/75 backdrop-blur-lg rounded-xl shadow-md border border-gray-200/50 dark:border-slate-700/50 p-4 transition-all duration-200 hover:shadow-lg">
+      <div className="bg-card/75 dark:bg-card/75 backdrop-blur-lg rounded-xl shadow-md border border-border/50 dark:border-border/50 p-4 transition-all duration-200 hover:shadow-lg">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
             <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white">

@@ -47,14 +47,14 @@ export default function ComposeMessageModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-lg w-full mx-4 shadow-xl">
-        <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
+      <div className="bg-card rounded-lg p-6 max-w-lg w-full mx-4 shadow-xl">
+        <h2 className="text-2xl font-bold mb-4 text-foreground">
           发送私信给 {recipientName}
         </h2>
         
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+            <label className="block text-sm font-medium mb-2 text-foreground">
               主题（可选）
             </label>
             <input
@@ -62,13 +62,13 @@ export default function ComposeMessageModal({
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               maxLength={100}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-border rounded-lg bg-muted text-foreground focus:ring-2 focus:ring-primary/50 focus:border-transparent"
               placeholder="消息主题"
             />
           </div>
           
           <div className="mb-4">
-            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+            <label className="block text-sm font-medium mb-2 text-foreground">
               内容 <span className="text-red-500">*</span>
             </label>
             <textarea
@@ -76,11 +76,11 @@ export default function ComposeMessageModal({
               onChange={(e) => setContent(e.target.value)}
               maxLength={2000}
               rows={6}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-border rounded-lg bg-muted text-foreground focus:ring-2 focus:ring-primary/50 focus:border-transparent"
               placeholder="输入消息内容..."
               required
             />
-            <div className="text-sm text-gray-500 dark:text-gray-400 text-right mt-1">
+            <div className="text-sm text-muted-foreground text-right mt-1">
               {content.length}/2000
             </div>
           </div>
@@ -89,14 +89,14 @@ export default function ComposeMessageModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700"
+              className="px-4 py-2 border border-border rounded-lg text-foreground hover:bg-accent"
               disabled={sending}
             >
               取消
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+              className="px-4 py-2 bg-primary/80 text-white rounded-lg hover:bg-primary disabled:opacity-50"
               disabled={sending}
             >
               {sending ? '发送中...' : '发送'}

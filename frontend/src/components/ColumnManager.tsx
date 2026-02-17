@@ -187,10 +187,10 @@ export function ColumnManager() {
     <div className="space-y-6">
       {/* 头部 */}
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">专栏管理</h2>
+        <h2 className="text-2xl font-bold text-foreground">专栏管理</h2>
         <button
           onClick={handleCreate}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium flex items-center gap-2"
+          className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg transition-colors font-medium flex items-center gap-2"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -202,15 +202,15 @@ export function ColumnManager() {
       {/* 表单对话框 */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-card rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                <h3 className="text-xl font-bold text-foreground">
                   {editingId ? '编辑专栏' : '新建专栏'}
                 </h3>
                 <button
                   onClick={() => setShowForm(false)}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  className="text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -227,14 +227,14 @@ export function ColumnManager() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* 专栏名称 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     专栏名称 *
                   </label>
                   <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/50 dark:bg-muted dark:text-foreground"
                     placeholder="例如：前端开发专栏"
                     required
                   />
@@ -242,27 +242,27 @@ export function ColumnManager() {
 
                 {/* Slug */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     URL 标识 (留空自动生成)
                   </label>
                   <input
                     type="text"
                     value={formData.slug}
                     onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/50 dark:bg-muted dark:text-foreground"
                     placeholder="例如：frontend-development"
                   />
                 </div>
 
                 {/* 描述 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     描述
                   </label>
                   <textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/50 dark:bg-muted dark:text-foreground"
                     rows={3}
                     placeholder="专栏的简短描述"
                   />
@@ -270,42 +270,42 @@ export function ColumnManager() {
 
                 {/* 封面图片 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     封面图片 URL
                   </label>
                   <input
                     type="url"
                     value={formData.coverImage}
                     onChange={(e) => setFormData({ ...formData, coverImage: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/50 dark:bg-muted dark:text-foreground"
                     placeholder="https://example.com/image.jpg"
                   />
                 </div>
 
                 {/* 显示顺序 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     显示顺序
                   </label>
                   <input
                     type="number"
                     value={formData.displayOrder}
                     onChange={(e) => setFormData({ ...formData, displayOrder: parseInt(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/50 dark:bg-muted dark:text-foreground"
                     placeholder="数字越小越靠前"
                   />
                 </div>
 
                 {/* 专栏状态 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     专栏状态
                   </label>
                   <div className="flex flex-wrap gap-3">
                     <label className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border-2 transition-all ${
                       formData.status === 'active'
                         ? 'border-green-500 bg-green-50 dark:bg-green-900/30'
-                        : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
+                        : 'border-border hover:border-primary/50'
                     }`}>
                       <input
                         type="radio"
@@ -315,12 +315,12 @@ export function ColumnManager() {
                         onChange={(e) => setFormData({ ...formData, status: e.target.value as 'active' })}
                         className="w-4 h-4 text-green-600"
                       />
-                      <span className="text-gray-700 dark:text-gray-300 font-medium">正常</span>
+                      <span className="text-foreground font-medium">正常</span>
                     </label>
                     <label className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border-2 transition-all ${
                       formData.status === 'hidden'
                         ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30'
-                        : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
+                        : 'border-border hover:border-primary/50'
                     }`}>
                       <input
                         type="radio"
@@ -330,12 +330,12 @@ export function ColumnManager() {
                         onChange={(e) => setFormData({ ...formData, status: e.target.value as 'hidden' })}
                         className="w-4 h-4 text-yellow-600"
                       />
-                      <span className="text-gray-700 dark:text-gray-300 font-medium">隐藏</span>
+                      <span className="text-foreground font-medium">隐藏</span>
                     </label>
                     <label className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border-2 transition-all ${
                       formData.status === 'archived'
-                        ? 'border-gray-500 bg-gray-50 dark:bg-gray-900/30'
-                        : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
+                        ? 'border-border/80 bg-background/30'
+                        : 'border-border hover:border-primary/50'
                     }`}>
                       <input
                         type="radio"
@@ -343,12 +343,12 @@ export function ColumnManager() {
                         value="archived"
                         checked={formData.status === 'archived'}
                         onChange={(e) => setFormData({ ...formData, status: e.target.value as 'archived' })}
-                        className="w-4 h-4 text-gray-600"
+                        className="w-4 h-4 text-muted-foreground"
                       />
-                      <span className="text-gray-700 dark:text-gray-300 font-medium">归档</span>
+                      <span className="text-foreground font-medium">归档</span>
                     </label>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  <p className="text-xs text-muted-foreground mt-2">
                     {formData.status === 'active' && '正常：专栏在首页正常展示，可以新建文章'}
                     {formData.status === 'hidden' && '隐藏：专栏不在首页展示，禁止新建文章，关联文章同步隐藏'}
                     {formData.status === 'archived' && '归档：专栏在首页展示，但禁止新建文章'}
@@ -360,14 +360,14 @@ export function ColumnManager() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition-colors font-medium"
+                    className="flex-1 px-4 py-2 bg-primary hover:bg-primary/90 disabled:bg-primary/60 text-white rounded-lg transition-colors font-medium"
                   >
                     {submitting ? '提交中...' : editingId ? '更新' : '创建'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowForm(false)}
-                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors font-medium"
+                    className="px-4 py-2 bg-muted hover:bg-accent text-foreground rounded-lg transition-colors font-medium"
                   >
                     取消
                   </button>
@@ -381,8 +381,8 @@ export function ColumnManager() {
       {/* 专栏列表 */}
       {loading ? (
         <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">加载中...</p>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-2 text-muted-foreground">加载中...</p>
         </div>
       ) : error ? (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 text-center">
@@ -395,14 +395,14 @@ export function ColumnManager() {
           </button>
         </div>
       ) : columns.length === 0 ? (
-        <div className="bg-gray-50 dark:bg-slate-800 rounded-lg p-12 text-center">
-          <svg className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="bg-background dark:bg-card rounded-lg p-12 text-center">
+          <svg className="mx-auto h-12 w-12 text-muted-foreground mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">还没有创建任何专栏</p>
+          <p className="text-muted-foreground mb-4">还没有创建任何专栏</p>
           <button
             onClick={handleCreate}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg transition-colors"
           >
             创建第一个专栏
           </button>
@@ -412,7 +412,7 @@ export function ColumnManager() {
           {columns.map((column) => (
             <div
               key={column.id}
-              className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden hover:shadow-lg transition-shadow"
+              className="bg-card rounded-lg border border-border overflow-hidden hover:shadow-lg transition-shadow"
             >
               {/* 封面图片 */}
               <div className="h-32 bg-gradient-to-br from-blue-500 to-indigo-600 relative">
@@ -434,56 +434,56 @@ export function ColumnManager() {
               <div className="p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div>
-                    <h3 className="font-bold text-gray-900 dark:text-white">{column.name}</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{column.slug}</p>
+                    <h3 className="font-bold text-foreground">{column.name}</h3>
+                    <p className="text-xs text-muted-foreground">{column.slug}</p>
                   </div>
                   <span className={`px-2 py-1 text-xs rounded-full ${
                     column.status === 'active'
                       ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
                       : column.status === 'hidden'
                       ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
-                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                      : 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground'
                   }`}>
                     {column.status === 'active' ? '正常' : column.status === 'hidden' ? '隐藏' : '归档'}
                   </span>
                 </div>
 
                 {column.description && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                  <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
                     {column.description}
                   </p>
                 )}
 
                 {/* 统计数据 */}
                 <div className="grid grid-cols-4 gap-2 mb-3 text-center">
-                  <div className="bg-gray-50 dark:bg-slate-700/50 rounded p-2">
-                    <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                  <div className="bg-background dark:bg-muted/50 rounded p-2">
+                    <div className="text-lg font-bold text-primary dark:text-primary">
                       {formatNumber(column.postCount)}
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">文章</div>
+                    <div className="text-xs text-muted-foreground">文章</div>
                   </div>
-                  <div className="bg-gray-50 dark:bg-slate-700/50 rounded p-2">
+                  <div className="bg-background dark:bg-muted/50 rounded p-2">
                     <div className="text-lg font-bold text-green-600 dark:text-green-400">
                       {formatNumber(column.totalViewCount)}
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">阅读</div>
+                    <div className="text-xs text-muted-foreground">阅读</div>
                   </div>
-                  <div className="bg-gray-50 dark:bg-slate-700/50 rounded p-2">
+                  <div className="bg-background dark:bg-muted/50 rounded p-2">
                     <div className="text-lg font-bold text-red-600 dark:text-red-400">
                       {formatNumber(column.totalLikeCount)}
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">点赞</div>
+                    <div className="text-xs text-muted-foreground">点赞</div>
                   </div>
-                  <div className="bg-gray-50 dark:bg-slate-700/50 rounded p-2">
+                  <div className="bg-background dark:bg-muted/50 rounded p-2">
                     <div className="text-lg font-bold text-purple-600 dark:text-purple-400">
                       {formatNumber(column.totalCommentCount)}
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">评论</div>
+                    <div className="text-xs text-muted-foreground">评论</div>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500 dark:text-gray-400">
+                  <span className="text-muted-foreground">
                     序号 {column.displayOrder}
                   </span>
                   <div className="flex gap-2">
@@ -499,7 +499,7 @@ export function ColumnManager() {
                     </button>
                     <button
                       onClick={() => handleRefreshStats(column.id, column.name)}
-                      className="px-2 py-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                      className="px-2 py-1 text-primary dark:text-primary hover:bg-primary/10 rounded transition-colors"
                       title="刷新统计数据"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -508,7 +508,7 @@ export function ColumnManager() {
                     </button>
                     <button
                       onClick={() => handleEdit(column)}
-                      className="px-3 py-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                      className="px-3 py-1 text-primary dark:text-primary hover:bg-primary/10 rounded transition-colors"
                     >
                       编辑
                     </button>

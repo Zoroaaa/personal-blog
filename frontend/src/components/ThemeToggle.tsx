@@ -71,7 +71,7 @@ export function ThemeToggle() {
       {/* 主题切换按钮 */}
       <button
         onClick={toggleMenu}
-        className="flex items-center space-x-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+        className="flex items-center space-x-2 text-foreground hover:text-primary dark:hover:text-primary px-3 py-2 rounded-md text-sm font-medium transition-colors"
         aria-label="主题设置"
       >
         {renderThemeIcon()}
@@ -80,16 +80,16 @@ export function ThemeToggle() {
       
       {/* 主题设置菜单 */}
       {isOpen && (
-        <div className="absolute left-1/2 -translate-x-1/2 sm:left-auto sm:translate-x-0 sm:right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-3 z-50 max-w-[calc(100vw-2rem)]">
+        <div className="absolute left-1/2 -translate-x-1/2 sm:left-auto sm:translate-x-0 sm:right-0 mt-2 w-72 bg-card rounded-lg shadow-lg border border-border py-3 z-50 max-w-[calc(100vw-2rem)]">
           {/* 主题模式 */}
           <div className="px-4 mb-4">
-            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">主题模式</h3>
+            <h3 className="text-sm font-medium text-foreground dark:text-foreground mb-2">主题模式</h3>
             <div className="grid grid-cols-3 gap-2">
               {themeModeOptions.map((option) => (
                 <button
                   key={option.value}
                   onClick={() => handleThemeModeChange(option.value as ThemeMode)}
-                  className={`px-3 py-2 rounded-md text-sm transition-colors ${config.mode === option.value ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                  className={`px-3 py-2 rounded-md text-sm transition-colors ${config.mode === option.value ? 'bg-primary/15 text-primary' : 'hover:bg-accent'}`}
                 >
                   {option.name}
                 </button>
@@ -99,13 +99,13 @@ export function ThemeToggle() {
           
           {/* 主色调选择 */}
           <div className="px-4 mb-4">
-            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">主色调</h3>
+            <h3 className="text-sm font-medium text-foreground dark:text-foreground mb-2">主色调</h3>
             <div className="grid grid-cols-4 gap-2">
               {themeColors.map((color) => (
                 <button
                   key={color.value}
                   onClick={() => handleColorChange(color.value)}
-                  className={`w-8 h-8 rounded-full transition-transform ${config.primaryColor === color.value ? 'ring-2 ring-offset-2 ring-blue-500 dark:ring-offset-gray-800 scale-110' : 'hover:scale-105'}`}
+                  className={`w-8 h-8 rounded-full transition-transform ${config.primaryColor === color.value ? 'ring-2 ring-offset-2 ring-primary/50 dark:ring-offset-gray-800 scale-110' : 'hover:scale-105'}`}
                   style={{ backgroundColor: color.value }}
                   aria-label={color.name}
                 />
@@ -115,13 +115,13 @@ export function ThemeToggle() {
           
           {/* 字体大小 */}
           <div className="px-4">
-            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">字体大小</h3>
+            <h3 className="text-sm font-medium text-foreground dark:text-foreground mb-2">字体大小</h3>
             <div className="grid grid-cols-3 gap-2">
               {fontSizeOptions.map((option) => (
                 <button
                   key={option.value}
                   onClick={() => handleFontSizeChange(option.value as 'small' | 'medium' | 'large')}
-                  className={`px-3 py-2 rounded-md text-sm transition-colors ${config.fontSize === option.value ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                  className={`px-3 py-2 rounded-md text-sm transition-colors ${config.fontSize === option.value ? 'bg-primary/15 text-primary' : 'hover:bg-accent'}`}
                 >
                   {option.name}
                 </button>
