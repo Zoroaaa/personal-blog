@@ -236,7 +236,7 @@ export default function MessagesPage() {
       )}
 
       {showNewMessageModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-card rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-foreground">发起私信</h2>
@@ -341,7 +341,7 @@ export default function MessagesPage() {
       )}
 
       {showSettingsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-card rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-xl">
             <div className="sticky top-0 bg-card border-b border-border p-4 flex items-center justify-between">
               <h2 className="text-xl font-bold text-foreground">私信设置</h2>
