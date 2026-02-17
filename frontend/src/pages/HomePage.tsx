@@ -579,7 +579,7 @@ export function HomePage() {
   return (
     <>
       <SEO title="首页" />
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30 dark:from-slate-900 dark:via-slate-800/50 dark:to-slate-900">
+      <div className="min-h-screen bg-background">
         <div className="max-w-[1600px] mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-6 sm:py-8 lg:py-10">
 
           {/* 通知轮播 */}

@@ -20,7 +20,7 @@ export function AboutPage() {
   return (
     <>
       <SEO title="关于我们" />
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+      <div className="min-h-screen bg-background">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
 
           {/* 页面标题 */}

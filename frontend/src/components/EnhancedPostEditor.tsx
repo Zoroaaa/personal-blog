@@ -1177,7 +1177,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
  activeTab === 'edit'
  ? 'bg-card text-foreground shadow-sm'
- : 'text-muted-foreground hover:text-foreground dark:hover:text-white'
+ : 'text-muted-foreground hover:text-foreground'
  }`}
  >
  编辑
@@ -1188,7 +1188,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
  activeTab === 'split'
  ? 'bg-card text-foreground shadow-sm'
- : 'text-muted-foreground hover:text-foreground dark:hover:text-white'
+ : 'text-muted-foreground hover:text-foreground'
  }`}
  >
  分屏
@@ -1198,8 +1198,8 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
  onClick={() => setActiveTab('preview')}
  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
  activeTab === 'preview'
- ? 'bg-card text-foreground shadow-sm'
- : 'text-muted-foreground hover:text-foreground dark:hover:text-white'
+? 'bg-card text-foreground shadow-sm'
+: 'text-muted-foreground hover:text-foreground'
  }`}
  >
  预览
@@ -1211,8 +1211,8 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
  title={isFullscreen ? '退出全屏 (F11/Esc)' : '全屏模式 (F11)'}
  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
  isFullscreen
- ? 'bg-primary/10 text-primary'
- : 'text-muted-foreground hover:text-foreground dark:hover:text-white'
+? 'bg-primary/10 text-primary'
+: 'text-muted-foreground hover:text-foreground'
  }`}
  >
  {isFullscreen ? (
@@ -1586,7 +1586,7 @@ export function EnhancedPostEditor({ postId, onSave, onCancel }: PostEditorProps
  type="button"
  onClick={handleSaveDraft}
  disabled={isSaving}
- className="px-6 py-3 bg-muted hover:bg-muted dark:bg-muted dark:hover:bg-slate-600 text-foreground rounded-lg transition-colors font-medium"
+ className="px-6 py-3 bg-muted hover:bg-accent text-foreground rounded-lg transition-colors font-medium"
  >
  {isSaving ? '保存中...' : '保存草稿'}
  </button>

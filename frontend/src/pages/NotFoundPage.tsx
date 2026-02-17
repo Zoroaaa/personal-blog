@@ -19,10 +19,9 @@ import { Link } from 'react-router-dom';
  */
 export function NotFoundPage() {
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-white to-gray-100 dark:from-slate-900 dark:to-slate-800 py-16 px-4">
+    <div className="flex items-center justify-center min-h-screen bg-background py-16 px-4">
       <div className="text-center max-w-md mx-auto">
-        {/* 404大数字 */}
-        <div className="text-9xl font-bold text-muted-foreground dark:text-slate-600 mb-4 animate-fade-in">
+        <div className="text-9xl font-bold text-muted-foreground mb-4 animate-fade-in">
           404
         </div>
         
