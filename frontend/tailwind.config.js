@@ -8,7 +8,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // 使用CSS变量的主色调系统
+        // 使用CSS变量的主色调系统 - 支持 alpha 值
         primary: {
           50: 'var(--primary-50)',
           100: 'var(--primary-100)',
@@ -21,7 +21,7 @@ export default {
           800: 'var(--primary-800)',
           900: 'var(--primary-900)',
           950: 'var(--primary-950)',
-          DEFAULT: 'var(--primary-color)',
+          DEFAULT: 'rgb(var(--primary-rgb) / <alpha-value>)',
         },
         // 语义化颜色系统
         background: 'rgb(var(--color-background) / <alpha-value>)',
