@@ -1,601 +1,610 @@
 # 部署指南
 
-本文档详细介绍如何将个人博客系统部署到 Cloudflare 平台。
+本文档详细介绍如何将 Personal Blog 博客系统部署到 Cloudflare 边缘计算平台。
 
-**版本**: v1.3.3 | **更新日期**: 2026-02-16
+**版本**: v1.4.0  
+**更新日期**: 2026-02-17
 
 ---
 
 ## 目录
 
-- [环境准备](#环境准备)
-- [配置 Cloudflare 资源](#配置-cloudflare-资源)
-- [本地配置](#本地配置)
-- [部署步骤](#部署步骤)
-- [环境变量说明](#环境变量说明)
-- [验证部署](#验证部署)
-- [故障排查](#故障排查)
-- [更新部署](#更新部署)
+- [部署架构](#部署架构)
+- [前置准备](#前置准备)
+- [后端部署](#后端部署)
+- [前端部署](#前端部署)
+- [域名配置](#域名配置)
+- [环境变量配置](#环境变量配置)
+- [CI/CD 配置](#cicd-配置)
+- [监控与日志](#监控与日志)
+- [性能优化](#性能优化)
+- [故障排除](#故障排除)
 
 ---
 
-## 环境准备
+## 部署架构
 
-### 必要条件
+### 整体架构图
 
-1. **Cloudflare 账号**
-   - 访问 [Cloudflare Dashboard](https://dash.cloudflare.com) 注册账号
-   - 验证邮箱地址
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         用户请求                                  │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Cloudflare CDN (全球边缘节点)                  │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                ┌───────────────┴───────────────┐
+                ▼                               ▼
+┌───────────────────────────┐   ┌───────────────────────────┐
+│   Cloudflare Pages        │   │   Cloudflare Workers      │
+│   (前端静态资源)           │   │   (后端 API 服务)          │
+│   - React SPA             │   │   - Hono 框架              │
+│   - 静态资源 CDN 加速      │   │   - 边缘计算               │
+└───────────────────────────┘   └───────────────────────────┘
+                │                               │
+                └───────────────┬───────────────┘
+                                ▼
+        ┌───────────────────────────────────────────┐
+        │           Cloudflare 服务层               │
+        ├───────────────────────────────────────────┤
+        │  ┌─────────────┐  ┌─────────────┐        │
+        │  │  D1 数据库   │  │  R2 存储     │        │
+        │  │  (SQLite)   │  │  (图片/文件) │        │
+        │  └─────────────┘  └─────────────┘        │
+        │  ┌─────────────┐  ┌─────────────┐        │
+        │  │  KV 缓存    │  │  Analytics  │        │
+        │  │  (可选)     │  │  (分析)     │        │
+        │  └─────────────┘  └─────────────┘        │
+        └───────────────────────────────────────────┘
+                                │
+                                ▼
+        ┌───────────────────────────────────────────┐
+        │              第三方服务                    │
+        ├───────────────────────────────────────────┤
+        │  Resend (邮件服务)                        │
+        │  GitHub OAuth (第三方登录)                │
+        └───────────────────────────────────────────┘
+```
 
-2. **Node.js 环境**
-   ```bash
-   node --version  # 需要 v20 或更高
-   npm --version   # 需要 v9 或更高
-   ```
+### 服务组件说明
 
-3. **Wrangler CLI**
-   ```bash
-   npm install -g wrangler
-   wrangler --version  # 需要 v4.x 或更高
-   ```
-
-4. **Git** (可选，用于版本控制)
+| 组件 | 服务 | 用途 | 免费额度 |
+|------|------|------|---------|
+| 前端托管 | Cloudflare Pages | React SPA 托管 | 无限制 |
+| 后端运行 | Cloudflare Workers | API 服务 | 10万次/天 |
+| 数据库 | Cloudflare D1 | SQLite 数据存储 | 500MB |
+| 对象存储 | Cloudflare R2 | 图片文件存储 | 10GB |
+| 缓存 | Cloudflare KV | 数据缓存 | 1GB |
+| 邮件 | Resend | 邮件发送 | 3000封/月 |
 
 ---
 
-## 配置 Cloudflare 资源
+## 前置准备
 
-### 1. 创建 D1 数据库
+### 1. Cloudflare 账号
 
-```bash
-# 登录 Cloudflare
-wrangler login
+确保您已拥有 Cloudflare 账号，并完成以下操作：
 
-# 创建 D1 数据库
-wrangler d1 create personal-blog-db
+- 绑定支付方式（部分服务需要）
+- 验证邮箱地址
+- 开通 Workers、D1、R2 服务
 
-# 记录返回的 database_id，后续配置需要
-```
+### 2. 域名配置（推荐）
 
-### 2. 创建 R2 存储桶
+如果使用自定义域名：
 
-```bash
-# 创建图片存储桶
-wrangler r2 bucket create personal-blog-images
+1. 将域名添加到 Cloudflare
+2. 更新域名 DNS 服务器
+3. 等待 DNS 生效（通常几分钟到几小时）
 
-# 配置公开访问（如需直接访问图片）
-# 在 Cloudflare Dashboard > R2 > 存储桶 > 设置中配置
-```
+### 3. 第三方服务
 
-### 3. 创建 KV 命名空间（可选）
+#### Resend 邮件服务
 
-```bash
-# 创建缓存 KV
-wrangler kv:namespace create "CACHE"
+1. 访问 [resend.com](https://resend.com) 注册账号
+2. 创建 API Key
+3. 验证发件域名（生产环境必需）
 
-# 记录返回的 id，后续配置需要
-```
+#### GitHub OAuth（可选）
 
-### 4. 配置 GitHub OAuth (可选)
-
-如需支持 GitHub 登录：
-
-1. 访问 [GitHub Developer Settings](https://github.com/settings/developers)
+1. 访问 GitHub Settings → Developer settings → OAuth Apps
 2. 创建新的 OAuth App
-3. 填写信息：
-   - Application name: Personal Blog
-   - Homepage URL: `https://your-domain.pages.dev`
-   - Authorization callback URL: `https://your-domain.pages.dev/api/auth/github/callback`
-4. 记录 Client ID 和 Client Secret
-
-### 5. 配置 Resend 邮箱服务（可选）
-
-如需支持邮箱验证码功能：
-
-1. 访问 [Resend](https://resend.com) 注册账号
-2. 验证域名
-3. 获取 API Key
+3. 设置回调 URL：`https://your-domain.com/auth/callback`
+4. 获取 Client ID 和 Client Secret
 
 ---
 
-## 本地配置
+## 后端部署
 
-### 1. 配置后端环境变量
+### 1. 配置 wrangler.toml
 
-编辑 `backend/.env.production`：
-
-```env
-# D1 数据库 ID（从创建数据库时获取）
-D1_DATABASE_ID=your-database-id-here
-
-# JWT 密钥（生成强随机字符串）
-JWT_SECRET=your-super-secret-jwt-key-min-32-chars-long
-
-# GitHub OAuth (可选)
-GITHUB_CLIENT_ID=your-github-client-id
-GITHUB_CLIENT_SECRET=your-github-client-secret
-
-# Resend 邮箱服务（可选）
-RESEND_API_KEY=your-resend-api-key
-RESEND_FROM_EMAIL=noreply@your-domain.com
-
-# 管理员邮箱（用于接收系统通知）
-ADMIN_EMAIL=admin@example.com
+```bash
+cd backend
+cp wrangler.toml.example wrangler.toml
 ```
 
-### 2. 配置前端环境变量
-
-编辑 `frontend/.env.production`：
-
-```env
-# API 基础 URL
-VITE_API_URL=https://your-worker.your-subdomain.workers.dev
-
-# 站点名称
-VITE_SITE_NAME=My Personal Blog
-```
-
-### 3. 配置 wrangler.toml
-
-编辑 `backend/wrangler.toml`：
+编辑 `wrangler.toml`：
 
 ```toml
-name = "personal-blog-api"
+name = "personal-blog-backend"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
 
-# D1 数据库绑定
-[[d1_databases]]
-binding = "DB"
-database_name = "personal-blog-db"
-database_id = "your-database-id-here"
-
-# R2 存储桶绑定
-[[r2_buckets]]
-binding = "STORAGE"
-bucket_name = "personal-blog-images"
-
-# KV 命名空间绑定（可选）
-[[kv_namespaces]]
-binding = "CACHE"
-id = "your-cache-kv-id-here"
-
-# 环境变量
 [vars]
-FRONTEND_URL = "https://your-domain.pages.dev"
-STORAGE_PUBLIC_URL = "https://your-r2-public-url"
 ENVIRONMENT = "production"
 
-# 密钥（使用 wrangler secret 设置）
-# wrangler secret put JWT_SECRET
-# wrangler secret put GITHUB_CLIENT_SECRET
-# wrangler secret put RESEND_API_KEY
+[[d1_databases]]
+binding = "DB"
+database_name = "personal-blog-prod"
+database_id = "your-production-database-id"
+
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "personal-blog-images-prod"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "your-kv-namespace-id"
+
+[observability]
+enabled = true
 ```
+
+### 2. 创建生产数据库
+
+```bash
+# 创建生产数据库
+wrangler d1 create personal-blog-prod
+
+# 记录返回的 database_id，填入 wrangler.toml
+```
+
+### 3. 执行数据库迁移
+
+```bash
+# 按顺序执行迁移脚本
+wrangler d1 execute personal-blog-prod --file=../database/schema-v1.1-base.sql
+wrangler d1 execute personal-blog-prod --file=../database/schema-v1.3-notification-messaging.sql
+wrangler d1 execute personal-blog-prod --file=../database/migration-v1.4-message-recall.sql
+wrangler d1 execute personal-blog-prod --file=../database/migration-v1.9-post-pinning.sql
+```
+
+### 4. 创建 R2 存储桶
+
+```bash
+wrangler r2 bucket create personal-blog-images-prod
+```
+
+### 5. 创建 KV 命名空间
+
+```bash
+wrangler kv:namespace create CACHE
+# 记录返回的 id，填入 wrangler.toml
+```
+
+### 6. 配置环境变量（敏感信息）
+
+使用 Wrangler Secrets 管理敏感配置：
+
+```bash
+# JWT 密钥
+wrangler secret put JWT_SECRET
+# 输入: your-super-secret-jwt-key-at-least-32-chars
+
+# Resend API Key
+wrangler secret put RESEND_API_KEY
+# 输入: re_xxxxxxxxxxxx
+
+# GitHub OAuth（可选）
+wrangler secret put GITHUB_CLIENT_ID
+wrangler secret put GITHUB_CLIENT_SECRET
+
+# 前端地址
+wrangler secret put FRONTEND_URL
+# 输入: https://your-domain.com
+```
+
+### 7. 部署后端
+
+```bash
+cd backend
+pnpm deploy
+# 或
+wrangler deploy
+```
+
+部署成功后会返回 Worker URL，如：`https://personal-blog-backend.your-subdomain.workers.dev`
 
 ---
 
-## 部署步骤
+## 前端部署
 
-### 第一步：初始化数据库
+### 1. 配置环境变量
 
-```bash
-cd backend
-
-# 执行数据库迁移（需按顺序执行）
-# 注意：数据库文件在项目根目录的 database/ 文件夹中
-wrangler d1 execute personal-blog-db --file=../database/schema-v1.1-base.sql
-wrangler d1 execute personal-blog-db --file=../database/schema-v1.3-notification-messaging.sql
-
-# 验证表创建成功
-wrangler d1 execute personal-blog-db --command="SELECT name FROM sqlite_master WHERE type='table';"
-```
-
-数据库架构包含以下表：
-- `users` - 用户信息（支持OAuth、邮箱验证、软删除）
-- `posts` - 文章数据（支持专栏、SEO、密码保护）
-- `posts_fts` - 全文搜索虚拟表（FTS5引擎）
-- `columns` - 专栏数据
-- `comments` - 评论数据（支持嵌套、@提及）
-- `categories` - 文章分类
-- `tags` - 文章标签
-- `post_tags` - 文章标签关联
-- `likes` - 点赞记录
-- `reading_history` - 阅读历史
-- `favorites` - 收藏记录
-- `notifications` - 通知数据
-- `notification_settings` - 通知设置
-- `messages` - 私信数据
-- `message_settings` - 私信设置
-- `email_digest_queue` - 邮件汇总队列
-- `site_config` - 站点配置
-
-### 第二步：部署后端
-
-```bash
-cd backend
-
-# 设置密钥
-wrangler secret put JWT_SECRET
-# 输入你的 JWT 密钥
-
-wrangler secret put GITHUB_CLIENT_SECRET
-# 输入你的 GitHub Client Secret（如使用 GitHub OAuth）
-
-wrangler secret put RESEND_API_KEY
-# 输入你的 Resend API Key（如使用邮箱验证）
-
-# 部署 Workers
-wrangler deploy
-
-# 记录部署后的 Workers URL
-```
-
-### 第三步：构建并部署前端
+创建生产环境配置：
 
 ```bash
 cd frontend
+```
 
-# 安装依赖
-pnpm install
+编辑 `.env.production`：
 
-# 构建生产版本
+```env
+VITE_API_URL=https://your-backend-domain.com
+```
+
+### 2. 构建前端
+
+```bash
 pnpm build
+```
 
-# 部署到 Pages
+### 3. 部署到 Cloudflare Pages
+
+#### 方式一：命令行部署
+
+```bash
 wrangler pages deploy dist --project-name=personal-blog
 ```
 
-或者使用 Git 集成自动部署：
+#### 方式二：Git 集成部署（推荐）
 
-1. 在 Cloudflare Dashboard 创建 Pages 项目
-2. 连接 Git 仓库
-3. 构建设置：
-   - Build command: `cd frontend && pnpm install && pnpm build`
-   - Build output directory: `frontend/dist`
-   - Root directory: `/`
-   - Node.js version: `20`
+1. 登录 Cloudflare Dashboard
+2. 进入 Pages → Create a project → Connect to Git
+3. 选择您的 Git 仓库
+4. 配置构建设置：
+   - **Framework preset**: Vite
+   - **Build command**: `pnpm build`
+   - **Build output directory**: `dist`
+   - **Root directory**: `frontend`
+5. 添加环境变量：
+   - `VITE_API_URL`: 后端 API 地址
+6. 点击「Save and Deploy」
 
-### 第四步：配置自定义域名（可选）
+### 4. 配置 Pages 路由
 
-1. 在 Cloudflare Dashboard 添加域名
-2. 配置 DNS 记录：
-   - CNAME `blog` → `your-project.pages.dev`
-3. 在 Pages 项目设置中绑定自定义域名
-4. 更新后端 `FRONTEND_URL` 环境变量
+在 Cloudflare Pages 设置中添加重定向规则：
+
+创建 `public/_redirects` 文件：
+
+```
+/* /index.html 200
+```
 
 ---
 
-## 环境变量说明
+## 域名配置
 
-### 后端必需变量
+### 1. 配置自定义域名
 
-| 变量名 | 说明 | 示例 |
-|--------|------|------|
-| `JWT_SECRET` | JWT 签名密钥 | 随机字符串，至少32位 |
-| `D1_DATABASE_ID` | D1 数据库 ID | xxxxxxxx-xxxx-xxxx |
-| `FRONTEND_URL` | 前端 URL | https://blog.example.com |
-| `STORAGE_PUBLIC_URL` | R2 公开访问 URL | https://images.example.com |
+#### 后端 Workers 域名
 
-### 后端可选变量
+1. 进入 Workers → your-worker → Settings → Triggers
+2. 添加自定义域名：`api.your-domain.com`
 
-| 变量名 | 说明 | 用途 |
-|--------|------|------|
-| `GITHUB_CLIENT_ID` | GitHub OAuth ID | GitHub 登录 |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth 密钥 | GitHub 登录 |
-| `RESEND_API_KEY` | Resend API 密钥 | 邮件发送 |
-| `RESEND_FROM_EMAIL` | 发件人邮箱 | 邮件发送 |
-| `ADMIN_EMAIL` | 管理员邮箱 | 接收通知 |
+#### 前端 Pages 域名
 
-### 前端变量
+1. 进入 Pages → your-project → Custom domains
+2. 添加自定义域名：`your-domain.com` 或 `www.your-domain.com`
 
-| 变量名 | 说明 | 示例 |
-|--------|------|------|
-| `VITE_API_URL` | API 基础 URL | https://api.example.com |
-| `VITE_SITE_NAME` | 站点名称 | My Blog |
+### 2. DNS 配置
+
+Cloudflare 会自动配置 DNS 记录，无需手动操作。
+
+### 3. SSL/TLS 配置
+
+在 Cloudflare Dashboard → SSL/TLS 中：
+
+- 设置加密模式为「Full (strict)」
+- 启用「Always Use HTTPS」
+- 启用「Automatic HTTPS Rewrites」
 
 ---
 
-## 验证部署
+## 环境变量配置
 
-### 1. 检查 API 健康状态
+### 后端环境变量
 
-```bash
-curl https://your-worker.workers.dev/health
-```
+| 变量名 | 说明 | 是否必需 | 示例 |
+|--------|------|---------|------|
+| JWT_SECRET | JWT 签名密钥 | 必需 | 32位以上随机字符串 |
+| RESEND_API_KEY | Resend API Key | 推荐 | re_xxxxxxxxxxxx |
+| GITHUB_CLIENT_ID | GitHub OAuth ID | 可选 | Iv1.xxxxxxxx |
+| GITHUB_CLIENT_SECRET | GitHub OAuth Secret | 可选 | xxxxxxxx |
+| FRONTEND_URL | 前端地址 | 必需 | https://your-domain.com |
 
-预期响应：
-```json
-{
-  "success": true,
-  "data": {
-    "status": "healthy",
-    "version": "1.3.3",
-    "timestamp": "2026-02-16T10:00:00.000Z",
-    "services": {
-      "database": "healthy",
-      "cache": "healthy",
-      "storage": "healthy"
-    }
-  }
-}
-```
+### 前端环境变量
 
-### 2. 检查数据库连接
-
-```bash
-wrangler d1 execute personal-blog-db --command="SELECT COUNT(*) FROM users;"
-```
-
-### 3. 验证前端访问
-
-打开 `https://your-domain.pages.dev`，确认：
-- 首页正常加载
-- 文章列表显示
-- 分类/标签正常
-- 专栏页面正常
-- 通知中心正常
-- 私信功能正常
-
-### 4. 测试管理员登录
-
-使用默认管理员账号登录：
-- 用户名：`admin`
-- 密码：`Admin123!`（**生产环境请立即修改**）
-
-### 5. 测试邮箱验证（如启用）
-
-1. 访问注册页面
-2. 输入邮箱
-3. 点击"发送验证码"
-4. 检查邮箱是否收到验证码邮件
+| 变量名 | 说明 | 是否必需 | 示例 |
+|--------|------|---------|------|
+| VITE_API_URL | 后端 API 地址 | 必需 | https://api.your-domain.com |
 
 ---
 
-## 故障排查
+## CI/CD 配置
 
-### 数据库连接失败
+### GitHub Actions 配置
 
-**症状**: API 返回 500 错误，日志显示数据库连接问题
+创建 `.github/workflows/deploy.yml`：
 
-**解决**:
-1. 检查 `wrangler.toml` 中的 `database_id` 是否正确
-2. 确认数据库已创建：`wrangler d1 list`
-3. 检查数据库绑定名称是否为 `DB`
-4. 确认数据库迁移已执行（两个 SQL 文件都需执行）
+```yaml
+name: Deploy
 
-### CORS 错误
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
-**症状**: 浏览器控制台显示 CORS 错误
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+          
+      - name: Install dependencies
+        run: cd backend && pnpm install
+        
+      - name: Deploy to Workers
+        run: cd backend && pnpm deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
-**解决**:
-1. 检查后端 `FRONTEND_URL` 环境变量是否包含前端域名
-2. 确认 `wrangler.toml` 中的 `FRONTEND_URL` 配置正确
-3. 检查后端 CORS 中间件配置
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+          
+      - name: Install dependencies
+        run: cd frontend && pnpm install
+        
+      - name: Build
+        run: cd frontend && pnpm build
+        env:
+          VITE_API_URL: ${{ secrets.API_URL }}
+          
+      - name: Deploy to Pages
+        run: cd frontend && wrangler pages deploy dist --project-name=personal-blog
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+```
 
-### 图片上传失败
+### 配置 Secrets
 
-**症状**: 上传图片返回 500 错误
+在 GitHub 仓库 Settings → Secrets and variables → Actions 中添加：
 
-**解决**:
-1. 检查 R2 存储桶绑定是否正确
-2. 确认存储桶名称与 `wrangler.toml` 一致
-3. 检查文件大小限制（默认 5MB）
-4. 确认 `STORAGE_PUBLIC_URL` 已正确设置
-5. 检查文件类型验证（支持 JPEG、PNG、GIF、WebP）
-
-### 认证失败
-
-**症状**: 登录后无法保持会话
-
-**解决**:
-1. 检查 `JWT_SECRET` 是否正确设置
-2. 确认浏览器允许第三方 Cookie
-3. 检查 Token 是否过期
-
-### 邮箱验证码发送失败
-
-**症状**: 发送验证码返回错误
-
-**解决**:
-1. 检查 `RESEND_API_KEY` 是否正确设置
-2. 确认发件人域名已在 Resend 验证
-3. 检查 `RESEND_FROM_EMAIL` 格式是否正确
-4. 查看 Resend 控制台发送日志
-
-### 专栏功能异常
-
-**症状**: 专栏页面无法加载或文章不显示
-
-**解决**:
-1. 检查专栏数据是否正确创建
-2. 确认文章已关联到专栏
-3. 检查专栏统计触发器是否正常工作
-4. 手动刷新专栏统计：`POST /api/columns/:id/refresh-stats`
-
-### 通知不显示
-
-**症状**: 通知中心无通知或首页无轮播
-
-**解决**:
-1. 检查 `notifications` 表是否有数据
-2. 确认通知类型正确（system/interaction）
-3. 检查用户通知设置是否开启
-4. 确认首页轮播通知是否标记为公告
-
-### 私信功能异常
-
-**症状**: 私信无法发送或接收
-
-**解决**:
-1. 检查 `messages` 表是否存在
-2. 确认数据库迁移已完整执行
-3. 检查会话查询是否正确
-4. 确认用户 ID 有效
-
-### 全文搜索不工作
-
-**症状**: 搜索返回空结果或错误
-
-**解决**:
-1. 确认 `posts_fts` 虚拟表已创建
-2. 检查 FTS5 触发器是否正常工作
-3. 手动重建搜索索引：
-   ```bash
-   wrangler d1 execute personal-blog-db --command="
-     DELETE FROM posts_fts;
-     INSERT INTO posts_fts (rowid, title, excerpt, content)
-     SELECT id, title, excerpt, content FROM posts WHERE deleted_at IS NULL;
-   "
-   ```
+- `CLOUDFLARE_API_TOKEN`: Cloudflare API Token
+- `API_URL`: 后端 API 地址
 
 ---
 
-## 更新部署
+## 监控与日志
 
-### 更新后端
+### Cloudflare Analytics
+
+Cloudflare 自动提供：
+- 请求统计
+- 流量分析
+- 性能指标
+- 错误追踪
+
+### Workers 日志
+
+查看实时日志：
 
 ```bash
-cd backend
-
-# 拉取最新代码
-git pull
-
-# 重新部署
-wrangler deploy
+wrangler tail
 ```
 
-### 更新前端
+或在 Cloudflare Dashboard → Workers → your-worker → Logs 中查看。
 
-```bash
-cd frontend
+### 错误追踪
 
-# 拉取最新代码
-git pull
+建议集成 Sentry 等错误追踪服务：
 
-# 重新构建并部署
-pnpm build
-wrangler pages deploy dist
-```
+```typescript
+// backend/src/index.ts
+import * as Sentry from '@sentry/cloudflare';
 
-### 数据库迁移
-
-如需更新数据库架构，请按顺序执行迁移文件：
-
-```bash
-cd backend
-
-# 查看可用的迁移文件
-ls ../database/
-
-# 执行新的迁移文件（如果有）
-wrangler d1 execute personal-blog-db --file=../database/migration-xxx.sql
-
-# 验证迁移结果
-wrangler d1 execute personal-blog-db --command="SELECT name FROM sqlite_master WHERE type='table';"
+Sentry.init({
+  dsn: 'your-sentry-dsn',
+  environment: ENVIRONMENT,
+});
 ```
 
 ---
 
 ## 性能优化
 
-### 启用缓存
+### 1. 启用 Cloudflare 缓存
 
-在 `wrangler.toml` 中添加：
+在 Workers 中配置缓存策略：
 
-```toml
-[env.production]
-routes = [
-  { pattern = "api/*", zone_id = "your-zone-id" }
-]
+```typescript
+// 缓存静态资源
+app.use('/api/posts/*', async (c, next) => {
+  const cache = caches.default;
+  const cachedResponse = await cache.match(c.req.raw);
+  if (cachedResponse) return cachedResponse;
+  
+  const response = await next();
+  if (response.status === 200) {
+    const headers = new Headers(response.headers);
+    headers.set('Cache-Control', 'public, max-age=300');
+    const cachedResponse = new Response(response.body, { ...response, headers });
+    c.executionCtx.waitUntil(cache.put(c.req.raw, cachedResponse));
+  }
+  return response;
+});
 ```
 
-### 配置 CDN
+### 2. 图片优化
 
-1. 在 Cloudflare Dashboard 启用 CDN
-2. 配置缓存规则：
-   - 静态资源：缓存 1 天
-   - API 响应：根据 Cache-Control 头
+- 使用 R2 的图片转换功能
+- 配置 Cloudflare Polish（图片压缩）
+- 启用 WebP 自动转换
 
-### R2 公开访问优化
+### 3. CDN 配置
 
-1. 配置自定义域名用于 R2 访问
-2. 启用 Cloudflare CDN 加速图片访问
-3. 设置合理的缓存策略
+在 Cloudflare Dashboard → Speed → Optimization 中：
 
----
+- 启用 Auto Minify（HTML/CSS/JS）
+- 启用 Brotli 压缩
+- 启用 Early Hints
+- 启用 Rocket Loader（可选）
 
-## 安全建议
+### 4. 数据库优化
 
-1. **使用强密码**: 修改默认管理员密码
-2. **启用 HTTPS**: 强制使用 HTTPS 访问
-3. **定期备份**: 定期导出 D1 数据库
-4. **监控日志**: 启用 Workers 日志记录
-5. **限制访问**: 使用 Cloudflare Access 保护管理后台
-6. **密钥管理**: 使用 wrangler secret 管理敏感信息
-7. **文件上传安全**: 已实现魔数验证，防止恶意文件上传
-8. **软删除机制**: 用户和文章采用软删除，可恢复数据
+- 创建必要的索引
+- 使用 KV 缓存热点数据
+- 避免大查询
 
 ---
 
-## 监控和维护
+## 故障排除
 
-### 日志查看
+### 常见问题
+
+#### 1. Workers 部署失败
+
+**错误**: `Error: No such binding: DB`
+
+**解决**: 检查 `wrangler.toml` 中的 D1 绑定配置是否正确。
+
+#### 2. 数据库连接失败
+
+**错误**: `D1_ERROR: No such database`
+
+**解决**: 
+- 确认数据库已创建
+- 检查 database_id 是否正确
+
+#### 3. CORS 错误
+
+**错误**: `Access-Control-Allow-Origin`
+
+**解决**: 
+- 检查后端 CORS 配置
+- 确认 FRONTEND_URL 环境变量正确
+
+#### 4. 图片上传失败
+
+**错误**: `R2 bucket not found`
+
+**解决**: 
+- 确认 R2 存储桶已创建
+- 检查 bucket_name 配置
+
+#### 5. 邮件发送失败
+
+**错误**: `Invalid API key`
+
+**解决**: 
+- 检查 Resend API Key 是否正确
+- 确认域名已验证
+
+#### 6. 主题设置丢失
+
+**错误**: 刷新页面后主题设置重置
+
+**解决**: 
+- 检查 localStorage 是否被禁用
+- 确认 themeStore 正确保存设置
+
+#### 7. 置顶文章不显示
+
+**错误**: 置顶文章未显示在顶部
+
+**解决**: 
+- 确认已执行 `migration-v1.9-post-pinning.sql`
+- 检查文章的 `is_pinned` 字段值
+
+### 调试技巧
 
 ```bash
-# 查看 Workers 日志
+# 查看后端日志
 wrangler tail
 
-# 过滤特定请求
-wrangler tail --grep "POST /api/posts"
+# 本地测试生产配置
+wrangler dev --remote
 
-# 查看最近的错误
-wrangler tail --grep "error"
-```
+# 检查数据库内容
+wrangler d1 execute personal-blog-prod --command="SELECT * FROM posts LIMIT 5"
 
-### 数据库维护
-
-```bash
-# 查看数据库大小
-wrangler d1 execute personal-blog-db --command="
-  SELECT 
-    page_count * page_size as size 
-  FROM pragma_page_count(), pragma_page_size();
-"
-
-# 优化数据库
-wrangler d1 execute personal-blog-db --command="VACUUM;"
-
-# 分析查询性能
-wrangler d1 execute personal-blog-db --command="
-  EXPLAIN QUERY PLAN 
-  SELECT * FROM posts WHERE status = 'published';
-"
-```
-
-### 备份策略
-
-```bash
-# 导出数据库（需要本地工具）
-wrangler d1 export personal-blog-db > backup.sql
-
-# 定期备份重要表
-wrangler d1 execute personal-blog-db --command="
-  SELECT * FROM posts WHERE deleted_at IS NULL;
-" > posts_backup.json
+# 测试 API
+curl https://your-api-domain.com/api/posts
 ```
 
 ---
 
-## 参考资源
+## 版本升级
 
-- [Cloudflare Workers 文档](https://developers.cloudflare.com/workers/)
-- [Cloudflare D1 文档](https://developers.cloudflare.com/d1/)
-- [Cloudflare Pages 文档](https://developers.cloudflare.com/pages/)
-- [Cloudflare R2 文档](https://developers.cloudflare.com/r2/)
-- [Wrangler CLI 文档](https://developers.cloudflare.com/workers/wrangler/)
-- [Resend 文档](https://resend.com/docs)
-- [Hono 框架文档](https://hono.dev/)
+### 从旧版本升级
+
+#### 升级到 v1.4.0
+
+1. 拉取最新代码：
+   ```bash
+   git pull origin main
+   ```
+
+2. 执行数据库迁移：
+   ```bash
+   wrangler d1 execute personal-blog-prod --file=database/migration-v1.9-post-pinning.sql
+   ```
+
+3. 重新部署：
+   ```bash
+   cd backend && wrangler deploy
+   cd ../frontend && pnpm build && wrangler pages deploy dist
+   ```
+
+4. 清除缓存（如需要）：
+   ```bash
+   wrangler kv:key delete --binding CACHE --key="posts:*"
+   ```
 
 ---
 
-如有部署问题，请参考 [故障排查](#故障排查) 部分或提交 Issue。
+## 回滚
+
+### 后端回滚
+
+```bash
+# 查看部署历史
+wrangler deployments list
+
+# 回滚到指定版本
+wrangler rollback [deployment-id]
+```
+
+### 前端回滚
+
+在 Cloudflare Dashboard → Pages → your-project → Deployments 中选择历史版本回滚。
+
+---
+
+**版本**: v1.4.0 | **更新日期**: 2026-02-17
