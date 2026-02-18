@@ -5,6 +5,7 @@
  * - 用户注册
  * - 用户登录（密码和GitHub OAuth）
  * - 用户登出
+ * - Token 刷新
  * - 获取当前用户信息
  * - 更新用户资料
  * - 修改密码
@@ -13,9 +14,10 @@
  * - 重置密码
  *
  * @author 博客系统
- * @version 2.1.0
+ * @version 2.2.0
  * @created 2024-01-01
  * @refactored 2026-02-16
+ * @updated 2026-02-18 - 添加 Token 刷新机制
  */
 
 import { Hono } from 'hono';
@@ -29,6 +31,7 @@ import { sendVerificationEmail } from '../utils/resend';
 import type { VerificationEmailType } from '../utils/resend';
 import { EmailVerificationService } from '../services/emailVerificationService';
 import { AuthService, validateVerificationType } from '../services/authService';
+import { RefreshTokenService } from '../services/refreshTokenService';
 import { AUTH_CONSTANTS } from '../config/constants';
 
 export const authRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -243,7 +246,12 @@ authRoutes.post(
         email: result.user?.email
       });
 
-      return c.json(successResponse({ user: result.user, token: result.token }, result.message), getStatus(result.statusCode, 201));
+      return c.json(successResponse({
+        user: result.user,
+        token: result.token,
+        refreshToken: result.refreshToken,
+        expiresIn: result.expiresIn
+      }, result.message), getStatus(result.statusCode, 201));
     } catch (error) {
       logger.error('Registration error', error);
       return c.json(errorResponse('Registration failed', 'An error occurred during registration. Please try again.'), 500);
@@ -280,7 +288,12 @@ authRoutes.post(
         username: result.user?.username
       });
 
-      return c.json(successResponse({ user: result.user, token: result.token }, result.message));
+      return c.json(successResponse({
+        user: result.user,
+        token: result.token,
+        refreshToken: result.refreshToken,
+        expiresIn: result.expiresIn
+      }, result.message));
     } catch (error) {
       logger.error('Login error', error);
       return c.json(errorResponse('Login failed', 'An error occurred during login. Please try again.'), 500);
@@ -342,7 +355,12 @@ authRoutes.post(
         username: result.user?.username
       });
 
-      return c.json(successResponse({ user: result.user, token: result.token }, result.message));
+      return c.json(successResponse({
+        user: result.user,
+        token: result.token,
+        refreshToken: result.refreshToken,
+        expiresIn: result.expiresIn
+      }, result.message));
     } catch (error) {
       logger.error('GitHub OAuth error', error);
       return c.json(errorResponse('OAuth authentication failed', 'An error occurred during GitHub authentication'), 500);
@@ -360,7 +378,10 @@ authRoutes.post('/logout', requireAuth, async (c) => {
     }
 
     const token = authHeader.substring(7);
-    const result = await AuthService.logout(c.env, token);
+    
+    const body = await c.req.json().catch(() => ({})) as { refreshToken?: string };
+    
+    const result = await AuthService.logout(c.env.DB, c.env, token, body.refreshToken);
 
     const user = c.get('user') as any;
     logger.info('User logged out', { userId: user?.userId });
@@ -369,6 +390,33 @@ authRoutes.post('/logout', requireAuth, async (c) => {
   } catch (error) {
     logger.error('Logout error', error);
     return c.json(errorResponse('Logout failed', 'An error occurred during logout'), 500);
+  }
+});
+
+authRoutes.post('/refresh', async (c) => {
+  const logger = createLogger(c);
+
+  try {
+    const body = await c.req.json() as { refreshToken?: string };
+    
+    if (!body.refreshToken) {
+      return c.json(errorResponse('Missing refresh token', '请提供 refresh token'), 400);
+    }
+
+    const result = await AuthService.refreshAccessToken(c.env.DB, c.env, body.refreshToken);
+
+    if (!result.success) {
+      return c.json(errorResponse('Token refresh failed', result.message), getStatus(result.statusCode, 401));
+    }
+
+    return c.json(successResponse({
+      token: result.token,
+      refreshToken: result.refreshToken,
+      expiresIn: result.expiresIn
+    }, 'Token refreshed successfully'));
+  } catch (error) {
+    logger.error('Token refresh error', error);
+    return c.json(errorResponse('Token refresh failed', 'An error occurred during token refresh'), 500);
   }
 });
 

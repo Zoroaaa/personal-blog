@@ -1,11 +1,12 @@
 /**
  * 错误边界组件
- * 
+ *
  * 功能：捕获并处理React组件树中的JavaScript错误，防止整个应用崩溃
- * 
+ *
  * @author 博客系统
- * @version 1.0.0
+ * @version 1.1.0
  * @created 2026-02-13
+ * @updated 2026-02-18 - 增强错误边界功能
  */
 
 import React, { ErrorInfo, ReactNode } from 'react';
@@ -13,95 +14,132 @@ import React, { ErrorInfo, ReactNode } from 'react';
 interface ErrorBoundaryProps {
   children: ReactNode;
   fallback?: ReactNode;
+  onReset?: () => void;
+  showDetails?: boolean;
 }
 
 interface ErrorBoundaryState {
   hasError: boolean;
   error?: Error;
+  errorInfo?: ErrorInfo;
 }
 
-/**
- * 错误边界组件
- * 
- * 用法：
- * ```tsx
- * <ErrorBoundary>
- *   <YourComponent />
- * </ErrorBoundary>
- * ```
- * 
- * 支持自定义错误UI：
- * ```tsx
- * <ErrorBoundary fallback={<CustomErrorUI />}>
- *   <YourComponent />
- * </ErrorBoundary>
- * ```
- */
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false };
   }
 
-  /**
-   * 静态方法：从错误中更新状态
-   * 
-   * 当子组件抛出错误时，React会调用此方法
-   * 
-   * @param error 捕获到的错误
-   * @returns 新的状态对象
-   */
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
   }
 
-  /**
-   * 实例方法：捕获错误并记录
-   * 
-   * 当子组件抛出错误时，React会调用此方法
-   * 
-   * @param error 捕获到的错误
-   * @param errorInfo 错误信息，包含错误发生的组件栈
-   */
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // 记录错误
-    console.error('错误边界捕获:', error, errorInfo);
-
-    // 可以在这里发送到错误跟踪服务（如Sentry）
-    // sendToErrorTracking(error, errorInfo);
+    console.error('[ErrorBoundary] 捕获错误:', error, errorInfo);
+    this.setState({ errorInfo });
   }
 
-  /**
-   * 渲染方法
-   * 
-   * 如果有错误，显示错误UI；否则显示子组件
-   * 
-   * @returns 渲染的React元素
-   */
+  handleReset = () => {
+    this.setState({ hasError: false, error: undefined, errorInfo: undefined });
+    this.props.onReset?.();
+  };
+
   render() {
     if (this.state.hasError) {
+      if (this.props.fallback) {
+        return this.props.fallback;
+      }
+
+      const isDev = import.meta.env.DEV;
+
       return (
-        this.props.fallback || (
-          <div className="flex items-center justify-center min-h-screen bg-muted">
-            <div className="bg-card p-8 rounded-lg shadow-lg text-center max-w-md mx-auto">
-              <h1 className="text-2xl font-bold text-red-600 mb-4">出错了</h1>
-              <p className="text-muted-foreground mb-6">
-                应用遇到了意外错误。请刷新页面重试。
-              </p>
+        <div className="flex items-center justify-center min-h-[400px] bg-muted/50 p-4">
+          <div className="bg-card p-6 rounded-lg shadow-lg text-center max-w-lg mx-auto border">
+            <div className="text-red-500 text-5xl mb-4">⚠️</div>
+            <h1 className="text-xl font-bold text-red-600 mb-2">页面出错了</h1>
+            <p className="text-muted-foreground mb-4">
+              当前页面遇到了问题，您可以尝试重试或返回首页。
+            </p>
+
+            {isDev && this.props.showDetails !== false && this.state.error && (
+              <details className="text-left mb-4 p-3 bg-red-50 rounded text-sm overflow-auto max-h-40">
+                <summary className="cursor-pointer font-medium text-red-700">
+                  错误详情
+                </summary>
+                <pre className="mt-2 text-red-600 whitespace-pre-wrap">
+                  {this.state.error.message}
+                  {this.state.errorInfo?.componentStack && (
+                    <div className="mt-2 text-gray-600">
+                      {this.state.errorInfo.componentStack}
+                    </div>
+                  )}
+                </pre>
+              </details>
+            )}
+
+            <div className="flex gap-3 justify-center">
               <button
-                onClick={() => window.location.reload()}
-                className="bg-primary text-white px-6 py-2 rounded hover:bg-primary/90 transition-colors"
+                onClick={this.handleReset}
+                className="bg-primary text-white px-4 py-2 rounded hover:bg-primary/90 transition-colors"
               >
-                刷新页面
+                重试
+              </button>
+              <button
+                onClick={() => window.location.href = '/'}
+                className="bg-secondary text-secondary-foreground px-4 py-2 rounded hover:bg-secondary/80 transition-colors"
+              >
+                返回首页
               </button>
             </div>
           </div>
-        )
+        </div>
       );
     }
 
     return this.props.children;
   }
+}
+
+interface PageErrorBoundaryProps {
+  children: ReactNode;
+  pageName?: string;
+}
+
+export function PageErrorBoundary({ children, pageName }: PageErrorBoundaryProps) {
+  return (
+    <ErrorBoundary
+      showDetails={true}
+      fallback={
+        <div className="flex items-center justify-center min-h-[60vh] bg-muted/50">
+          <div className="bg-card p-8 rounded-lg shadow-lg text-center max-w-md mx-auto border">
+            <div className="text-red-500 text-5xl mb-4">⚠️</div>
+            <h1 className="text-xl font-bold text-red-600 mb-2">
+              {pageName ? `${pageName}加载失败` : '页面加载失败'}
+            </h1>
+            <p className="text-muted-foreground mb-6">
+              页面遇到了问题，请刷新页面或稍后重试。
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => window.location.reload()}
+                className="bg-primary text-white px-4 py-2 rounded hover:bg-primary/90 transition-colors"
+              >
+                刷新页面
+              </button>
+              <button
+                onClick={() => window.location.href = '/'}
+                className="bg-secondary text-secondary-foreground px-4 py-2 rounded hover:bg-secondary/80 transition-colors"
+              >
+                返回首页
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      {children}
+    </ErrorBoundary>
+  );
 }
 
 export default ErrorBoundary;

@@ -26,8 +26,12 @@ export const AUTH_CONSTANTS = {
   EMAIL_VERIFY_RATE_WINDOW: 3600, // 1 小时（秒）
   EMAIL_VERIFY_RATE_MAX: 10, // 1 小时内最多 10 次
 
-  // JWT token 有效期
-  JWT_EXPIRY_IN_DAYS: 30,
+  // JWT Access Token 有效期（秒）- 2 小时
+  JWT_ACCESS_TOKEN_EXPIRY: 2 * 60 * 60,
+  // JWT Refresh Token 有效期（秒）- 7 天
+  JWT_REFRESH_TOKEN_EXPIRY: 7 * 24 * 60 * 60,
+  // Token 黑名单 TTL（秒）- 与 refresh token 有效期一致
+  TOKEN_BLACKLIST_TTL: 7 * 24 * 60 * 60,
 };
 
 /**

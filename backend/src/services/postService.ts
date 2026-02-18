@@ -11,8 +11,9 @@
  * - 密码验证
  *
  * @author 博客系统
- * @version 1.0.0
+ * @version 1.1.0
  * @created 2026-02-16
+ * @updated 2026-02-18 - 文章密码 Token 使用独立密钥
  */
 
 import bcrypt from 'bcryptjs';
@@ -27,6 +28,10 @@ import {
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
 import { createInteractionNotification } from './notificationService';
 import { isInteractionSubtypeEnabled } from './notificationSettingsService';
+
+function getPostPasswordSecret(env: any): string {
+  return env.POST_PASSWORD_SECRET || env.JWT_SECRET;
+}
 
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 50;
@@ -758,7 +763,7 @@ export class PostService {
       };
     }
 
-    const token = await generateToken(asSecret(env.JWT_SECRET), {
+    const token = await generateToken(asSecret(getPostPasswordSecret(env)), {
       postId: post.id,
       type: 'post_password_access',
       expiresIn: '24h'
@@ -781,7 +786,7 @@ export class PostService {
     postId: number
   ): Promise<boolean> {
     try {
-      const decoded = await verifyToken(asJWTToken(token), asSecret(env.JWT_SECRET));
+      const decoded = await verifyToken(asJWTToken(token), asSecret(getPostPasswordSecret(env)));
       return decoded && 'postId' in decoded && decoded.postId === postId && decoded.type === 'post_password_access';
     } catch {
       return false;

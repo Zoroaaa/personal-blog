@@ -6,25 +6,53 @@
  * - 文件删除
  * - 文件信息获取
  *
- * @version 2.1.0
+ * 安全措施：
+ * - 速率限制
+ * - 文件大小预检
+ * - 文件类型验证
+ *
+ * @version 2.2.0
  * @author 博客系统
  * @created 2024-01-01
  * @refactored 2026-02-16
+ * @updated 2026-02-18 - 添加安全加固
  */
 
 import { Hono } from 'hono';
 import { Env, Variables } from '../types';
 import { successResponse, errorResponse, getStatus } from '../utils/response';
 import { requireAuth } from '../middleware/auth';
+import { rateLimit } from '../middleware/rateLimit';
 import { createLogger } from '../middleware/requestLogger';
-import { UploadService } from '../services/uploadService';
+import { UploadService, UPLOAD_CONSTANTS } from '../services/uploadService';
 
 export const uploadRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
-uploadRoutes.post('/', requireAuth, async (c) => {
+const uploadRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  maxRequests: 5,
+  message: '1 分钟内最多上传 5 个文件'
+});
+
+function checkContentLength(c: any, maxSize: number): boolean {
+  const contentLength = c.req.header('content-length');
+  if (contentLength) {
+    const length = parseInt(contentLength, 10);
+    if (length > maxSize * 1.1) {
+      return false;
+    }
+  }
+  return true;
+}
+
+uploadRoutes.post('/', uploadRateLimit, requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
+    if (!checkContentLength(c, UPLOAD_CONSTANTS.MAX_IMAGE_SIZE)) {
+      return c.json(errorResponse('File too large', `文件大小不能超过 ${UPLOAD_CONSTANTS.MAX_IMAGE_SIZE / 1024 / 1024}MB`), 413);
+    }
+
     const user = c.get('user') as any;
 
     const formData = await c.req.formData();
@@ -105,10 +133,14 @@ uploadRoutes.get('/:filename', requireAuth, async (c) => {
   }
 });
 
-uploadRoutes.post('/file', requireAuth, async (c) => {
+uploadRoutes.post('/file', uploadRateLimit, requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
+    if (!checkContentLength(c, UPLOAD_CONSTANTS.MAX_FILE_SIZE)) {
+      return c.json(errorResponse('File too large', `文件大小不能超过 ${UPLOAD_CONSTANTS.MAX_FILE_SIZE / 1024 / 1024}MB`), 413);
+    }
+
     const user = c.get('user') as any;
 
     const formData = await c.req.formData();
