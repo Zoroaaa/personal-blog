@@ -446,8 +446,9 @@ export function PostPage() {
       return null;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      showError('图片大小不能超过 5MB');
+    const maxImageSize = (config.upload_max_image_size_mb || 5) * 1024 * 1024;
+    if (file.size > maxImageSize) {
+      showError(`图片大小不能超过 ${config.upload_max_image_size_mb || 5}MB`);
       return null;
     }
 
