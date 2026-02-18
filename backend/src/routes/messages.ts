@@ -53,7 +53,7 @@ messageRoutes.post('/', requireAuth, rateLimit({
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const body = await c.req.json();
     let { 
       recipientId, 
@@ -173,7 +173,7 @@ messageRoutes.get('/inbox', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const page = safeParseInt(c.req.query('page'), 1);
     const limit = safeParseInt(c.req.query('limit'), 20);
     const threadId = c.req.query('threadId');
@@ -204,7 +204,7 @@ messageRoutes.get('/outbox', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const page = safeParseInt(c.req.query('page'), 1);
     const limit = safeParseInt(c.req.query('limit'), 20);
     const threadId = c.req.query('threadId');
@@ -235,7 +235,7 @@ messageRoutes.get('/threads', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const page = safeParseInt(c.req.query('page'), 1);
     const limit = safeParseInt(c.req.query('limit'), 20);
 
@@ -261,7 +261,7 @@ messageRoutes.get('/thread/:threadId', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const threadId = c.req.param('threadId');
     const page = safeParseInt(c.req.query('page'), 1);
     const limit = safeParseInt(c.req.query('limit'), 20);
@@ -296,7 +296,7 @@ messageRoutes.get('/:id', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const messageId = safeParseInt(c.req.param('id'));
 
     if (!messageId) {
@@ -329,7 +329,7 @@ messageRoutes.patch('/:id/read', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const messageId = safeParseInt(c.req.param('id'));
 
     if (!messageId) {
@@ -362,7 +362,7 @@ messageRoutes.patch('/threads/:threadId/read', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const threadId = c.req.param('threadId');
 
     if (!threadId) {
@@ -392,7 +392,7 @@ messageRoutes.post('/:id/recall', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const messageId = safeParseInt(c.req.param('id'));
 
     if (!messageId) {
@@ -425,7 +425,7 @@ messageRoutes.post('/:id/resend', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const messageId = safeParseInt(c.req.param('id'));
 
     if (!messageId) {
@@ -485,7 +485,7 @@ messageRoutes.get('/unread/count', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const count = await getUnreadCount(c.env.DB, user.userId);
 
     logger.info('Unread count fetched', { userId: user.userId, count });
@@ -505,7 +505,7 @@ messageRoutes.get('/thread-id/:userId', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const otherUserId = safeParseInt(c.req.param('userId'));
 
     if (!otherUserId) {

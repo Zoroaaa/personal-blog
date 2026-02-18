@@ -100,7 +100,7 @@ columnRoutes.post('/', requireAuth, requireAdmin, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const body = await c.req.json();
     const result = await ColumnService.createColumn(c.env.DB, user.userId, body);
 

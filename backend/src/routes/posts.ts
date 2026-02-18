@@ -89,7 +89,7 @@ postRoutes.get('/admin/:id', requireAuth, async (c) => {
 
   try {
     const id = c.req.param('id');
-    const user = c.get('user') as any;
+    const user = c.get('user');
 
     const result = await PostService.getAdminPostDetail(c.env.DB, id, user.userId, user.role);
 
@@ -151,7 +151,7 @@ postRoutes.get('/likes', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const result = await PostService.getLikedPosts(c.env.DB, user.userId, {
       page: safeParseInt(c.req.query('page'), 1),
       limit: safeParseInt(c.req.query('limit'), POST_CONSTANTS.DEFAULT_PAGE_SIZE)
@@ -178,7 +178,7 @@ postRoutes.get('/reading-history', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const result = await PostService.getReadingHistory(c.env.DB, user.userId, {
       page: safeParseInt(c.req.query('page'), 1),
       limit: safeParseInt(c.req.query('limit'), POST_CONSTANTS.DEFAULT_PAGE_SIZE)
@@ -198,7 +198,7 @@ postRoutes.get('/favorites', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const result = await PostService.getFavorites(c.env.DB, user.userId, {
       page: safeParseInt(c.req.query('page'), 1),
       limit: safeParseInt(c.req.query('limit'), POST_CONSTANTS.DEFAULT_PAGE_SIZE)
@@ -220,7 +220,7 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
 
   try {
     const slug = c.req.param('slug');
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
 
     const result = await PostService.getPostBySlug(c.env.DB, c.env, slug, currentUser);
 
@@ -228,13 +228,15 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
       return c.json(errorResponse(result.message || 'Post not found'), getStatus(result.statusCode, 404));
     }
 
+    const postId = (result.post as { id: number }).id;
+
     if (result.requiresPassword) {
       const { results: tags } = await c.env.DB.prepare(`
         SELECT t.id, t.name, t.slug, t.post_count
         FROM tags t
         JOIN post_tags pt ON t.id = pt.tag_id
         WHERE pt.post_id = ?
-      `).bind((result.post as any).id).all();
+      `).bind(postId).all();
 
       return c.json(successResponse({
         ...result.post,
@@ -243,10 +245,10 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
     }
 
     c.executionCtx.waitUntil(
-      PostService.incrementViewCount(c.env.DB, (result.post as any).id)
+      PostService.incrementViewCount(c.env.DB, postId)
     );
 
-    logger.info('Post fetched successfully', { slug, postId: (result.post as any).id });
+    logger.info('Post fetched successfully', { slug, postId });
 
     return c.json(successResponse(result.post));
   } catch (error) {
@@ -259,7 +261,7 @@ postRoutes.post('/', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const body = await c.req.json();
 
     const result = await PostService.createPost(c.env.DB, user.userId, body);
@@ -288,7 +290,7 @@ postRoutes.put('/:id', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const id = c.req.param('id');
     const body = await c.req.json();
 
@@ -338,7 +340,7 @@ postRoutes.post('/:id/like', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const postId = c.req.param('id');
 
     const result = await PostService.toggleLike(c.env.DB, c.env, user.userId, user, postId, isFeatureEnabled);
@@ -360,7 +362,7 @@ postRoutes.post('/:id/reading-progress', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const postId = c.req.param('id');
     const body = await c.req.json().catch(() => ({}));
 
@@ -389,7 +391,7 @@ postRoutes.post('/:id/favorite', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const postId = c.req.param('id');
 
     const result = await PostService.toggleFavorite(c.env.DB, c.env, user.userId, user, postId);

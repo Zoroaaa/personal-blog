@@ -19,6 +19,7 @@ import {
   safeParseInt
 } from '../utils/validation';
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
+import type { ColumnRow, TotalResult, TagRowWithPostId } from '../types/database';
 
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 50;
@@ -115,7 +116,7 @@ export class ColumnService {
       countParams.push(author);
     }
 
-    const countResult = await db.prepare(countSql).bind(...countParams).first() as any;
+    const countResult = await db.prepare(countSql).bind(...countParams).first() as TotalResult | null;
     const total = countResult?.total || 0;
 
     return {
@@ -186,7 +187,7 @@ export class ColumnService {
 
     const column = await db.prepare(
       'SELECT id, status FROM columns WHERE slug = ? AND deleted_at IS NULL'
-    ).bind(slug).first() as any;
+    ).bind(slug).first() as { id: number; status: string } | null;
 
     if (!column) {
       return {
@@ -226,10 +227,10 @@ export class ColumnService {
       FROM posts p
       LEFT JOIN users u ON p.author_id = u.id
       WHERE p.column_id = ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
-    `).bind(column.id).first() as any;
+    `).bind(column.id).first() as TotalResult | null;
     const total = countResult?.total || 0;
 
-    const postIds = (results as any[]).map(p => p.id);
+    const postIds = (results as { id: number }[]).map(p => p.id);
     let postsWithTags = results;
 
     if (postIds.length > 0) {
@@ -242,7 +243,7 @@ export class ColumnService {
       const { results: tagResults } = await db.prepare(tagsSql).bind(...postIds).all();
 
       const tagsByPost = new Map();
-      (tagResults as any[]).forEach(tag => {
+      (tagResults as TagRowWithPostId[]).forEach(tag => {
         if (!tagsByPost.has(tag.post_id)) {
           tagsByPost.set(tag.post_id, []);
         }
@@ -253,7 +254,7 @@ export class ColumnService {
         });
       });
 
-      postsWithTags = (results as any[]).map(post => ({
+      postsWithTags = (results as { id: number }[]).map(post => ({
         ...post,
         tags: tagsByPost.get(post.id) || []
       }));
@@ -368,7 +369,7 @@ export class ColumnService {
   static async updateColumn(db: any, id: string, body: ColumnUpdateRequest): Promise<ColumnResult> {
     const column = await db.prepare(
       'SELECT * FROM columns WHERE id = ?'
-    ).bind(id).first() as any;
+    ).bind(id).first() as ColumnRow | null;
 
     if (!column) {
       return {
@@ -436,7 +437,7 @@ export class ColumnService {
   static async deleteColumn(db: any, id: string): Promise<ColumnResult> {
     const column = await db.prepare(
       'SELECT * FROM columns WHERE id = ?'
-    ).bind(id).first() as any;
+    ).bind(id).first() as ColumnRow | null;
 
     if (!column) {
       return {
@@ -449,9 +450,9 @@ export class ColumnService {
     const postCount = await db.prepare(`
       SELECT COUNT(*) as count FROM posts
       WHERE column_id = ? AND status = 'published'
-    `).bind(id).first() as any;
+    `).bind(id).first() as { count: number } | null;
 
-    if (postCount.count > 0) {
+    if (postCount && postCount.count > 0) {
       return {
         success: false,
         message: `This column has ${postCount.count} published post(s). Please reassign or delete those posts first.`,
@@ -489,14 +490,20 @@ export class ColumnService {
         COALESCE(SUM(comment_count), 0) as total_comment_count
       FROM posts
       WHERE column_id = ? AND status = 'published'
-    `).bind(id).first() as any;
+    `).bind(id).first() as { post_count: number; total_view_count: number; total_like_count: number; total_comment_count: number } | null;
 
     const favoriteStats = await db.prepare(`
       SELECT COUNT(*) as total_favorite_count
       FROM favorites f
       JOIN posts p ON f.post_id = p.id
       WHERE p.column_id = ? AND p.status = 'published'
-    `).bind(id).first() as any;
+    `).bind(id).first() as { total_favorite_count: number } | null;
+
+    const postCount = stats?.post_count || 0;
+    const totalViewCount = stats?.total_view_count || 0;
+    const totalLikeCount = stats?.total_like_count || 0;
+    const totalCommentCount = stats?.total_comment_count || 0;
+    const totalFavoriteCount = favoriteStats?.total_favorite_count || 0;
 
     await db.prepare(`
       UPDATE columns
@@ -508,22 +515,22 @@ export class ColumnService {
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).bind(
-      stats.post_count || 0,
-      stats.total_view_count || 0,
-      stats.total_like_count || 0,
-      favoriteStats?.total_favorite_count || 0,
-      stats.total_comment_count || 0,
+      postCount,
+      totalViewCount,
+      totalLikeCount,
+      totalFavoriteCount,
+      totalCommentCount,
       id
     ).run();
 
     return {
       success: true,
       data: {
-        postCount: stats.post_count || 0,
-        totalViewCount: stats.total_view_count || 0,
-        totalLikeCount: stats.total_like_count || 0,
-        totalFavoriteCount: favoriteStats?.total_favorite_count || 0,
-        totalCommentCount: stats.total_comment_count || 0
+        postCount,
+        totalViewCount,
+        totalLikeCount,
+        totalFavoriteCount,
+        totalCommentCount
       },
       message: 'Column stats refreshed successfully'
     };

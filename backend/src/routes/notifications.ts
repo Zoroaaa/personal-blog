@@ -47,7 +47,7 @@ notificationRoutes.get('/', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
     const page = parseInt(c.req.query('page') || String(DEFAULT_PAGE));
     const limit = Math.min(
       MAX_LIMIT,
@@ -99,7 +99,7 @@ notificationRoutes.get('/unread-count', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
 
     const result = await getUnreadCount(c.env.DB, currentUser.userId);
 
@@ -126,7 +126,7 @@ notificationRoutes.get('/unread', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
 
     const result = await getUnreadCount(c.env.DB, currentUser.userId);
 
@@ -153,7 +153,7 @@ notificationRoutes.put('/:id/read', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
     const notificationId = parseInt(c.req.param('id'));
 
     if (isNaN(notificationId)) {
@@ -200,7 +200,7 @@ notificationRoutes.put('/read-all', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
     const body = await c.req.json().catch(() => ({}));
     const type = body.type as NotificationType | undefined;
 
@@ -240,7 +240,7 @@ notificationRoutes.delete('/:id', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
     const notificationId = parseInt(c.req.param('id'));
 
     if (isNaN(notificationId)) {
@@ -294,9 +294,9 @@ notificationRoutes.get('/carousel', async (c) => {
       WHERE n.type = ? AND n.subtype = ? AND n.is_active = 1 AND n.deleted_at IS NULL
       ORDER BY n.created_at DESC
       LIMIT 5`
-    ).bind('system', 'announcement').all() as any;
+    ).bind('system', 'announcement').all() as { results: { id: number; title: string; content: string; related_data: string; created_at: string }[] };
 
-    const formattedNotifications = (notifications.results || []).map((n: any) => {
+    const formattedNotifications = (notifications.results || []).map((n) => {
       let relatedData: { link?: string } = {};
       try {
         relatedData = JSON.parse(n.related_data || '{}');

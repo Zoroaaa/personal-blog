@@ -16,6 +16,7 @@
 
 import type { D1Database } from '@cloudflare/workers-types';
 import { isStrangerMessageAllowed } from './messageSettingsService';
+import type { MessageRow } from '../types/database';
 
 export type MessageType = 'text' | 'image' | 'attachment' | 'mixed';
 
@@ -148,7 +149,7 @@ export async function sendMessage(
     if (replyToId) {
       const originalMessage = await db.prepare(
         'SELECT id, thread_id FROM messages WHERE id = ?'
-      ).bind(replyToId).first() as any;
+      ).bind(replyToId).first() as { id: number; thread_id: string | null } | null;
 
       if (!originalMessage || originalMessage.thread_id !== threadId) {
         throw new Error('Invalid reply target');
@@ -525,7 +526,7 @@ export async function recallMessage(
       SELECT id, sender_id, created_at, is_recalled
       FROM messages 
       WHERE id = ?
-    `).bind(messageId).first() as any;
+    `).bind(messageId).first() as { id: number; sender_id: number; created_at: string; is_recalled: number } | null;
 
     if (!message) {
       return { success: false, error: '消息不存在' };
@@ -584,7 +585,7 @@ export async function resendMessage(
       SELECT id, sender_id, is_recalled, thread_id
       FROM messages 
       WHERE id = ?
-    `).bind(messageId).first() as any;
+    `).bind(messageId).first() as { id: number; sender_id: number; is_recalled: number; thread_id: string | null } | null;
 
     if (!message) {
       return { success: false, error: '消息不存在' };
@@ -655,7 +656,7 @@ export async function canRecallMessage(
       SELECT sender_id, created_at, is_recalled
       FROM messages 
       WHERE id = ?
-    `).bind(messageId).first() as any;
+    `).bind(messageId).first() as { sender_id: number; created_at: string; is_recalled: number } | null;
 
     if (!message) return false;
     if (message.sender_id !== userId) return false;

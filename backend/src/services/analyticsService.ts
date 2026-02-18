@@ -311,12 +311,12 @@ export class AnalyticsService {
         dayViewsResult = await db.prepare(`
           SELECT COUNT(*) as count FROM view_history 
           WHERE post_id = ? AND created_at >= ? AND created_at < ?
-        `).bind(postId, date.toISOString(), nextDay.toISOString()).first() as any;
+        `).bind(postId, date.toISOString(), nextDay.toISOString()).first() as { count: number } | null;
       } else {
         dayViewsResult = await db.prepare(`
           SELECT COUNT(*) as count FROM view_history 
           WHERE created_at >= ? AND created_at < ?
-        `).bind(date.toISOString(), nextDay.toISOString()).first() as any;
+        `).bind(date.toISOString(), nextDay.toISOString()).first() as { count: number } | null;
       }
 
       viewTrend.push({

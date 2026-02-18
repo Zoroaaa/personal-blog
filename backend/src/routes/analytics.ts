@@ -118,7 +118,7 @@ analyticsRoutes.post('/track', async (c) => {
     const body = await c.req.json();
     const { postId, referrer } = body;
 
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const userId = user?.userId || null;
 
     const ip = c.req.header('CF-Connecting-IP') ||

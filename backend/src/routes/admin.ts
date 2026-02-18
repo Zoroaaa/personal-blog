@@ -137,7 +137,7 @@ adminRoutes.put('/users/:id/status', requireAdmin, async (c) => {
   try {
     const userId = c.req.param('id');
     const { status } = await c.req.json();
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
 
     if (!userId) {
       return c.json(errorResponse('Invalid user ID'), 400);
@@ -189,7 +189,7 @@ adminRoutes.delete('/users/:id', requireAdmin, async (c) => {
 
   try {
     const userId = c.req.param('id');
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
 
     if (!userId) {
       return c.json(errorResponse('Invalid user ID'), 400);

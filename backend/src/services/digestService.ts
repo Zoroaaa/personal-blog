@@ -53,7 +53,7 @@ export async function processDigestQueue(
         AND eq.scheduled_at <= ?
         AND n.deleted_at IS NULL
       ORDER BY eq.user_id, n.created_at DESC
-    `).bind(digestType, now).all() as any;
+    `).bind(digestType, now).all() as { results: { id: number; user_id: number; notification_id: number; digest_type: string; scheduled_at: string; is_sent: number; title: string; content: string; type: string; subtype: string | null; created_at: string }[] };
 
     if (!pendingItems.results || pendingItems.results.length === 0) {
       return { processed: 0, failed: 0 };
@@ -163,19 +163,19 @@ export async function getDigestStats(
   try {
     const dailyPending = await db.prepare(
       `SELECT COUNT(*) as count FROM email_digest_queue WHERE digest_type = 'daily' AND is_sent = 0`
-    ).first() as any;
+    ).first() as { count: number } | null;
 
     const dailySent = await db.prepare(
       `SELECT COUNT(*) as count FROM email_digest_queue WHERE digest_type = 'daily' AND is_sent = 1`
-    ).first() as any;
+    ).first() as { count: number } | null;
 
     const weeklyPending = await db.prepare(
       `SELECT COUNT(*) as count FROM email_digest_queue WHERE digest_type = 'weekly' AND is_sent = 0`
-    ).first() as any;
+    ).first() as { count: number } | null;
 
     const weeklySent = await db.prepare(
       `SELECT COUNT(*) as count FROM email_digest_queue WHERE digest_type = 'weekly' AND is_sent = 1`
-    ).first() as any;
+    ).first() as { count: number } | null;
 
     return {
       daily: {

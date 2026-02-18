@@ -159,6 +159,10 @@ export interface CountResult {
   count: number;
 }
 
+export interface TotalResult {
+  total: number;
+}
+
 export interface SumResult {
   total: number | null;
 }
@@ -176,6 +180,154 @@ export interface FavoriteRow {
   user_id: number;
   post_id: number;
   created_at: string;
+}
+
+export interface UserLoginRow {
+  id: number;
+  username: string;
+  email: string;
+  password_hash: string | null;
+  display_name: string;
+  avatar_url: string | null;
+  bio: string | null;
+  role: 'admin' | 'user' | 'moderator';
+  status: 'active' | 'suspended' | 'deleted';
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface OAuthUserRow {
+  id: number;
+  username: string;
+  email: string;
+  display_name: string;
+  avatar_url: string | null;
+  bio?: string | null;
+  role: 'admin' | 'user' | 'moderator';
+  status?: 'active' | 'suspended' | 'deleted';
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface UserBasicRow {
+  id: number;
+  username: string;
+  email: string;
+  display_name: string;
+  avatar_url: string | null;
+  bio: string | null;
+  role: 'admin' | 'user' | 'moderator';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserPasswordRow {
+  password_hash: string | null;
+  email: string;
+}
+
+export interface OAuthTokenRow {
+  id: number;
+  user_id: number;
+  provider: string;
+  access_token: string;
+  refresh_token: string | null;
+  scopes: string | null;
+  expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GitHubTokenResponse {
+  access_token: string;
+  token_type: string;
+  scope: string;
+  error?: string;
+  error_description?: string;
+  refresh_token?: string;
+  expires_in?: number;
+}
+
+export interface GitHubUserResponse {
+  id: number;
+  login: string;
+  name: string | null;
+  email: string | null;
+  avatar_url: string;
+}
+
+export interface GitHubEmailResponse {
+  email: string;
+  primary: boolean;
+  verified: boolean;
+}
+
+export interface PostDetailRow {
+  id: number;
+  title: string;
+  slug: string;
+  summary: string | null;
+  content: string;
+  cover_image: string | null;
+  author_id: number;
+  category_id: number | null;
+  column_id: number | null;
+  status: 'draft' | 'published' | 'archived';
+  visibility: 'public' | 'private' | 'password';
+  password_hash: string | null;
+  view_count: number;
+  like_count: number;
+  comment_count: number;
+  reading_time: number | null;
+  meta_title: string | null;
+  meta_description: string | null;
+  meta_keywords: string | null;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+  is_pinned: number;
+  pin_order: number;
+  author_name?: string;
+  author_display_name?: string;
+  author_avatar_url?: string | null;
+  category_name?: string;
+  category_slug?: string;
+}
+
+export interface PostBasicRow {
+  id: number;
+  title: string;
+  slug: string;
+  summary: string | null;
+  cover_image: string | null;
+  author_id: number;
+  category_id: number | null;
+  status: 'draft' | 'published' | 'archived';
+  visibility: 'public' | 'private' | 'password';
+  view_count: number;
+  like_count: number;
+  comment_count: number;
+  published_at: string | null;
+  created_at: string;
+  is_pinned: number;
+  pin_order: number;
+}
+
+export interface TagRowWithPostId extends TagRow {
+  post_id: number;
+}
+
+export interface LikeStatusRow {
+  id: number;
+  user_id: number;
+  post_id: number | null;
+  comment_id: number | null;
+}
+
+export interface FavoriteStatusRow {
+  id: number;
+  user_id: number;
+  post_id: number;
 }
 
 export function typedResult<T>(result: unknown): T {

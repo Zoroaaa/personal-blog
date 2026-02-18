@@ -18,6 +18,7 @@ import {
   safeParseInt
 } from '../utils/validation';
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
+import type { CategoryRow, TagRow, TotalResult, CountResult, TagRowWithPostId } from '../types/database';
 
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 50;
@@ -184,7 +185,7 @@ export class CategoryService {
   static async updateCategory(db: any, id: string, body: CategoryUpdateRequest): Promise<CategoryResult> {
     const category = await db.prepare(
       'SELECT * FROM categories WHERE id = ?'
-    ).bind(id).first() as any;
+    ).bind(id).first() as CategoryRow | null;
 
     if (!category) {
       return {
@@ -223,7 +224,7 @@ export class CategoryService {
   static async deleteCategory(db: any, id: string): Promise<CategoryResult> {
     const category = await db.prepare(
       'SELECT * FROM categories WHERE id = ?'
-    ).bind(id).first() as any;
+    ).bind(id).first() as CategoryRow | null;
 
     if (!category) {
       return {
@@ -269,7 +270,7 @@ export class CategoryService {
 
     const category = await db.prepare(
       'SELECT id FROM categories WHERE slug = ? AND deleted_at IS NULL'
-    ).bind(slug).first() as any;
+    ).bind(slug).first() as { id: number } | null;
 
     if (!category) {
       return {
@@ -301,10 +302,10 @@ export class CategoryService {
       FROM posts p
       LEFT JOIN users u ON p.author_id = u.id
       WHERE p.category_id = ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
-    `).bind(category.id).first() as any;
+    `).bind(category.id).first() as TotalResult | null;
     const total = countResult?.total || 0;
 
-    const postIds = (results as any[]).map(p => p.id);
+    const postIds = (results as { id: number }[]).map(p => p.id);
     let postsWithTags = results;
 
     if (postIds.length > 0) {
@@ -317,7 +318,7 @@ export class CategoryService {
       const { results: tagResults } = await db.prepare(tagsSql).bind(...postIds).all();
 
       const tagsByPost = new Map();
-      (tagResults as any[]).forEach(tag => {
+      (tagResults as TagRowWithPostId[]).forEach(tag => {
         if (!tagsByPost.has(tag.post_id)) {
           tagsByPost.set(tag.post_id, []);
         }
@@ -329,7 +330,7 @@ export class CategoryService {
         });
       });
 
-      postsWithTags = (results as any[]).map(post => ({
+      postsWithTags = (results as { id: number }[]).map(post => ({
         ...post,
         tags: tagsByPost.get(post.id) || []
       }));
@@ -457,7 +458,7 @@ export class TagService {
   static async updateTag(db: any, id: string, body: TagUpdateRequest): Promise<CategoryResult> {
     const tag = await db.prepare(
       'SELECT * FROM tags WHERE id = ?'
-    ).bind(id).first() as any;
+    ).bind(id).first() as TagRow | null;
 
     if (!tag) {
       return {
@@ -493,7 +494,7 @@ export class TagService {
   static async deleteTag(db: any, id: string): Promise<CategoryResult> {
     const tag = await db.prepare(
       'SELECT * FROM tags WHERE id = ?'
-    ).bind(id).first() as any;
+    ).bind(id).first() as TagRow | null;
 
     if (!tag) {
       return {
@@ -531,7 +532,7 @@ export class TagService {
 
     const tag = await db.prepare(
       'SELECT id FROM tags WHERE slug = ? AND deleted_at IS NULL'
-    ).bind(slug).first() as any;
+    ).bind(slug).first() as { id: number } | null;
 
     if (!tag) {
       return {
@@ -565,10 +566,10 @@ export class TagService {
       INNER JOIN post_tags pt ON p.id = pt.post_id
       LEFT JOIN users u ON p.author_id = u.id
       WHERE pt.tag_id = ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
-    `).bind(tag.id).first() as any;
+    `).bind(tag.id).first() as TotalResult | null;
     const total = countResult?.total || 0;
 
-    const postIds = (results as any[]).map(p => p.id);
+    const postIds = (results as { id: number }[]).map(p => p.id);
     let postsWithTags = results;
 
     if (postIds.length > 0) {
@@ -581,7 +582,7 @@ export class TagService {
       const { results: tagResults } = await db.prepare(tagsSql).bind(...postIds).all();
 
       const tagsByPost = new Map();
-      (tagResults as any[]).forEach(t => {
+      (tagResults as TagRowWithPostId[]).forEach(t => {
         if (!tagsByPost.has(t.post_id)) {
           tagsByPost.set(t.post_id, []);
         }
@@ -593,7 +594,7 @@ export class TagService {
         });
       });
 
-      postsWithTags = (results as any[]).map(post => ({
+      postsWithTags = (results as { id: number }[]).map(post => ({
         ...post,
         tags: tagsByPost.get(post.id) || []
       }));

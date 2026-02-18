@@ -11,6 +11,8 @@
  * @created 2026-02-16
  */
 
+import type { TotalResult, TagRowWithPostId } from '../types/database';
+
 export interface UserSearchQuery {
   username: string;
 }
@@ -177,10 +179,10 @@ export class UserService {
     const countResult = await db.prepare(`
       SELECT COUNT(*) as total FROM posts
       WHERE author_id = ? AND status = 'published' AND visibility = 'public' AND deleted_at IS NULL
-    `).bind(userId).first() as any;
+    `).bind(userId).first() as TotalResult | null;
     const total = countResult?.total || 0;
 
-    const postIds = (results as any[]).map(p => p.id);
+    const postIds = (results as { id: number }[]).map(p => p.id);
     let postsWithTags = results;
 
     if (postIds.length > 0) {
@@ -193,7 +195,7 @@ export class UserService {
       const { results: tagResults } = await db.prepare(tagsSql).bind(...postIds).all();
 
       const tagsByPost = new Map();
-      (tagResults as any[]).forEach(tag => {
+      (tagResults as TagRowWithPostId[]).forEach(tag => {
         if (!tagsByPost.has(tag.post_id)) {
           tagsByPost.set(tag.post_id, []);
         }
@@ -204,7 +206,7 @@ export class UserService {
         });
       });
 
-      postsWithTags = (results as any[]).map(post => ({
+      postsWithTags = (results as { id: number }[]).map(post => ({
         ...post,
         tags: tagsByPost.get(post.id) || []
       }));

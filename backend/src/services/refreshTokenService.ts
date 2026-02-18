@@ -97,7 +97,7 @@ export class RefreshTokenService {
         SELECT user_id, expires_at, revoked_at
         FROM refresh_tokens
         WHERE token_hash = ?
-      `).bind(tokenHash).first() as any;
+      `).bind(tokenHash).first() as { user_id: number; expires_at: string; revoked_at: string | null } | null;
 
       if (!storedToken) {
         return {

@@ -32,6 +32,17 @@ import { EmailVerificationService, type VerificationEmailType } from './emailVer
 import { RefreshTokenService } from './refreshTokenService';
 import { AUTH_CONSTANTS } from '../config/constants';
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
+import type { 
+  UserLoginRow, 
+  UserBasicRow, 
+  UserPasswordRow, 
+  OAuthTokenRow,
+  OAuthUserRow,
+  CountResult,
+  GitHubTokenResponse,
+  GitHubUserResponse,
+  GitHubEmailResponse
+} from '../types/database';
 
 const BCRYPT_ROUNDS = AUTH_CONSTANTS.BCRYPT_ROUNDS;
 
@@ -303,7 +314,7 @@ export class AuthService {
 
     const user = await db.prepare(
       'SELECT id, username, email, password_hash, display_name, avatar_url, bio, role, status FROM users WHERE (username = ? OR email = ?) AND deleted_at IS NULL'
-    ).bind(username, username).first() as any;
+    ).bind(username, username).first() as UserLoginRow | null;
 
     if (!user) {
       return {
@@ -427,7 +438,7 @@ export class AuthService {
         };
       }
 
-      tokenData = await tokenResponse.json() as any;
+      tokenData = await tokenResponse.json() as GitHubTokenResponse;
 
       if (!tokenData.access_token) {
         return {
@@ -454,7 +465,7 @@ export class AuthService {
         };
       }
 
-      githubUser = await userResponse.json() as any;
+      githubUser = await userResponse.json() as GitHubUserResponse;
 
       if (!githubUser || !githubUser.id) {
         return {
@@ -476,7 +487,7 @@ export class AuthService {
         });
 
         if (emailResponse.ok) {
-          const emails = await emailResponse.json() as any[];
+          const emails = await emailResponse.json() as GitHubEmailResponse[];
           const primaryEmail = emails.find(e => e.primary && e.verified);
           if (primaryEmail) {
             githubEmail = primaryEmail.email;
@@ -493,9 +504,9 @@ export class AuthService {
       };
     }
 
-    let user = await db.prepare(
+    let user: OAuthUserRow | null = await db.prepare(
       'SELECT * FROM users WHERE oauth_provider = ? AND oauth_id = ? AND deleted_at IS NULL'
-    ).bind('github', githubUser.id.toString()).first() as any;
+    ).bind('github', githubUser.id.toString()).first() as OAuthUserRow | null;
 
     if (!user) {
       const username = githubUser.login;
@@ -529,7 +540,11 @@ export class AuthService {
           email,
           display_name: githubUser.name || finalUsername,
           avatar_url: githubUser.avatar_url,
+          bio: null,
           role: 'user',
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         };
       } catch (dbError) {
         return {
@@ -645,7 +660,7 @@ export class AuthService {
 
     const user = await db.prepare(
       'SELECT id, oauth_provider, password_hash FROM users WHERE email = ? AND deleted_at IS NULL'
-    ).bind(email).first() as any;
+    ).bind(email).first() as { id: number; oauth_provider: string | null; password_hash: string | null } | null;
 
     if (!user) {
       return {
@@ -779,7 +794,7 @@ export class AuthService {
   }> {
     const user = await db.prepare(
       'SELECT id, username, email, display_name, avatar_url, bio, role, created_at, updated_at FROM users WHERE id = ? AND deleted_at IS NULL'
-    ).bind(userId).first() as any;
+    ).bind(userId).first() as UserBasicRow | null;
 
     if (!user) {
       return {
@@ -791,11 +806,11 @@ export class AuthService {
 
     const postCount = await db.prepare(
       'SELECT COUNT(*) as count FROM posts WHERE author_id = ? AND status = ? AND deleted_at IS NULL'
-    ).bind(userId, 'published').first() as any;
+    ).bind(userId, 'published').first() as CountResult | null;
 
     const commentCount = await db.prepare(
       'SELECT COUNT(*) as count FROM comments WHERE user_id = ? AND status = ? AND deleted_at IS NULL'
-    ).bind(userId, 'approved').first() as any;
+    ).bind(userId, 'approved').first() as CountResult | null;
 
     return {
       success: true,
@@ -882,7 +897,15 @@ export class AuthService {
 
     const userData = await db.prepare(
       'SELECT id, username, email, display_name, avatar_url, bio, role, created_at, updated_at FROM users WHERE id = ? AND deleted_at IS NULL'
-    ).bind(userId).first() as any;
+    ).bind(userId).first() as UserBasicRow | null;
+
+    if (!userData) {
+      return {
+        success: false,
+        message: 'User not found after update',
+        statusCode: 404
+      };
+    }
 
     return {
       success: true,
@@ -919,7 +942,7 @@ export class AuthService {
 
     const user = await db.prepare(
       'SELECT password_hash, email FROM users WHERE id = ? AND deleted_at IS NULL'
-    ).bind(userId).first() as any;
+    ).bind(userId).first() as UserPasswordRow | null;
 
     if (!user) {
       return {
@@ -1009,7 +1032,7 @@ export class AuthService {
 
     const user = await db.prepare(
       'SELECT password_hash, email FROM users WHERE id = ? AND deleted_at IS NULL'
-    ).bind(userId).first() as any;
+    ).bind(userId).first() as UserPasswordRow | null;
 
     if (!user) {
       return {
@@ -1077,7 +1100,7 @@ export class AuthService {
     try {
       const tokenData = await db.prepare(
         'SELECT * FROM oauth_tokens WHERE user_id = ? AND provider = ?'
-      ).bind(userId, provider).first() as any;
+      ).bind(userId, provider).first() as OAuthTokenRow | null;
 
       if (!tokenData) {
         return {

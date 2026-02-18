@@ -13,6 +13,7 @@
 
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
 import { safeParseInt } from '../utils/validation';
+import type { TotalResult, CommentRow, UserRow } from '../types/database';
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -108,7 +109,7 @@ export class AdminService {
       countParams.push(postId);
     }
 
-    const countResult = await db.prepare(countSql).bind(...countParams).first() as any;
+    const countResult = await db.prepare(countSql).bind(...countParams).first() as TotalResult | null;
     const total = countResult?.total || 0;
 
     return {
@@ -140,7 +141,7 @@ export class AdminService {
 
     const comment = await db.prepare(
       'SELECT id, post_id FROM comments WHERE id = ?'
-    ).bind(commentId).first() as any;
+    ).bind(commentId).first() as { id: number; post_id: number } | null;
 
     if (!comment) {
       return {
@@ -166,7 +167,7 @@ export class AdminService {
   ): Promise<AdminResult> {
     const comment = await db.prepare(
       'SELECT id, post_id FROM comments WHERE id = ?'
-    ).bind(commentId).first() as any;
+    ).bind(commentId).first() as { id: number; post_id: number } | null;
 
     if (!comment) {
       return {
@@ -242,7 +243,7 @@ export class AdminService {
       countParams.push(status);
     }
 
-    const countResult = await db.prepare(countSql).bind(...countParams).first() as any;
+    const countResult = await db.prepare(countSql).bind(...countParams).first() as TotalResult | null;
     const total = countResult?.total || 0;
 
     return {
@@ -275,7 +276,7 @@ export class AdminService {
 
     const user = await db.prepare(
       'SELECT id, username FROM users WHERE id = ?'
-    ).bind(userId).first() as any;
+    ).bind(userId).first() as { id: number; username: string } | null;
 
     if (!user) {
       return {
@@ -318,7 +319,7 @@ export class AdminService {
 
     const user = await db.prepare(
       'SELECT id, username FROM users WHERE id = ?'
-    ).bind(userId).first() as any;
+    ).bind(userId).first() as { id: number; username: string } | null;
 
     if (!user) {
       return {
@@ -345,7 +346,7 @@ export class AdminService {
   ): Promise<AdminResult> {
     const user = await db.prepare(
       'SELECT id, username FROM users WHERE id = ?'
-    ).bind(userId).first() as any;
+    ).bind(userId).first() as { id: number; username: string } | null;
 
     if (!user) {
       return {

@@ -218,7 +218,7 @@ export async function createMentionNotifications(
           WHERE c.id = ? AND c.deleted_at IS NULL
         `)
         .bind(contentId)
-        .first() as any;
+        .first() as { content: string; post_id: number; title: string; slug: string } | null;
 
       if (comment) {
         contentInfo = {
@@ -329,7 +329,7 @@ export async function createMentionNotificationsByIds(
           WHERE c.id = ? AND c.deleted_at IS NULL
         `)
         .bind(contentId)
-        .first() as any;
+        .first() as { content: string; post_id: number; title: string; slug: string } | null;
 
       if (comment) {
         contentInfo = {
@@ -345,7 +345,7 @@ export async function createMentionNotificationsByIds(
     const { results: targetUsers } = await db
       .prepare(`SELECT id, username, display_name FROM users WHERE id IN (${mentionedUserIds.map(() => '?').join(',')}) AND status = 'active' AND deleted_at IS NULL`)
       .bind(...mentionedUserIds)
-      .all() as any;
+      .all() as { results: { id: number; username: string; display_name: string | null }[] };
 
     if (!targetUsers || targetUsers.length === 0) {
       return;

@@ -28,6 +28,17 @@ import {
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
 import { createInteractionNotification } from './notificationService';
 import { isInteractionSubtypeEnabled } from './notificationSettingsService';
+import type { 
+  PostRow, 
+  PostDetailRow, 
+  PostBasicRow,
+  CountResult,
+  TotalResult,
+  TagRow,
+  TagRowWithPostId,
+  LikeStatusRow,
+  FavoriteStatusRow
+} from '../types/database';
 
 function getPostPasswordSecret(env: any): string {
   return env.POST_PASSWORD_SECRET || env.JWT_SECRET;
@@ -237,7 +248,7 @@ export class PostService {
       countParams.push(searchTerm, searchTerm, searchTerm);
     }
 
-    const countResult = await db.prepare(countSql).bind(...countParams).first() as any;
+    const countResult = await db.prepare(countSql).bind(...countParams).first() as TotalResult | null;
     const total = countResult?.total || 0;
 
     const postIds = results.map((p: any) => p.id);
@@ -253,7 +264,7 @@ export class PostService {
       const { results: tagResults } = await db.prepare(tagsSql).bind(...postIds).all();
 
       const tagsByPost = new Map();
-      (tagResults as any[]).forEach(tag => {
+      (tagResults as TagRowWithPostId[]).forEach(tag => {
         if (!tagsByPost.has(tag.post_id)) {
           tagsByPost.set(tag.post_id, []);
         }
@@ -307,7 +318,7 @@ export class PostService {
       LIMIT ? OFFSET ?
     `).bind(limit, offset).all();
 
-    const countResult = await db.prepare('SELECT COUNT(*) as total FROM posts WHERE deleted_at IS NULL').first() as any;
+    const countResult = await db.prepare('SELECT COUNT(*) as total FROM posts WHERE deleted_at IS NULL').first() as TotalResult | null;
     const total = countResult?.total || 0;
 
     const postIds = results.map((p: any) => p.id);
@@ -323,7 +334,7 @@ export class PostService {
       const { results: tagResults } = await db.prepare(tagsSql).bind(...postIds).all();
 
       const tagsByPost = new Map();
-      (tagResults as any[]).forEach(tag => {
+      (tagResults as TagRowWithPostId[]).forEach(tag => {
         if (!tagsByPost.has(tag.post_id)) {
           tagsByPost.set(tag.post_id, []);
         }
@@ -376,7 +387,18 @@ export class PostService {
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN columns col ON p.column_id = col.id
       WHERE p.id = ?
-    `).bind(postId).first() as any;
+    `).bind(postId).first() as (PostRow & {
+      author_username?: string;
+      author_name?: string;
+      author_avatar?: string | null;
+      author_bio?: string | null;
+      category_name?: string;
+      category_slug?: string;
+      category_color?: string;
+      category_icon?: string;
+      column_name?: string;
+      column_slug?: string;
+    }) | null;
 
     if (!post) {
       return {
@@ -572,7 +594,7 @@ export class PostService {
       countParams.push(tag);
     }
 
-    const countResult = await db.prepare(countSql).bind(...countParams).first() as any;
+    const countResult = await db.prepare(countSql).bind(...countParams).first() as TotalResult | null;
     const total = countResult?.total || 0;
 
     const postIds = results.map((p: any) => p.id);
@@ -588,7 +610,7 @@ export class PostService {
       const { results: tagResults } = await db.prepare(tagsSql).bind(...postIds).all();
 
       const tagsByPost = new Map();
-      (tagResults as any[]).forEach(tag => {
+      (tagResults as TagRowWithPostId[]).forEach(tag => {
         if (!tagsByPost.has(tag.post_id)) {
           tagsByPost.set(tag.post_id, []);
         }
@@ -642,7 +664,18 @@ export class PostService {
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN columns col ON p.column_id = col.id
       WHERE p.slug = ? AND p.status = 'published' AND p.deleted_at IS NULL
-    `).bind(slug).first() as any;
+    `).bind(slug).first() as (PostRow & {
+      author_username?: string;
+      author_name?: string;
+      author_avatar?: string | null;
+      author_bio?: string | null;
+      category_name?: string;
+      category_slug?: string;
+      category_color?: string;
+      category_icon?: string;
+      column_name?: string;
+      column_slug?: string;
+    }) | null;
 
     if (!post) {
       return {
@@ -735,7 +768,7 @@ export class PostService {
       `SELECT id, visibility, password_hash, title, slug
        FROM posts
        WHERE id = ? AND visibility = 'password' AND status = 'published' AND deleted_at IS NULL`
-    ).bind(postId).first() as any;
+    ).bind(postId).first() as { id: number; visibility: string; password_hash: string | null; title: string; slug: string } | null;
 
     if (!post) {
       return {
@@ -927,7 +960,7 @@ export class PostService {
 
     const post = await db.prepare(
       'SELECT * FROM posts WHERE id = ? AND deleted_at IS NULL'
-    ).bind(postId).first() as any;
+    ).bind(postId).first() as PostRow | null;
 
     if (!post) {
       return {
@@ -1036,8 +1069,8 @@ export class PostService {
 
       const { results: existingTags } = await db.prepare(
         'SELECT tag_id FROM post_tags WHERE post_id = ?'
-      ).bind(postId).all() as any;
-      const existingTagIds = existingTags.map((t: any) => t.tag_id);
+      ).bind(postId).all() as { results: { tag_id: number }[] };
+      const existingTagIds = existingTags.map((t) => t.tag_id);
 
       const tagsToAdd = newTagIds.filter(id => !existingTagIds.includes(id));
       const tagsToRemove = existingTagIds.filter((id: number) => !newTagIds.includes(id));
@@ -1068,7 +1101,7 @@ export class PostService {
   ): Promise<{ success: boolean; imagesDeleted?: number; message?: string; statusCode?: 200 | 201 | 400 | 401 | 403 | 404 | 409 | 500 | 503 }> {
     const post = await db.prepare(
       'SELECT slug, cover_image, content FROM posts WHERE id = ? AND deleted_at IS NULL'
-    ).bind(postId).first() as any;
+    ).bind(postId).first() as { slug: string; cover_image: string | null; content: string } | null;
 
     if (!post) {
       return {
@@ -1135,7 +1168,7 @@ export class PostService {
 
     const post = await db.prepare(
       'SELECT id, slug FROM posts WHERE id = ? AND deleted_at IS NULL'
-    ).bind(postId).first() as any;
+    ).bind(postId).first() as { id: number; slug: string } | null;
 
     if (!post) {
       return {
@@ -1169,7 +1202,7 @@ export class PostService {
       try {
         const postInfo = await db.prepare(
           'SELECT author_id, title, slug FROM posts WHERE id = ?'
-        ).bind(postId).first() as any;
+        ).bind(postId).first() as { author_id: number; title: string; slug: string } | null;
 
         if (postInfo && postInfo.author_id !== userId) {
           const isEnabled = await isInteractionSubtypeEnabled(
@@ -1199,7 +1232,7 @@ export class PostService {
       }
     }
 
-    const updated = await db.prepare('SELECT like_count FROM posts WHERE id = ?').bind(postId).first() as any;
+    const updated = await db.prepare('SELECT like_count FROM posts WHERE id = ?').bind(postId).first() as { like_count: number } | null;
     const likeCount = updated?.like_count ?? 0;
 
     return {
@@ -1216,7 +1249,7 @@ export class PostService {
     user: any,
     postId: string
   ): Promise<{ success: boolean; favorited?: boolean; message?: string; statusCode?: 200 | 201 | 400 | 401 | 403 | 404 | 409 | 500 | 503 }> {
-    const post = await db.prepare('SELECT id FROM posts WHERE id = ? AND deleted_at IS NULL').bind(postId).first() as any;
+    const post = await db.prepare('SELECT id FROM posts WHERE id = ? AND deleted_at IS NULL').bind(postId).first() as { id: number } | null;
     if (!post) {
       return {
         success: false,
@@ -1240,7 +1273,7 @@ export class PostService {
       try {
         const postInfo = await db.prepare(
           'SELECT author_id, title, slug FROM posts WHERE id = ?'
-        ).bind(postId).first() as any;
+        ).bind(postId).first() as { author_id: number; title: string; slug: string } | null;
 
         if (postInfo && postInfo.author_id !== userId) {
           const isEnabled = await isInteractionSubtypeEnabled(
@@ -1284,7 +1317,7 @@ export class PostService {
     readPercentage: number
   ): Promise<{ success: boolean; message?: string; statusCode?: 200 | 201 | 400 | 401 | 403 | 404 | 409 | 500 | 503 }> {
     const post = await db.prepare('SELECT id FROM posts WHERE id = ? AND status = ? AND visibility = ? AND deleted_at IS NULL')
-      .bind(postId, 'published', 'public').first() as any;
+      .bind(postId, 'published', 'public').first() as { id: number } | null;
 
     if (!post) {
       return {
@@ -1296,7 +1329,7 @@ export class PostService {
 
     const existing = await db.prepare(
       'SELECT read_duration_seconds, read_percentage FROM reading_history WHERE user_id = ? AND post_id = ?'
-    ).bind(userId, postId).first() as any;
+    ).bind(userId, postId).first() as { read_duration_seconds: number; read_percentage: number } | null;
 
     if (existing) {
       const duration = Math.max(existing.read_duration_seconds || 0, readDurationSeconds);
@@ -1349,7 +1382,7 @@ export class PostService {
       JOIN likes l ON p.id = l.post_id
       LEFT JOIN users u ON p.author_id = u.id
       WHERE l.user_id = ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
-    `).bind(userId).first() as any;
+    `).bind(userId).first() as TotalResult | null;
 
     const total = countResult?.total || 0;
 
@@ -1392,7 +1425,7 @@ export class PostService {
 
     const countResult = await db.prepare(
       'SELECT COUNT(*) as total FROM reading_history rh JOIN posts p ON p.id = rh.post_id WHERE rh.user_id = ? AND p.status = ? AND p.visibility = ? AND p.deleted_at IS NULL'
-    ).bind(userId, 'published', 'public').first() as any;
+    ).bind(userId, 'published', 'public').first() as TotalResult | null;
     const total = countResult?.total || 0;
 
     return {
@@ -1435,7 +1468,7 @@ export class PostService {
 
     const countResult = await db.prepare(
       'SELECT COUNT(*) as total FROM favorites f JOIN posts p ON p.id = f.post_id WHERE f.user_id = ? AND p.status = ? AND p.visibility = ? AND p.deleted_at IS NULL'
-    ).bind(userId, 'published', 'public').first() as any;
+    ).bind(userId, 'published', 'public').first() as TotalResult | null;
     const total = countResult?.total || 0;
 
     return {
@@ -1485,9 +1518,9 @@ export class PostService {
        AND u.status = 'active'
        ORDER BY u.display_name ASC
        LIMIT 20`
-    ).bind(postId, postId).all() as any;
+    ).bind(postId, postId).all() as { results: { id: number; username: string; display_name: string; avatar_url: string | null }[] };
 
-    const formattedUsers = (users.results || []).map((user: any) => ({
+    const formattedUsers = (users.results || []).map((user) => ({
       id: user.id,
       username: user.username,
       displayName: user.display_name,
@@ -1506,7 +1539,7 @@ export class PostService {
   ): Promise<{ success: boolean; prevPost?: any; nextPost?: any }> {
     const currentPost = await db.prepare(
       'SELECT id, published_at FROM posts WHERE id = ? AND status = ? AND visibility = ? AND deleted_at IS NULL'
-    ).bind(postId, 'published', 'public').first() as any;
+    ).bind(postId, 'published', 'public').first() as { id: number; published_at: string | null } | null;
 
     if (!currentPost) {
       return { success: false };
@@ -1519,7 +1552,7 @@ export class PostService {
         AND published_at < ?
       ORDER BY published_at DESC
       LIMIT 1
-    `).bind(currentPost.published_at).first() as any;
+    `).bind(currentPost.published_at).first() as { id: number; title: string; slug: string; cover_image: string | null } | null;
 
     const nextPost = await db.prepare(`
       SELECT id, title, slug, cover_image
@@ -1528,7 +1561,7 @@ export class PostService {
         AND published_at > ?
       ORDER BY published_at ASC
       LIMIT 1
-    `).bind(currentPost.published_at).first() as any;
+    `).bind(currentPost.published_at).first() as { id: number; title: string; slug: string; cover_image: string | null } | null;
 
     return {
       success: true,
@@ -1546,7 +1579,7 @@ export class PostService {
       SELECT id, category_id, column_id
       FROM posts
       WHERE id = ? AND status = 'published' AND visibility = 'public' AND deleted_at IS NULL
-    `).bind(postId).first() as any;
+    `).bind(postId).first() as { id: number; category_id: number | null; column_id: number | null } | null;
 
     if (!currentPost) {
       return { success: false };
@@ -1554,8 +1587,8 @@ export class PostService {
 
     const tagResult = await db.prepare(`
       SELECT tag_id FROM post_tags WHERE post_id = ?
-    `).bind(postId).all() as any;
-    const tagIds = (tagResult.results || []).map((t: any) => t.tag_id);
+    `).bind(postId).all() as { results: { tag_id: number }[] };
+    const tagIds = (tagResult.results || []).map((t) => t.tag_id);
 
     let candidates: any[] = [];
 
@@ -1565,7 +1598,7 @@ export class PostService {
         FROM posts
         WHERE column_id = ? AND id != ? AND status = 'published' AND visibility = 'public' AND deleted_at IS NULL
         ORDER BY RANDOM() LIMIT ?
-      `).bind(currentPost.column_id, postId, limit).all() as any;
+      `).bind(currentPost.column_id, postId, limit).all() as { results: any[] };
       candidates = candidates.concat(columnPosts.results || []);
     }
 
@@ -1577,7 +1610,7 @@ export class PostService {
         WHERE pt.tag_id IN (${tagIds.map(() => '?').join(',')})
           AND p.id != ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL
         ORDER BY RANDOM() LIMIT ?
-      `).bind(...tagIds, postId, limit - candidates.length).all() as any;
+      `).bind(...tagIds, postId, limit - candidates.length).all() as { results: any[] };
       candidates = candidates.concat(tagPosts.results || []);
     }
 
@@ -1587,7 +1620,7 @@ export class PostService {
         FROM posts
         WHERE category_id = ? AND id != ? AND status = 'published' AND visibility = 'public' AND deleted_at IS NULL
         ORDER BY RANDOM() LIMIT ?
-      `).bind(currentPost.category_id, postId, limit - candidates.length).all() as any;
+      `).bind(currentPost.category_id, postId, limit - candidates.length).all() as { results: any[] };
       candidates = candidates.concat(categoryPosts.results || []);
     }
 

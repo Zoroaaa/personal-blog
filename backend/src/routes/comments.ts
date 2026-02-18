@@ -29,7 +29,7 @@ commentRoutes.get('/', optionalAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
 
     const result = await CommentService.getCommentList(c.env.DB, {
       postId: c.req.query('postId'),
@@ -67,7 +67,7 @@ commentRoutes.post('/', requireAuth, rateLimit({
   const logger = createLogger(c);
 
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const body = await c.req.json();
 
     const ip = c.req.header('CF-Connecting-IP') ||
@@ -115,7 +115,7 @@ commentRoutes.delete('/:id', requireAuth, rateLimit({
   const logger = createLogger(c);
 
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const id = c.req.param('id');
 
     const result = await CommentService.deleteComment(c.env.DB, user.userId, user.role, id);
@@ -145,7 +145,7 @@ commentRoutes.post('/:id/like', requireAuth, rateLimit({
   const logger = createLogger(c);
 
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const commentId = parseInt(c.req.param('id'));
 
     const result = await CommentService.toggleLike(

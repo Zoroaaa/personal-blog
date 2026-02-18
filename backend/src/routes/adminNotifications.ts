@@ -320,13 +320,13 @@ adminNotificationRoutes.get('/system-notifications', requireAuth, requireAdmin, 
       ${whereClause}
       ORDER BY n.created_at DESC
       LIMIT ? OFFSET ?`
-    ).bind(...params, limit, offset).all() as any;
+    ).bind(...params, limit, offset).all() as { results: { id: number; title: string; content: string; type: string; subtype: string | null; related_data: string; is_active: number; created_at: string; updated_at: string }[] };
 
     const countResult = await c.env.DB.prepare(
       `SELECT COUNT(*) as count FROM notifications n ${whereClause}`
-    ).bind(...params).first() as any;
+    ).bind(...params).first() as { count: number } | null;
 
-    const formattedNotifications = (notifications.results || []).map((n: any) => {
+    const formattedNotifications = (notifications.results || []).map((n) => {
       let relatedData: { link?: string } = {};
       try {
         relatedData = JSON.parse(n.related_data || '{}');
@@ -459,7 +459,7 @@ adminNotificationRoutes.put('/system-notifications/:id', requireAuth, requireAdm
 
     const existing = await c.env.DB.prepare(
       'SELECT id, subtype, related_data FROM notifications WHERE id = ? AND type = ?'
-    ).bind(id, 'system').first() as any;
+    ).bind(id, 'system').first() as { id: number; subtype: string | null; related_data: string } | null;
 
     if (!existing) {
       return c.json(errorResponse('Not found', '通知不存在'), 404);

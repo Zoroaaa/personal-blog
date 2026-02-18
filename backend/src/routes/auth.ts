@@ -103,11 +103,11 @@ authRoutes.post(
         }
 
         if (rawType === 'forgot_password') {
-          const userRow = (await c.env.DB.prepare(
+          const userRow = await c.env.DB.prepare(
             'SELECT id, oauth_provider FROM users WHERE email = ? AND deleted_at IS NULL'
           )
             .bind(email)
-            .first()) as any;
+            .first() as { id: number; oauth_provider: string | null } | null;
 
           if (!userRow) {
             return c.json(
@@ -129,16 +129,16 @@ authRoutes.post(
           }
         }
       } else {
-        const user = c.get('user') as any;
+        const user = c.get('user');
         if (!user) {
           return c.json(errorResponse('Unauthorized', '请先登录'), 401);
         }
 
-        const row = (await c.env.DB.prepare(
+        const row = await c.env.DB.prepare(
           'SELECT email FROM users WHERE id = ? AND deleted_at IS NULL'
         )
           .bind(user.userId)
-          .first()) as any;
+          .first() as { email: string } | null;
 
         if (!row?.email) {
           return c.json(
@@ -180,7 +180,7 @@ authRoutes.post(
         );
       }
 
-      const codeData = result.data as any;
+      const codeData = result.data as { code: string; ttl: number } | undefined;
       const code = codeData?.code;
 
       if (!code) {
@@ -383,7 +383,7 @@ authRoutes.post('/logout', requireAuth, async (c) => {
     
     const result = await AuthService.logout(c.env.DB, c.env, token, body.refreshToken);
 
-    const user = c.get('user') as any;
+    const user = c.get('user');
     logger.info('User logged out', { userId: user?.userId });
 
     return c.json(successResponse({ loggedOut: true }, result.message));
@@ -424,7 +424,7 @@ authRoutes.get('/me', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
     const result = await AuthService.getCurrentUser(c.env.DB, currentUser.userId);
 
     if (!result.success) {
@@ -442,7 +442,7 @@ authRoutes.put('/profile', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
     const body = await c.req.json();
     const result = await AuthService.updateProfile(c.env.DB, currentUser.userId, body);
 
@@ -466,7 +466,7 @@ authRoutes.put('/password', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
     const body = await c.req.json();
     const result = await AuthService.changePassword(c.env.DB, c.env, currentUser.userId, body);
 
@@ -487,7 +487,7 @@ authRoutes.delete('/account', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
     const body = await c.req.json();
     const result = await AuthService.deleteAccount(c.env.DB, c.env, currentUser.userId, body);
 
@@ -508,7 +508,7 @@ authRoutes.delete('/delete', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
     const body = await c.req.json().catch(() => ({}));
     const result = await AuthService.deleteAccount(c.env.DB, c.env, currentUser.userId, body);
 
@@ -529,7 +529,7 @@ authRoutes.post('/delete', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
     const body = await c.req.json();
     const result = await AuthService.deleteAccount(c.env.DB, c.env, currentUser.userId, body);
 

@@ -82,8 +82,33 @@ export async function getConfigValue<T>(env: Env, key: string, defaultValue: T):
   }
 }
 
-// 公开配置白名单 (不需要管理员权限即可访问)
-const PUBLIC_CONFIG_KEYS = [
+export interface UploadLimits {
+  maxImageSizeMB: number;
+  maxFileSizeMB: number;
+  maxImageSizeBytes: number;
+  maxFileSizeBytes: number;
+}
+
+const DEFAULT_UPLOAD_LIMITS: UploadLimits = {
+  maxImageSizeMB: 5,
+  maxFileSizeMB: 10,
+  maxImageSizeBytes: 5 * 1024 * 1024,
+  maxFileSizeBytes: 10 * 1024 * 1024
+};
+
+export async function getUploadLimits(env: Env): Promise<UploadLimits> {
+  const maxImageSizeMB = await getConfigValue(env, 'upload_max_image_size_mb', DEFAULT_UPLOAD_LIMITS.maxImageSizeMB);
+  const maxFileSizeMB = await getConfigValue(env, 'upload_max_file_size_mb', DEFAULT_UPLOAD_LIMITS.maxFileSizeMB);
+  
+  return {
+    maxImageSizeMB,
+    maxFileSizeMB,
+    maxImageSizeBytes: maxImageSizeMB * 1024 * 1024,
+    maxFileSizeBytes: maxFileSizeMB * 1024 * 1024
+  };
+}
+
+export const PUBLIC_CONFIG_KEYS = [
   'site_name',
   'site_subtitle',
   'site_logo',
@@ -113,7 +138,8 @@ const PUBLIC_CONFIG_KEYS = [
   'footer_links',
   'footer_tech_stack',
   'posts_per_page',
-  'max_upload_size_mb',
+  'upload_max_image_size_mb',
+  'upload_max_file_size_mb',
   'allow_html_comments',
   'max_comment_length'
 ];
@@ -301,8 +327,8 @@ configRoutes.put('/:key', requireAuth, requireAdmin, async (c) => {
     
     // ===== 1. 验证配置键是否存在 =====
     const existing = await c.env.DB.prepare(
-      'SELECT id, type FROM site_config WHERE key = ?'
-    ).bind(key).first() as any;
+      'SELECT id, key, type, category FROM site_config WHERE key = ?'
+    ).bind(key).first() as { id: number; key: string; type: string; category: string } | null;
     
     if (!existing) {
       return c.json(errorResponse('Config not found'), 404);
@@ -340,7 +366,7 @@ configRoutes.put('/:key', requireAuth, requireAdmin, async (c) => {
     
     return c.json(successResponse({ 
       key, 
-      value: parseConfigValue({ ...existing, value: processedValue }) 
+      value: parseConfigValue({ ...existing!, value: processedValue, type: existing!.type as 'string' | 'number' | 'boolean' | 'json' }) 
     }, 'Config updated successfully'));
     
   } catch (error) {
@@ -383,10 +409,10 @@ configRoutes.put('/', requireAuth, requireAdmin, async (c) => {
     const keys = Object.keys(configs);
     const { results: existingConfigs } = await c.env.DB.prepare(`
       SELECT key, type FROM site_config WHERE key IN (${keys.map(() => '?').join(',')})
-    `).bind(...keys).all();
+    `).bind(...keys).all() as { results: { key: string; type: string }[] };
     
     const configMap = new Map(
-      (existingConfigs as any[]).map(c => [c.key, c.type])
+      existingConfigs.map(c => [c.key, c.type])
     );
     
     // ===== 2. 验证并更新每个配置 =====

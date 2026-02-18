@@ -22,6 +22,7 @@ import { SoftDeleteHelper } from '../utils/softDeleteHelper';
 import { createInteractionNotification } from './notificationService';
 import { isInteractionSubtypeEnabled } from './notificationSettingsService';
 import { detectMentions, createMentionNotifications } from './mentionService';
+import type { CommentRow, TotalResult, CountResult } from '../types/database';
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -188,7 +189,7 @@ export class CommentService {
       countParams = [userId];
     }
 
-    const countResult = await db.prepare(countSql).bind(...countParams).first() as any;
+    const countResult = await db.prepare(countSql).bind(...countParams).first() as TotalResult | null;
     const total = countResult?.total || 0;
 
     let comments = results as any[];
@@ -215,7 +216,7 @@ export class CommentService {
         SELECT * FROM comment_tree ORDER BY created_at ASC
       `).bind(...commentIds).all();
 
-      comments = buildCommentTree([...comments, ...replies as any[]]);
+      comments = buildCommentTree([...comments, ...(replies as any[])]);
     } else if (!postId) {
       for (const comment of comments) {
         const post = await db.prepare(`
@@ -224,7 +225,7 @@ export class CommentService {
           FROM posts p
           LEFT JOIN categories c ON p.category_id = c.id
           WHERE p.id = ?
-        `).bind(comment.post_id).first() as any;
+        `).bind(comment.post_id).first() as { id: number; title: string; slug: string; cover_image: string | null; category_name: string | null; category_slug: string | null; category_color: string | null } | null;
         if (post) {
           comment.post = {
             id: post.id,
@@ -248,7 +249,7 @@ export class CommentService {
           WHERE user_id = ? AND comment_id IN (${allCommentIds.map(() => '?').join(',')})
         `).bind(currentUser.userId, ...allCommentIds).all();
 
-        const likedIds = new Set((likes as any[]).map(l => l.comment_id));
+        const likedIds = new Set((likes as { comment_id: number }[]).map(l => l.comment_id));
         markLikedComments(comments, likedIds);
       }
     }
@@ -311,7 +312,7 @@ export class CommentService {
 
     const post = await db.prepare(
       'SELECT id, status FROM posts WHERE id = ?'
-    ).bind(postId).first() as any;
+    ).bind(postId).first() as { id: number; status: string } | null;
 
     if (!post) {
       return {
@@ -340,7 +341,7 @@ export class CommentService {
     if (parentId) {
       const parent = await db.prepare(
         'SELECT id, post_id FROM comments WHERE id = ? AND deleted_at IS NULL'
-      ).bind(parentId).first() as any;
+      ).bind(parentId).first() as { id: number; post_id: number } | null;
 
       if (!parent) {
         return {
@@ -390,7 +391,7 @@ export class CommentService {
         const parentComment = await db.prepare(
           'SELECT c.user_id, c.content, u.display_name, u.username FROM comments c ' +
           'LEFT JOIN users u ON c.user_id = u.id WHERE c.id = ? AND c.deleted_at IS NULL'
-        ).bind(parentId).first() as any;
+        ).bind(parentId).first() as { user_id: number; content: string; display_name: string | null; username: string } | null;
 
         if (parentComment && parentComment.user_id !== userId) {
           const isEnabled = await isInteractionSubtypeEnabled(
@@ -402,7 +403,7 @@ export class CommentService {
           if (isEnabled) {
             const postInfo = await db.prepare(
               'SELECT title, slug FROM posts WHERE id = ?'
-            ).bind(postId).first() as any;
+            ).bind(postId).first() as { title: string; slug: string } | null;
 
             await createInteractionNotification(db, {
               userId: parentComment.user_id,
@@ -428,7 +429,7 @@ export class CommentService {
       } else {
         const postInfo = await db.prepare(
           'SELECT author_id, title, slug FROM posts WHERE id = ?'
-        ).bind(postId).first() as any;
+        ).bind(postId).first() as { author_id: number; title: string; slug: string } | null;
 
         if (postInfo && postInfo.author_id !== userId) {
           const isEnabled = await isInteractionSubtypeEnabled(
@@ -468,14 +469,14 @@ export class CommentService {
           `SELECT id, username, display_name FROM users
            WHERE id IN (${mentionedUserIds.map(() => '?').join(',')})
            AND status = 'active' AND deleted_at IS NULL`
-        ).bind(...mentionedUserIds).all() as any;
+        ).bind(...mentionedUserIds).all() as { results: { id: number; username: string; display_name: string | null }[] };
 
         if (validMentionedUsers.results && validMentionedUsers.results.length > 0) {
           const userIdsFromClient = new Set(mentionedUserIds);
           const detectedNames = new Set(mentions);
 
           for (const user of validMentionedUsers.results) {
-            if (!detectedNames.has(user.username) && !detectedNames.has(user.display_name)) {
+            if (!detectedNames.has(user.username) && !detectedNames.has(user.display_name || '')) {
               mentions.push(user.display_name || user.username);
             }
           }
@@ -485,7 +486,7 @@ export class CommentService {
       if (mentions.length > 0) {
         const postInfo = await db.prepare(
           'SELECT title, slug FROM posts WHERE id = ?'
-        ).bind(postId).first() as any;
+        ).bind(postId).first() as { title: string; slug: string } | null;
 
         await createMentionNotifications(
           db,
@@ -518,7 +519,7 @@ export class CommentService {
   ): Promise<CommentResult> {
     const comment = await db.prepare(
       'SELECT * FROM comments WHERE id = ? AND deleted_at IS NULL'
-    ).bind(commentId).first() as any;
+    ).bind(commentId).first() as CommentRow | null;
 
     if (!comment) {
       return {
@@ -612,7 +613,7 @@ export class CommentService {
            FROM comments c
            JOIN posts p ON c.post_id = p.id
            WHERE c.id = ? AND c.deleted_at IS NULL`
-        ).bind(commentId).first() as any;
+        ).bind(commentId).first() as { user_id: number; content: string; post_id: number; title: string; slug: string } | null;
 
         if (commentInfo && commentInfo.user_id !== userId) {
           const isEnabled = await isInteractionSubtypeEnabled(

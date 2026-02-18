@@ -34,7 +34,7 @@ userNotificationSettingsRoutes.get('/', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
 
     const settings = await getNotificationSettings(c.env.DB, currentUser.userId);
 
@@ -63,7 +63,7 @@ userNotificationSettingsRoutes.put('/', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
     const body = await c.req.json();
 
     const validationError = validateSettingsUpdate(body);

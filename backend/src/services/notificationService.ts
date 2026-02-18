@@ -431,7 +431,7 @@ export async function markAsRead(
   try {
     const notification = await db.prepare(
       'SELECT id, user_id, type FROM notifications WHERE id = ? AND deleted_at IS NULL'
-    ).bind(notificationId).first() as any;
+    ).bind(notificationId).first() as { id: number; user_id: number; type: string } | null;
 
     if (!notification) {
       return false;
@@ -488,7 +488,7 @@ export async function markAllAsRead(
       ).bind(userId).all();
 
       for (const row of systemNotifications.results || []) {
-        const notificationId = (row as any).id;
+        const notificationId = (row as { id: number }).id;
         const existing = await db.prepare(
           'SELECT id FROM notification_reads WHERE notification_id = ? AND user_id = ?'
         ).bind(notificationId, userId).first();
@@ -536,7 +536,7 @@ export async function deleteNotification(
   try {
     const notification = await db.prepare(
       'SELECT id, user_id, type FROM notifications WHERE id = ? AND deleted_at IS NULL'
-    ).bind(notificationId).first() as any;
+    ).bind(notificationId).first() as { id: number; user_id: number; type: string } | null;
 
     if (!notification) {
       return false;

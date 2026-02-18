@@ -6,16 +6,18 @@
  * - 文件删除
  * - 文件类型和大小验证
  * - 文件魔数验证
+ * - 动态上传大小限制（从系统配置读取）
  *
  * @author 博客系统
- * @version 1.0.0
+ * @version 2.0.0
  * @created 2026-02-16
+ * @updated 2026-02-19 - 支持动态上传大小限制
  */
 
 import { generateRandomString } from '../utils/validation';
 
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const DEFAULT_MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 const ALLOWED_IMAGE_TYPES = [
   'image/jpeg',
@@ -74,12 +76,12 @@ export class UploadService {
     return ALLOWED_FILE_TYPES.includes(mimeType);
   }
 
-  static validateImageSize(size: number): boolean {
-    return size > 0 && size <= MAX_IMAGE_SIZE;
+  static validateImageSize(size: number, maxSize: number = DEFAULT_MAX_IMAGE_SIZE): boolean {
+    return size > 0 && size <= maxSize;
   }
 
-  static validateFileSize(size: number): boolean {
-    return size > 0 && size <= MAX_FILE_SIZE;
+  static validateFileSize(size: number, maxSize: number = DEFAULT_MAX_FILE_SIZE): boolean {
+    return size > 0 && size <= maxSize;
   }
 
   static validateFileSignature(bytes: Uint8Array, mimeType: string): boolean {
@@ -117,7 +119,7 @@ export class UploadService {
     return prefix ? `${prefix}/${timestamp}-${randomStr}.${ext}` : `${timestamp}-${randomStr}.${ext}`;
   }
 
-  static async uploadImage(storage: any, file: File, userId: number, storageUrl: string): Promise<UploadResult> {
+  static async uploadImage(storage: any, file: File, userId: number, storageUrl: string, maxSizeBytes: number = DEFAULT_MAX_IMAGE_SIZE): Promise<UploadResult> {
     if (!this.validateImageType(file.type)) {
       return {
         success: false,
@@ -126,10 +128,10 @@ export class UploadService {
       };
     }
 
-    if (!this.validateImageSize(file.size)) {
+    if (!this.validateImageSize(file.size, maxSizeBytes)) {
       return {
         success: false,
-        message: `File size must be less than ${MAX_IMAGE_SIZE / 1024 / 1024}MB`,
+        message: `File size must be less than ${maxSizeBytes / 1024 / 1024}MB`,
         statusCode: 400
       };
     }
@@ -181,7 +183,7 @@ export class UploadService {
     };
   }
 
-  static async uploadFile(storage: any, file: File, userId: number, storageUrl: string): Promise<UploadResult> {
+  static async uploadFile(storage: any, file: File, userId: number, storageUrl: string, maxSizeBytes: number = DEFAULT_MAX_FILE_SIZE): Promise<UploadResult> {
     if (!this.validateFileType(file.type)) {
       return {
         success: false,
@@ -190,10 +192,10 @@ export class UploadService {
       };
     }
 
-    if (!this.validateFileSize(file.size)) {
+    if (!this.validateFileSize(file.size, maxSizeBytes)) {
       return {
         success: false,
-        message: `文件大小不能超过 ${MAX_FILE_SIZE / 1024 / 1024}MB`,
+        message: `文件大小不能超过 ${maxSizeBytes / 1024 / 1024}MB`,
         statusCode: 400
       };
     }
@@ -314,8 +316,8 @@ export class UploadService {
 }
 
 export const UPLOAD_CONSTANTS = {
-  MAX_IMAGE_SIZE,
-  MAX_FILE_SIZE,
+  DEFAULT_MAX_IMAGE_SIZE,
+  DEFAULT_MAX_FILE_SIZE,
   ALLOWED_IMAGE_TYPES,
   ALLOWED_FILE_TYPES
 };
