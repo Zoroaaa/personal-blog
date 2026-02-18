@@ -2,7 +2,7 @@
  * JWT 工具函数
  * 
  * 功能：
- * - 生成JWT token
+ * - 生成JWT token（Access Token 和 Refresh Token）
  * - 验证JWT token
  * - 提供HMAC-SHA256签名
  * - 实现Base64 URL编码/解码
@@ -10,8 +10,9 @@
  * 使用Web Crypto API实现JWT签名和验证
  * 
  * @author 博客系统
- * @version 1.0.0
+ * @version 2.0.0
  * @created 2024-01-01
+ * @updated 2026-02-18 - 添加 Refresh Token 支持
  */
 
 export interface JWTPayload {
@@ -19,6 +20,7 @@ export interface JWTPayload {
   username: string;
   role: string;
   exp: number;
+  type: 'access' | 'refresh';
 }
 
 export interface PostPasswordPayload {
@@ -43,9 +45,75 @@ export function asSecret(secret: string): Secret {
 }
 
 /**
- * 生成JWT token
+ * 生成 Access Token
  * 
- * 功能：使用HMAC-SHA256算法生成JWT token，有效期为7天
+ * @param secret 密钥字符串
+ * @param payload 用户信息载荷
+ * @param expiresInSeconds 有效期（秒）
+ * @returns Access Token
+ */
+export async function generateAccessToken(
+  secret: Secret | string,
+  payload: { userId: number; username: string; role: string },
+  expiresInSeconds: number
+): Promise<JWTToken> {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const exp = Math.floor(Date.now() / 1000) + expiresInSeconds;
+  
+  const fullPayload: JWTPayload = {
+    ...payload,
+    exp,
+    type: 'access'
+  };
+  
+  const encodedHeader = base64urlEncode(JSON.stringify(header));
+  const encodedPayload = base64urlEncode(JSON.stringify(fullPayload));
+  
+  const signature = await sign(
+    `${encodedHeader}.${encodedPayload}`,
+    secret
+  );
+  
+  return asJWTToken(`${encodedHeader}.${encodedPayload}.${signature}`);
+}
+
+/**
+ * 生成 Refresh Token
+ * 
+ * @param secret 密钥字符串
+ * @param payload 用户信息载荷
+ * @param expiresInSeconds 有效期（秒）
+ * @returns Refresh Token
+ */
+export async function generateRefreshToken(
+  secret: Secret | string,
+  payload: { userId: number; username: string; role: string },
+  expiresInSeconds: number
+): Promise<JWTToken> {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const exp = Math.floor(Date.now() / 1000) + expiresInSeconds;
+  
+  const fullPayload: JWTPayload = {
+    ...payload,
+    exp,
+    type: 'refresh'
+  };
+  
+  const encodedHeader = base64urlEncode(JSON.stringify(header));
+  const encodedPayload = base64urlEncode(JSON.stringify(fullPayload));
+  
+  const signature = await sign(
+    `${encodedHeader}.${encodedPayload}`,
+    secret
+  );
+  
+  return asJWTToken(`${encodedHeader}.${encodedPayload}.${signature}`);
+}
+
+/**
+ * 生成JWT token（兼容旧接口）
+ * 
+ * 功能：使用HMAC-SHA256算法生成JWT token
  * 
  * @param secret 密钥字符串
  * @param payload JWT载荷，可以包含 expiresIn 字段自定义过期时间

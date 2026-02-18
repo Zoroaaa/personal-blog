@@ -4,8 +4,9 @@
  * 包含所有TypeScript类型定义
  *
  * @author 博客系统
- * @version 1.0.0
+ * @version 1.1.0
  * @created 2024-01-01
+ * @updated 2026-02-18 - 添加 POST_PASSWORD_SECRET
  */
 
 import type { JWTPayload, TokenPayload } from '../utils/jwt';
@@ -14,19 +15,20 @@ import type { JWTPayload, TokenPayload } from '../utils/jwt';
  * Cloudflare Workers环境绑定
  */
 export type Env = {
-  DB: D1Database;              // D1数据库
-  CACHE?: KVNamespace;         // KV缓存（可选）
-  STORAGE: R2Bucket;           // R2对象存储
-  JWT_SECRET: string;          // JWT密钥
-  GITHUB_CLIENT_ID: string;    // GitHub OAuth客户端ID
-  GITHUB_CLIENT_SECRET: string; // GitHub OAuth密钥
-  FRONTEND_URL: string;        // 前端URL
-  STORAGE_PUBLIC_URL: string;  // R2公开访问URL
-  ENVIRONMENT: string;         // 运行环境（development/production）
-  ENABLE_CACHE?: string;       // 是否启用缓存
-  CACHE_HOMEPAGE_ONLY?: string; // 是否只缓存首页
-  RESEND_API_KEY?: string;     // Resend 邮件 API Key（邮箱验证码）
-  RESEND_FROM_EMAIL?: string; // Resend 发件人邮箱（可选，默认使用 Resend 测试发件人）
+  DB: D1Database;
+  CACHE?: KVNamespace;
+  STORAGE: R2Bucket;
+  JWT_SECRET: string;
+  POST_PASSWORD_SECRET?: string;
+  GITHUB_CLIENT_ID: string;
+  GITHUB_CLIENT_SECRET: string;
+  FRONTEND_URL: string;
+  STORAGE_PUBLIC_URL: string;
+  ENVIRONMENT: string;
+  ENABLE_CACHE?: string;
+  CACHE_HOMEPAGE_ONLY?: string;
+  RESEND_API_KEY?: string;
+  RESEND_FROM_EMAIL?: string;
 };
 
 /**

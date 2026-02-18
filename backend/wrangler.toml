@@ -45,12 +45,14 @@ STORAGE_PUBLIC_URL = "https://storage.blog.neutronx.uk"
 
 # Secrets（需要通过命令行或Cloudflare Dashboard设置）
 # wrangler secret put JWT_SECRET
+# wrangler secret put POST_PASSWORD_SECRET  # 文章密码访问 Token 密钥（可选，默认使用 JWT_SECRET）
 # wrangler secret put GITHUB_CLIENT_ID
 # wrangler secret put GITHUB_CLIENT_SECRET
 
 # 或者在Cloudflare Dashboard设置:
 # Workers & Pages > blog-api > Settings > Variables
 # 添加以下环境变量（加密）：
-# - JWT_SECRET: 你的JWT密钥
+# - JWT_SECRET: 用户认证 JWT 密钥
+# - POST_PASSWORD_SECRET: 文章密码访问 Token 密钥（可选）
 # - GITHUB_CLIENT_ID: GitHub OAuth Client ID
 # - GITHUB_CLIENT_SECRET: GitHub OAuth Client Secret

@@ -10,14 +10,16 @@
  * - 密码修改
  * - 账号删除
  * - OAuth令牌管理
+ * - Token 刷新机制
  *
  * @author 博客系统
- * @version 1.0.0
+ * @version 2.0.0
  * @created 2026-02-16
+ * @updated 2026-02-18 - 添加 Refresh Token 支持
  */
 
 import bcrypt from 'bcryptjs';
-import { generateToken, asSecret } from '../utils/jwt';
+import { generateToken, generateAccessToken, asSecret } from '../utils/jwt';
 import { safePutCache } from '../utils/cache';
 import {
   validateUsername,
@@ -27,6 +29,7 @@ import {
   sanitizeInput
 } from '../utils/validation';
 import { EmailVerificationService, type VerificationEmailType } from './emailVerificationService';
+import { RefreshTokenService } from './refreshTokenService';
 import { AUTH_CONSTANTS } from '../config/constants';
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
 
@@ -55,6 +58,8 @@ export interface RegisterResult {
     updatedAt: string;
   };
   token?: string;
+  refreshToken?: string;
+  expiresIn?: number;
   statusCode?: 200 | 201 | 400 | 401 | 403 | 404 | 409 | 500 | 503;
 }
 
@@ -76,6 +81,8 @@ export interface LoginResult {
     role: string;
   };
   token?: string;
+  refreshToken?: string;
+  expiresIn?: number;
   statusCode?: 200 | 201 | 400 | 401 | 403 | 404 | 409 | 500 | 503;
 }
 
@@ -94,6 +101,8 @@ export interface GitHubOAuthResult {
     updatedAt: string;
   };
   token?: string;
+  refreshToken?: string;
+  expiresIn?: number;
   statusCode?: 200 | 201 | 400 | 401 | 403 | 404 | 409 | 500 | 503;
 }
 
@@ -242,11 +251,19 @@ export class AuthService {
 
     const userId = result.meta.last_row_id;
 
-    const token = await generateToken(asSecret(env.JWT_SECRET), {
+    const token = await generateAccessToken(
+      asSecret(env.JWT_SECRET),
+      { userId, username: cleanUsername, role: 'user' },
+      AUTH_CONSTANTS.JWT_ACCESS_TOKEN_EXPIRY
+    );
+
+    const refreshTokenResult = await RefreshTokenService.createRefreshToken(
+      db,
+      env.JWT_SECRET,
       userId,
-      username: cleanUsername,
-      role: 'user',
-    });
+      cleanUsername,
+      'user'
+    );
 
     return {
       success: true,
@@ -263,6 +280,8 @@ export class AuthService {
         updatedAt: new Date().toISOString()
       },
       token,
+      refreshToken: refreshTokenResult.refreshToken,
+      expiresIn: AUTH_CONSTANTS.JWT_ACCESS_TOKEN_EXPIRY,
       statusCode: 201
     };
   }
@@ -327,11 +346,19 @@ export class AuthService {
       };
     }
 
-    const token = await generateToken(asSecret(env.JWT_SECRET), {
-      userId: user.id,
-      username: user.username,
-      role: user.role,
-    });
+    const token = await generateAccessToken(
+      asSecret(env.JWT_SECRET),
+      { userId: user.id, username: user.username, role: user.role },
+      AUTH_CONSTANTS.JWT_ACCESS_TOKEN_EXPIRY
+    );
+
+    const refreshTokenResult = await RefreshTokenService.createRefreshToken(
+      db,
+      env.JWT_SECRET,
+      user.id,
+      user.username,
+      user.role
+    );
 
     return {
       success: true,
@@ -346,6 +373,8 @@ export class AuthService {
         role: user.role,
       },
       token,
+      refreshToken: refreshTokenResult.refreshToken,
+      expiresIn: AUTH_CONSTANTS.JWT_ACCESS_TOKEN_EXPIRY,
       statusCode: 200
     };
   }
@@ -553,11 +582,19 @@ export class AuthService {
       console.error('Failed to store OAuth token:', tokenError);
     }
 
-    const token = await generateToken(asSecret(env.JWT_SECRET), {
-      userId: user.id,
-      username: user.username,
-      role: user.role,
-    });
+    const token = await generateAccessToken(
+      asSecret(env.JWT_SECRET),
+      { userId: user.id, username: user.username, role: user.role },
+      AUTH_CONSTANTS.JWT_ACCESS_TOKEN_EXPIRY
+    );
+
+    const refreshTokenResult = await RefreshTokenService.createRefreshToken(
+      db,
+      env.JWT_SECRET,
+      user.id,
+      user.username,
+      user.role
+    );
 
     return {
       success: true,
@@ -574,6 +611,8 @@ export class AuthService {
         updatedAt: user.updated_at || new Date().toISOString()
       },
       token,
+      refreshToken: refreshTokenResult.refreshToken,
+      expiresIn: AUTH_CONSTANTS.JWT_ACCESS_TOKEN_EXPIRY,
       statusCode: 200
     };
   }
@@ -660,16 +699,72 @@ export class AuthService {
   }
 
   static async logout(
+    db: any,
     env: any,
-    token: string
+    token: string,
+    refreshToken?: string
   ): Promise<{ success: boolean; message: string }> {
     await safePutCache(env, `blacklist:${token}`, '1', {
-      expirationTtl: 60 * 60 * 24 * 7,
+      expirationTtl: AUTH_CONSTANTS.TOKEN_BLACKLIST_TTL,
     });
+
+    if (refreshToken) {
+      await RefreshTokenService.revokeRefreshToken(db, refreshToken, 'user_logout');
+    }
 
     return {
       success: true,
       message: 'Logout successful'
+    };
+  }
+
+  static async refreshAccessToken(
+    db: any,
+    env: any,
+    refreshToken: string
+  ): Promise<{
+    success: boolean;
+    token?: string;
+    refreshToken?: string;
+    expiresIn?: number;
+    message?: string;
+    statusCode?: 200 | 401 | 403 | 500;
+  }> {
+    const validateResult = await RefreshTokenService.validateRefreshToken(
+      db,
+      env.JWT_SECRET,
+      refreshToken
+    );
+
+    if (!validateResult.success) {
+      return {
+        success: false,
+        message: validateResult.message || 'Invalid refresh token',
+        statusCode: 401
+      };
+    }
+
+    await RefreshTokenService.revokeRefreshToken(db, refreshToken, 'token_refresh');
+
+    const newToken = await generateAccessToken(
+      asSecret(env.JWT_SECRET),
+      { userId: validateResult.userId!, username: validateResult.username!, role: validateResult.role! },
+      AUTH_CONSTANTS.JWT_ACCESS_TOKEN_EXPIRY
+    );
+
+    const newRefreshTokenResult = await RefreshTokenService.createRefreshToken(
+      db,
+      env.JWT_SECRET,
+      validateResult.userId!,
+      validateResult.username!,
+      validateResult.role!
+    );
+
+    return {
+      success: true,
+      token: newToken,
+      refreshToken: newRefreshTokenResult.refreshToken,
+      expiresIn: AUTH_CONSTANTS.JWT_ACCESS_TOKEN_EXPIRY
     };
   }
 

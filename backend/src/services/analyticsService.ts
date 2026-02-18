@@ -9,11 +9,13 @@
  * - 页面访问追踪
  *
  * @author 博客系统
- * @version 1.0.0
+ * @version 1.1.0
  * @created 2026-02-16
+ * @updated 2026-02-18 - 添加类型安全
  */
 
 import { safeParseInt } from '../utils/validation';
+import type { CountResult, SumResult, PostRow } from '../types/database';
 
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 50;
@@ -29,22 +31,22 @@ export class AnalyticsService {
   static async getOverview(db: any): Promise<AnalyticsResult> {
     const totalPostsResult = await db.prepare(
       'SELECT COUNT(*) as count FROM posts WHERE status = ? AND deleted_at IS NULL'
-    ).bind('published').first() as any;
+    ).bind('published').first() as CountResult | null;
     const totalPosts = totalPostsResult?.count || 0;
 
     const totalUsersResult = await db.prepare(
       'SELECT COUNT(*) as count FROM users WHERE status = ? AND deleted_at IS NULL'
-    ).bind('active').first() as any;
+    ).bind('active').first() as CountResult | null;
     const totalUsers = totalUsersResult?.count || 0;
 
     const totalCommentsResult = await db.prepare(
       'SELECT COUNT(*) as count FROM comments WHERE status = ? AND deleted_at IS NULL'
-    ).bind('approved').first() as any;
+    ).bind('approved').first() as CountResult | null;
     const totalComments = totalCommentsResult?.count || 0;
 
     const totalViewsResult = await db.prepare(
       'SELECT SUM(view_count) as total FROM posts WHERE deleted_at IS NULL'
-    ).first() as any;
+    ).first() as SumResult | null;
     const totalViews = totalViewsResult?.total || 0;
 
     const { results: recentPosts } = await db.prepare(`
@@ -84,22 +86,22 @@ export class AnalyticsService {
   static async getStats(db: any): Promise<AnalyticsResult> {
     const totalPostsResult = await db.prepare(
       'SELECT COUNT(*) as count FROM posts WHERE status = ? AND deleted_at IS NULL'
-    ).bind('published').first() as any;
+    ).bind('published').first() as CountResult | null;
     const totalPosts = totalPostsResult?.count || 0;
 
     const totalUsersResult = await db.prepare(
       'SELECT COUNT(*) as count FROM users WHERE status = ? AND deleted_at IS NULL'
-    ).bind('active').first() as any;
+    ).bind('active').first() as CountResult | null;
     const totalUsers = totalUsersResult?.count || 0;
 
     const totalCommentsResult = await db.prepare(
       'SELECT COUNT(*) as count FROM comments WHERE status = ? AND deleted_at IS NULL'
-    ).bind('approved').first() as any;
+    ).bind('approved').first() as CountResult | null;
     const totalComments = totalCommentsResult?.count || 0;
 
     const totalViewsResult = await db.prepare(
       'SELECT SUM(view_count) as total FROM posts WHERE deleted_at IS NULL'
-    ).first() as any;
+    ).first() as SumResult | null;
     const totalViews = totalViewsResult?.total || 0;
 
     const today = new Date();
@@ -107,7 +109,7 @@ export class AnalyticsService {
 
     const todayViewsResult = await db.prepare(`
       SELECT COUNT(*) as count FROM view_history WHERE created_at >= ?
-    `).bind(today.toISOString()).first() as any;
+    `).bind(today.toISOString()).first() as CountResult | null;
     const todayViews = todayViewsResult?.count || 0;
 
     const viewTrend = await this.getViewTrend(db, null, 7);
@@ -181,7 +183,7 @@ export class AnalyticsService {
 
     const post = await db.prepare(
       'SELECT id, title, slug FROM posts WHERE id = ? AND deleted_at IS NULL'
-    ).bind(postId).first() as any;
+    ).bind(postId).first() as Pick<PostRow, 'id' | 'title' | 'slug'> | null;
 
     if (!post) {
       return {
