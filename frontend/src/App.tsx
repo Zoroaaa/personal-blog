@@ -21,7 +21,7 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
-import { ErrorBoundary } from './components/ErrorBoundary';
+import { ErrorBoundary, PageErrorBoundary } from './components/ErrorBoundary';
 import { HomePage } from './pages/HomePage';
 import { PostPage } from './pages/PostPage';
 import { LoginPage } from './pages/LoginPage';
@@ -90,25 +90,24 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<PageTransition><HomePage /></PageTransition>} />
       <Route path="/about" element={<PageTransition><AboutPage /></PageTransition>} />
-      <Route path="/posts/:slug" element={<PageTransition><PostPage /></PageTransition>} />
+      <Route path="/posts/:slug" element={<PageTransition><PageErrorBoundary pageName="文章页面"><PostPage /></PageErrorBoundary></PageTransition>} />
       <Route path="/login" element={<PageTransition><LoginPage /></PageTransition>} />
-      <Route path="/admin" element={<PageTransition><AdminPage /></PageTransition>} />
-      <Route path="/admin/config" element={<PageTransition><ConfigPage /></PageTransition>} />
+      <Route path="/admin" element={<PageTransition><PageErrorBoundary pageName="管理后台"><AdminPage /></PageErrorBoundary></PageTransition>} />
+      <Route path="/admin/config" element={<PageTransition><PageErrorBoundary pageName="配置页面"><ConfigPage /></PageErrorBoundary></PageTransition>} />
       <Route path="/search" element={<PageTransition><SearchPage /></PageTransition>} />
-      <Route path="/profile" element={<PageTransition><ProfilePage /></PageTransition>} />
-      <Route path="/reading-history" element={<PageTransition><ReadingHistoryPage /></PageTransition>} />
-      <Route path="/account-settings" element={<PageTransition><AccountSettingsPage /></PageTransition>} />
+      <Route path="/profile" element={<PageTransition><PageErrorBoundary pageName="个人资料"><ProfilePage /></PageErrorBoundary></PageTransition>} />
+      <Route path="/reading-history" element={<PageTransition><PageErrorBoundary pageName="阅读历史"><ReadingHistoryPage /></PageErrorBoundary></PageTransition>} />
+      <Route path="/account-settings" element={<PageTransition><PageErrorBoundary pageName="账号设置"><AccountSettingsPage /></PageErrorBoundary></PageTransition>} />
       <Route path="/columns/:slug" element={<PageTransition><ColumnPage /></PageTransition>} />
       <Route path="/categories/:slug" element={<PageTransition><CategoryPage /></PageTransition>} />
       <Route path="/tags/:slug" element={<PageTransition><TagPage /></PageTransition>} />
-      <Route path="/notifications" element={<PageTransition><NotificationCenter /></PageTransition>} />
+      <Route path="/notifications" element={<PageTransition><PageErrorBoundary pageName="通知中心"><NotificationCenter /></PageErrorBoundary></PageTransition>} />
       <Route path="/notification-settings" element={<PageTransition><NotificationSettings /></PageTransition>} />
-      <Route path="/messages" element={<PageTransition><MessagesPage /></PageTransition>} />
+      <Route path="/messages" element={<PageTransition><PageErrorBoundary pageName="私信"><MessagesPage /></PageErrorBoundary></PageTransition>} />
       <Route path="/messages/new" element={<PageTransition><NewMessagePage /></PageTransition>} />
       <Route path="/messages/:threadId" element={<PageTransition><ThreadPage /></PageTransition>} />
-      <Route path="/admin/notifications" element={<PageTransition><SystemNotificationPage /></PageTransition>} />
+      <Route path="/admin/notifications" element={<PageTransition><PageErrorBoundary pageName="系统通知"><SystemNotificationPage /></PageErrorBoundary></PageTransition>} />
       
-      {/* 404路由 - 捕获所有未匹配的路径 */}
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
