@@ -378,13 +378,22 @@ const configGroups: ConfigGroup[] = [
         placeholder: '10'
       },
       {
-        key: 'max_upload_size_mb',
-        label: '最大上传文件大小(MB) (实现中)',
+        key: 'upload_max_image_size_mb',
+        label: '图片上传大小限制 (MB)',
         type: 'number',
-        description: '允许上传的最大文件大小 (此功能正在开发中，暂不可用)',
+        description: '允许上传的最大图片文件大小，单位为 MB。建议范围：1-50MB',
+        min: 1,
+        max: 50,
+        placeholder: '5'
+      },
+      {
+        key: 'upload_max_file_size_mb',
+        label: '附件上传大小限制 (MB)',
+        type: 'number',
+        description: '允许上传的最大附件文件大小，单位为 MB。建议范围：1-100MB',
         min: 1,
         max: 100,
-        placeholder: '5'
+        placeholder: '10'
       }
     ]
   }

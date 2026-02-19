@@ -16,6 +16,12 @@
 
 import type { D1Database } from '@cloudflare/workers-types';
 import { isStrangerMessageAllowed } from './messageSettingsService';
+import {
+  MESSAGE_CONSTANTS,
+  PAGINATION_CONSTANTS,
+  MESSAGE_TYPE_CONSTANTS,
+} from '../config/constants';
+import type { MessageRow } from '../types/database';
 
 export type MessageType = 'text' | 'image' | 'attachment' | 'mixed';
 
@@ -85,11 +91,6 @@ export interface MessageListResponse {
   };
 }
 
-const DEFAULT_PAGE = 1;
-const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 50;
-const RECALL_TIME_LIMIT_MS = 3 * 60 * 1000;
-
 export function generateThreadId(userId1: number, userId2: number): string {
   const min = Math.min(userId1, userId2);
   const max = Math.max(userId1, userId2);
@@ -148,7 +149,7 @@ export async function sendMessage(
     if (replyToId) {
       const originalMessage = await db.prepare(
         'SELECT id, thread_id FROM messages WHERE id = ?'
-      ).bind(replyToId).first() as any;
+      ).bind(replyToId).first() as { id: number; thread_id: string | null } | null;
 
       if (!originalMessage || originalMessage.thread_id !== threadId) {
         throw new Error('Invalid reply target');
@@ -227,8 +228,8 @@ export async function getInbox(
   params: MessageListParams = {}
 ): Promise<MessageListResponse> {
   try {
-    const page = Math.max(1, params.page || DEFAULT_PAGE);
-    const limit = Math.min(MAX_LIMIT, Math.max(1, params.limit || DEFAULT_LIMIT));
+    const page = Math.max(1, params.page || PAGINATION_CONSTANTS.DEFAULT_PAGE);
+    const limit = Math.min(PAGINATION_CONSTANTS.MAX_LIMIT, Math.max(1, params.limit || PAGINATION_CONSTANTS.DEFAULT_LIMIT));
     const offset = (page - 1) * limit;
 
     let whereClause = 'm.recipient_id = ? AND m.is_recalled = 0';
@@ -277,7 +278,7 @@ export async function getInbox(
     console.error('Get inbox error:', error);
     return {
       messages: [],
-      pagination: { page: 1, limit: DEFAULT_LIMIT, total: 0, totalPages: 0 },
+      pagination: { page: 1, limit: PAGINATION_CONSTANTS.DEFAULT_LIMIT, total: 0, totalPages: 0 },
     };
   }
 }
@@ -288,8 +289,8 @@ export async function getOutbox(
   params: MessageListParams = {}
 ): Promise<MessageListResponse> {
   try {
-    const page = Math.max(1, params.page || DEFAULT_PAGE);
-    const limit = Math.min(MAX_LIMIT, Math.max(1, params.limit || DEFAULT_LIMIT));
+    const page = Math.max(1, params.page || PAGINATION_CONSTANTS.DEFAULT_PAGE);
+    const limit = Math.min(PAGINATION_CONSTANTS.MAX_LIMIT, Math.max(1, params.limit || PAGINATION_CONSTANTS.DEFAULT_LIMIT));
     const offset = (page - 1) * limit;
 
     let whereClause = 'm.sender_id = ?';
@@ -338,7 +339,7 @@ export async function getOutbox(
     console.error('Get outbox error:', error);
     return {
       messages: [],
-      pagination: { page: 1, limit: DEFAULT_LIMIT, total: 0, totalPages: 0 },
+      pagination: { page: 1, limit: PAGINATION_CONSTANTS.DEFAULT_LIMIT, total: 0, totalPages: 0 },
     };
   }
 }
@@ -349,8 +350,8 @@ export async function getThreads(
   params: MessageListParams = {}
 ): Promise<{ threads: MessageThread[]; pagination: any }> {
   try {
-    const page = Math.max(1, params.page || DEFAULT_PAGE);
-    const limit = Math.min(MAX_LIMIT, Math.max(1, params.limit || DEFAULT_LIMIT));
+    const page = Math.max(1, params.page || PAGINATION_CONSTANTS.DEFAULT_PAGE);
+    const limit = Math.min(PAGINATION_CONSTANTS.MAX_LIMIT, Math.max(1, params.limit || PAGINATION_CONSTANTS.DEFAULT_LIMIT));
     const offset = (page - 1) * limit;
 
     const rows = await db.prepare(`
@@ -472,7 +473,7 @@ export async function getThreads(
     console.error('Get threads error:', error);
     return {
       threads: [],
-      pagination: { page: 1, limit: DEFAULT_LIMIT, total: 0, totalPages: 0 },
+      pagination: { page: 1, limit: PAGINATION_CONSTANTS.DEFAULT_LIMIT, total: 0, totalPages: 0 },
     };
   }
 }
@@ -525,7 +526,7 @@ export async function recallMessage(
       SELECT id, sender_id, created_at, is_recalled
       FROM messages 
       WHERE id = ?
-    `).bind(messageId).first() as any;
+    `).bind(messageId).first() as { id: number; sender_id: number; created_at: string; is_recalled: number } | null;
 
     if (!message) {
       return { success: false, error: '消息不存在' };
@@ -543,7 +544,7 @@ export async function recallMessage(
     const now = new Date();
     const timeDiff = now.getTime() - createdAt.getTime();
 
-    if (timeDiff > RECALL_TIME_LIMIT_MS) {
+    if (timeDiff > MESSAGE_CONSTANTS.RECALL_TIME_LIMIT) {
       return { success: false, error: '消息发送超过3分钟，无法撤回' };
     }
 
@@ -584,7 +585,7 @@ export async function resendMessage(
       SELECT id, sender_id, is_recalled, thread_id
       FROM messages 
       WHERE id = ?
-    `).bind(messageId).first() as any;
+    `).bind(messageId).first() as { id: number; sender_id: number; is_recalled: number; thread_id: string | null } | null;
 
     if (!message) {
       return { success: false, error: '消息不存在' };
@@ -655,7 +656,7 @@ export async function canRecallMessage(
       SELECT sender_id, created_at, is_recalled
       FROM messages 
       WHERE id = ?
-    `).bind(messageId).first() as any;
+    `).bind(messageId).first() as { sender_id: number; created_at: string; is_recalled: number } | null;
 
     if (!message) return false;
     if (message.sender_id !== userId) return false;
@@ -665,7 +666,7 @@ export async function canRecallMessage(
     const now = new Date();
     const timeDiff = now.getTime() - createdAt.getTime();
 
-    return timeDiff <= RECALL_TIME_LIMIT_MS;
+    return timeDiff <= MESSAGE_CONSTANTS.RECALL_TIME_LIMIT;
   } catch (error) {
     console.error('Check recall status error:', error);
     return false;
@@ -697,8 +698,8 @@ export async function getThreadMessages(
   params: MessageListParams = {}
 ): Promise<MessageListResponse> {
   try {
-    const page = Math.max(1, params.page || DEFAULT_PAGE);
-    const limit = Math.min(MAX_LIMIT, Math.max(1, params.limit || DEFAULT_LIMIT));
+    const page = Math.max(1, params.page || PAGINATION_CONSTANTS.DEFAULT_PAGE);
+    const limit = Math.min(PAGINATION_CONSTANTS.MAX_LIMIT, Math.max(1, params.limit || PAGINATION_CONSTANTS.DEFAULT_LIMIT));
     const offset = (page - 1) * limit;
 
     const whereClause = `
@@ -745,7 +746,7 @@ export async function getThreadMessages(
     console.error('Get thread messages error:', error);
     return {
       messages: [],
-      pagination: { page: 1, limit: DEFAULT_LIMIT, total: 0, totalPages: 0 },
+      pagination: { page: 1, limit: PAGINATION_CONSTANTS.DEFAULT_LIMIT, total: 0, totalPages: 0 },
     };
   }
 }

@@ -25,6 +25,7 @@ import { api } from '../utils/api';
 import { useAuthStore } from '../stores/authStore';
 import { useToast } from '../components/Toast';
 import { useMessageUnread } from '../hooks/useMessageUnread';
+import { useSiteConfig } from '../hooks/useSiteConfig';
 
 type MessageType = 'text' | 'image' | 'attachment' | 'mixed';
 
@@ -79,8 +80,6 @@ const EMOJI_LIST = [
 ];
 
 const RECALL_TIME_LIMIT_MS = 3 * 60 * 1000;
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1020;
 
 export default function ThreadPage() {
   const { threadId } = useParams<{ threadId: string }>();
@@ -88,6 +87,10 @@ export default function ThreadPage() {
   const { user } = useAuthStore();
   const { showSuccess, showError } = useToast();
   const { refresh: refreshUnreadCount } = useMessageUnread();
+  const { config } = useSiteConfig();
+
+  const MAX_IMAGE_SIZE = (config.upload_max_image_size_mb || 5) * 1024 * 1024;
+  const MAX_ATTACHMENT_SIZE = (config.upload_max_file_size_mb || 10) * 1024 * 1024;
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [threadInfo, setThreadInfo] = useState<ThreadInfo | null>(null);
@@ -263,7 +266,7 @@ export default function ThreadPage() {
 
   const handleImageUpload = async (file: File): Promise<string | null> => {
     if (file.size > MAX_IMAGE_SIZE) {
-      showError('图片大小不能超过 5MB');
+      showError(`图片大小不能超过 ${config.upload_max_image_size_mb || 5}MB`);
       return null;
     }
 
@@ -281,7 +284,7 @@ export default function ThreadPage() {
 
   const handleAttachmentUpload = async (file: File) => {
     if (file.size > MAX_ATTACHMENT_SIZE) {
-      showError('附件大小不能超过 10MB');
+      showError(`附件大小不能超过 ${config.upload_max_file_size_mb || 10}MB`);
       return;
     }
 

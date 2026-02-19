@@ -15,10 +15,8 @@
  */
 
 import { safeParseInt } from '../utils/validation';
+import { ANALYTICS_CONSTANTS } from '../config/constants';
 import type { CountResult, SumResult, PostRow } from '../types/database';
-
-const DEFAULT_PAGE_SIZE = 10;
-const MAX_PAGE_SIZE = 50;
 
 export interface AnalyticsResult {
   success: boolean;
@@ -311,12 +309,12 @@ export class AnalyticsService {
         dayViewsResult = await db.prepare(`
           SELECT COUNT(*) as count FROM view_history 
           WHERE post_id = ? AND created_at >= ? AND created_at < ?
-        `).bind(postId, date.toISOString(), nextDay.toISOString()).first() as any;
+        `).bind(postId, date.toISOString(), nextDay.toISOString()).first() as { count: number } | null;
       } else {
         dayViewsResult = await db.prepare(`
           SELECT COUNT(*) as count FROM view_history 
           WHERE created_at >= ? AND created_at < ?
-        `).bind(date.toISOString(), nextDay.toISOString()).first() as any;
+        `).bind(date.toISOString(), nextDay.toISOString()).first() as { count: number } | null;
       }
 
       viewTrend.push({
@@ -328,8 +326,3 @@ export class AnalyticsService {
     return viewTrend;
   }
 }
-
-export const ANALYTICS_CONSTANTS = {
-  DEFAULT_PAGE_SIZE,
-  MAX_PAGE_SIZE
-};

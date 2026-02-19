@@ -25,13 +25,9 @@ import {
   deleteNotification,
 } from '../services/notificationService';
 import type { NotificationType } from '../types/notifications';
+import { NOTIFICATION_CONSTANTS } from '../config/constants';
 
 export const notificationRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
-
-// 默认分页配置
-const DEFAULT_PAGE = 1;
-const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 50;
 
 /**
  * GET /api/notifications
@@ -47,18 +43,17 @@ notificationRoutes.get('/', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
-    const page = parseInt(c.req.query('page') || String(DEFAULT_PAGE));
+    const currentUser = c.get('user');
+    const page = parseInt(c.req.query('page') || String(NOTIFICATION_CONSTANTS.DEFAULT_PAGE));
     const limit = Math.min(
-      MAX_LIMIT,
-      Math.max(1, parseInt(c.req.query('limit') || String(DEFAULT_LIMIT)))
+      NOTIFICATION_CONSTANTS.MAX_LIMIT,
+      Math.max(1, parseInt(c.req.query('limit') || String(NOTIFICATION_CONSTANTS.DEFAULT_LIMIT)))
     );
     const type = c.req.query('type') as NotificationType | undefined;
     const isReadQuery = c.req.query('isRead');
     const isRead = isReadQuery !== undefined ? isReadQuery === 'true' : undefined;
 
-    // 验证type参数
-    if (type && !['system', 'interaction', 'private_message'].includes(type)) {
+    if (type && !NOTIFICATION_CONSTANTS.TYPES.includes(type as any)) {
       return c.json(
         errorResponse('Invalid type parameter', '无效的通知类型'),
         400
@@ -99,7 +94,7 @@ notificationRoutes.get('/unread-count', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
 
     const result = await getUnreadCount(c.env.DB, currentUser.userId);
 
@@ -126,7 +121,7 @@ notificationRoutes.get('/unread', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
 
     const result = await getUnreadCount(c.env.DB, currentUser.userId);
 
@@ -153,7 +148,7 @@ notificationRoutes.put('/:id/read', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
     const notificationId = parseInt(c.req.param('id'));
 
     if (isNaN(notificationId)) {
@@ -200,7 +195,7 @@ notificationRoutes.put('/read-all', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
     const body = await c.req.json().catch(() => ({}));
     const type = body.type as NotificationType | undefined;
 
@@ -240,7 +235,7 @@ notificationRoutes.delete('/:id', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const currentUser = c.get('user') as any;
+    const currentUser = c.get('user');
     const notificationId = parseInt(c.req.param('id'));
 
     if (isNaN(notificationId)) {
@@ -294,9 +289,9 @@ notificationRoutes.get('/carousel', async (c) => {
       WHERE n.type = ? AND n.subtype = ? AND n.is_active = 1 AND n.deleted_at IS NULL
       ORDER BY n.created_at DESC
       LIMIT 5`
-    ).bind('system', 'announcement').all() as any;
+    ).bind('system', 'announcement').all() as { results: { id: number; title: string; content: string; related_data: string; created_at: string }[] };
 
-    const formattedNotifications = (notifications.results || []).map((n: any) => {
+    const formattedNotifications = (notifications.results || []).map((n) => {
       let relatedData: { link?: string } = {};
       try {
         relatedData = JSON.parse(n.related_data || '{}');

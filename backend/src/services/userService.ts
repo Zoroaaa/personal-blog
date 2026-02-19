@@ -11,6 +11,9 @@
  * @created 2026-02-16
  */
 
+import { PAGINATION_CONSTANTS } from '../config/constants';
+import type { TotalResult, TagRowWithPostId } from '../types/database';
+
 export interface UserSearchQuery {
   username: string;
 }
@@ -38,9 +41,6 @@ export interface UserResult {
   message?: string;
   statusCode?: 200 | 201 | 400 | 401 | 403 | 404 | 409 | 500 | 503;
 }
-
-const DEFAULT_PAGE_SIZE = 10;
-const MAX_PAGE_SIZE = 50;
 
 export class UserService {
   static async searchUser(
@@ -137,7 +137,7 @@ export class UserService {
   ): Promise<UserResult> {
     const { userId } = query;
     const page = Math.max(1, query.page || 1);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit || DEFAULT_PAGE_SIZE));
+    const limit = Math.min(PAGINATION_CONSTANTS.MAX_PAGE_SIZE, Math.max(1, query.limit || PAGINATION_CONSTANTS.DEFAULT_PAGE_SIZE));
     const offset = (page - 1) * limit;
 
     if (isNaN(userId) || userId <= 0) {
@@ -177,10 +177,10 @@ export class UserService {
     const countResult = await db.prepare(`
       SELECT COUNT(*) as total FROM posts
       WHERE author_id = ? AND status = 'published' AND visibility = 'public' AND deleted_at IS NULL
-    `).bind(userId).first() as any;
+    `).bind(userId).first() as TotalResult | null;
     const total = countResult?.total || 0;
 
-    const postIds = (results as any[]).map(p => p.id);
+    const postIds = (results as { id: number }[]).map(p => p.id);
     let postsWithTags = results;
 
     if (postIds.length > 0) {
@@ -193,7 +193,7 @@ export class UserService {
       const { results: tagResults } = await db.prepare(tagsSql).bind(...postIds).all();
 
       const tagsByPost = new Map();
-      (tagResults as any[]).forEach(tag => {
+      (tagResults as TagRowWithPostId[]).forEach(tag => {
         if (!tagsByPost.has(tag.post_id)) {
           tagsByPost.set(tag.post_id, []);
         }
@@ -204,7 +204,7 @@ export class UserService {
         });
       });
 
-      postsWithTags = (results as any[]).map(post => ({
+      postsWithTags = (results as { id: number }[]).map(post => ({
         ...post,
         tags: tagsByPost.get(post.id) || []
       }));
@@ -222,8 +222,3 @@ export class UserService {
     };
   }
 }
-
-export const USER_CONSTANTS = {
-  DEFAULT_PAGE_SIZE,
-  MAX_PAGE_SIZE
-};

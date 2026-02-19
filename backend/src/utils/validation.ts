@@ -11,30 +11,10 @@
  * @created 2024-01-01
  */
 
-// ============= 正则表达式常量 =============
-
-/** 用户名正则：3-20字符，只允许字母、数字、下划线、连字符 */
-const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,20}$/;
-
-/** 邮箱正则 */
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/** 主流邮箱域名（用于注册/改密/删号验证码） */
-const MAINSTREAM_EMAIL_DOMAINS = new Set([
-  'gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com', 'live.com', 'msn.com', 'yahoo.com', 'yahoo.cn', 'yahoo.com.cn',
-  'qq.com', '163.com', '126.com', 'sina.com', 'sina.cn', 'foxmail.com', '139.com', '189.cn', 'aliyun.com', 'foxmail.com',
-  'icloud.com', 'me.com', 'mac.com', 'aol.com', 'protonmail.com', 'proton.me', 'mail.com', 'zoho.com', 'yandex.com',
-  'gmial.com', 'gmai.com', 'gmal.com'
-]);
-
-/** 强密码正则：至少8位，包含大小写字母和数字 */
-const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-
-/** URL正则 */
-const URL_REGEX = /^https?:\/\/.+/;
-
-/** Slug正则：URL友好的字符串 */
-const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+import {
+  VALIDATION_CONSTANTS,
+  USER_PROFILE_CONSTANTS,
+} from '../config/constants';
 
 // ============= 验证函数 =============
 
@@ -48,21 +28,19 @@ export function validateUsername(username: string): string | null {
     return 'Username is required';
   }
   
-  if (username.length < 3) {
+  if (username.length < USER_PROFILE_CONSTANTS.MIN_USERNAME_LENGTH) {
     return 'Username must be at least 3 characters long';
   }
   
-  if (username.length > 20) {
+  if (username.length > USER_PROFILE_CONSTANTS.MAX_USERNAME_LENGTH) {
     return 'Username must be less than 20 characters long';
   }
   
-  if (!USERNAME_REGEX.test(username)) {
+  if (!VALIDATION_CONSTANTS.USERNAME_REGEX.test(username)) {
     return 'Username can only contain letters, numbers, underscores, and hyphens';
   }
   
-  // 检查保留用户名
-  const reserved = ['admin', 'root', 'system', 'api', 'www', 'mail', 'ftp'];
-  if (reserved.includes(username.toLowerCase())) {
+  if (VALIDATION_CONSTANTS.RESERVED_USERNAMES.includes(username.toLowerCase() as any)) {
     return 'This username is reserved';
   }
   
@@ -79,18 +57,16 @@ export function validateEmail(email: string): string | null {
     return 'Email is required';
   }
   
-  if (email.length > 254) { // RFC 5321标准
+  if (email.length > USER_PROFILE_CONSTANTS.MAX_EMAIL_LENGTH) {
     return 'Email address is too long';
   }
   
-  if (!EMAIL_REGEX.test(email)) {
+  if (!VALIDATION_CONSTANTS.EMAIL_REGEX.test(email)) {
     return 'Invalid email format';
   }
   
-  // 检查常见的一次性邮箱域名（可选）
-  const disposableDomains = ['tempmail.com', '10minutemail.com', 'guerrillamail.com'];
   const domain = email.split('@')[1]?.toLowerCase();
-  if (domain && disposableDomains.includes(domain)) {
+  if (domain && VALIDATION_CONSTANTS.DISPOSABLE_EMAIL_DOMAINS.includes(domain as any)) {
     return 'Disposable email addresses are not allowed';
   }
   
@@ -107,7 +83,7 @@ export function validateMainstreamEmail(email: string): string | null {
   if (err) return err;
   const domain = email.split('@')[1]?.toLowerCase();
   if (!domain) return 'Invalid email format';
-  if (!MAINSTREAM_EMAIL_DOMAINS.has(domain)) {
+  if (!VALIDATION_CONSTANTS.MAINSTREAM_EMAIL_DOMAINS.has(domain)) {
     return '请使用主流邮箱（如 Gmail、QQ、163、Outlook 等）以接收验证码';
   }
   return null;
@@ -123,24 +99,19 @@ export function validatePassword(password: string): string | null {
     return 'Password is required';
   }
   
-  if (password.length < 8) {
+  if (password.length < USER_PROFILE_CONSTANTS.MIN_PASSWORD_LENGTH) {
     return 'Password must be at least 8 characters long';
   }
   
-  if (password.length > 128) {
+  if (password.length > USER_PROFILE_CONSTANTS.MAX_PASSWORD_LENGTH) {
     return 'Password is too long';
   }
   
-  if (!STRONG_PASSWORD_REGEX.test(password)) {
+  if (!VALIDATION_CONSTANTS.STRONG_PASSWORD_REGEX.test(password)) {
     return 'Password must contain at least one uppercase letter, one lowercase letter, and one number';
   }
   
-  // 检查常见弱密码
-  const commonPasswords = [
-    'password', 'password123', '12345678', 'qwerty123', 
-    'abc123456', 'password1', '123456789', 'Password1'
-  ];
-  if (commonPasswords.includes(password.toLowerCase())) {
+  if (VALIDATION_CONSTANTS.COMMON_PASSWORDS.includes(password.toLowerCase() as any)) {
     return 'This password is too common. Please choose a stronger password';
   }
   
@@ -157,7 +128,7 @@ export function validateUrl(url: string): boolean {
   
   try {
     new URL(url);
-    return URL_REGEX.test(url);
+    return VALIDATION_CONSTANTS.URL_REGEX.test(url);
   } catch {
     return false;
   }
@@ -177,11 +148,11 @@ export function validateSlug(slug: string): string | null {
     return 'Slug must be at least 3 characters long';
   }
   
-  if (slug.length > 100) {
+  if (slug.length > USER_PROFILE_CONSTANTS.MAX_SLUG_LENGTH) {
     return 'Slug must be less than 100 characters long';
   }
   
-  if (!SLUG_REGEX.test(slug)) {
+  if (!VALIDATION_CONSTANTS.SLUG_REGEX.test(slug)) {
     return 'Slug can only contain lowercase letters, numbers, and hyphens';
   }
   
@@ -288,7 +259,7 @@ export function sanitizeCommentContent(input: string): string {
     return '';
   }
 
-  const allowedTags = ['b', 'strong', 'i', 'em', 'a', 'img', 'br', 'p', 'span'];
+  const allowedTags = [...VALIDATION_CONSTANTS.ALLOWED_HTML_TAGS];
   
   let result = input
     // 移除所有script标签及其内容
@@ -399,12 +370,10 @@ export function sanitizeSearchQuery(query: string): string {
   }
   
   return query
-    // 移除SQL通配符（如果直接用于SQL LIKE）
     .replace(/[%_]/g, '')
-    // 移除特殊字符
     .replace(/[^\w\s\u4e00-\u9fa5-]/g, '')
     .trim()
-    .substring(0, 100); // 限制长度
+    .substring(0, VALIDATION_CONSTANTS.MAX_SEARCH_QUERY_LENGTH);
 }
 
 // ============= 生成函数 =============

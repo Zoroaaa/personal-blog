@@ -72,7 +72,8 @@ export interface SiteConfig {
   
   // 系统设置
   posts_per_page: number;
-  max_upload_size_mb: number;
+  upload_max_image_size_mb: number;
+  upload_max_file_size_mb: number;
   
   // 索引签名
   [key: string]: any;
@@ -128,7 +129,8 @@ const DEFAULT_CONFIG: SiteConfig = {
   
   // 系统设置
   posts_per_page: 10,
-  max_upload_size_mb: 5
+  upload_max_image_size_mb: 5,
+  upload_max_file_size_mb: 10
 };
 
 // ============= 配置状态管理 =============

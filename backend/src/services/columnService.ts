@@ -19,15 +19,8 @@ import {
   safeParseInt
 } from '../utils/validation';
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
-
-const DEFAULT_PAGE_SIZE = 10;
-const MAX_PAGE_SIZE = 50;
-const MIN_NAME_LENGTH = 2;
-const MAX_NAME_LENGTH = 100;
-const MAX_DESCRIPTION_LENGTH = 500;
-const ALLOWED_SORT_FIELDS = ['created_at', 'post_count', 'total_view_count', 'total_like_count', 'display_order'];
-const ALLOWED_POST_SORT_FIELDS = ['published_at', 'view_count', 'like_count', 'comment_count', 'created_at'];
-const VALID_STATUSES = ['active', 'hidden', 'archived'];
+import { COLUMN_CONSTANTS } from '../config/constants';
+import type { ColumnRow, TotalResult, TagRowWithPostId } from '../types/database';
 
 export interface ColumnListQuery {
   page?: number;
@@ -70,13 +63,13 @@ export interface ColumnResult {
 export class ColumnService {
   static async getColumns(db: any, query: ColumnListQuery): Promise<ColumnResult> {
     const page = Math.max(1, query.page || 1);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit || DEFAULT_PAGE_SIZE));
+    const limit = Math.min(COLUMN_CONSTANTS.MAX_PAGE_SIZE, Math.max(1, query.limit || COLUMN_CONSTANTS.DEFAULT_PAGE_SIZE));
     const author = query.author;
     const sortBy = query.sortBy || 'display_order';
     const order = query.order === 'asc' ? 'ASC' : 'DESC';
     const offset = (page - 1) * limit;
 
-    const finalSortBy = ALLOWED_SORT_FIELDS.includes(sortBy) ? sortBy : 'display_order';
+    const finalSortBy = COLUMN_CONSTANTS.ALLOWED_SORT_FIELDS.includes(sortBy as any) ? sortBy : 'display_order';
 
     let sql = `
       SELECT
@@ -115,7 +108,7 @@ export class ColumnService {
       countParams.push(author);
     }
 
-    const countResult = await db.prepare(countSql).bind(...countParams).first() as any;
+    const countResult = await db.prepare(countSql).bind(...countParams).first() as TotalResult | null;
     const total = countResult?.total || 0;
 
     return {
@@ -177,16 +170,16 @@ export class ColumnService {
     }
 
     const page = Math.max(1, query.page || 1);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit || DEFAULT_PAGE_SIZE));
+    const limit = Math.min(COLUMN_CONSTANTS.MAX_PAGE_SIZE, Math.max(1, query.limit || COLUMN_CONSTANTS.DEFAULT_PAGE_SIZE));
     const sortBy = query.sortBy || 'published_at';
     const order = query.order === 'asc' ? 'ASC' : 'DESC';
     const offset = (page - 1) * limit;
 
-    const finalSortBy = ALLOWED_POST_SORT_FIELDS.includes(sortBy) ? sortBy : 'published_at';
+    const finalSortBy = COLUMN_CONSTANTS.ALLOWED_POST_SORT_FIELDS.includes(sortBy as any) ? sortBy : 'published_at';
 
     const column = await db.prepare(
       'SELECT id, status FROM columns WHERE slug = ? AND deleted_at IS NULL'
-    ).bind(slug).first() as any;
+    ).bind(slug).first() as { id: number; status: string } | null;
 
     if (!column) {
       return {
@@ -226,10 +219,10 @@ export class ColumnService {
       FROM posts p
       LEFT JOIN users u ON p.author_id = u.id
       WHERE p.column_id = ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
-    `).bind(column.id).first() as any;
+    `).bind(column.id).first() as TotalResult | null;
     const total = countResult?.total || 0;
 
-    const postIds = (results as any[]).map(p => p.id);
+    const postIds = (results as { id: number }[]).map(p => p.id);
     let postsWithTags = results;
 
     if (postIds.length > 0) {
@@ -242,7 +235,7 @@ export class ColumnService {
       const { results: tagResults } = await db.prepare(tagsSql).bind(...postIds).all();
 
       const tagsByPost = new Map();
-      (tagResults as any[]).forEach(tag => {
+      (tagResults as TagRowWithPostId[]).forEach(tag => {
         if (!tagsByPost.has(tag.post_id)) {
           tagsByPost.set(tag.post_id, []);
         }
@@ -253,7 +246,7 @@ export class ColumnService {
         });
       });
 
-      postsWithTags = (results as any[]).map(post => ({
+      postsWithTags = (results as { id: number }[]).map(post => ({
         ...post,
         tags: tagsByPost.get(post.id) || []
       }));
@@ -287,7 +280,7 @@ export class ColumnService {
     name = sanitizeInput(name);
     description = description ? sanitizeInput(description) : undefined;
 
-    const nameError = validateLength(name, MIN_NAME_LENGTH, MAX_NAME_LENGTH, 'Name');
+    const nameError = validateLength(name, COLUMN_CONSTANTS.MIN_NAME_LENGTH, COLUMN_CONSTANTS.MAX_NAME_LENGTH, 'Name');
     if (nameError) {
       return {
         success: false,
@@ -297,7 +290,7 @@ export class ColumnService {
     }
 
     if (description) {
-      const descError = validateLength(description, 0, MAX_DESCRIPTION_LENGTH, 'Description');
+      const descError = validateLength(description, 0, COLUMN_CONSTANTS.MAX_DESCRIPTION_LENGTH, 'Description');
       if (descError) {
         return {
           success: false,
@@ -368,7 +361,7 @@ export class ColumnService {
   static async updateColumn(db: any, id: string, body: ColumnUpdateRequest): Promise<ColumnResult> {
     const column = await db.prepare(
       'SELECT * FROM columns WHERE id = ?'
-    ).bind(id).first() as any;
+    ).bind(id).first() as ColumnRow | null;
 
     if (!column) {
       return {
@@ -382,7 +375,7 @@ export class ColumnService {
 
     if (name) {
       name = sanitizeInput(name);
-      const nameError = validateLength(name, MIN_NAME_LENGTH, MAX_NAME_LENGTH, 'Name');
+      const nameError = validateLength(name, COLUMN_CONSTANTS.MIN_NAME_LENGTH, COLUMN_CONSTANTS.MAX_NAME_LENGTH, 'Name');
       if (nameError) {
         return {
           success: false,
@@ -394,7 +387,7 @@ export class ColumnService {
 
     if (description !== undefined) {
       description = sanitizeInput(description);
-      const descError = validateLength(description, 0, MAX_DESCRIPTION_LENGTH, 'Description');
+      const descError = validateLength(description, 0, COLUMN_CONSTANTS.MAX_DESCRIPTION_LENGTH, 'Description');
       if (descError) {
         return {
           success: false,
@@ -404,7 +397,7 @@ export class ColumnService {
       }
     }
 
-    if (status && !VALID_STATUSES.includes(status)) {
+    if (status && !COLUMN_CONSTANTS.VALID_STATUSES.includes(status as any)) {
       return {
         success: false,
         message: 'Invalid status',
@@ -436,7 +429,7 @@ export class ColumnService {
   static async deleteColumn(db: any, id: string): Promise<ColumnResult> {
     const column = await db.prepare(
       'SELECT * FROM columns WHERE id = ?'
-    ).bind(id).first() as any;
+    ).bind(id).first() as ColumnRow | null;
 
     if (!column) {
       return {
@@ -449,9 +442,9 @@ export class ColumnService {
     const postCount = await db.prepare(`
       SELECT COUNT(*) as count FROM posts
       WHERE column_id = ? AND status = 'published'
-    `).bind(id).first() as any;
+    `).bind(id).first() as { count: number } | null;
 
-    if (postCount.count > 0) {
+    if (postCount && postCount.count > 0) {
       return {
         success: false,
         message: `This column has ${postCount.count} published post(s). Please reassign or delete those posts first.`,
@@ -489,14 +482,20 @@ export class ColumnService {
         COALESCE(SUM(comment_count), 0) as total_comment_count
       FROM posts
       WHERE column_id = ? AND status = 'published'
-    `).bind(id).first() as any;
+    `).bind(id).first() as { post_count: number; total_view_count: number; total_like_count: number; total_comment_count: number } | null;
 
     const favoriteStats = await db.prepare(`
       SELECT COUNT(*) as total_favorite_count
       FROM favorites f
       JOIN posts p ON f.post_id = p.id
       WHERE p.column_id = ? AND p.status = 'published'
-    `).bind(id).first() as any;
+    `).bind(id).first() as { total_favorite_count: number } | null;
+
+    const postCount = stats?.post_count || 0;
+    const totalViewCount = stats?.total_view_count || 0;
+    const totalLikeCount = stats?.total_like_count || 0;
+    const totalCommentCount = stats?.total_comment_count || 0;
+    const totalFavoriteCount = favoriteStats?.total_favorite_count || 0;
 
     await db.prepare(`
       UPDATE columns
@@ -508,35 +507,24 @@ export class ColumnService {
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).bind(
-      stats.post_count || 0,
-      stats.total_view_count || 0,
-      stats.total_like_count || 0,
-      favoriteStats?.total_favorite_count || 0,
-      stats.total_comment_count || 0,
+      postCount,
+      totalViewCount,
+      totalLikeCount,
+      totalFavoriteCount,
+      totalCommentCount,
       id
     ).run();
 
     return {
       success: true,
       data: {
-        postCount: stats.post_count || 0,
-        totalViewCount: stats.total_view_count || 0,
-        totalLikeCount: stats.total_like_count || 0,
-        totalFavoriteCount: favoriteStats?.total_favorite_count || 0,
-        totalCommentCount: stats.total_comment_count || 0
+        postCount,
+        totalViewCount,
+        totalLikeCount,
+        totalFavoriteCount,
+        totalCommentCount
       },
       message: 'Column stats refreshed successfully'
     };
   }
 }
-
-export const COLUMN_CONSTANTS = {
-  DEFAULT_PAGE_SIZE,
-  MAX_PAGE_SIZE,
-  MIN_NAME_LENGTH,
-  MAX_NAME_LENGTH,
-  MAX_DESCRIPTION_LENGTH,
-  ALLOWED_SORT_FIELDS,
-  ALLOWED_POST_SORT_FIELDS,
-  VALID_STATUSES
-};

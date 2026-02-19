@@ -31,7 +31,7 @@ import { requestLogger } from './middleware/requestLogger';
 
 import type { Env, ApiResponse } from './types';
 
-import { getAllowedOrigins, getBaseUrl } from './config/constants';
+import { getAllowedOrigins, getBaseUrl, APP_CONSTANTS } from './config/constants';
 import { isAppError, UnauthorizedError, ForbiddenError, NotFoundError, ValidationError, ConflictError, RateLimitError, ServiceUnavailableError } from './utils/errors';
 import { createModuleLogger } from './utils/logger';
 
@@ -39,19 +39,40 @@ const appLogger = createModuleLogger('config');
 
 export type { Env, ApiResponse } from './types';
 
-const API_VERSION = '3.1.0';
-
 const app = new Hono<{ Bindings: Env }>();
 
-const SKIP_ENV_CHECK_PATHS = ['/', '/health', '/api/health'];
+let envValidated = false;
+let envValidationPassed = false;
+
+function validateEnv(env: Env): { valid: boolean; error?: string } {
+  if (!env.DB) {
+    return { valid: false, error: 'DB is not configured' };
+  }
+  if (!env.STORAGE) {
+    return { valid: false, error: 'STORAGE is not configured' };
+  }
+  if (!env.JWT_SECRET) {
+    return { valid: false, error: 'JWT_SECRET is not configured' };
+  }
+  return { valid: true };
+}
 
 app.use('*', async (c, next) => {
-  if (SKIP_ENV_CHECK_PATHS.includes(c.req.path)) {
+  if (APP_CONSTANTS.SKIP_ENV_CHECK_PATHS.includes(c.req.path)) {
     return next();
   }
 
-  if (!c.env.DB || !c.env.STORAGE || !c.env.JWT_SECRET) {
-    appLogger.error('缺少必需的环境变量');
+  if (!envValidated) {
+    const result = validateEnv(c.env);
+    envValidated = true;
+    envValidationPassed = result.valid;
+    
+    if (!result.valid) {
+      appLogger.error('环境变量验证失败', result.error);
+    }
+  }
+
+  if (!envValidationPassed) {
     return c.json<ApiResponse>({
       success: false,
       error: 'Server configuration error',
@@ -131,7 +152,7 @@ app.get('/', (c) => {
     success: true,
     data: {
       name: 'Personal Blog API',
-      version: API_VERSION,
+      version: APP_CONSTANTS.API_VERSION,
       description: 'Modern blog system built with Cloudflare Workers',
       status: 'operational',
       timestamp: new Date().toISOString(),
@@ -226,7 +247,7 @@ app.get('/health', async (c) => {
       status: allHealthy ? 'healthy' : 'degraded',
       timestamp: new Date().toISOString(),
       environment: c.env?.ENVIRONMENT || 'unknown',
-      version: API_VERSION,
+      version: APP_CONSTANTS.API_VERSION,
       services,
       config: envCheck,
       uptime: Date.now()
@@ -244,7 +265,7 @@ app.get('/api/health', (c) => {
     data: {
       status: 'healthy',
       timestamp: new Date().toISOString(),
-      version: API_VERSION
+      version: APP_CONSTANTS.API_VERSION
     }
   });
 });
@@ -435,6 +456,8 @@ import { successResponse, errorResponse } from './utils/response';
 
 // 导入邮件汇总服务
 import { processDigestQueue, cleanupSentDigestItems } from './services/digestService';
+// 导入 Refresh Token 清理服务
+import { RefreshTokenService } from './services/refreshTokenService';
 
 export default app;
 
@@ -443,6 +466,11 @@ export const scheduled: ExportedHandlerScheduledHandler<Env> = async (event, env
   console.log('Cron:', event.cron);
   
   try {
+    const cleanedTokens = await RefreshTokenService.cleanupExpiredTokens(env.DB);
+    if (cleanedTokens > 0) {
+      console.log(`Cleaned up ${cleanedTokens} expired refresh tokens`);
+    }
+
     if (event.cron === '0 8 * * *') {
       console.log('Processing daily digest...');
       const result = await processDigestQueue(env.DB, env, 'daily');

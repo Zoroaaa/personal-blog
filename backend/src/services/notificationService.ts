@@ -36,10 +36,7 @@ import type { Env } from '../types';
 import { getNotificationSettings } from './notificationSettingsService';
 import { shouldSendNow } from './doNotDisturb';
 import { sendNotificationEmail } from '../utils/resend';
-
-const DEFAULT_PAGE = 1;
-const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 50;
+import { NOTIFICATION_CONSTANTS, NOTIFICATION_PREVIEW_CONSTANTS } from '../config/constants';
 
 export async function createNotification(
   db: D1Database,
@@ -223,8 +220,8 @@ export async function getNotifications(
   params: NotificationQueryParams = {}
 ): Promise<NotificationListResponse> {
   try {
-    const page = Math.max(1, params.page || DEFAULT_PAGE);
-    const limit = Math.min(MAX_LIMIT, Math.max(1, params.limit || DEFAULT_LIMIT));
+    const page = Math.max(1, params.page || NOTIFICATION_CONSTANTS.DEFAULT_PAGE);
+    const limit = Math.min(NOTIFICATION_CONSTANTS.MAX_LIMIT, Math.max(1, params.limit || NOTIFICATION_CONSTANTS.DEFAULT_LIMIT));
     const offset = (page - 1) * limit;
 
     const typeFilter = params.type;
@@ -344,8 +341,8 @@ export async function getNotifications(
     return {
       notifications: [],
       pagination: {
-        page: params.page || DEFAULT_PAGE,
-        limit: params.limit || DEFAULT_LIMIT,
+        page: params.page || NOTIFICATION_CONSTANTS.DEFAULT_PAGE,
+        limit: params.limit || NOTIFICATION_CONSTANTS.DEFAULT_LIMIT,
         total: 0,
         totalPages: 0,
       },
@@ -431,7 +428,7 @@ export async function markAsRead(
   try {
     const notification = await db.prepare(
       'SELECT id, user_id, type FROM notifications WHERE id = ? AND deleted_at IS NULL'
-    ).bind(notificationId).first() as any;
+    ).bind(notificationId).first() as { id: number; user_id: number; type: string } | null;
 
     if (!notification) {
       return false;
@@ -488,7 +485,7 @@ export async function markAllAsRead(
       ).bind(userId).all();
 
       for (const row of systemNotifications.results || []) {
-        const notificationId = (row as any).id;
+        const notificationId = (row as { id: number }).id;
         const existing = await db.prepare(
           'SELECT id FROM notification_reads WHERE notification_id = ? AND user_id = ?'
         ).bind(notificationId, userId).first();
@@ -536,7 +533,7 @@ export async function deleteNotification(
   try {
     const notification = await db.prepare(
       'SELECT id, user_id, type FROM notifications WHERE id = ? AND deleted_at IS NULL'
-    ).bind(notificationId).first() as any;
+    ).bind(notificationId).first() as { id: number; user_id: number; type: string } | null;
 
     if (!notification) {
       return false;

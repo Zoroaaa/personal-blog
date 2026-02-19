@@ -18,7 +18,8 @@ import { successResponse, errorResponse, getStatus } from '../utils/response';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { safeParseInt } from '../utils/validation';
-import { AnalyticsService, ANALYTICS_CONSTANTS } from '../services/analyticsService';
+import { AnalyticsService } from '../services/analyticsService';
+import { ANALYTICS_CONSTANTS } from '../config/constants';
 
 export const analyticsRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -118,7 +119,7 @@ analyticsRoutes.post('/track', async (c) => {
     const body = await c.req.json();
     const { postId, referrer } = body;
 
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const userId = user?.userId || null;
 
     const ip = c.req.header('CF-Connecting-IP') ||

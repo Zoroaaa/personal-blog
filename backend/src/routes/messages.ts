@@ -37,23 +37,24 @@ import {
   type SendMessageRequest,
   type MessageType,
 } from '../services/messageService';
+import { getUploadLimits } from './config';
+import {
+  MESSAGE_CONSTANTS,
+  MESSAGE_TYPE_CONSTANTS,
+  RATE_LIMIT_CONSTANTS,
+} from '../config/constants';
 
 export const messageRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
-const MIN_MESSAGE_LENGTH = 1;
-const MAX_MESSAGE_LENGTH = 2000;
-const MAX_SUBJECT_LENGTH = 100;
-const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
-
 messageRoutes.post('/', requireAuth, rateLimit({
-  windowMs: 60 * 1000,
-  maxRequests: 10,
+  windowMs: RATE_LIMIT_CONSTANTS.WINDOW_1_MINUTE,
+  maxRequests: RATE_LIMIT_CONSTANTS.MESSAGE_MAX_REQUESTS,
   message: '发送私信过于频繁，请稍后再试'
 }), async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const body = await c.req.json();
     let { 
       recipientId, 
@@ -81,10 +82,12 @@ messageRoutes.post('/', requireAuth, rateLimit({
       ), 400);
     }
 
-    if (attachmentSize && attachmentSize > MAX_ATTACHMENT_SIZE) {
+    const uploadLimits = await getUploadLimits(c.env);
+
+    if (attachmentSize && attachmentSize > uploadLimits.maxFileSizeBytes) {
       return c.json(errorResponse(
         'Attachment too large',
-        'Attachment size cannot exceed 10MB'
+        `Attachment size cannot exceed ${uploadLimits.maxFileSizeMB}MB`
       ), 400);
     }
 
@@ -106,7 +109,7 @@ messageRoutes.post('/', requireAuth, rateLimit({
 
     if (content) {
       content = sanitizeInput(content);
-      const contentError = validateLength(content, MIN_MESSAGE_LENGTH, MAX_MESSAGE_LENGTH, 'Message content');
+      const contentError = validateLength(content, 1, MESSAGE_CONSTANTS.MAX_MESSAGE_LENGTH, 'Message content');
       if (contentError) {
         return c.json(errorResponse('Invalid message content', contentError), 400);
       }
@@ -114,7 +117,7 @@ messageRoutes.post('/', requireAuth, rateLimit({
 
     if (subject) {
       subject = sanitizeInput(subject);
-      const subjectError = validateLength(subject, 1, MAX_SUBJECT_LENGTH, 'Subject');
+      const subjectError = validateLength(subject, 1, MESSAGE_TYPE_CONSTANTS.MAX_SUBJECT_LENGTH, 'Subject');
       if (subjectError) {
         return c.json(errorResponse('Invalid subject', subjectError), 400);
       }
@@ -173,7 +176,7 @@ messageRoutes.get('/inbox', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const page = safeParseInt(c.req.query('page'), 1);
     const limit = safeParseInt(c.req.query('limit'), 20);
     const threadId = c.req.query('threadId');
@@ -204,7 +207,7 @@ messageRoutes.get('/outbox', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const page = safeParseInt(c.req.query('page'), 1);
     const limit = safeParseInt(c.req.query('limit'), 20);
     const threadId = c.req.query('threadId');
@@ -235,7 +238,7 @@ messageRoutes.get('/threads', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const page = safeParseInt(c.req.query('page'), 1);
     const limit = safeParseInt(c.req.query('limit'), 20);
 
@@ -261,7 +264,7 @@ messageRoutes.get('/thread/:threadId', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const threadId = c.req.param('threadId');
     const page = safeParseInt(c.req.query('page'), 1);
     const limit = safeParseInt(c.req.query('limit'), 20);
@@ -296,7 +299,7 @@ messageRoutes.get('/:id', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const messageId = safeParseInt(c.req.param('id'));
 
     if (!messageId) {
@@ -329,7 +332,7 @@ messageRoutes.patch('/:id/read', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const messageId = safeParseInt(c.req.param('id'));
 
     if (!messageId) {
@@ -362,7 +365,7 @@ messageRoutes.patch('/threads/:threadId/read', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const threadId = c.req.param('threadId');
 
     if (!threadId) {
@@ -392,7 +395,7 @@ messageRoutes.post('/:id/recall', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const messageId = safeParseInt(c.req.param('id'));
 
     if (!messageId) {
@@ -425,7 +428,7 @@ messageRoutes.post('/:id/resend', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const messageId = safeParseInt(c.req.param('id'));
 
     if (!messageId) {
@@ -444,7 +447,7 @@ messageRoutes.post('/:id/resend', requireAuth, async (c) => {
 
     if (content) {
       content = sanitizeInput(content);
-      const contentError = validateLength(content, 0, MAX_MESSAGE_LENGTH, 'Message content');
+      const contentError = validateLength(content, 0, MESSAGE_CONSTANTS.MAX_MESSAGE_LENGTH, 'Message content');
       if (contentError) {
         return c.json(errorResponse('Invalid message content', contentError), 400);
       }
@@ -485,7 +488,7 @@ messageRoutes.get('/unread/count', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const count = await getUnreadCount(c.env.DB, user.userId);
 
     logger.info('Unread count fetched', { userId: user.userId, count });
@@ -505,7 +508,7 @@ messageRoutes.get('/thread-id/:userId', requireAuth, async (c) => {
   const logger = createLogger(c);
   
   try {
-    const user = c.get('user') as any;
+    const user = c.get('user');
     const otherUserId = safeParseInt(c.req.param('userId'));
 
     if (!otherUserId) {

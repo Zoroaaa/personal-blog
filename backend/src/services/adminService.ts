@@ -13,13 +13,8 @@
 
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
 import { safeParseInt } from '../utils/validation';
-
-const DEFAULT_PAGE_SIZE = 20;
-const MAX_PAGE_SIZE = 100;
-
-const VALID_COMMENT_STATUSES = ['approved', 'pending', 'rejected', 'deleted'];
-const VALID_USER_STATUSES = ['active', 'suspended', 'deleted'];
-const VALID_USER_ROLES = ['admin', 'user', 'moderator'];
+import { PAGINATION_CONSTANTS, DATABASE_CONSTANTS, COMMENT_STATUS_CONSTANTS } from '../config/constants';
+import type { TotalResult, CommentRow, UserRow } from '../types/database';
 
 export interface AdminCommentListQuery {
   page?: number;
@@ -50,7 +45,7 @@ export class AdminService {
     query: AdminCommentListQuery
   ): Promise<AdminResult> {
     const page = Math.max(1, query.page || 1);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit || DEFAULT_PAGE_SIZE));
+    const limit = Math.min(PAGINATION_CONSTANTS.MAX_PAGE_SIZE, Math.max(1, query.limit || PAGINATION_CONSTANTS.DEFAULT_PAGE_SIZE));
     const status = query.status || 'all';
     const postId = query.postId;
     const includeDeleted = query.includeDeleted || false;
@@ -108,7 +103,7 @@ export class AdminService {
       countParams.push(postId);
     }
 
-    const countResult = await db.prepare(countSql).bind(...countParams).first() as any;
+    const countResult = await db.prepare(countSql).bind(...countParams).first() as TotalResult | null;
     const total = countResult?.total || 0;
 
     return {
@@ -130,17 +125,17 @@ export class AdminService {
     commentId: string,
     status: string
   ): Promise<AdminResult> {
-    if (!VALID_COMMENT_STATUSES.includes(status)) {
+    if (!COMMENT_STATUS_CONSTANTS.STATUSES.includes(status as any)) {
       return {
         success: false,
-        message: `Status must be one of: ${VALID_COMMENT_STATUSES.join(', ')}`,
+        message: `Status must be one of: ${COMMENT_STATUS_CONSTANTS.STATUSES.join(', ')}`,
         statusCode: 400
       };
     }
 
     const comment = await db.prepare(
       'SELECT id, post_id FROM comments WHERE id = ?'
-    ).bind(commentId).first() as any;
+    ).bind(commentId).first() as { id: number; post_id: number } | null;
 
     if (!comment) {
       return {
@@ -166,7 +161,7 @@ export class AdminService {
   ): Promise<AdminResult> {
     const comment = await db.prepare(
       'SELECT id, post_id FROM comments WHERE id = ?'
-    ).bind(commentId).first() as any;
+    ).bind(commentId).first() as { id: number; post_id: number } | null;
 
     if (!comment) {
       return {
@@ -189,7 +184,7 @@ export class AdminService {
     query: AdminUserListQuery
   ): Promise<AdminResult> {
     const page = Math.max(1, query.page || 1);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit || DEFAULT_PAGE_SIZE));
+    const limit = Math.min(PAGINATION_CONSTANTS.MAX_PAGE_SIZE, Math.max(1, query.limit || PAGINATION_CONSTANTS.DEFAULT_PAGE_SIZE));
     const role = query.role || 'all';
     const status = query.status || 'all';
     const includeDeleted = query.includeDeleted || false;
@@ -242,7 +237,7 @@ export class AdminService {
       countParams.push(status);
     }
 
-    const countResult = await db.prepare(countSql).bind(...countParams).first() as any;
+    const countResult = await db.prepare(countSql).bind(...countParams).first() as TotalResult | null;
     const total = countResult?.total || 0;
 
     return {
@@ -265,17 +260,17 @@ export class AdminService {
     status: string,
     currentUserId: number
   ): Promise<AdminResult> {
-    if (!VALID_USER_STATUSES.includes(status)) {
+    if (!DATABASE_CONSTANTS.USER_STATUSES.includes(status as any)) {
       return {
         success: false,
-        message: `Status must be one of: ${VALID_USER_STATUSES.join(', ')}`,
+        message: `Status must be one of: ${DATABASE_CONSTANTS.USER_STATUSES.join(', ')}`,
         statusCode: 400
       };
     }
 
     const user = await db.prepare(
       'SELECT id, username FROM users WHERE id = ?'
-    ).bind(userId).first() as any;
+    ).bind(userId).first() as { id: number; username: string } | null;
 
     if (!user) {
       return {
@@ -308,17 +303,17 @@ export class AdminService {
     userId: string,
     role: string
   ): Promise<AdminResult> {
-    if (!VALID_USER_ROLES.includes(role)) {
+    if (!DATABASE_CONSTANTS.ROLES.includes(role as any)) {
       return {
         success: false,
-        message: `Role must be one of: ${VALID_USER_ROLES.join(', ')}`,
+        message: `Role must be one of: ${DATABASE_CONSTANTS.ROLES.join(', ')}`,
         statusCode: 400
       };
     }
 
     const user = await db.prepare(
       'SELECT id, username FROM users WHERE id = ?'
-    ).bind(userId).first() as any;
+    ).bind(userId).first() as { id: number; username: string } | null;
 
     if (!user) {
       return {
@@ -345,7 +340,7 @@ export class AdminService {
   ): Promise<AdminResult> {
     const user = await db.prepare(
       'SELECT id, username FROM users WHERE id = ?'
-    ).bind(userId).first() as any;
+    ).bind(userId).first() as { id: number; username: string } | null;
 
     if (!user) {
       return {
@@ -390,11 +385,3 @@ export class AdminService {
     };
   }
 }
-
-export const ADMIN_CONSTANTS = {
-  DEFAULT_PAGE_SIZE,
-  MAX_PAGE_SIZE,
-  VALID_COMMENT_STATUSES,
-  VALID_USER_STATUSES,
-  VALID_USER_ROLES
-};

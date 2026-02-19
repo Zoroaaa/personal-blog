@@ -690,7 +690,8 @@ INSERT OR IGNORE INTO site_config (key, value, type, category, description) VALU
 
 INSERT OR IGNORE INTO site_config (key, value, type, category, description) VALUES
   ('posts_per_page', '10', 'number', 'general', '每页文章数'),
-  ('max_upload_size_mb', '5', 'number', 'general', '最大上传文件大小(MB)');
+  ('upload_max_image_size_mb', '5', 'number', 'general', '图片上传大小限制(MB)'),
+  ('upload_max_file_size_mb', '10', 'number', 'general', '文件上传大小限制(MB)');
 
 -- ============= 版本记录 =============
 
