@@ -18,7 +18,8 @@ import { successResponse, errorResponse, getStatus } from '../utils/response';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { safeParseInt } from '../utils/validation';
-import { AnalyticsService, ANALYTICS_CONSTANTS } from '../services/analyticsService';
+import { AnalyticsService } from '../services/analyticsService';
+import { ANALYTICS_CONSTANTS } from '../config/constants';
 
 export const analyticsRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 

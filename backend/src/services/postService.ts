@@ -28,6 +28,12 @@ import {
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
 import { createInteractionNotification } from './notificationService';
 import { isInteractionSubtypeEnabled } from './notificationSettingsService';
+import {
+  POST_CONSTANTS,
+  NOTIFICATION_PREVIEW_CONSTANTS,
+  POST_PASSWORD_TOKEN_CONSTANTS,
+  VALIDATION_CONSTANTS,
+} from '../config/constants';
 import type { 
   PostRow, 
   PostDetailRow, 
@@ -43,14 +49,6 @@ import type {
 function getPostPasswordSecret(env: any): string {
   return env.POST_PASSWORD_SECRET || env.JWT_SECRET;
 }
-
-const DEFAULT_PAGE_SIZE = 10;
-const MAX_PAGE_SIZE = 50;
-const MIN_TITLE_LENGTH = 3;
-const MAX_TITLE_LENGTH = 200;
-const MIN_CONTENT_LENGTH = 10;
-const MAX_CONTENT_LENGTH = 100000;
-const READING_SPEED = 250;
 
 export interface PostListQuery {
   page?: number;
@@ -155,7 +153,7 @@ export class PostService {
     query: PostListQuery
   ): Promise<{ success: boolean; posts?: any[]; pagination?: any; message?: string }> {
     const page = Math.max(1, query.page || 1);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit || DEFAULT_PAGE_SIZE));
+    const limit = Math.min(POST_CONSTANTS.MAX_PAGE_SIZE, Math.max(1, query.limit || POST_CONSTANTS.DEFAULT_PAGE_SIZE));
     let category = (query.category === 'null' || !query.category) ? undefined : query.category;
     let tag = (query.tag === 'null' || !query.tag) ? undefined : query.tag;
     const author = query.author;
@@ -298,7 +296,7 @@ export class PostService {
     query: PostListQuery
   ): Promise<{ success: boolean; posts?: any[]; pagination?: any }> {
     const page = Math.max(1, query.page || 1);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit || DEFAULT_PAGE_SIZE));
+    const limit = Math.min(POST_CONSTANTS.MAX_PAGE_SIZE, Math.max(1, query.limit || POST_CONSTANTS.DEFAULT_PAGE_SIZE));
     const offset = (page - 1) * limit;
 
     const { results } = await db.prepare(`
@@ -461,7 +459,7 @@ export class PostService {
     let tag = (query.tag === 'null' || !query.tag) ? undefined : query.tag;
     const useFts = query.useFts !== false;
     const page = Math.max(1, query.page || 1);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit || DEFAULT_PAGE_SIZE));
+    const limit = Math.min(POST_CONSTANTS.MAX_PAGE_SIZE, Math.max(1, query.limit || POST_CONSTANTS.DEFAULT_PAGE_SIZE));
     const sort = query.sort || 'published_at';
     const order = query.order === 'asc' ? 'ASC' : 'DESC';
     const offset = (page - 1) * limit;
@@ -845,7 +843,7 @@ export class PostService {
     content = sanitizeMarkdown(content);
     summary = summary ? sanitizeInput(summary) : '';
 
-    const titleError = validateLength(title, MIN_TITLE_LENGTH, MAX_TITLE_LENGTH, 'Title');
+    const titleError = validateLength(title, POST_CONSTANTS.MIN_TITLE_LENGTH, POST_CONSTANTS.MAX_TITLE_LENGTH, 'Title');
     if (titleError) {
       return {
         success: false,
@@ -854,7 +852,7 @@ export class PostService {
       };
     }
 
-    const contentError = validateLength(content, MIN_CONTENT_LENGTH, MAX_CONTENT_LENGTH, 'Content');
+    const contentError = validateLength(content, POST_CONSTANTS.MIN_CONTENT_LENGTH, POST_CONSTANTS.MAX_CONTENT_LENGTH, 'Content');
     if (contentError) {
       return {
         success: false,
@@ -864,7 +862,7 @@ export class PostService {
     }
 
     const slug = generateSlug(title);
-    const readingTime = Math.ceil(content.length / READING_SPEED);
+    const readingTime = Math.ceil(content.length / POST_CONSTANTS.READING_SPEED);
 
     const finalVisibility = visibility || 'public';
     if (finalVisibility === 'password' && !password) {
@@ -980,7 +978,7 @@ export class PostService {
 
     if (title) {
       title = sanitizeInput(title);
-      const titleError = validateLength(title, MIN_TITLE_LENGTH, MAX_TITLE_LENGTH, 'Title');
+      const titleError = validateLength(title, POST_CONSTANTS.MIN_TITLE_LENGTH, POST_CONSTANTS.MAX_TITLE_LENGTH, 'Title');
       if (titleError) {
         return {
           success: false,
@@ -992,7 +990,7 @@ export class PostService {
 
     if (content) {
       content = sanitizeMarkdown(content);
-      const contentError = validateLength(content, MIN_CONTENT_LENGTH, MAX_CONTENT_LENGTH, 'Content');
+      const contentError = validateLength(content, POST_CONSTANTS.MIN_CONTENT_LENGTH, POST_CONSTANTS.MAX_CONTENT_LENGTH, 'Content');
       if (contentError) {
         return {
           success: false,
@@ -1020,7 +1018,7 @@ export class PostService {
       }
     }
 
-    const readingTime = content ? Math.ceil(content.length / READING_SPEED) : post.reading_time;
+    const readingTime = content ? Math.ceil(content.length / POST_CONSTANTS.READING_SPEED) : post.reading_time;
 
     let passwordHash = post.password_hash;
     if (visibility === 'password') {
@@ -1356,7 +1354,7 @@ export class PostService {
     query: PostListQuery
   ): Promise<{ success: boolean; posts?: any[]; pagination?: any }> {
     const page = Math.max(1, query.page || 1);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit || DEFAULT_PAGE_SIZE));
+    const limit = Math.min(POST_CONSTANTS.MAX_PAGE_SIZE, Math.max(1, query.limit || POST_CONSTANTS.DEFAULT_PAGE_SIZE));
     const offset = (page - 1) * limit;
 
     const { results } = await db.prepare(`
@@ -1404,7 +1402,7 @@ export class PostService {
     query: PostListQuery
   ): Promise<{ success: boolean; items?: any[]; pagination?: any }> {
     const page = Math.max(1, query.page || 1);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit || DEFAULT_PAGE_SIZE));
+    const limit = Math.min(POST_CONSTANTS.MAX_PAGE_SIZE, Math.max(1, query.limit || POST_CONSTANTS.DEFAULT_PAGE_SIZE));
     const offset = (page - 1) * limit;
 
     const { results } = await db.prepare(`
@@ -1446,7 +1444,7 @@ export class PostService {
     query: PostListQuery
   ): Promise<{ success: boolean; posts?: any[]; pagination?: any }> {
     const page = Math.max(1, query.page || 1);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit || DEFAULT_PAGE_SIZE));
+    const limit = Math.min(POST_CONSTANTS.MAX_PAGE_SIZE, Math.max(1, query.limit || POST_CONSTANTS.DEFAULT_PAGE_SIZE));
     const offset = (page - 1) * limit;
 
     const { results } = await db.prepare(`
@@ -1662,13 +1660,3 @@ export class PostService {
     }
   }
 }
-
-export const POST_CONSTANTS = {
-  DEFAULT_PAGE_SIZE,
-  MAX_PAGE_SIZE,
-  MIN_TITLE_LENGTH,
-  MAX_TITLE_LENGTH,
-  MIN_CONTENT_LENGTH,
-  MAX_CONTENT_LENGTH,
-  READING_SPEED
-};

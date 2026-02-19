@@ -17,16 +17,15 @@ import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { createNotification, getNotifications } from '../services/notificationService';
 import type { NotificationType, NotificationChannel } from '../types/notifications';
+import {
+  NOTIFICATION_CONSTANTS,
+  APP_CONSTANTS,
+} from '../config/constants';
 
 export const adminNotificationRoutes = new Hono<{
   Bindings: Env;
   Variables: Variables;
 }>();
-
-// 默认分页配置
-const DEFAULT_PAGE = 1;
-const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 100;
 
 /**
  * POST /api/admin/notifications/send
@@ -47,7 +46,6 @@ adminNotificationRoutes.post('/send', requireAuth, requireAdmin, async (c) => {
   try {
     const body = await c.req.json();
 
-    // 验证请求体
     if (!body.title || typeof body.title !== 'string') {
       return c.json(errorResponse('Title is required', '标题不能为空'), 400);
     }
@@ -188,10 +186,10 @@ adminNotificationRoutes.get('/list', requireAuth, requireAdmin, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const page = parseInt(c.req.query('page') || String(DEFAULT_PAGE));
+    const page = parseInt(c.req.query('page') || String(NOTIFICATION_CONSTANTS.DEFAULT_PAGE));
     const limit = Math.min(
-      MAX_LIMIT,
-      Math.max(1, parseInt(c.req.query('limit') || String(DEFAULT_LIMIT)))
+      NOTIFICATION_CONSTANTS.MAX_LIMIT,
+      Math.max(1, parseInt(c.req.query('limit') || String(NOTIFICATION_CONSTANTS.DEFAULT_LIMIT)))
     );
     const type = c.req.query('type') as NotificationType | undefined;
     const userId = c.req.query('userId')

@@ -22,7 +22,8 @@ import { requireAuth, requireAdmin, optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { isFeatureEnabled } from './config';
 import { safeParseInt } from '../utils/validation';
-import { PostService, POST_CONSTANTS } from '../services/postService';
+import { PostService } from '../services/postService';
+import { POST_CONSTANTS } from '../config/constants';
 
 export const postRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 

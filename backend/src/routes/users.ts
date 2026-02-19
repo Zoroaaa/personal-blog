@@ -17,7 +17,8 @@ import { Env, Variables } from '../types';
 import { successResponse, errorResponse, getStatus } from '../utils/response';
 import { createLogger } from '../middleware/requestLogger';
 import { safeParseInt } from '../utils/validation';
-import { UserService, USER_CONSTANTS } from '../services/userService';
+import { UserService } from '../services/userService';
+import { PAGINATION_CONSTANTS } from '../config/constants';
 
 export const userRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -72,7 +73,7 @@ userRoutes.get('/:id/posts', async (c) => {
     const result = await UserService.getUserPosts(c.env.DB, {
       userId,
       page: safeParseInt(c.req.query('page'), 1),
-      limit: safeParseInt(c.req.query('limit'), USER_CONSTANTS.DEFAULT_PAGE_SIZE)
+      limit: safeParseInt(c.req.query('limit'), PAGINATION_CONSTANTS.DEFAULT_PAGE_SIZE)
     });
 
     if (!result.success) {

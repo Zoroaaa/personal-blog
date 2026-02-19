@@ -18,7 +18,8 @@ import { successResponse, errorResponse, getStatus } from '../utils/response';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { safeParseInt } from '../utils/validation';
-import { AdminService, ADMIN_CONSTANTS } from '../services/adminService';
+import { AdminService } from '../services/adminService';
+import { PAGINATION_CONSTANTS } from '../config/constants';
 
 export const adminRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -30,7 +31,7 @@ adminRoutes.get('/comments', requireAdmin, async (c) => {
   try {
     const result = await AdminService.getComments(c.env.DB, {
       page: safeParseInt(c.req.query('page'), 1),
-      limit: safeParseInt(c.req.query('limit'), ADMIN_CONSTANTS.DEFAULT_PAGE_SIZE),
+      limit: safeParseInt(c.req.query('limit'), PAGINATION_CONSTANTS.DEFAULT_PAGE_SIZE),
       status: c.req.query('status'),
       postId: c.req.query('postId'),
       includeDeleted: c.req.query('includeDeleted') === 'true'
@@ -109,7 +110,7 @@ adminRoutes.get('/users', requireAdmin, async (c) => {
   try {
     const result = await AdminService.getUsers(c.env.DB, {
       page: safeParseInt(c.req.query('page'), 1),
-      limit: safeParseInt(c.req.query('limit'), ADMIN_CONSTANTS.DEFAULT_PAGE_SIZE),
+      limit: safeParseInt(c.req.query('limit'), PAGINATION_CONSTANTS.DEFAULT_PAGE_SIZE),
       role: c.req.query('role'),
       status: c.req.query('status'),
       includeDeleted: c.req.query('includeDeleted') === 'true'

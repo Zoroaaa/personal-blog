@@ -13,14 +13,8 @@
 
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
 import { safeParseInt } from '../utils/validation';
+import { PAGINATION_CONSTANTS, DATABASE_CONSTANTS, COMMENT_STATUS_CONSTANTS } from '../config/constants';
 import type { TotalResult, CommentRow, UserRow } from '../types/database';
-
-const DEFAULT_PAGE_SIZE = 20;
-const MAX_PAGE_SIZE = 100;
-
-const VALID_COMMENT_STATUSES = ['approved', 'pending', 'rejected', 'deleted'];
-const VALID_USER_STATUSES = ['active', 'suspended', 'deleted'];
-const VALID_USER_ROLES = ['admin', 'user', 'moderator'];
 
 export interface AdminCommentListQuery {
   page?: number;
@@ -51,7 +45,7 @@ export class AdminService {
     query: AdminCommentListQuery
   ): Promise<AdminResult> {
     const page = Math.max(1, query.page || 1);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit || DEFAULT_PAGE_SIZE));
+    const limit = Math.min(PAGINATION_CONSTANTS.MAX_PAGE_SIZE, Math.max(1, query.limit || PAGINATION_CONSTANTS.DEFAULT_PAGE_SIZE));
     const status = query.status || 'all';
     const postId = query.postId;
     const includeDeleted = query.includeDeleted || false;
@@ -131,10 +125,10 @@ export class AdminService {
     commentId: string,
     status: string
   ): Promise<AdminResult> {
-    if (!VALID_COMMENT_STATUSES.includes(status)) {
+    if (!COMMENT_STATUS_CONSTANTS.STATUSES.includes(status as any)) {
       return {
         success: false,
-        message: `Status must be one of: ${VALID_COMMENT_STATUSES.join(', ')}`,
+        message: `Status must be one of: ${COMMENT_STATUS_CONSTANTS.STATUSES.join(', ')}`,
         statusCode: 400
       };
     }
@@ -190,7 +184,7 @@ export class AdminService {
     query: AdminUserListQuery
   ): Promise<AdminResult> {
     const page = Math.max(1, query.page || 1);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit || DEFAULT_PAGE_SIZE));
+    const limit = Math.min(PAGINATION_CONSTANTS.MAX_PAGE_SIZE, Math.max(1, query.limit || PAGINATION_CONSTANTS.DEFAULT_PAGE_SIZE));
     const role = query.role || 'all';
     const status = query.status || 'all';
     const includeDeleted = query.includeDeleted || false;
@@ -266,10 +260,10 @@ export class AdminService {
     status: string,
     currentUserId: number
   ): Promise<AdminResult> {
-    if (!VALID_USER_STATUSES.includes(status)) {
+    if (!DATABASE_CONSTANTS.USER_STATUSES.includes(status as any)) {
       return {
         success: false,
-        message: `Status must be one of: ${VALID_USER_STATUSES.join(', ')}`,
+        message: `Status must be one of: ${DATABASE_CONSTANTS.USER_STATUSES.join(', ')}`,
         statusCode: 400
       };
     }
@@ -309,10 +303,10 @@ export class AdminService {
     userId: string,
     role: string
   ): Promise<AdminResult> {
-    if (!VALID_USER_ROLES.includes(role)) {
+    if (!DATABASE_CONSTANTS.ROLES.includes(role as any)) {
       return {
         success: false,
-        message: `Role must be one of: ${VALID_USER_ROLES.join(', ')}`,
+        message: `Role must be one of: ${DATABASE_CONSTANTS.ROLES.join(', ')}`,
         statusCode: 400
       };
     }
@@ -391,11 +385,3 @@ export class AdminService {
     };
   }
 }
-
-export const ADMIN_CONSTANTS = {
-  DEFAULT_PAGE_SIZE,
-  MAX_PAGE_SIZE,
-  VALID_COMMENT_STATUSES,
-  VALID_USER_STATUSES,
-  VALID_USER_ROLES
-};

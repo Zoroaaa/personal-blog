@@ -12,6 +12,7 @@
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
+import { APP_CONSTANTS } from '../config/constants';
 
 interface CacheEntry<T> {
   data: T;
@@ -20,14 +21,12 @@ interface CacheEntry<T> {
 
 const queryCache = new Map<string, CacheEntry<any>>();
 
-const DEFAULT_CACHE_TTL = 5 * 60 * 1000;
-
 export async function cachedQuery<T>(
   db: D1Database,
   cacheKey: string,
   query: string,
   params: any[] = [],
-  ttl: number = DEFAULT_CACHE_TTL
+  ttl: number = APP_CONSTANTS.DEFAULT_CACHE_TTL
 ): Promise<T> {
   const cached = queryCache.get(cacheKey);
   

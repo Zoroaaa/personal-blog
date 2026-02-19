@@ -19,16 +19,8 @@ import {
   safeParseInt
 } from '../utils/validation';
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
+import { COLUMN_CONSTANTS } from '../config/constants';
 import type { ColumnRow, TotalResult, TagRowWithPostId } from '../types/database';
-
-const DEFAULT_PAGE_SIZE = 10;
-const MAX_PAGE_SIZE = 50;
-const MIN_NAME_LENGTH = 2;
-const MAX_NAME_LENGTH = 100;
-const MAX_DESCRIPTION_LENGTH = 500;
-const ALLOWED_SORT_FIELDS = ['created_at', 'post_count', 'total_view_count', 'total_like_count', 'display_order'];
-const ALLOWED_POST_SORT_FIELDS = ['published_at', 'view_count', 'like_count', 'comment_count', 'created_at'];
-const VALID_STATUSES = ['active', 'hidden', 'archived'];
 
 export interface ColumnListQuery {
   page?: number;
@@ -71,13 +63,13 @@ export interface ColumnResult {
 export class ColumnService {
   static async getColumns(db: any, query: ColumnListQuery): Promise<ColumnResult> {
     const page = Math.max(1, query.page || 1);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit || DEFAULT_PAGE_SIZE));
+    const limit = Math.min(COLUMN_CONSTANTS.MAX_PAGE_SIZE, Math.max(1, query.limit || COLUMN_CONSTANTS.DEFAULT_PAGE_SIZE));
     const author = query.author;
     const sortBy = query.sortBy || 'display_order';
     const order = query.order === 'asc' ? 'ASC' : 'DESC';
     const offset = (page - 1) * limit;
 
-    const finalSortBy = ALLOWED_SORT_FIELDS.includes(sortBy) ? sortBy : 'display_order';
+    const finalSortBy = COLUMN_CONSTANTS.ALLOWED_SORT_FIELDS.includes(sortBy as any) ? sortBy : 'display_order';
 
     let sql = `
       SELECT
@@ -178,12 +170,12 @@ export class ColumnService {
     }
 
     const page = Math.max(1, query.page || 1);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit || DEFAULT_PAGE_SIZE));
+    const limit = Math.min(COLUMN_CONSTANTS.MAX_PAGE_SIZE, Math.max(1, query.limit || COLUMN_CONSTANTS.DEFAULT_PAGE_SIZE));
     const sortBy = query.sortBy || 'published_at';
     const order = query.order === 'asc' ? 'ASC' : 'DESC';
     const offset = (page - 1) * limit;
 
-    const finalSortBy = ALLOWED_POST_SORT_FIELDS.includes(sortBy) ? sortBy : 'published_at';
+    const finalSortBy = COLUMN_CONSTANTS.ALLOWED_POST_SORT_FIELDS.includes(sortBy as any) ? sortBy : 'published_at';
 
     const column = await db.prepare(
       'SELECT id, status FROM columns WHERE slug = ? AND deleted_at IS NULL'
@@ -288,7 +280,7 @@ export class ColumnService {
     name = sanitizeInput(name);
     description = description ? sanitizeInput(description) : undefined;
 
-    const nameError = validateLength(name, MIN_NAME_LENGTH, MAX_NAME_LENGTH, 'Name');
+    const nameError = validateLength(name, COLUMN_CONSTANTS.MIN_NAME_LENGTH, COLUMN_CONSTANTS.MAX_NAME_LENGTH, 'Name');
     if (nameError) {
       return {
         success: false,
@@ -298,7 +290,7 @@ export class ColumnService {
     }
 
     if (description) {
-      const descError = validateLength(description, 0, MAX_DESCRIPTION_LENGTH, 'Description');
+      const descError = validateLength(description, 0, COLUMN_CONSTANTS.MAX_DESCRIPTION_LENGTH, 'Description');
       if (descError) {
         return {
           success: false,
@@ -383,7 +375,7 @@ export class ColumnService {
 
     if (name) {
       name = sanitizeInput(name);
-      const nameError = validateLength(name, MIN_NAME_LENGTH, MAX_NAME_LENGTH, 'Name');
+      const nameError = validateLength(name, COLUMN_CONSTANTS.MIN_NAME_LENGTH, COLUMN_CONSTANTS.MAX_NAME_LENGTH, 'Name');
       if (nameError) {
         return {
           success: false,
@@ -395,7 +387,7 @@ export class ColumnService {
 
     if (description !== undefined) {
       description = sanitizeInput(description);
-      const descError = validateLength(description, 0, MAX_DESCRIPTION_LENGTH, 'Description');
+      const descError = validateLength(description, 0, COLUMN_CONSTANTS.MAX_DESCRIPTION_LENGTH, 'Description');
       if (descError) {
         return {
           success: false,
@@ -405,7 +397,7 @@ export class ColumnService {
       }
     }
 
-    if (status && !VALID_STATUSES.includes(status)) {
+    if (status && !COLUMN_CONSTANTS.VALID_STATUSES.includes(status as any)) {
       return {
         success: false,
         message: 'Invalid status',
@@ -536,14 +528,3 @@ export class ColumnService {
     };
   }
 }
-
-export const COLUMN_CONSTANTS = {
-  DEFAULT_PAGE_SIZE,
-  MAX_PAGE_SIZE,
-  MIN_NAME_LENGTH,
-  MAX_NAME_LENGTH,
-  MAX_DESCRIPTION_LENGTH,
-  ALLOWED_SORT_FIELDS,
-  ALLOWED_POST_SORT_FIELDS,
-  VALID_STATUSES
-};

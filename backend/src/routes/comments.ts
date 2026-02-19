@@ -20,7 +20,8 @@ import { requireAuth, optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { safeParseInt } from '../utils/validation';
 import { isFeatureEnabled, getConfigValue } from './config';
-import { CommentService, COMMENT_CONSTANTS } from '../services/commentService';
+import { CommentService } from '../services/commentService';
+import { COMMENT_CONSTANTS, RATE_LIMIT_CONSTANTS } from '../config/constants';
 import { rateLimit } from '../middleware/rateLimit';
 
 export const commentRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();

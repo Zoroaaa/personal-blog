@@ -11,6 +11,7 @@
  * @created 2026-02-16
  */
 
+import { PAGINATION_CONSTANTS } from '../config/constants';
 import type { TotalResult, TagRowWithPostId } from '../types/database';
 
 export interface UserSearchQuery {
@@ -40,9 +41,6 @@ export interface UserResult {
   message?: string;
   statusCode?: 200 | 201 | 400 | 401 | 403 | 404 | 409 | 500 | 503;
 }
-
-const DEFAULT_PAGE_SIZE = 10;
-const MAX_PAGE_SIZE = 50;
 
 export class UserService {
   static async searchUser(
@@ -139,7 +137,7 @@ export class UserService {
   ): Promise<UserResult> {
     const { userId } = query;
     const page = Math.max(1, query.page || 1);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit || DEFAULT_PAGE_SIZE));
+    const limit = Math.min(PAGINATION_CONSTANTS.MAX_PAGE_SIZE, Math.max(1, query.limit || PAGINATION_CONSTANTS.DEFAULT_PAGE_SIZE));
     const offset = (page - 1) * limit;
 
     if (isNaN(userId) || userId <= 0) {
@@ -224,8 +222,3 @@ export class UserService {
     };
   }
 }
-
-export const USER_CONSTANTS = {
-  DEFAULT_PAGE_SIZE,
-  MAX_PAGE_SIZE
-};

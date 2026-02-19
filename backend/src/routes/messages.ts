@@ -38,16 +38,17 @@ import {
   type MessageType,
 } from '../services/messageService';
 import { getUploadLimits } from './config';
+import {
+  MESSAGE_CONSTANTS,
+  MESSAGE_TYPE_CONSTANTS,
+  RATE_LIMIT_CONSTANTS,
+} from '../config/constants';
 
 export const messageRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
-const MIN_MESSAGE_LENGTH = 1;
-const MAX_MESSAGE_LENGTH = 2000;
-const MAX_SUBJECT_LENGTH = 100;
-
 messageRoutes.post('/', requireAuth, rateLimit({
-  windowMs: 60 * 1000,
-  maxRequests: 10,
+  windowMs: RATE_LIMIT_CONSTANTS.WINDOW_1_MINUTE,
+  maxRequests: RATE_LIMIT_CONSTANTS.MESSAGE_MAX_REQUESTS,
   message: '发送私信过于频繁，请稍后再试'
 }), async (c) => {
   const logger = createLogger(c);
@@ -108,7 +109,7 @@ messageRoutes.post('/', requireAuth, rateLimit({
 
     if (content) {
       content = sanitizeInput(content);
-      const contentError = validateLength(content, MIN_MESSAGE_LENGTH, MAX_MESSAGE_LENGTH, 'Message content');
+      const contentError = validateLength(content, 1, MESSAGE_CONSTANTS.MAX_MESSAGE_LENGTH, 'Message content');
       if (contentError) {
         return c.json(errorResponse('Invalid message content', contentError), 400);
       }
@@ -116,7 +117,7 @@ messageRoutes.post('/', requireAuth, rateLimit({
 
     if (subject) {
       subject = sanitizeInput(subject);
-      const subjectError = validateLength(subject, 1, MAX_SUBJECT_LENGTH, 'Subject');
+      const subjectError = validateLength(subject, 1, MESSAGE_TYPE_CONSTANTS.MAX_SUBJECT_LENGTH, 'Subject');
       if (subjectError) {
         return c.json(errorResponse('Invalid subject', subjectError), 400);
       }
@@ -446,7 +447,7 @@ messageRoutes.post('/:id/resend', requireAuth, async (c) => {
 
     if (content) {
       content = sanitizeInput(content);
-      const contentError = validateLength(content, 0, MAX_MESSAGE_LENGTH, 'Message content');
+      const contentError = validateLength(content, 0, MESSAGE_CONSTANTS.MAX_MESSAGE_LENGTH, 'Message content');
       if (contentError) {
         return c.json(errorResponse('Invalid message content', contentError), 400);
       }

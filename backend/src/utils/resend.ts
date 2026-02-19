@@ -9,19 +9,12 @@
 
 import type { Env } from '../types';
 import type { Notification, DigestType } from '../types/notifications';
-
-const RESEND_API = 'https://api.resend.com/emails';
+import { URL_CONSTANTS, EMAIL_CONSTANTS } from '../config/constants';
 
 export type VerificationEmailType = 'register' | 'password' | 'delete' | 'forgot_password';
 
 function getVerificationEmailHtml(code: string, type: string): string {
-  const titles: Record<string, string> = {
-    register: '邮箱验证 - 注册',
-    password: '邮箱验证 - 修改密码',
-    delete: '邮箱验证 - 删除账号',
-    forgot_password: '邮箱验证 - 重置密码'
-  };
-  const title = titles[type] || '邮箱验证';
+  const title = EMAIL_CONSTANTS.TITLES[type as keyof typeof EMAIL_CONSTANTS.TITLES] || '邮箱验证';
   return `
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -48,13 +41,13 @@ function getVerificationEmailHtml(code: string, type: string): string {
               <div style="background:#f1f5f9;border-radius:12px;padding:20px;text-align:center;margin-bottom:24px;">
                 <span style="font-size:28px;font-weight:700;letter-spacing:6px;color:#1e293b;font-family:ui-monospace,monospace;">${code}</span>
               </div>
-              <p style="margin:0 0 8px;color:#64748b;font-size:13px;">验证码 10 分钟内有效，请勿泄露给他人。</p>
-              <p style="margin:0;color:#64748b;font-size:13px;">如非本人操作，请忽略此邮件。</p>
+              <p style="margin:0 0 8px;color:#64748b;font-size:13px;">${EMAIL_CONSTANTS.VERIFICATION_HINT}</p>
+              <p style="margin:0;color:#64748b;font-size:13px;">${EMAIL_CONSTANTS.IGNORE_IF_NOT_YOU}</p>
             </td>
           </tr>
           <tr>
             <td style="padding:16px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;">
-              <p style="margin:0;color:#94a3b8;font-size:12px;text-align:center;">此邮件由系统自动发送，请勿直接回复</p>
+              <p style="margin:0;color:#94a3b8;font-size:12px;text-align:center;">${EMAIL_CONSTANTS.FOOTER}</p>
             </td>
           </tr>
         </table>
@@ -69,7 +62,7 @@ function getVerificationEmailHtml(code: string, type: string): string {
 function getNotificationEmailHtml(
   notification: Notification,
   user: { name: string, email: string },
-  baseUrl: string = 'https://blog.example.com'
+  baseUrl: string = URL_CONSTANTS.DEFAULT_FRONTEND
 ): string {
   const typeColors: Record<string, string> = {
     system: '#ef4444',
@@ -213,7 +206,7 @@ export async function sendVerificationEmail(
   const subject = subjects[type] || '【邮箱验证】验证码';
   const html = getVerificationEmailHtml(code, type);
 
-  const res = await fetch(RESEND_API, {
+  const res = await fetch(URL_CONSTANTS.RESEND_API, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -253,7 +246,7 @@ export async function sendNotificationEmail(
   const html = getNotificationEmailHtml(notification, user, baseUrl);
 
   try {
-    const res = await fetch(RESEND_API, {
+    const res = await fetch(URL_CONSTANTS.RESEND_API, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -304,7 +297,7 @@ export async function sendDigestEmail(
   const html = getDigestEmailHtml(user, notifications, digestType, baseUrl);
 
   try {
-    const res = await fetch(RESEND_API, {
+    const res = await fetch(URL_CONSTANTS.RESEND_API, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,

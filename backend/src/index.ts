@@ -31,15 +31,13 @@ import { requestLogger } from './middleware/requestLogger';
 
 import type { Env, ApiResponse } from './types';
 
-import { getAllowedOrigins, getBaseUrl } from './config/constants';
+import { getAllowedOrigins, getBaseUrl, APP_CONSTANTS } from './config/constants';
 import { isAppError, UnauthorizedError, ForbiddenError, NotFoundError, ValidationError, ConflictError, RateLimitError, ServiceUnavailableError } from './utils/errors';
 import { createModuleLogger } from './utils/logger';
 
 const appLogger = createModuleLogger('config');
 
 export type { Env, ApiResponse } from './types';
-
-const API_VERSION = '3.1.0';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -59,10 +57,8 @@ function validateEnv(env: Env): { valid: boolean; error?: string } {
   return { valid: true };
 }
 
-const SKIP_ENV_CHECK_PATHS = ['/', '/health', '/api/health'];
-
 app.use('*', async (c, next) => {
-  if (SKIP_ENV_CHECK_PATHS.includes(c.req.path)) {
+  if (APP_CONSTANTS.SKIP_ENV_CHECK_PATHS.includes(c.req.path)) {
     return next();
   }
 
@@ -156,7 +152,7 @@ app.get('/', (c) => {
     success: true,
     data: {
       name: 'Personal Blog API',
-      version: API_VERSION,
+      version: APP_CONSTANTS.API_VERSION,
       description: 'Modern blog system built with Cloudflare Workers',
       status: 'operational',
       timestamp: new Date().toISOString(),
@@ -251,7 +247,7 @@ app.get('/health', async (c) => {
       status: allHealthy ? 'healthy' : 'degraded',
       timestamp: new Date().toISOString(),
       environment: c.env?.ENVIRONMENT || 'unknown',
-      version: API_VERSION,
+      version: APP_CONSTANTS.API_VERSION,
       services,
       config: envCheck,
       uptime: Date.now()
@@ -269,7 +265,7 @@ app.get('/api/health', (c) => {
     data: {
       status: 'healthy',
       timestamp: new Date().toISOString(),
-      version: API_VERSION
+      version: APP_CONSTANTS.API_VERSION
     }
   });
 });

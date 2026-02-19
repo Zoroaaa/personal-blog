@@ -15,20 +15,26 @@
  */
 
 import { generateRandomString } from '../utils/validation';
+import { UPLOAD_CONSTANTS } from '../config/constants';
 
-const DEFAULT_MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-const DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024;
-
-const ALLOWED_IMAGE_TYPES = [
-  'image/jpeg',
-  'image/jpg',
-  'image/png',
-  'image/gif',
-  'image/webp'
-];
+export interface UploadResult {
+  success: boolean;
+  data?: {
+    url?: string;
+    filename?: string;
+    size?: number;
+    type?: string;
+    uploadedAt?: string;
+    deleted?: boolean;
+    uploadedBy?: string;
+    etag?: string;
+  };
+  message?: string;
+  statusCode?: 200 | 201 | 400 | 401 | 403 | 404 | 409 | 500 | 503;
+}
 
 const ALLOWED_FILE_TYPES = [
-  ...ALLOWED_IMAGE_TYPES,
+  ...UPLOAD_CONSTANTS.ALLOWED_IMAGE_TYPES,
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -51,36 +57,20 @@ const FILE_SIGNATURES: { [key: string]: number[] } = {
   'image/webp': [0x52, 0x49, 0x46, 0x46]
 };
 
-export interface UploadResult {
-  success: boolean;
-  data?: {
-    url?: string;
-    filename?: string;
-    size?: number;
-    type?: string;
-    uploadedAt?: string;
-    deleted?: boolean;
-    uploadedBy?: string;
-    etag?: string;
-  };
-  message?: string;
-  statusCode?: 200 | 201 | 400 | 401 | 403 | 404 | 409 | 500 | 503;
-}
-
 export class UploadService {
   static validateImageType(mimeType: string): boolean {
-    return ALLOWED_IMAGE_TYPES.includes(mimeType);
+    return UPLOAD_CONSTANTS.ALLOWED_IMAGE_TYPES.includes(mimeType as any);
   }
 
   static validateFileType(mimeType: string): boolean {
     return ALLOWED_FILE_TYPES.includes(mimeType);
   }
 
-  static validateImageSize(size: number, maxSize: number = DEFAULT_MAX_IMAGE_SIZE): boolean {
+  static validateImageSize(size: number, maxSize: number = UPLOAD_CONSTANTS.MAX_IMAGE_SIZE): boolean {
     return size > 0 && size <= maxSize;
   }
 
-  static validateFileSize(size: number, maxSize: number = DEFAULT_MAX_FILE_SIZE): boolean {
+  static validateFileSize(size: number, maxSize: number = UPLOAD_CONSTANTS.MAX_DOCUMENT_SIZE): boolean {
     return size > 0 && size <= maxSize;
   }
 
@@ -119,11 +109,11 @@ export class UploadService {
     return prefix ? `${prefix}/${timestamp}-${randomStr}.${ext}` : `${timestamp}-${randomStr}.${ext}`;
   }
 
-  static async uploadImage(storage: any, file: File, userId: number, storageUrl: string, maxSizeBytes: number = DEFAULT_MAX_IMAGE_SIZE): Promise<UploadResult> {
+  static async uploadImage(storage: any, file: File, userId: number, storageUrl: string, maxSizeBytes: number = UPLOAD_CONSTANTS.MAX_IMAGE_SIZE): Promise<UploadResult> {
     if (!this.validateImageType(file.type)) {
       return {
         success: false,
-        message: `Only ${ALLOWED_IMAGE_TYPES.join(', ')} files are allowed`,
+        message: `Only ${UPLOAD_CONSTANTS.ALLOWED_IMAGE_TYPES.join(', ')} files are allowed`,
         statusCode: 400
       };
     }
@@ -183,7 +173,7 @@ export class UploadService {
     };
   }
 
-  static async uploadFile(storage: any, file: File, userId: number, storageUrl: string, maxSizeBytes: number = DEFAULT_MAX_FILE_SIZE): Promise<UploadResult> {
+  static async uploadFile(storage: any, file: File, userId: number, storageUrl: string, maxSizeBytes: number = UPLOAD_CONSTANTS.MAX_DOCUMENT_SIZE): Promise<UploadResult> {
     if (!this.validateFileType(file.type)) {
       return {
         success: false,
@@ -314,10 +304,3 @@ export class UploadService {
     };
   }
 }
-
-export const UPLOAD_CONSTANTS = {
-  DEFAULT_MAX_IMAGE_SIZE,
-  DEFAULT_MAX_FILE_SIZE,
-  ALLOWED_IMAGE_TYPES,
-  ALLOWED_FILE_TYPES
-};

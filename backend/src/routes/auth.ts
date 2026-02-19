@@ -32,15 +32,15 @@ import type { VerificationEmailType } from '../utils/resend';
 import { EmailVerificationService } from '../services/emailVerificationService';
 import { AuthService, validateVerificationType } from '../services/authService';
 import { RefreshTokenService } from '../services/refreshTokenService';
-import { AUTH_CONSTANTS } from '../config/constants';
+import { AUTH_CONSTANTS, RATE_LIMIT_CONSTANTS } from '../config/constants';
 
 export const authRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 authRoutes.post(
   '/send-verification-code',
   rateLimit({
-    windowMs: 60 * 60 * 1000,
-    maxRequests: 5,
+    windowMs: RATE_LIMIT_CONSTANTS.WINDOW_1_HOUR,
+    maxRequests: RATE_LIMIT_CONSTANTS.VERIFY_CODE_MAX_REQUESTS,
     message: '1 小时内最多发送 5 次验证码'
   }),
   optionalAuth,
@@ -220,8 +220,8 @@ authRoutes.post(
 authRoutes.post(
   '/register',
   rateLimit({
-    windowMs: 60 * 60 * 1000,
-    maxRequests: 5,
+    windowMs: RATE_LIMIT_CONSTANTS.WINDOW_1_HOUR,
+    maxRequests: RATE_LIMIT_CONSTANTS.REGISTER_MAX_REQUESTS,
     message: '1 小时内最多只能注册 5 个账号'
   }),
   async (c) => {
@@ -330,8 +330,8 @@ authRoutes.post('/reset-password', async (c) => {
 authRoutes.post(
   '/github',
   rateLimit({
-    windowMs: 5 * 60 * 1000,
-    maxRequests: 10,
+    windowMs: RATE_LIMIT_CONSTANTS.WINDOW_5_MINUTES,
+    maxRequests: RATE_LIMIT_CONSTANTS.GITHUB_OAUTH_MAX_REQUESTS,
     message: '5 分钟内最多尝试 10 次 GitHub 登录'
   }),
   async (c) => {

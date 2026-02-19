@@ -15,10 +15,8 @@
  */
 
 import { safeParseInt } from '../utils/validation';
+import { ANALYTICS_CONSTANTS } from '../config/constants';
 import type { CountResult, SumResult, PostRow } from '../types/database';
-
-const DEFAULT_PAGE_SIZE = 10;
-const MAX_PAGE_SIZE = 50;
 
 export interface AnalyticsResult {
   success: boolean;
@@ -328,8 +326,3 @@ export class AnalyticsService {
     return viewTrend;
   }
 }
-
-export const ANALYTICS_CONSTANTS = {
-  DEFAULT_PAGE_SIZE,
-  MAX_PAGE_SIZE
-};

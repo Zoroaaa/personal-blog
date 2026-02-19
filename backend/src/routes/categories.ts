@@ -18,7 +18,8 @@ import { successResponse, errorResponse, getStatus } from '../utils/response';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { safeParseInt } from '../utils/validation';
-import { CategoryService, TagService, CATEGORY_CONSTANTS } from '../services/categoryService';
+import { CategoryService, TagService } from '../services/categoryService';
+import { CATEGORY_CONSTANTS } from '../config/constants';
 
 export const categoryRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 

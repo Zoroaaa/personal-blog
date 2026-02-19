@@ -25,14 +25,15 @@ import { successResponse, errorResponse, getStatus } from '../utils/response';
 import { requireAuth } from '../middleware/auth';
 import { rateLimit } from '../middleware/rateLimit';
 import { createLogger } from '../middleware/requestLogger';
-import { UploadService, UPLOAD_CONSTANTS } from '../services/uploadService';
+import { UploadService } from '../services/uploadService';
 import { getUploadLimits } from './config';
+import { UPLOAD_CONSTANTS, RATE_LIMIT_CONSTANTS } from '../config/constants';
 
 export const uploadRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 const uploadRateLimit = rateLimit({
-  windowMs: 60 * 1000,
-  maxRequests: 5,
+  windowMs: RATE_LIMIT_CONSTANTS.WINDOW_1_MINUTE,
+  maxRequests: RATE_LIMIT_CONSTANTS.UPLOAD_MAX_REQUESTS,
   message: '1 分钟内最多上传 5 个文件'
 });
 
@@ -187,8 +188,8 @@ uploadRoutes.get('/limits/public', async (c) => {
     }));
   } catch (error) {
     return c.json(successResponse({
-      maxImageSizeMB: UPLOAD_CONSTANTS.DEFAULT_MAX_IMAGE_SIZE / 1024 / 1024,
-      maxFileSizeMB: UPLOAD_CONSTANTS.DEFAULT_MAX_FILE_SIZE / 1024 / 1024
+      maxImageSizeMB: UPLOAD_CONSTANTS.MAX_IMAGE_SIZE / 1024 / 1024,
+      maxFileSizeMB: UPLOAD_CONSTANTS.MAX_DOCUMENT_SIZE / 1024 / 1024
     }));
   }
 });

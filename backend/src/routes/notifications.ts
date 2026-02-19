@@ -25,13 +25,9 @@ import {
   deleteNotification,
 } from '../services/notificationService';
 import type { NotificationType } from '../types/notifications';
+import { NOTIFICATION_CONSTANTS } from '../config/constants';
 
 export const notificationRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
-
-// 默认分页配置
-const DEFAULT_PAGE = 1;
-const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 50;
 
 /**
  * GET /api/notifications
@@ -48,17 +44,16 @@ notificationRoutes.get('/', requireAuth, async (c) => {
 
   try {
     const currentUser = c.get('user');
-    const page = parseInt(c.req.query('page') || String(DEFAULT_PAGE));
+    const page = parseInt(c.req.query('page') || String(NOTIFICATION_CONSTANTS.DEFAULT_PAGE));
     const limit = Math.min(
-      MAX_LIMIT,
-      Math.max(1, parseInt(c.req.query('limit') || String(DEFAULT_LIMIT)))
+      NOTIFICATION_CONSTANTS.MAX_LIMIT,
+      Math.max(1, parseInt(c.req.query('limit') || String(NOTIFICATION_CONSTANTS.DEFAULT_LIMIT)))
     );
     const type = c.req.query('type') as NotificationType | undefined;
     const isReadQuery = c.req.query('isRead');
     const isRead = isReadQuery !== undefined ? isReadQuery === 'true' : undefined;
 
-    // 验证type参数
-    if (type && !['system', 'interaction', 'private_message'].includes(type)) {
+    if (type && !NOTIFICATION_CONSTANTS.TYPES.includes(type as any)) {
       return c.json(
         errorResponse('Invalid type parameter', '无效的通知类型'),
         400

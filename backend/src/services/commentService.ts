@@ -22,12 +22,12 @@ import { SoftDeleteHelper } from '../utils/softDeleteHelper';
 import { createInteractionNotification } from './notificationService';
 import { isInteractionSubtypeEnabled } from './notificationSettingsService';
 import { detectMentions, createMentionNotifications } from './mentionService';
+import {
+  COMMENT_CONSTANTS,
+  NOTIFICATION_PREVIEW_CONSTANTS,
+  COMMENT_STATUS_CONSTANTS,
+} from '../config/constants';
 import type { CommentRow, TotalResult, CountResult } from '../types/database';
-
-const DEFAULT_PAGE_SIZE = 20;
-const MAX_PAGE_SIZE = 100;
-const MIN_COMMENT_LENGTH = 1;
-const DEFAULT_MAX_COMMENT_LENGTH = 1000;
 
 export interface CommentListQuery {
   postId?: string;
@@ -125,7 +125,7 @@ export class CommentService {
     const postId = query.postId;
     const userId = query.userId;
     const page = Math.max(1, query.page || 1);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit || DEFAULT_PAGE_SIZE));
+    const limit = Math.min(COMMENT_CONSTANTS.MAX_PAGE_SIZE, Math.max(1, query.limit || COMMENT_CONSTANTS.DEFAULT_PAGE_SIZE));
     const includeReplies = query.includeReplies !== false;
     const offset = (page - 1) * limit;
 
@@ -286,7 +286,7 @@ export class CommentService {
       };
     }
 
-    const maxCommentLength = await getConfigValue(env, 'max_comment_length', DEFAULT_MAX_COMMENT_LENGTH);
+    const maxCommentLength = await getConfigValue(env, 'max_comment_length', COMMENT_CONSTANTS.MAX_COMMENT_LENGTH);
     const commentApprovalRequired = await isFeatureEnabled(env, 'comment_approval_required');
 
     let { postId, content, parentId, mentionedUserIds } = body;
@@ -301,7 +301,7 @@ export class CommentService {
 
     content = sanitizeCommentContent(content);
 
-    const contentError = validateLength(content, MIN_COMMENT_LENGTH, maxCommentLength, 'Comment');
+    const contentError = validateLength(content, COMMENT_CONSTANTS.MIN_COMMENT_LENGTH, maxCommentLength, 'Comment');
     if (contentError) {
       return {
         success: false,
@@ -655,10 +655,3 @@ export class CommentService {
     };
   }
 }
-
-export const COMMENT_CONSTANTS = {
-  DEFAULT_PAGE_SIZE,
-  MAX_PAGE_SIZE,
-  MIN_COMMENT_LENGTH,
-  DEFAULT_MAX_COMMENT_LENGTH
-};

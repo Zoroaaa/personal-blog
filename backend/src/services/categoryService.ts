@@ -18,11 +18,8 @@ import {
   safeParseInt
 } from '../utils/validation';
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
+import { CATEGORY_CONSTANTS } from '../config/constants';
 import type { CategoryRow, TagRow, TotalResult, CountResult, TagRowWithPostId } from '../types/database';
-
-const DEFAULT_PAGE_SIZE = 10;
-const MAX_PAGE_SIZE = 50;
-const ALLOWED_SORT_FIELDS = ['published_at', 'view_count', 'like_count', 'comment_count', 'created_at'];
 
 export interface CategoryCreateRequest {
   name: string;
@@ -261,12 +258,12 @@ export class CategoryService {
     }
 
     const page = Math.max(1, query.page || 1);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit || DEFAULT_PAGE_SIZE));
+    const limit = Math.min(CATEGORY_CONSTANTS.MAX_PAGE_SIZE, Math.max(1, query.limit || CATEGORY_CONSTANTS.DEFAULT_PAGE_SIZE));
     const sortBy = query.sortBy || 'published_at';
     const order = query.order === 'asc' ? 'ASC' : 'DESC';
     const offset = (page - 1) * limit;
 
-    const finalSortBy = ALLOWED_SORT_FIELDS.includes(sortBy) ? sortBy : 'published_at';
+    const finalSortBy = CATEGORY_CONSTANTS.ALLOWED_SORT_FIELDS.includes(sortBy as any) ? sortBy : 'published_at';
 
     const category = await db.prepare(
       'SELECT id FROM categories WHERE slug = ? AND deleted_at IS NULL'
@@ -523,12 +520,12 @@ export class TagService {
     }
 
     const page = Math.max(1, query.page || 1);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit || DEFAULT_PAGE_SIZE));
+    const limit = Math.min(CATEGORY_CONSTANTS.MAX_PAGE_SIZE, Math.max(1, query.limit || CATEGORY_CONSTANTS.DEFAULT_PAGE_SIZE));
     const sortBy = query.sortBy || 'published_at';
     const order = query.order === 'asc' ? 'ASC' : 'DESC';
     const offset = (page - 1) * limit;
 
-    const finalSortBy = ALLOWED_SORT_FIELDS.includes(sortBy) ? sortBy : 'published_at';
+    const finalSortBy = CATEGORY_CONSTANTS.ALLOWED_SORT_FIELDS.includes(sortBy as any) ? sortBy : 'published_at';
 
     const tag = await db.prepare(
       'SELECT id FROM tags WHERE slug = ? AND deleted_at IS NULL'
@@ -614,9 +611,3 @@ export class TagService {
     };
   }
 }
-
-export const CATEGORY_CONSTANTS = {
-  DEFAULT_PAGE_SIZE,
-  MAX_PAGE_SIZE,
-  ALLOWED_SORT_FIELDS
-};

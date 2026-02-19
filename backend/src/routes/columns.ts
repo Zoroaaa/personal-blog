@@ -19,7 +19,8 @@ import { successResponse, errorResponse, getStatus } from '../utils/response';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { safeParseInt } from '../utils/validation';
-import { ColumnService, COLUMN_CONSTANTS } from '../services/columnService';
+import { ColumnService } from '../services/columnService';
+import { COLUMN_CONSTANTS } from '../config/constants';
 
 export const columnRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 

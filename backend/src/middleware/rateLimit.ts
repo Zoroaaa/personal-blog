@@ -21,6 +21,12 @@
 import type { Context, Next } from 'hono';
 import { errorResponse } from '../utils/response';
 import { createModuleLogger } from '../utils/logger';
+import {
+  RATE_LIMIT_CONSTANTS,
+  TIME_CONSTANTS,
+  PUBLIC_ENDPOINTS,
+  LOCALHOST_IPS,
+} from '../config/constants';
 
 const logger = createModuleLogger('rateLimit');
 
@@ -48,8 +54,8 @@ function getRealIP(c: Context): string {
 
 export function rateLimit(options: RateLimitOptions = {}) {
   const {
-    windowMs = 60 * 1000,
-    maxRequests = 30,
+    windowMs = RATE_LIMIT_CONSTANTS.WINDOW_1_MINUTE,
+    maxRequests = RATE_LIMIT_CONSTANTS.DEFAULT_MAX_REQUESTS,
     keyGenerator = (c: Context) => getRealIP(c),
     skip = () => false,
     message = '请求过于频繁，请稍后再试'
@@ -172,16 +178,10 @@ export function skipPublicRead(c: Context): boolean {
     return true;
   }
 
-  const publicEndpoints = [
-    '/api/posts',
-    '/api/categories',
-    '/api/tags'
-  ];
-
-  return publicEndpoints.some(endpoint => path.startsWith(endpoint));
+  return PUBLIC_ENDPOINTS.some(endpoint => path.startsWith(endpoint));
 }
 
 export function skipLocalhost(c: Context): boolean {
   const ip = getRealIP(c);
-  return ['127.0.0.1', 'localhost', '::1'].includes(ip);
+  return LOCALHOST_IPS.includes(ip as any);
 }
