@@ -124,11 +124,10 @@
    cd backend
    wrangler d1 create personal-blog-dev
    
-   # 执行数据库迁移（需按顺序执行）
+   # 执行数据库迁移（按顺序执行）
    wrangler d1 execute personal-blog-dev --file=../database/schema-v1.1-base.sql
    wrangler d1 execute personal-blog-dev --file=../database/schema-v1.3-notification-messaging.sql
-   wrangler d1 execute personal-blog-dev --file=../database/migration-v1.4-message-recall.sql
-   wrangler d1 execute personal-blog-dev --file=../database/migration-v1.9-post-pinning.sql
+   wrangler d1 execute personal-blog-dev --file=../database/schema-v1.4-refresh-tokens.sql
    ```
 
 5. **创建 R2 存储桶**
@@ -203,8 +202,7 @@ personal-blog/
 ├── database/               # 数据库文件
 │   ├── schema-v1.1-base.sql          # 基础数据库架构
 │   ├── schema-v1.3-notification-messaging.sql # 通知私信架构
-│   ├── migration-v1.4-message-recall.sql # 消息撤回迁移
-│   └── migration-v1.9-post-pinning.sql # 文章置顶迁移
+│   └── schema-v1.4-refresh-tokens.sql # Refresh Token 支持
 ├── frontend/               # 前端应用 (64个TypeScript文件)
 │   ├── src/
 │   │   ├── pages/          # 页面组件
