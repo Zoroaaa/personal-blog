@@ -2,8 +2,6 @@ name = "blog-api"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 
-# 绑定域名
-routes = [{ pattern = "blogapi.wort.uk", custom_domain = true }]
 
 # D1 数据库
 [[d1_databases]]
