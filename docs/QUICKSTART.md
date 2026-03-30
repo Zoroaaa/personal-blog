@@ -167,11 +167,8 @@ wrangler d1 execute personal-blog-dev --file=../database/schema-v1.1-base.sql
 # 通知和私信系统
 wrangler d1 execute personal-blog-dev --file=../database/schema-v1.3-notification-messaging.sql
 
-# 消息撤回功能
-wrangler d1 execute personal-blog-dev --file=../database/migration-v1.4-message-recall.sql
-
-# 文章置顶功能（v1.4.0新增）
-wrangler d1 execute personal-blog-dev --file=../database/migration-v1.9-post-pinning.sql
+# Refresh Token 支持
+wrangler d1 execute personal-blog-dev --file=../database/schema-v1.4-refresh-tokens.sql
 ```
 
 #### 3. 验证数据库
@@ -241,8 +238,8 @@ cp .env.example .env
 #### 2. 编辑 `.env` 文件
 
 ```env
-# 后端 API 地址
-VITE_API_URL=http://localhost:8787
+# 后端 API 地址（需包含 /api 后缀）
+VITE_API_URL=http://localhost:8787/api
 
 # 是否开启调试模式
 VITE_DEBUG=true

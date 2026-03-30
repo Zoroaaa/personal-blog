@@ -212,11 +212,11 @@ export default function ApiTestPage() {
                 </div>
                 <div>
                   <strong>2. 检查后端部署</strong>
-                  <p>访问 https://apiblog.neutronx.uk/health 确认后端是否正常运行</p>
+                  <p>访问 https://blogapi.wort.uk/health 确认后端是否正常运行</p>
                 </div>
                 <div>
                   <strong>3. 检查CORS配置</strong>
-                  <p>确保后端允许 https://blog.neutronx.uk 的跨域请求</p>
+                  <p>确保后端允许 https://blog.wort.uk 的跨域请求</p>
                 </div>
                 <div>
                   <strong>4. 检查浏览器控制台</strong>

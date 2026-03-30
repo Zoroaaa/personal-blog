@@ -5,10 +5,20 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Version](https://img.shields.io/badge/version-1.4.0-green.svg)](https://github.com/yourusername/personal-blog)
 [![Cloudflare](https://img.shields.io/badge/Cloudflare-Workers-orange.svg)](https://workers.cloudflare.com/)
-
-**体验地址**: [blog.neutronx.uk](https://blog.neutronx.uk)
+[![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/Zoroaaa/personal-blog)
 
 ---
+
+## 🔗 快速访问
+
+<div align="center">
+
+| 资源类型 | 链接 | 备注 |
+|---------|------|------|
+| 📖 项目文档 | 👉 [完整介绍](https://zread.ai/Zoroaaa/personal-blog) | 详细的项目说明和使用指南 |
+| 🚀 在线体验 | 👉 [https://blog.wort.uk](https://blog.wort.uk) | 体验完整功能 |
+
+</div>
 
 ## 效果图
 
@@ -114,11 +124,10 @@
    cd backend
    wrangler d1 create personal-blog-dev
    
-   # 执行数据库迁移（需按顺序执行）
+   # 执行数据库迁移（按顺序执行）
    wrangler d1 execute personal-blog-dev --file=../database/schema-v1.1-base.sql
    wrangler d1 execute personal-blog-dev --file=../database/schema-v1.3-notification-messaging.sql
-   wrangler d1 execute personal-blog-dev --file=../database/migration-v1.4-message-recall.sql
-   wrangler d1 execute personal-blog-dev --file=../database/migration-v1.9-post-pinning.sql
+   wrangler d1 execute personal-blog-dev --file=../database/schema-v1.4-refresh-tokens.sql
    ```
 
 5. **创建 R2 存储桶**
@@ -193,8 +202,7 @@ personal-blog/
 ├── database/               # 数据库文件
 │   ├── schema-v1.1-base.sql          # 基础数据库架构
 │   ├── schema-v1.3-notification-messaging.sql # 通知私信架构
-│   ├── migration-v1.4-message-recall.sql # 消息撤回迁移
-│   └── migration-v1.9-post-pinning.sql # 文章置顶迁移
+│   └── schema-v1.4-refresh-tokens.sql # Refresh Token 支持
 ├── frontend/               # 前端应用 (64个TypeScript文件)
 │   ├── src/
 │   │   ├── pages/          # 页面组件
