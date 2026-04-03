@@ -404,7 +404,6 @@ wrangler pages deploy dist
 如有问题或建议，欢迎通过以下方式联系：
 
 - 提交 [GitHub Issue](https://github.com/Zoroaaa/personal-blog/issues)
-- 发送邮件至：zoroasx@gmail.com
 
 ---
 
