@@ -222,8 +222,9 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
   try {
     const slug = c.req.param('slug');
     const currentUser = c.get('user');
+    const postToken = c.req.header('X-Post-Token');
 
-    const result = await PostService.getPostBySlug(c.env.DB, c.env, slug, currentUser);
+    const result = await PostService.getPostBySlug(c.env.DB, c.env, slug, currentUser, postToken);
 
     if (!result.success) {
       return c.json(errorResponse(result.message || 'Post not found'), getStatus(result.statusCode, 404));

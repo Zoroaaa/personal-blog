@@ -642,7 +642,8 @@ export class PostService {
     db: any,
     env: any,
     slug: string,
-    currentUser: any
+    currentUser: any,
+    postToken?: string
   ): Promise<{ success: boolean; post?: any; message?: string; statusCode?: 200 | 201 | 400 | 401 | 403 | 404 | 409 | 500 | 503; requiresPassword?: boolean }> {
     const post = await db.prepare(`
       SELECT p.*,
@@ -695,27 +696,34 @@ export class PostService {
     }
 
     if (post.visibility === 'password') {
-      return {
-        success: true,
-        requiresPassword: true,
-        post: {
-          id: post.id,
-          title: post.title,
-          slug: post.slug,
-          summary: post.summary,
-          cover_image: post.cover_image,
-          visibility: post.visibility,
-          requires_password: true,
-          author_username: post.author_username,
-          author_name: post.author_name,
-          author_avatar: post.author_avatar,
-          category_name: post.category_name,
-          category_slug: post.category_slug,
-          category_color: post.category_color,
-          published_at: post.published_at,
-          created_at: post.created_at
-        }
-      };
+      // 携带有效访问令牌时返回完整内容，否则要求输入密码
+      const hasValidToken = postToken
+        ? await PostService.verifyPostToken(env, postToken, post.id)
+        : false;
+
+      if (!hasValidToken) {
+        return {
+          success: true,
+          requiresPassword: true,
+          post: {
+            id: post.id,
+            title: post.title,
+            slug: post.slug,
+            summary: post.summary,
+            cover_image: post.cover_image,
+            visibility: post.visibility,
+            requires_password: true,
+            author_username: post.author_username,
+            author_name: post.author_name,
+            author_avatar: post.author_avatar,
+            category_name: post.category_name,
+            category_slug: post.category_slug,
+            category_color: post.category_color,
+            published_at: post.published_at,
+            created_at: post.created_at
+          }
+        };
+      }
     }
 
     const { results: tags } = await db.prepare(`
