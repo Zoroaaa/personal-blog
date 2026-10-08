@@ -58,6 +58,9 @@ jobs:
           npx wrangler --version
           echo "Wrangler 版本验证完成"
       
+      - name: Type Check
+        run: npm run typecheck
+      
       - name: Validate Configuration
         run: |
           echo "验证配置文件..."
