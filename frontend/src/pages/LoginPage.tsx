@@ -116,10 +116,10 @@ export function LoginPage() {
           const response = await api.githubLogin(code);
           
           if (response.success && response.data) {
-            const { user, token } = response.data;
+            const { user, token, refreshToken, expiresIn } = response.data;
             
             // 保存到store
-            login(user, token);
+            login(user, token, refreshToken, expiresIn);
             
             // 跳转
             navigate(redirectPath, { replace: true });
@@ -169,12 +169,12 @@ export function LoginPage() {
         
         // 检查响应格式
         if (response.success && response.data) {
-          const { user, token } = response.data;
+          const { user, token, refreshToken, expiresIn } = response.data;
           
           console.log('Login successful:', { user, hasToken: !!token });
           
           // 保存到store
-          login(user, token);
+          login(user, token, refreshToken, expiresIn);
           
           showSuccess('登录成功');
           
@@ -196,8 +196,8 @@ export function LoginPage() {
         });
         
         if (response.success && response.data) {
-          const { user, token } = response.data;
-          login(user, token);
+          const { user, token, refreshToken, expiresIn } = response.data;
+          login(user, token, refreshToken, expiresIn);
           showSuccess('注册成功');
           navigate(redirectPath, { replace: true });
         } else {
