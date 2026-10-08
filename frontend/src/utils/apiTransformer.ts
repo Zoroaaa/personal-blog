@@ -121,6 +121,7 @@ export function transformComment(comment: any): Comment {
     content: comment.content,
     status: comment.status,
     likeCount: comment.like_count,
+    isLiked: comment.isLiked,
     replyCount: comment.reply_count,
     createdAt: comment.created_at,
     updatedAt: comment.updated_at,

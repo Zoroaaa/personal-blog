@@ -545,6 +545,7 @@ export function PostPage() {
       if (comment.id === commentId) {
         return {
           ...comment,
+          isLiked: liked,
           likeCount: comment.likeCount + (liked ? 1 : -1),
         };
       }
@@ -597,9 +598,14 @@ export function PostPage() {
             <button
               onClick={() => handleLikeComment(comment.id)}
               disabled={commentLiking === comment.id}
-              className={`hover:text-primary flex items-center ${commentLiking === comment.id ? 'opacity-50' : ''}`}
+              className={`flex items-center transition-colors ${comment.isLiked ? 'text-red-600' : 'hover:text-primary'} ${commentLiking === comment.id ? 'opacity-50' : ''}`}
             >
-              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg
+                className={`w-4 h-4 mr-1 ${comment.isLiked ? 'fill-current' : ''}`}
+                fill={comment.isLiked ? 'currentColor' : 'none'}
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
               </svg>
               {comment.likeCount || 0}
