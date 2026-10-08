@@ -109,7 +109,7 @@ commentRoutes.post('/', requireAuth, rateLimit({
 });
 
 commentRoutes.delete('/:id', requireAuth, rateLimit({
-  windowMs: 30 * 1000,
+  windowMs: 60 * 1000,
   maxRequests: 10,
   message: '删除评论过于频繁，请稍后再试'
 }), async (c) => {
@@ -139,7 +139,7 @@ commentRoutes.delete('/:id', requireAuth, rateLimit({
 });
 
 commentRoutes.post('/:id/like', requireAuth, rateLimit({
-  windowMs: 15 * 1000,
+  windowMs: 60 * 1000,
   maxRequests: 20,
   message: '点赞操作过于频繁，请稍后再试'
 }), async (c) => {
