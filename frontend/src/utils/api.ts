@@ -39,6 +39,7 @@ import type {
   PostQueryParams,
   CommentQueryParams
 } from '../types';
+import { useAuthStore } from '../stores/authStore';
 
 // ============= 配置 =============
 
@@ -50,10 +51,15 @@ const isDevelopment = import.meta?.env?.DEV;
 
 /**
  * 统一的API请求函数
+ *
+ * @param endpoint 接口路径
+ * @param options fetch 配置
+ * @param _retried 内部使用：标记该请求是否已因 401 重试过，防止死循环
  */
 export async function apiRequest<T = any>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  _retried = false
 ): Promise<ApiResponse<T>> {
   // 获取token
   const token = getAuthToken();
@@ -115,7 +121,17 @@ export async function apiRequest<T = any>(
     
     // 处理HTTP错误
     if (!response.ok) {
-      // Token过期,自动登出
+      // Token过期：先尝试静默刷新一次，成功后重试原请求，失败再登出
+      if (response.status === 401 && !_retried && endpoint !== '/auth/refresh') {
+        const newToken = await getRefreshedToken();
+        if (newToken) {
+          return apiRequest<T>(endpoint, options, true);
+        }
+        handleUnauthorized();
+        throw new Error(data.error || data.message || '登录已过期，请重新登录');
+      }
+
+      // 刷新接口本身返回 401，或重试后仍 401：登出
       if (response.status === 401) {
         handleUnauthorized();
       }
@@ -140,23 +156,92 @@ export async function apiRequest<T = any>(
  * 获取认证token
  */
 function getAuthToken(): string | null {
+  return getAuthState()?.token || null;
+}
+
+/**
+ * 获取refresh token
+ */
+function getRefreshToken(): string | null {
+  return getAuthState()?.refreshToken || null;
+}
+
+/**
+ * 从持久化的 auth-storage 读取认证状态
+ */
+function getAuthState(): { token?: string | null; refreshToken?: string | null } | null {
   try {
     const storage = localStorage.getItem('auth-storage');
     if (!storage) return null;
     
     const parsed = JSON.parse(storage);
-    return parsed.state?.token || null;
+    return parsed.state || null;
   } catch (e) {
-    console.error('Failed to parse auth token:', e);
+    console.error('Failed to parse auth storage:', e);
     return null;
   }
+}
+
+// 单飞：并发 401 时共用一个刷新 Promise，避免刷新风暴
+let refreshPromise: Promise<string | null> | null = null;
+
+/**
+ * 执行一次静默刷新（内部函数，注意单飞复用）
+ */
+async function performRefresh(): Promise<string | null> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return null;
+
+  try {
+    // 直接用 fetch，避免走 apiRequest 触发 401 重试路径
+    const response = await fetch(`${API_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!response.ok) return null;
+
+    const json = await response.json() as ApiResponse<{
+      token: string;
+      refreshToken?: string;
+      expiresIn?: number;
+    }>;
+
+    const data = json?.data;
+    if (!json?.success || !data?.token) return null;
+
+    // 刷新后后端会轮换 refresh token，需同步更新
+    useAuthStore.getState().setTokens(data.token, data.refreshToken ?? null, data.expiresIn);
+
+    return data.token;
+  } catch (e) {
+    if (isDevelopment) {
+      console.warn('Token refresh failed:', e);
+    }
+    return null;
+  }
+}
+
+/**
+ * 单飞刷新入口：同一时刻只触发一次刷新，其余请求复用同一个 Promise
+ */
+function getRefreshedToken(): Promise<string | null> {
+  if (!refreshPromise) {
+    refreshPromise = performRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
 }
 
 /**
  * 处理未授权错误
  */
 function handleUnauthorized(): void {
-  // 清除本地存储的认证信息
+  // 清空认证状态（zustand persist 会同步写回 auth-storage）
+  useAuthStore.getState().logout();
   localStorage.removeItem('auth-storage');
   
   // 跳转到登录页(如果不在登录页)
@@ -223,7 +308,7 @@ export const api = {
    * 用户注册
    */
   register: (data: RegisterRequest) => 
-    apiRequest<{ user: User; token: string }>('/auth/register', {
+    apiRequest<{ user: User; token: string; refreshToken?: string; expiresIn?: number }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -232,7 +317,7 @@ export const api = {
    * 用户登录
    */
   login: (data: LoginRequest) => 
-    apiRequest<{ user: User; token: string }>('/auth/login', {
+    apiRequest<{ user: User; token: string; refreshToken?: string; expiresIn?: number }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -282,7 +367,7 @@ export const api = {
    * GitHub OAuth登录
    */
   githubLogin: (code: string) =>
-    apiRequest<{ user: User; token: string }>('/auth/github', {
+    apiRequest<{ user: User; token: string; refreshToken?: string; expiresIn?: number }>('/auth/github', {
       method: 'POST',
       body: JSON.stringify({ code }),
     }),

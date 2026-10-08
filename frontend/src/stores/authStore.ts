@@ -33,14 +33,27 @@ export interface User {
 export interface AuthState {
   user: User | null;
   token: string | null;
+  refreshToken: string | null;
+  /** access token 过期时间戳（毫秒），由后端 expiresIn（秒）换算 */
+  expiresAt: number | null;
   isAuthenticated: boolean;
   
   /**
    * 登录方法
    * @param user 用户信息
    * @param token 认证token
+   * @param refreshToken 刷新token
+   * @param expiresIn access token 有效期（秒）
    */
-  login: (user: User, token: string) => void;
+  login: (user: User, token: string, refreshToken?: string | null, expiresIn?: number) => void;
+  
+  /**
+   * 静默刷新成功后更新 token
+   * @param token 新的 access token
+   * @param refreshToken 新的 refresh token
+   * @param expiresIn access token 有效期（秒）
+   */
+  setTokens: (token: string, refreshToken?: string | null, expiresIn?: number) => void;
   
   /**
    * 登出方法
@@ -59,14 +72,36 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       token: null,
+      refreshToken: null,
+      expiresAt: null,
       isAuthenticated: false,
       
-      login: (user, token) => {
-        set({ user, token, isAuthenticated: true });
+      login: (user, token, refreshToken, expiresIn) => {
+        set({
+          user,
+          token,
+          refreshToken: refreshToken ?? null,
+          expiresAt: expiresIn ? Date.now() + expiresIn * 1000 : null,
+          isAuthenticated: true,
+        });
+      },
+
+      setTokens: (token, refreshToken, expiresIn) => {
+        set({
+          token,
+          refreshToken: refreshToken ?? null,
+          expiresAt: expiresIn ? Date.now() + expiresIn * 1000 : null,
+        });
       },
       
       logout: () => {
-        set({ user: null, token: null, isAuthenticated: false });
+        set({
+          user: null,
+          token: null,
+          refreshToken: null,
+          expiresAt: null,
+          isAuthenticated: false,
+        });
       },
       
       setUser: (user) => {
