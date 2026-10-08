@@ -27,6 +27,7 @@ import { SEO } from '../components/SEO';
 import { getMarkdownComponents, generateToc } from '../utils/markdownRenderer';
 import { useToast } from '../components/Toast';
 import { RichTextEditor } from '../components/RichTextEditor';
+import { sanitizeHtml } from '../utils/sanitizeHtml';
 import type { User } from '../types';
 
 // 导入代码高亮样式
@@ -590,7 +591,7 @@ export function PostPage() {
           <div 
             className="text-foreground comment-content"
             dangerouslySetInnerHTML={{ 
-              __html: comment.content 
+              __html: sanitizeHtml(comment.content) 
             }}
           />
 
