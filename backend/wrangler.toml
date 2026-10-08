@@ -19,6 +19,15 @@ id = "69c0b7cfff1d48769cc2bd29f2d9711f"
 binding = "STORAGE"
 bucket_name = "blog-storage"
 
+# Durable Object - 原子限流计数器
+[[durable_objects.bindings]]
+name = "RATE_LIMITER"
+class_name = "RateLimiter"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RateLimiter"]
+
 # 日志配置
 [observability]
 enabled = true

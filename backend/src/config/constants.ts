@@ -469,6 +469,12 @@ export const RATE_LIMIT_CONSTANTS = {
   DEFAULT_MAX_REQUESTS: 30,
 
   /**
+   * 全局限流最大请求数
+   * 对所有路由生效的兜底限流：每个 IP 每分钟最多 300 次请求
+   */
+  GLOBAL_MAX_REQUESTS: 300,
+
+  /**
    * 注册接口限制
    * 1 小时内最多注册 5 次（防止批量注册）
    */
