@@ -28,10 +28,11 @@ import { userNotificationSettingsRoutes } from './routes/users/notificationSetti
 import { messageSettingsRoutes } from './routes/users/messageSettings';
 
 import { requestLogger } from './middleware/requestLogger';
+import { rateLimit } from './middleware/rateLimit';
 
 import type { Env, ApiResponse } from './types';
 
-import { getAllowedOrigins, getBaseUrl, APP_CONSTANTS } from './config/constants';
+import { getAllowedOrigins, getBaseUrl, APP_CONSTANTS, RATE_LIMIT_CONSTANTS } from './config/constants';
 import { isAppError, UnauthorizedError, ForbiddenError, NotFoundError, ValidationError, ConflictError, RateLimitError, ServiceUnavailableError } from './utils/errors';
 import { createModuleLogger } from './utils/logger';
 
@@ -138,6 +139,14 @@ app.use('*', (c, next) => {
 
   return corsMiddleware(c, next);
 });
+
+// 3. 全局限流（兜底）——按 IP 每分钟 300 次
+//    跳过 CORS 预检 OPTIONS 与健康检查端点；更严格的路由级限流在各自路由内注册
+app.use('*', rateLimit({
+  windowMs: RATE_LIMIT_CONSTANTS.WINDOW_1_MINUTE,
+  maxRequests: RATE_LIMIT_CONSTANTS.GLOBAL_MAX_REQUESTS,
+  skip: (c) => c.req.method === 'OPTIONS' || ['/health', '/api/health'].includes(c.req.path)
+}));
 
 
 
@@ -460,6 +469,9 @@ import { processDigestQueue, cleanupSentDigestItems } from './services/digestSer
 import { RefreshTokenService } from './services/refreshTokenService';
 
 export default app;
+
+// 导出 Durable Object 类（限流原子计数器），供 wrangler 绑定引用
+export { RateLimiter } from './durableObjects/RateLimiter';
 
 export const scheduled: ExportedHandlerScheduledHandler<Env> = async (event, env, ctx) => {
   console.log('Scheduled task triggered at:', new Date().toISOString());

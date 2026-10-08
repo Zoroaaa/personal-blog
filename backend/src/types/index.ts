@@ -17,6 +17,8 @@ import type { JWTPayload, TokenPayload } from '../utils/jwt';
 export type Env = {
   DB: D1Database;
   CACHE?: KVNamespace;
+  /** Durable Object 原子限流计数器 */
+  RATE_LIMITER: DurableObjectNamespace;
   STORAGE: R2Bucket;
   JWT_SECRET: string;
   POST_PASSWORD_SECRET?: string;
