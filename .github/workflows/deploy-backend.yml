@@ -28,38 +28,28 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: 'backend/package-lock.json'
-      
-      - name: Install and Update Dependencies
+          # 单仓 workspaces：唯一权威锁文件在仓库根目录
+          cache-dependency-path: 'package-lock.json'
+
+      - name: Install Dependencies
+        # workspaces 依赖统一 hoist 到根 node_modules，必须在仓库根执行 npm ci
+        # npm ci 严格按根 package-lock.json 安装，保证可复现；lock 与 package.json 不一致会直接失败
+        working-directory: .
         run: |
-          echo "安装和更新依赖..."
-          # 检查当前状态
-          echo "=== 安装前状态 ==="
-          ls -la package*.json || echo "没有 package 文件"
-          
-          # 如果有 lock 文件，先备份然后删除
-          if [ -f package-lock.json ]; then
-            echo "备份旧的 lock 文件..."
-            cp package-lock.json package-lock.json.backup
-            rm package-lock.json
-          fi
-          
-          # 如果有 node_modules，删除
-          if [ -d node_modules ]; then
-            rm -rf node_modules
-          fi
-          
-          # 全新安装
-          echo "执行全新安装..."
-          npm install
-          
-          # 验证安装
-          echo "=== 安装后验证 ==="
+          npm ci
           npx wrangler --version
-          echo "Wrangler 版本验证完成"
       
       - name: Type Check
         run: npm run typecheck
+
+      - name: Apply D1 Migrations
+        # 部署前先同步生产库结构；脚本为幂等重放，重复执行安全。
+        # 失败即中断，避免旧结构上线新代码。
+        working-directory: .
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: bash scripts/migrate.sh blog-db --remote
       
       - name: Validate Configuration
         run: |

@@ -218,8 +218,10 @@ CREATE VIRTUAL TABLE IF NOT EXISTS posts_fts USING fts5(
     content
 );
 
-INSERT INTO posts_fts(rowid, title, content)
-SELECT id, title, content FROM posts;
+-- 幂等回填：仅索引尚未进入 FTS 的行，重复执行不会报错也不会重复写入
+INSERT OR REPLACE INTO posts_fts(rowid, title, content)
+SELECT id, title, content FROM posts
+WHERE id NOT IN (SELECT rowid FROM posts_fts);
 
 CREATE TRIGGER IF NOT EXISTS trg_posts_fts_insert 
 AFTER INSERT ON posts
