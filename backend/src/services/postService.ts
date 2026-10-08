@@ -41,10 +41,14 @@ import type {
   CountResult,
   TotalResult,
   TagRow,
-  TagRowWithPostId,
   LikeStatusRow,
   FavoriteStatusRow
 } from '../types/database';
+import {
+  POST_LIST_COLUMNS,
+  attachTagsToPosts,
+  fetchTagsForPost,
+} from '../repositories/postRepository';
 
 function getPostPasswordSecret(env: any): string {
   return env.POST_PASSWORD_SECRET || env.JWT_SECRET;
@@ -166,13 +170,7 @@ export class PostService {
     const finalSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'published_at';
 
     let sql = `
-      SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
-             p.view_count, p.like_count, p.comment_count, p.reading_time,
-             p.published_at, p.created_at, p.visibility, p.is_pinned, p.pin_order,
-             u.username as author_name, u.display_name as author_display_name,
-             u.avatar_url as author_avatar,
-             c.name as category_name, c.slug as category_slug, c.color as category_color,
-             col.name as column_name, col.slug as column_slug
+      SELECT ${POST_LIST_COLUMNS}, p.visibility, p.is_pinned, p.pin_order
       FROM posts p
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
@@ -249,35 +247,7 @@ export class PostService {
     const countResult = await db.prepare(countSql).bind(...countParams).first() as TotalResult | null;
     const total = countResult?.total || 0;
 
-    const postIds = results.map((p: any) => p.id);
-    let postsWithTags = results;
-
-    if (postIds.length > 0) {
-      const tagsSql = `
-        SELECT pt.post_id, t.id, t.name, t.slug
-        FROM post_tags pt
-        JOIN tags t ON pt.tag_id = t.id
-        WHERE pt.post_id IN (${postIds.map(() => '?').join(',')})
-      `;
-      const { results: tagResults } = await db.prepare(tagsSql).bind(...postIds).all();
-
-      const tagsByPost = new Map();
-      (tagResults as TagRowWithPostId[]).forEach(tag => {
-        if (!tagsByPost.has(tag.post_id)) {
-          tagsByPost.set(tag.post_id, []);
-        }
-        tagsByPost.get(tag.post_id).push({
-          id: tag.id,
-          name: tag.name,
-          slug: tag.slug
-        });
-      });
-
-      postsWithTags = results.map((post: any) => ({
-        ...post,
-        tags: tagsByPost.get(post.id) || []
-      }));
-    }
+    const postsWithTags = await attachTagsToPosts(db, results);
 
     return {
       success: true,
@@ -300,13 +270,7 @@ export class PostService {
     const offset = (page - 1) * limit;
 
     const { results } = await db.prepare(`
-      SELECT p.id, p.title, p.slug, p.summary, p.cover_image, p.status,
-             p.view_count, p.like_count, p.comment_count, p.reading_time,
-             p.published_at, p.created_at, p.updated_at,
-             u.username as author_name, u.display_name as author_display_name,
-             u.avatar_url as author_avatar,
-             c.name as category_name, c.slug as category_slug, c.color as category_color,
-             col.name as column_name, col.slug as column_slug
+      SELECT ${POST_LIST_COLUMNS}, p.status, p.updated_at
       FROM posts p
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
@@ -319,35 +283,7 @@ export class PostService {
     const countResult = await db.prepare('SELECT COUNT(*) as total FROM posts WHERE deleted_at IS NULL').first() as TotalResult | null;
     const total = countResult?.total || 0;
 
-    const postIds = results.map((p: any) => p.id);
-    let postsWithTags = results;
-
-    if (postIds.length > 0) {
-      const tagsSql = `
-        SELECT pt.post_id, t.id, t.name, t.slug
-        FROM post_tags pt
-        JOIN tags t ON pt.tag_id = t.id
-        WHERE pt.post_id IN (${postIds.map(() => '?').join(',')})
-      `;
-      const { results: tagResults } = await db.prepare(tagsSql).bind(...postIds).all();
-
-      const tagsByPost = new Map();
-      (tagResults as TagRowWithPostId[]).forEach(tag => {
-        if (!tagsByPost.has(tag.post_id)) {
-          tagsByPost.set(tag.post_id, []);
-        }
-        tagsByPost.get(tag.post_id).push({
-          id: tag.id,
-          name: tag.name,
-          slug: tag.slug
-        });
-      });
-
-      postsWithTags = results.map((post: any) => ({
-        ...post,
-        tags: tagsByPost.get(post.id) || []
-      }));
-    }
+    const postsWithTags = await attachTagsToPosts(db, results);
 
     return {
       success: true,
@@ -414,12 +350,7 @@ export class PostService {
       };
     }
 
-    const { results: tags } = await db.prepare(`
-      SELECT t.id, t.name, t.slug, t.post_count
-      FROM tags t
-      JOIN post_tags pt ON t.id = pt.tag_id
-      WHERE pt.post_id = ?
-    `).bind(post.id).all();
+    const tags = await fetchTagsForPost(db, post.id);
 
     return {
       success: true,
@@ -476,14 +407,7 @@ export class PostService {
 
     if (shouldUseFts) {
       sql = `
-        SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
-               p.view_count, p.like_count, p.comment_count, p.reading_time,
-               p.published_at, p.created_at,
-               u.username as author_name, u.display_name as author_display_name,
-               u.avatar_url as author_avatar,
-               c.name as category_name, c.slug as category_slug, c.color as category_color,
-               col.name as column_name, col.slug as column_slug,
-               posts_fts.rank as search_rank
+        SELECT ${POST_LIST_COLUMNS}, posts_fts.rank as search_rank
         FROM posts_fts
         JOIN posts p ON posts_fts.rowid = p.id
         LEFT JOIN users u ON p.author_id = u.id
@@ -494,13 +418,7 @@ export class PostService {
       params.push(escapedQuery);
     } else {
       sql = `
-        SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
-               p.view_count, p.like_count, p.comment_count, p.reading_time,
-               p.published_at, p.created_at,
-               u.username as author_name, u.display_name as author_display_name,
-               u.avatar_url as author_avatar,
-               c.name as category_name, c.slug as category_slug, c.color as category_color,
-               col.name as column_name, col.slug as column_slug
+        SELECT ${POST_LIST_COLUMNS}
         FROM posts p
         LEFT JOIN users u ON p.author_id = u.id
         LEFT JOIN columns col ON p.column_id = col.id
@@ -595,35 +513,7 @@ export class PostService {
     const countResult = await db.prepare(countSql).bind(...countParams).first() as TotalResult | null;
     const total = countResult?.total || 0;
 
-    const postIds = results.map((p: any) => p.id);
-    let postsWithTags = results;
-
-    if (postIds.length > 0) {
-      const tagsSql = `
-        SELECT pt.post_id, t.id, t.name, t.slug
-        FROM post_tags pt
-        JOIN tags t ON pt.tag_id = t.id
-        WHERE pt.post_id IN (${postIds.map(() => '?').join(',')})
-      `;
-      const { results: tagResults } = await db.prepare(tagsSql).bind(...postIds).all();
-
-      const tagsByPost = new Map();
-      (tagResults as TagRowWithPostId[]).forEach(tag => {
-        if (!tagsByPost.has(tag.post_id)) {
-          tagsByPost.set(tag.post_id, []);
-        }
-        tagsByPost.get(tag.post_id).push({
-          id: tag.id,
-          name: tag.name,
-          slug: tag.slug
-        });
-      });
-
-      postsWithTags = results.map((post: any) => ({
-        ...post,
-        tags: tagsByPost.get(post.id) || []
-      }));
-    }
+    const postsWithTags = await attachTagsToPosts(db, results);
 
     return {
       success: true,
@@ -726,12 +616,7 @@ export class PostService {
       }
     }
 
-    const { results: tags } = await db.prepare(`
-      SELECT t.id, t.name, t.slug, t.post_count
-      FROM tags t
-      JOIN post_tags pt ON t.id = pt.tag_id
-      WHERE pt.post_id = ?
-    `).bind(post.id).all();
+    const tags = await fetchTagsForPost(db, post.id);
 
     let isLiked = false;
     let isFavorited = false;
@@ -1370,13 +1255,7 @@ export class PostService {
     const offset = (page - 1) * limit;
 
     const { results } = await db.prepare(`
-      SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
-             p.view_count, p.like_count, p.comment_count, p.reading_time,
-             p.published_at, p.created_at,
-             u.username as author_name, u.display_name as author_display_name,
-             u.avatar_url as author_avatar,
-             c.name as category_name, c.slug as category_slug, c.color as category_color,
-             col.name as column_name, col.slug as column_slug
+      SELECT ${POST_LIST_COLUMNS}
       FROM posts p
       JOIN likes l ON p.id = l.post_id
       LEFT JOIN users u ON p.author_id = u.id
@@ -1460,12 +1339,7 @@ export class PostService {
     const offset = (page - 1) * limit;
 
     const { results } = await db.prepare(`
-      SELECT p.id, p.title, p.slug, p.summary, p.cover_image,
-             p.view_count, p.like_count, p.comment_count, p.reading_time,
-             p.published_at, p.created_at,
-             u.username as author_name, u.display_name as author_display_name, u.avatar_url as author_avatar,
-             c.name as category_name, c.slug as category_slug, c.color as category_color,
-             col.name as column_name, col.slug as column_slug
+      SELECT ${POST_LIST_COLUMNS}
       FROM posts p
       JOIN favorites f ON p.id = f.post_id
       LEFT JOIN users u ON p.author_id = u.id
