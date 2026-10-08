@@ -593,18 +593,16 @@ export class CommentService {
     let liked = false;
 
     if (existing) {
-      await db.prepare('DELETE FROM likes WHERE id = ?').bind(existing.id).run();
-      await db.prepare(
-        'UPDATE comments SET like_count = like_count - 1 WHERE id = ?'
-      ).bind(commentId).run();
+      await db.batch([
+        db.prepare('DELETE FROM likes WHERE id = ?').bind(existing.id),
+        db.prepare('UPDATE comments SET like_count = like_count - 1 WHERE id = ?').bind(commentId)
+      ]);
       liked = false;
     } else {
-      await db.prepare(
-        'INSERT INTO likes (user_id, comment_id) VALUES (?, ?)'
-      ).bind(userId, commentId).run();
-      await db.prepare(
-        'UPDATE comments SET like_count = like_count + 1 WHERE id = ?'
-      ).bind(commentId).run();
+      await db.batch([
+        db.prepare('INSERT INTO likes (user_id, comment_id) VALUES (?, ?)').bind(userId, commentId),
+        db.prepare('UPDATE comments SET like_count = like_count + 1 WHERE id = ?').bind(commentId)
+      ]);
       liked = true;
 
       try {

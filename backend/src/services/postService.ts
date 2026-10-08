@@ -941,10 +941,12 @@ export class PostService {
 
     if (tags && Array.isArray(tags) && tags.length > 0) {
       const uniqueTagIds = [...new Set(tags.filter(id => id != null))];
-      for (const tagId of uniqueTagIds) {
-        await db.prepare(
-          'INSERT OR IGNORE INTO post_tags (post_id, tag_id) VALUES (?, ?)'
-        ).bind(postId, tagId).run();
+      if (uniqueTagIds.length > 0) {
+        await db.batch(
+          uniqueTagIds.map((tagId) =>
+            db.prepare('INSERT OR IGNORE INTO post_tags (post_id, tag_id) VALUES (?, ?)').bind(postId, tagId)
+          )
+        );
       }
     }
 
@@ -1046,29 +1048,31 @@ export class PostService {
     const finalIsPinned = isPinned !== undefined ? (isPinned ? 1 : 0) : post.is_pinned;
     const finalPinOrder = pinOrder !== undefined ? pinOrder : (post.pin_order || 0);
 
-    await db.prepare(`
-      UPDATE posts
-      SET title = ?, content = ?, summary = ?, category_id = ?, column_id = ?,
-          cover_image = ?, status = ?, visibility = ?, password_hash = ?,
-          reading_time = ?, published_at = ?, updated_at = CURRENT_TIMESTAMP,
-          is_pinned = ?, pin_order = ?
-      WHERE id = ?
-    `).bind(
-      title || post.title,
-      content || post.content,
-      summary !== undefined ? summary : post.summary,
-      categoryId !== undefined ? categoryId : post.category_id,
-      columnId !== undefined ? columnId : post.column_id,
-      coverImage !== undefined ? coverImage : post.cover_image,
-      status || post.status,
-      visibility || post.visibility,
-      passwordHash,
-      readingTime,
-      (status === 'published' && !post.published_at) ? new Date().toISOString() : post.published_at,
-      finalIsPinned,
-      finalPinOrder,
-      postId
-    ).run();
+    const statements = [
+      db.prepare(`
+        UPDATE posts
+        SET title = ?, content = ?, summary = ?, category_id = ?, column_id = ?,
+            cover_image = ?, status = ?, visibility = ?, password_hash = ?,
+            reading_time = ?, published_at = ?, updated_at = CURRENT_TIMESTAMP,
+            is_pinned = ?, pin_order = ?
+        WHERE id = ?
+      `).bind(
+        title || post.title,
+        content || post.content,
+        summary !== undefined ? summary : post.summary,
+        categoryId !== undefined ? categoryId : post.category_id,
+        columnId !== undefined ? columnId : post.column_id,
+        coverImage !== undefined ? coverImage : post.cover_image,
+        status || post.status,
+        visibility || post.visibility,
+        passwordHash,
+        readingTime,
+        (status === 'published' && !post.published_at) ? new Date().toISOString() : post.published_at,
+        finalIsPinned,
+        finalPinOrder,
+        postId
+      )
+    ];
 
     if (tags && Array.isArray(tags)) {
       const newTagIds = [...new Set(tags.filter(id => id != null))];
@@ -1082,17 +1086,19 @@ export class PostService {
       const tagsToRemove = existingTagIds.filter((id: number) => !newTagIds.includes(id));
 
       for (const tagId of tagsToRemove) {
-        await db.prepare(
-          'DELETE FROM post_tags WHERE post_id = ? AND tag_id = ?'
-        ).bind(postId, tagId).run();
+        statements.push(
+          db.prepare('DELETE FROM post_tags WHERE post_id = ? AND tag_id = ?').bind(postId, tagId)
+        );
       }
 
       for (const tagId of tagsToAdd) {
-        await db.prepare(
-          'INSERT OR IGNORE INTO post_tags (post_id, tag_id) VALUES (?, ?)'
-        ).bind(postId, tagId).run();
+        statements.push(
+          db.prepare('INSERT OR IGNORE INTO post_tags (post_id, tag_id) VALUES (?, ?)').bind(postId, tagId)
+        );
       }
     }
+
+    await db.batch(statements);
 
     return {
       success: true,
@@ -1191,18 +1197,16 @@ export class PostService {
     let liked = false;
 
     if (existing) {
-      await db.prepare('DELETE FROM likes WHERE id = ?').bind(existing.id).run();
-      await db.prepare(
-        'UPDATE posts SET like_count = like_count - 1 WHERE id = ?'
-      ).bind(postId).run();
+      await db.batch([
+        db.prepare('DELETE FROM likes WHERE id = ?').bind(existing.id),
+        db.prepare('UPDATE posts SET like_count = like_count - 1 WHERE id = ?').bind(postId)
+      ]);
       liked = false;
     } else {
-      await db.prepare(
-        'INSERT INTO likes (user_id, post_id) VALUES (?, ?)'
-      ).bind(userId, postId).run();
-      await db.prepare(
-        'UPDATE posts SET like_count = like_count + 1 WHERE id = ?'
-      ).bind(postId).run();
+      await db.batch([
+        db.prepare('INSERT INTO likes (user_id, post_id) VALUES (?, ?)').bind(userId, postId),
+        db.prepare('UPDATE posts SET like_count = like_count + 1 WHERE id = ?').bind(postId)
+      ]);
       liked = true;
 
       try {
