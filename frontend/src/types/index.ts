@@ -392,6 +392,7 @@ export interface Comment {
   content: string;
   status: CommentStatus;
   likeCount: number;
+  isLiked?: boolean;
   replyCount: number;
   createdAt: string;
   updatedAt: string;
