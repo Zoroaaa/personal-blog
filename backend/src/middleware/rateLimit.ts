@@ -99,15 +99,19 @@ export function rateLimit(options: RateLimitOptions = {}) {
 
       const newCount = count + 1;
 
+      // Cloudflare KV 的 expirationTtl 最小值为 60 秒，小于该值 put() 会抛错。
+      // 因此子分钟窗口统一以 60 秒为下限，否则会退化成 RATE_LIMIT_ERROR 500。
+      const windowSeconds = Math.max(60, Math.ceil(windowMs / 1000));
+
       await cache.put(cacheKey, newCount.toString(), {
-        expirationTtl: Math.ceil(windowMs / 1000)
+        expirationTtl: windowSeconds
       });
 
       c.header('X-RateLimit-Limit', maxRequests.toString());
       c.header('X-RateLimit-Remaining', Math.max(0, maxRequests - newCount).toString());
       c.header(
         'X-RateLimit-Reset',
-        new Date(Date.now() + windowMs).toISOString()
+        new Date(Date.now() + windowSeconds * 1000).toISOString()
       );
 
       return next();
