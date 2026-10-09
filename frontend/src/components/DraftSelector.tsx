@@ -14,27 +14,13 @@
  */
 
 import { useState, useEffect } from 'react';
-
-interface Draft {
-  key: string;
-  data: {
-    title?: string;
-    content?: string;
-    summary?: string;
-    coverImage?: string;
-    categoryId?: number | null;
-    tags?: number[];
-    status?: 'draft' | 'published';
-  };
-  timestamp: string;
-  sessionId: string;
-}
+import type { DraftItem } from '../hooks/useDraftManager';
 
 interface DraftSelectorProps {
   isOpen: boolean;
-  drafts: Draft[];
+  drafts: DraftItem[];
   onClose: () => void;
-  onSelect: (draft: Draft) => void;
+  onSelect: (draft: DraftItem) => void;
   onClearAll: () => void;
 }
 
