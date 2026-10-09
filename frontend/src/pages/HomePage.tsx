@@ -1,579 +1,71 @@
 /**
- * 重构的现代化首页组件
+ * 重构的现代化首页组件（编排层）
  *
- * 新功能:
- * - 分类和标签展示区域
- * - 支持点击分类/标签过滤文章
- * - 分类/标签展开/收起功能
- * - 现代化的响应式UI设计
- * - 平滑的动画效果
- * - 优化的布局结构 - 桌面端3列，平板2列，移动端1列
+ * 结构说明：
+ * - 数据加载、过滤逻辑、热门文章等由 hooks/useHomeData 负责；
+ * - 侧边栏 / 热门文章 / 过滤条 / 文章列表 / 分页等 UI
+ *   由 components/home/ 下子组件渲染。
  *
  * @author 博客系统
- * @version 4.0.0
+ * @version 5.0.0
  * @created 2024-01-01
  */
 
-import { useEffect, useState } from 'react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { api } from '../utils/api';
-import { format } from 'date-fns';
-import type { PostListItem } from '../types';
-import { transformPostList, transformCategoryList, transformColumnList, transformTagList } from '../utils/apiTransformer';
-import { useSiteConfig } from '../hooks/useSiteConfig';
-import { SEO } from '../components/SEO';
+import { useState } from 'react';
 import { NotificationCarousel } from '../components/NotificationCarousel';
-import { TruncatedText } from '../components/TruncatedText';
-import type { Category, Column, Tag } from '../types';
+import { SEO } from '../components/SEO';
+import { HomeSidebar } from '../components/home/HomeSidebar';
+import { HotPostsCarousel } from '../components/home/HotPostsCarousel';
+import { HotPostsSidebar } from '../components/home/HotPostsSidebar';
+import { ActiveFilters } from '../components/home/ActiveFilters';
+import { PostList } from '../components/home/PostList';
+import { useHomeData } from '../hooks/useHomeData';
 
 export function HomePage() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const { config, isReady } = useSiteConfig();
-
-  // 文章相关状态
-  const [posts, setPosts] = useState<PostListItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-
-  // 获取每页文章数配置
-  const postsPerPage = config.posts_per_page || 10;
-
-  // 分类、专栏和标签状态
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [columns, setColumns] = useState<Column[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [categoriesLoading, setCategoriesLoading] = useState(true);
-  const [columnsLoading, setColumnsLoading] = useState(true);
-  const [tagsLoading, setTagsLoading] = useState(true);
-
-  // 热门文章状态
-  const [hotPosts, setHotPosts] = useState<PostListItem[]>([]);
-
-  // 展开/收起状态
-  const [showAllCategories, setShowAllCategories] = useState(false);
-  const [showAllColumns, setShowAllColumns] = useState(false);
-  const [showAllTags, setShowAllTags] = useState(false);
+  const {
+    posts,
+    loading,
+    error,
+    page,
+    setPage,
+    totalPages,
+    loadPosts,
+    categories,
+    columns,
+    tags,
+    categoriesLoading,
+    columnsLoading,
+    tagsLoading,
+    hotPosts,
+    selectedCategory,
+    selectedColumn,
+    selectedTag,
+    handleCategoryClick,
+    handleColumnClick,
+    handleTagClick,
+    clearFilters,
+    hasFilters,
+  } = useHomeData();
 
   // 移动端侧边栏展开状态
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
-  // 过滤状态
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(
-    searchParams.get('category')
-  );
-  const [selectedColumn, setSelectedColumn] = useState<string | null>(
-    searchParams.get('column')
-  );
-  const [selectedTag, setSelectedTag] = useState<string | null>(
-    searchParams.get('tag')
-  );
-
-  // 显示数量
-  const INITIAL_CATEGORY_COUNT = 6;
-  const INITIAL_COLUMN_COUNT = 4;
-  const INITIAL_TAG_COUNT = 12;
-
-  // 加载分类
-  useEffect(() => {
-    loadCategories();
-  }, []);
-
-  // 加载专栏
-  useEffect(() => {
-    loadColumns();
-  }, []);
-
-  // 加载标签
-  useEffect(() => {
-    loadTags();
-  }, []);
-
-  // 加载热门文章
-  useEffect(() => {
-    loadHotPosts();
-  }, []);
-
-  // 加载文章
-  useEffect(() => {
-    if (!isReady) return;
-    loadPosts();
-  }, [page, selectedCategory, selectedColumn, selectedTag, postsPerPage, isReady]);
-
-  // 同步URL参数
-  useEffect(() => {
-    const params: Record<string, string> = {};
-    if (selectedCategory) params.category = selectedCategory;
-    if (selectedColumn) params.column = selectedColumn;
-    if (selectedTag) params.tag = selectedTag;
-    setSearchParams(params);
-  }, [selectedCategory, selectedColumn, selectedTag]);
-
-  const loadCategories = async () => {
-    try {
-      setCategoriesLoading(true);
-      const response = await api.getCategories();
-      if (response.success && response.data) {
-        setCategories(transformCategoryList(response.data.categories || []));
-      }
-    } catch (error) {
-      console.error('Failed to load categories:', error);
-    } finally {
-      setCategoriesLoading(false);
-    }
-  };
-
-  const loadColumns = async () => {
-    try {
-      setColumnsLoading(true);
-      const response = await api.getColumns({ limit: '100' });
-      if (response.success && response.data) {
-        setColumns(transformColumnList(response.data.columns || []));
-      }
-    } catch (error) {
-      console.error('Failed to load columns:', error);
-    } finally {
-      setColumnsLoading(false);
-    }
-  };
-
-  const loadTags = async () => {
-    try {
-      setTagsLoading(true);
-      const response = await api.getTags();
-      if (response.success && response.data) {
-        setTags(transformTagList(response.data.tags || []));
-      }
-    } catch (error) {
-      console.error('Failed to load tags:', error);
-    } finally {
-      setTagsLoading(false);
-    }
-  };
-
-  const loadHotPosts = async () => {
-    try {
-      const response = await api.getHotPosts(10);
-      if (response.success && response.data) {
-        setHotPosts(transformPostList(response.data.posts || []));
-      }
-    } catch (error) {
-      console.error('Failed to load hot posts:', error);
-    }
-  };
-
-  const loadPosts = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const params: Record<string, string> = {
-        page: page.toString(),
-        limit: postsPerPage.toString()
-      };
-
-      if (selectedCategory) params.category = selectedCategory;
-      if (selectedColumn) params.column = selectedColumn;
-      if (selectedTag) params.tag = selectedTag;
-
-      const response = await api.getPosts(params);
-
-      if (response.success && response.data) {
-        const transformedPosts = transformPostList(response.data.posts || []);
-        setPosts(transformedPosts);
-
-        if (response.data.pagination) {
-          setTotalPages(response.data.pagination.totalPages);
-        }
-      } else {
-        throw new Error(response.error || '获取文章列表失败');
-      }
-    } catch (error) {
-      console.error('Failed to load posts:', error);
-      setError(error instanceof Error ? error.message : '加载失败,请稍后重试');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 处理分类点击（过滤模式）
-  const handleCategoryClick = (slug: string) => {
-    if (selectedCategory === slug) {
-      setSelectedCategory(null);
-    } else {
-      setSelectedCategory(slug);
-      setSelectedColumn(null);
-      setSelectedTag(null);
-    }
-    setPage(1);
-  };
-
-  // 处理专栏点击（过滤模式）
-  const handleColumnClick = (slug: string) => {
-    if (selectedColumn === slug) {
-      setSelectedColumn(null);
-    } else {
-      setSelectedColumn(slug);
-      setSelectedCategory(null);
-      setSelectedTag(null);
-    }
-    setPage(1);
-  };
-
-  // 处理标签点击（过滤模式）
-  const handleTagClick = (slug: string) => {
-    if (selectedTag === slug) {
-      setSelectedTag(null);
-    } else {
-      setSelectedTag(slug);
-      setSelectedCategory(null);
-      setSelectedColumn(null);
-    }
-    setPage(1);
-  };
-
-  // 处理分类点击穿透（导航到分类详情页）
-  const handleCategoryNavigate = (e: React.MouseEvent, slug: string) => {
-    e.stopPropagation();
-    navigate(`/categories/${slug}`);
-  };
-
-  // 处理专栏点击穿透（导航到专栏详情页）
-  const handleColumnNavigate = (e: React.MouseEvent, slug: string) => {
-    e.stopPropagation();
-    navigate(`/columns/${slug}`);
-  };
-
-  // 处理标签点击穿透（导航到标签详情页）
-  const handleTagNavigate = (e: React.MouseEvent, slug: string) => {
-    e.stopPropagation();
-    navigate(`/tags/${slug}`);
-  };
-
-  // 处理文章卡片中的分类点击（导航到分类详情页）
-  const handlePostCategoryClick = (e: React.MouseEvent, slug: string) => {
-    e.stopPropagation();
-    e.preventDefault();
-    navigate(`/categories/${slug}`);
-  };
-
-  // 处理文章卡片中的标签点击（导航到标签详情页）
-  const handlePostTagClick = (e: React.MouseEvent, slug: string) => {
-    e.stopPropagation();
-    e.preventDefault();
-    navigate(`/tags/${slug}`);
-  };
-
-  // 清除所有过滤
-  const clearFilters = () => {
-    setSelectedCategory(null);
-    setSelectedColumn(null);
-    setSelectedTag(null);
-    setPage(1);
-  };
-
-  // 渲染分类列表
-  const visibleCategories = showAllCategories
-    ? categories
-    : categories.slice(0, INITIAL_CATEGORY_COUNT);
-
-  // 渲染专栏列表
-  const visibleColumns = showAllColumns
-    ? columns
-    : columns.slice(0, INITIAL_COLUMN_COUNT);
-
-  // 渲染标签列表
-  const visibleTags = showAllTags
-    ? tags
-    : tags.slice(0, INITIAL_TAG_COUNT);
-
-  // 侧边栏内容组件
-  const SidebarContent = () => (
-    <div className="space-y-4">
-      {/* 分类卡片 */}
-      <div className="bg-card/75 dark:bg-card/75 backdrop-blur-lg rounded-xl shadow-md border border-border/50 dark:border-border/50 p-4 transition-all duration-200 hover:shadow-lg">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-            <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-              </svg>
-            </span>
-            分类
-          </h2>
-          {selectedCategory && (
-            <button
-              onClick={clearFilters}
-              className="text-xs px-2 py-1 rounded-md bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
-            >
-              清除
-            </button>
-          )}
-        </div>
-
-        {categoriesLoading ? (
-          <div className="space-y-1.5">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-9 bg-muted dark:bg-muted rounded-lg animate-pulse" />
-            ))}
-          </div>
-        ) : (
-          <>
-            <div className="space-y-1">
-              {visibleCategories.map((category) => (
-                <div
-                  key={category.id}
-                  className={`group w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-150 cursor-pointer ${
-                    selectedCategory === category.slug
-                      ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-sm'
-                      : 'bg-muted/50 hover:bg-muted text-foreground'
-                  }`}
-                  onClick={() => handleCategoryClick(category.slug)}
-                >
-                  <span className="flex items-center gap-2 text-sm font-medium truncate">
-                    {category.icon && <span>{category.icon}</span>}
-                    {category.name}
-                  </span>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <span className={`text-xs px-1.5 py-0.5 rounded ${
-                      selectedCategory === category.slug
-                        ? 'bg-card/20'
-                        : 'bg-muted'
-                    }`}>
-                      {category.postCount}
-                    </span>
-                    <button
-                      onClick={(e) => handleCategoryNavigate(e, category.slug)}
-                      className={`p-1 rounded transition-all opacity-0 group-hover:opacity-100 ${
-                        selectedCategory === category.slug
-                          ? 'hover:bg-card/20 text-white'
-                          : 'hover:bg-muted text-muted-foreground'
-                      }`}
-                      title="查看分类详情"
-                    >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {categories.length > INITIAL_CATEGORY_COUNT && (
-              <button
-                onClick={() => setShowAllCategories(!showAllCategories)}
-                className="w-full mt-2.5 px-3 py-1.5 text-sm text-primary hover:text-primary/80 font-medium transition-colors flex items-center justify-center gap-1 rounded-lg hover:bg-primary/10"
-              >
-                {showAllCategories ? '收起' : `更多 (${categories.length - INITIAL_CATEGORY_COUNT})`}
-                <svg
-                  className={`w-3.5 h-3.5 transition-transform ${showAllCategories ? 'rotate-180' : ''}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* 专栏卡片 */}
-      <div className="bg-card/75 dark:bg-card/75 backdrop-blur-lg rounded-xl shadow-md border border-border/50 dark:border-border/50 p-4 transition-all duration-200 hover:shadow-lg">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-            <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-            </span>
-            专栏
-          </h2>
-          {selectedColumn && (
-            <button
-              onClick={clearFilters}
-              className="text-xs px-2 py-1 rounded-md bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
-            >
-              清除
-            </button>
-          )}
-        </div>
-
-        {columnsLoading ? (
-          <div className="space-y-1.5">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-12 bg-muted rounded-lg animate-pulse" />
-            ))}
-          </div>
-        ) : columns.length === 0 ? (
-          <div className="text-center py-3 text-muted-foreground text-sm">
-            暂无专栏
-          </div>
-        ) : (
-          <>
-            <div className="space-y-1.5">
-              {visibleColumns.map((column) => (
-                <div
-                  key={column.id}
-                  className={`group w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 cursor-pointer ${
-                    selectedColumn === column.slug
-                      ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-sm'
-                      : 'bg-muted/50 hover:bg-muted text-foreground'
-                  }`}
-                  onClick={() => handleColumnClick(column.slug)}
-                >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${
-                    selectedColumn === column.slug
-                      ? 'bg-card/20'
-                      : 'bg-gradient-to-br from-purple-500 to-indigo-600'
-                  }`}>
-                    {column.name.slice(0, 2)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm truncate">{column.name}</div>
-                    <div className={`text-xs ${
-                      selectedColumn === column.slug
-                        ? 'text-white/70'
-                        : 'text-muted-foreground'
-                    }`}>
-                      {column.postCount} 篇
-                    </div>
-                  </div>
-                  <button
-                    onClick={(e) => handleColumnNavigate(e, column.slug)}
-                    className={`p-1 rounded transition-all opacity-0 group-hover:opacity-100 flex-shrink-0 ${
-                      selectedColumn === column.slug
-                        ? 'hover:bg-card/20 text-white'
-                        : 'hover:bg-muted text-muted-foreground'
-                    }`}
-                    title="查看专栏详情"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {columns.length > INITIAL_COLUMN_COUNT && (
-              <button
-                onClick={() => setShowAllColumns(!showAllColumns)}
-                className="w-full mt-2.5 px-3 py-1.5 text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium transition-colors flex items-center justify-center gap-1 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20"
-              >
-                {showAllColumns ? '收起' : `更多 (${columns.length - INITIAL_COLUMN_COUNT})`}
-                <svg
-                  className={`w-3.5 h-3.5 transition-transform ${showAllColumns ? 'rotate-180' : ''}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* 标签云卡片 */}
-      <div className="bg-card/75 dark:bg-card/75 backdrop-blur-lg rounded-xl shadow-md border border-border/50 dark:border-border/50 p-4 transition-all duration-200 hover:shadow-lg">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-            <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
-              </svg>
-            </span>
-            标签
-          </h2>
-          {selectedTag && (
-            <button
-              onClick={clearFilters}
-              className="text-xs px-2 py-1 rounded-md bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
-            >
-              清除
-            </button>
-          )}
-        </div>
-
-        {tagsLoading ? (
-          <div className="flex flex-wrap gap-1.5">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="h-6 w-14 bg-muted rounded-full animate-pulse" />
-            ))}
-          </div>
-        ) : (
-          <>
-            <div className="flex flex-wrap gap-1.5">
-              {visibleTags.map((tag) => (
-                <div
-                  key={tag.id}
-                  className="group relative"
-                >
-                  <button
-                    onClick={() => handleTagClick(tag.slug)}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-150 ${
-                      selectedTag === tag.slug
-                        ? 'shadow-sm scale-105 text-white'
-                        : 'hover:scale-105 text-foreground'
-                    }`}
-                    style={{
-                      backgroundColor: selectedTag === tag.slug
-                        ? tag.color || '#6B7280'
-                        : selectedTag
-                          ? 'rgb(243 244 246)'
-                          : tag.color
-                            ? `${tag.color}20`
-                            : 'rgb(243 244 246)',
-                      borderWidth: '1px',
-                      borderColor: selectedTag === tag.slug
-                        ? 'transparent'
-                        : tag.color || '#E5E7EB'
-                    }}
-                  >
-                    #{tag.name}
-                    <span className="ml-0.5 text-xs opacity-70">
-                      {tag.postCount}
-                    </span>
-                  </button>
-                  <button
-                    onClick={(e) => handleTagNavigate(e, tag.slug)}
-                    className="absolute -top-0.5 -right-0.5 p-0.5 rounded-full bg-card shadow-sm opacity-0 group-hover:opacity-100 transition-all hover:bg-muted z-10"
-                    title="查看标签详情"
-                  >
-                    <svg className="w-2.5 h-2.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {tags.length > INITIAL_TAG_COUNT && (
-              <button
-                onClick={() => setShowAllTags(!showAllTags)}
-                className="w-full mt-2.5 px-3 py-1.5 text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium transition-colors flex items-center justify-center gap-1 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-              >
-                {showAllTags ? '收起' : `更多 (${tags.length - INITIAL_TAG_COUNT})`}
-                <svg
-                  className={`w-3.5 h-3.5 transition-transform ${showAllTags ? 'rotate-180' : ''}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-            )}
-          </>
-        )}
-      </div>
-    </div>
+  const sidebar = (
+    <HomeSidebar
+      categories={categories}
+      columns={columns}
+      tags={tags}
+      categoriesLoading={categoriesLoading}
+      columnsLoading={columnsLoading}
+      tagsLoading={tagsLoading}
+      selectedCategory={selectedCategory}
+      selectedColumn={selectedColumn}
+      selectedTag={selectedTag}
+      onCategoryClick={handleCategoryClick}
+      onColumnClick={handleColumnClick}
+      onTagClick={handleTagClick}
+      onClearFilters={clearFilters}
+    />
   );
 
   return (
@@ -612,7 +104,7 @@ export function HomePage() {
             {/* 移动端侧边栏内容 */}
             {mobileSidebarOpen && (
               <div className="mt-3 animate-fade-in">
-                <SidebarContent />
+                {sidebar}
               </div>
             )}
           </div>
@@ -623,417 +115,42 @@ export function HomePage() {
             {/* 左侧: 分类和标签 - 桌面端显示 */}
             <div className="hidden lg:block lg:col-span-3">
               <div className="sticky top-20">
-                <SidebarContent />
+                {sidebar}
               </div>
             </div>
 
             {/* 中间: 文章列表 */}
             <div className="lg:col-span-9 xl:col-span-6">
               {/* 手机端/平板端热门文章 - 横向滚动卡片 */}
-              <div className="xl:hidden mb-6">
-                <div className="bg-card/75 backdrop-blur-lg rounded-xl shadow-md border border-border/50 p-4">
-                  <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-lg bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center text-white">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
-                      </svg>
-                    </span>
-                    热门文章
-                  </h3>
-                  <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
-                    {hotPosts.slice(0, 5).map((post, index) => (
-                      <Link
-                        key={post.id}
-                        to={`/posts/${post.slug}`}
-                        className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className={`flex-shrink-0 w-5 h-5 rounded text-xs font-bold flex items-center justify-center ${
-                            index === 0 ? 'bg-red-500 text-white' :
-                            index === 1 ? 'bg-orange-500 text-white' :
-                            index === 2 ? 'bg-yellow-500 text-white' :
-                            'bg-muted text-muted-foreground'
-                          }`}>
-                            {index + 1}
-                          </span>
-                          <span className="text-xs text-muted-foreground">{post.viewCount || 0} 阅读</span>
-                        </div>
-                        <p className="text-xs sm:text-sm text-foreground line-clamp-2 group-hover:text-primary transition-colors leading-snug">
-                          {post.title}
-                        </p>
-                      </Link>
-                    ))}
-                    {hotPosts.length === 0 && (
-                      <div className="text-center py-4 text-muted-foreground text-sm w-full">
-                        暂无文章
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <HotPostsCarousel hotPosts={hotPosts} />
 
               {/* 当前过滤标签 */}
-              {(selectedCategory || selectedColumn || selectedTag) && (
-                <div className="mb-4 flex flex-wrap items-center gap-2 animate-fade-in">
-                  <span className="text-xs text-muted-foreground">筛选:</span>
-                  {selectedCategory && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium">
-                      {categories.find(c => c.slug === selectedCategory)?.name}
-                      <button onClick={clearFilters} className="hover:text-primary/80">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </span>
-                  )}
-                  {selectedColumn && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">
-                      {columns.find(c => c.slug === selectedColumn)?.name}
-                      <button onClick={clearFilters} className="hover:text-purple-900 dark:hover:text-purple-100">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </span>
-                  )}
-                  {selectedTag && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-full text-xs font-medium">
-                      #{tags.find(t => t.slug === selectedTag)?.name}
-                      <button onClick={clearFilters} className="hover:text-emerald-900 dark:hover:text-emerald-100">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </span>
-                  )}
-                </div>
-              )}
+              <ActiveFilters
+                selectedCategory={selectedCategory}
+                selectedColumn={selectedColumn}
+                selectedTag={selectedTag}
+                categories={categories}
+                columns={columns}
+                tags={tags}
+                onClearFilters={clearFilters}
+              />
 
               {/* 文章列表 */}
-              {loading ? (
-                <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lt:grid-cols-4 gap-4 sm:gap-5">
-                  {[...Array(8)].map((_, i) => (
-                    <div key={i} className="bg-card/80 rounded-xl shadow-md p-4 animate-pulse">
-                      <div className="h-32 sm:h-36 bg-muted rounded-lg mb-3" />
-                      <div className="h-4 bg-muted rounded w-3/4 mb-2" />
-                      <div className="h-3 bg-muted rounded w-full mb-1.5" />
-                      <div className="h-3 bg-muted rounded w-5/6" />
-                    </div>
-                  ))}
-                </div>
-              ) : error ? (
-                <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-6 text-center">
-                  <svg className="w-12 h-12 text-destructive mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <h3 className="text-base font-semibold text-destructive mb-1.5">加载失败</h3>
-                  <p className="text-destructive/80 mb-3 text-sm">{error}</p>
-                  <button
-                    onClick={loadPosts}
-                    className="px-4 py-2 bg-destructive hover:bg-destructive/90 text-white rounded-lg transition-colors font-medium text-sm"
-                  >
-                    重试
-                  </button>
-                </div>
-              ) : posts.length === 0 ? (
-                <div className="bg-card/80 rounded-xl shadow-md p-8 text-center">
-                  <svg
-                    className="mx-auto h-14 w-14 text-muted-foreground mb-3"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                  <h3 className="text-lg font-semibold text-foreground mb-1.5">暂无文章</h3>
-                  <p className="text-muted-foreground mb-4 text-sm">
-                    {selectedCategory || selectedColumn || selectedTag ? '该分类/专栏/标签下暂无文章' : '还没有发布任何文章'}
-                  </p>
-                  {(selectedCategory || selectedColumn || selectedTag) && (
-                    <button
-                      onClick={clearFilters}
-                      className="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white rounded-lg transition-all duration-200 font-medium text-sm"
-                    >
-                      查看所有文章
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <>
-                  {/* 文章网格 - 响应式列数：手机1列、平板2列、笔记本3列、台式4列 */}
-                  <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lt:grid-cols-4 gap-4 sm:gap-5">
-                    {posts.map((post, index) => (
-                      <article
-                        key={post.id}
-                        className="group bg-card/80 backdrop-blur-sm rounded-xl shadow-md border border-border/60 overflow-hidden hover:shadow-xl transition-all duration-300 animate-fade-in flex flex-col"
-                        style={{ animationDelay: `${index * 50}ms`, isolation: 'auto' }}
-                      >
-                        {/* 封面图 */}
-                        {post.coverImage && (
-                          <div className="relative h-32 sm:h-36 overflow-hidden">
-                            <img
-                              src={post.coverImage}
-                              alt={post.title}
-                              className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-400"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                            {/* 置顶标识 */}
-                            {(post as any).isPinned && (
-                              <div className="absolute top-2 left-2 px-2 py-0.5 bg-gradient-to-r from-red-500 to-orange-500 text-white text-xs font-bold rounded-md shadow-lg flex items-center gap-1">
-                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                  <path d="M9.828.722a.5.5 0 0 1 .354.146l4.95 4.95a.5.5 0 0 1 0 .707c-.48.48-1.072.588-1.503.588-.177 0-.335-.018-.46-.039l-3.134 3.134a5.927 5.927 0 0 1 .16 1.013c.046.702-.032 1.687-.72 2.375a.5.5 0 0 1-.707 0l-2.829-2.828-3.182 3.182c-.195.195-1.219.902-1.414.707-.195-.195.512-1.22.707-1.414l3.182-3.182-2.828-2.829a.5.5 0 0 1 0-.707c.688-.688 1.673-.767 2.375-.72a5.922 5.922 0 0 1 1.013.16l3.134-3.133a2.772 2.772 0 0 1-.04-.461c0-.43.108-1.022.589-1.503a.5.5 0 0 1 .353-.146z"/>
-                                </svg>
-                                置顶
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* 内容区域 */}
-                        <div className="flex-1 p-3.5 sm:p-4 flex flex-col">
-                          {/* 专栏归属 */}
-                          {post.columnName && post.columnSlug && (
-                            <Link
-                              to={`/columns/${post.columnSlug}`}
-                              className="inline-flex items-center gap-1 text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors mb-1.5 w-fit"
-                            >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                              </svg>
-                              <span className="truncate">{post.columnName}</span>
-                            </Link>
-                          )}
-
-                          {/* 标题 */}
-                          <Link to={`/posts/${post.slug}`} className="flex items-start gap-1.5">
-                            {(post as any).isPinned && (
-                              <span className="flex-shrink-0 mt-0.5 px-1.5 py-0.5 bg-gradient-to-r from-red-500 to-orange-500 text-white text-xs font-bold rounded flex items-center gap-0.5">
-                                <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
-                                  <path d="M9.828.722a.5.5 0 0 1 .354.146l4.95 4.95a.5.5 0 0 1 0 .707c-.48.48-1.072.588-1.503.588-.177 0-.335-.018-.46-.039l-3.134 3.134a5.927 5.927 0 0 1 .16 1.013c.046.702-.032 1.687-.72 2.375a.5.5 0 0 1-.707 0l-2.829-2.828-3.182 3.182c-.195.195-1.219.902-1.414.707-.195-.195.512-1.22.707-1.414l3.182-3.182-2.828-2.829a.5.5 0 0 1 0-.707c.688-.688 1.673-.767 2.375-.72a5.922 5.922 0 0 1 1.013.16l3.134-3.133a2.772 2.772 0 0 1-.04-.461c0-.43.108-1.022.589-1.503a.5.5 0 0 1 .353-.146z"/>
-                                </svg>
-                                置顶
-                              </span>
-                            )}
-                            {post.visibility === 'password' && (
-                              <span className="flex-shrink-0 mt-0.5 w-4 h-4 rounded-full bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center">
-                                <svg className="w-2.5 h-2.5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                </svg>
-                              </span>
-                            )}
-                            <h2 className="text-sm sm:text-base font-semibold text-foreground mb-1.5 group-hover:text-primary transition-colors line-clamp-2 leading-snug">
-                              {post.title}
-                            </h2>
-                          </Link>
-
-                          {/* 摘要 */}
-                          {post.summary && (
-                            <TruncatedText
-                              text={post.summary}
-                              className="text-xs sm:text-sm text-muted-foreground mb-3 flex-1 leading-relaxed"
-                              lines={2}
-                            />
-                          )}
-
-                          {/* 元信息 */}
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mb-3">
-                            <span className="flex items-center gap-1 truncate">
-                              {post.authorAvatar ? (
-                                <img
-                                  src={post.authorAvatar}
-                                  alt={post.authorName}
-                                  className="w-4 h-4 rounded-full flex-shrink-0"
-                                />
-                              ) : (
-                                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                </svg>
-                              )}
-                              <span className="truncate max-w-[60px]">{post.authorName}</span>
-                            </span>
-
-                            <span className="flex items-center gap-0.5 flex-shrink-0">
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
-                              {post.publishedAt ? format(new Date(post.publishedAt), 'MM-dd') : '未发布'}
-                            </span>
-
-                            <span className="flex items-center gap-0.5 flex-shrink-0">
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                              </svg>
-                              {post.viewCount || 0}
-                            </span>
-
-                            {post.readingTime && (
-                              <span className="hidden xs:flex items-center gap-0.5 flex-shrink-0">
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                {post.readingTime}min
-                              </span>
-                            )}
-                          </div>
-
-                          {/* 分类和标签 */}
-                          <div className="flex flex-wrap items-center gap-1">
-                            {post.categoryName && (
-                              <button
-                                onClick={(e) => post.categorySlug && handlePostCategoryClick(e, post.categorySlug)}
-                                className="px-2 py-0.5 rounded text-white text-xs font-medium hover:opacity-80 transition-opacity"
-                                style={{ backgroundColor: post.categoryColor || '#3B82F6' }}
-                              >
-                                {post.categoryName}
-                              </button>
-                            )}
-
-                            {post.tags && post.tags.length > 0 && post.tags.slice(0, 2).map((tag) => (
-                              <button
-                                key={tag.id}
-                                onClick={(e) => handlePostTagClick(e, tag.slug)}
-                                className="px-1.5 py-0.5 rounded-full text-xs font-medium border hover:scale-105 transition-transform"
-                                style={{
-                                  backgroundColor: tag.color ? `${tag.color}15` : '#F3F4F6',
-                                  borderColor: tag.color || '#E5E7EB',
-                                  color: tag.color || '#6B7280'
-                                }}
-                              >
-                                #{tag.name}
-                              </button>
-                            ))}
-
-                            {post.tags && post.tags.length > 2 && (
-                              <span className="text-xs text-muted-foreground">
-                                +{post.tags.length - 2}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-
-                  {/* 分页 */}
-                  {!loading && !error && totalPages > 1 && (
-                    <div className="mt-6 flex justify-center items-center gap-1.5 animate-fade-in">
-                      <button
-                        onClick={() => setPage(p => Math.max(1, p - 1))}
-                        disabled={page === 1}
-                        className="px-3 py-1.5 bg-card border border-border rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted transition-all text-sm font-medium"
-                      >
-                        上一页
-                      </button>
-
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                          let pageNum;
-                          if (totalPages <= 5) {
-                            pageNum = i + 1;
-                          } else if (page <= 3) {
-                            pageNum = i + 1;
-                          } else if (page >= totalPages - 2) {
-                            pageNum = totalPages - 4 + i;
-                          } else {
-                            pageNum = page - 2 + i;
-                          }
-
-                          return (
-                            <button
-                              key={pageNum}
-                              onClick={() => setPage(pageNum)}
-                              className={`px-3 py-1.5 rounded-lg transition-all text-sm font-medium ${
-                                page === pageNum
-                                  ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white'
-                                  : 'bg-card border border-border hover:bg-muted'
-                              }`}
-                            >
-                              {pageNum}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      <button
-                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                        disabled={page === totalPages}
-                        className="px-3 py-1.5 bg-card border border-border rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted transition-all text-sm font-medium"
-                      >
-                        下一页
-                      </button>
-                    </div>
-                  )}
-
-                  {!loading && !error && (
-                    <div className="mt-3 text-center text-xs text-muted-foreground">
-                      第 {page} 页，共 {totalPages} 页
-                    </div>
-                  )}
-                </>
-              )}
+              <PostList
+                posts={posts}
+                loading={loading}
+                error={error}
+                hasFilters={hasFilters}
+                page={page}
+                totalPages={totalPages}
+                onRetry={loadPosts}
+                onClearFilters={clearFilters}
+                onPageChange={setPage}
+              />
             </div>
 
             {/* 右侧: 热门文章区域 - 大屏显示 */}
-            <div className="hidden xl:block xl:col-span-3">
-              <div className="sticky top-24 space-y-4">
-                {/* 热门文章卡片 */}
-                <div className="bg-card/75 backdrop-blur-lg rounded-xl shadow-md border border-border/50 p-4">
-                  <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-lg bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center text-white">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
-                      </svg>
-                    </span>
-                    热门文章排行
-                  </h3>
-                  <div className="space-y-2">
-                    {hotPosts.map((post, index) => (
-                      <Link
-                        key={post.id}
-                        to={`/posts/${post.slug}`}
-                        className="flex items-start gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors group"
-                      >
-                        <span className={`flex-shrink-0 w-5 h-5 rounded text-xs font-bold flex items-center justify-center ${
-                          index === 0 ? 'bg-red-500 text-white' :
-                          index === 1 ? 'bg-orange-500 text-white' :
-                          index === 2 ? 'bg-yellow-500 text-white' :
-                          'bg-muted text-muted-foreground'
-                        }`}>
-                          {index + 1}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-foreground line-clamp-2 group-hover:text-primary transition-colors">
-                            {post.title}
-                          </p>
-                          <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-                            <span>{post.viewCount || 0} 阅读</span>
-                            {post.publishedAt && (
-                              <>
-                                <span>•</span>
-                                <span>{format(new Date(post.publishedAt), 'MM-dd')}</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                    {hotPosts.length === 0 && (
-                      <div className="text-center py-4 text-muted-foreground text-sm">
-                        暂无文章
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <HotPostsSidebar hotPosts={hotPosts} />
           </div>
         </div>
 
