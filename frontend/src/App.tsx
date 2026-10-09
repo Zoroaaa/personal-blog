@@ -18,32 +18,34 @@
  */
 
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { ErrorBoundary, PageErrorBoundary } from './components/ErrorBoundary';
-import { HomePage } from './pages/HomePage';
-import { PostPage } from './pages/PostPage';
-import { LoginPage } from './pages/LoginPage';
-import { AdminPage } from './pages/AdminPage';
-import { SearchPage } from './pages/SearchPage';
-import { ProfilePage } from './pages/ProfilePage';
-import { ConfigPage } from './pages/ConfigPage';
-import { AboutPage } from './pages/AboutPage';
-import { ColumnPage } from './pages/ColumnPage';
-import { CategoryPage } from './pages/CategoryPage';
-import { TagPage } from './pages/TagPage';
-import { NotFoundPage } from './pages/NotFoundPage';
-import NotificationCenter from './pages/NotificationCenter';
-import NotificationSettings from './pages/NotificationSettings';
-import MessagesPage from './pages/MessagesPage';
-import ThreadPage from './pages/ThreadPage';
-import NewMessagePage from './pages/NewMessagePage';
-import { SystemNotificationPage } from './pages/admin/SystemNotificationPage';
-import { ReadingHistoryPage } from './pages/ReadingHistoryPage';
-import { AccountSettingsPage } from './pages/AccountSettingsPage';
 import { useSiteConfig } from './hooks/useSiteConfig';
 import { ToastProvider } from './components/Toast';
+
+// 路由级代码分割：页面组件按需加载，避免全部打进首屏 bundle
+const HomePage = lazy(() => import('./pages/HomePage').then((m) => ({ default: m.HomePage })));
+const PostPage = lazy(() => import('./pages/PostPage').then((m) => ({ default: m.PostPage })));
+const LoginPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })));
+const AdminPage = lazy(() => import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })));
+const SearchPage = lazy(() => import('./pages/SearchPage').then((m) => ({ default: m.SearchPage })));
+const ProfilePage = lazy(() => import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })));
+const ConfigPage = lazy(() => import('./pages/ConfigPage').then((m) => ({ default: m.ConfigPage })));
+const AboutPage = lazy(() => import('./pages/AboutPage').then((m) => ({ default: m.AboutPage })));
+const ColumnPage = lazy(() => import('./pages/ColumnPage').then((m) => ({ default: m.ColumnPage })));
+const CategoryPage = lazy(() => import('./pages/CategoryPage').then((m) => ({ default: m.CategoryPage })));
+const TagPage = lazy(() => import('./pages/TagPage').then((m) => ({ default: m.TagPage })));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
+const NotificationCenter = lazy(() => import('./pages/NotificationCenter'));
+const NotificationSettings = lazy(() => import('./pages/NotificationSettings'));
+const MessagesPage = lazy(() => import('./pages/MessagesPage'));
+const ThreadPage = lazy(() => import('./pages/ThreadPage'));
+const NewMessagePage = lazy(() => import('./pages/NewMessagePage'));
+const SystemNotificationPage = lazy(() => import('./pages/admin/SystemNotificationPage').then((m) => ({ default: m.SystemNotificationPage })));
+const ReadingHistoryPage = lazy(() => import('./pages/ReadingHistoryPage').then((m) => ({ default: m.ReadingHistoryPage })));
+const AccountSettingsPage = lazy(() => import('./pages/AccountSettingsPage').then((m) => ({ default: m.AccountSettingsPage })));
 
 /**
  * 页面过渡包装组件
@@ -59,6 +61,24 @@ function PageTransition({ children }: { children: React.ReactNode }) {
   return (
     <div key={location.pathname} className="animate-fade-in">
       {children}
+    </div>
+  );
+}
+
+/**
+ * 路由懒加载占位组件
+ * 
+ * 功能：页面 chunk 按需加载期间的过渡占位
+ * 
+ * @returns 加载中占位组件
+ */
+function RouteLoadingFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="text-center">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <p className="mt-2 text-muted-foreground">加载中...</p>
+      </div>
     </div>
   );
 }
@@ -87,29 +107,31 @@ function PageTransition({ children }: { children: React.ReactNode }) {
  */
 function AppRoutes() {
   return (
-    <Routes>
-      <Route path="/" element={<PageTransition><HomePage /></PageTransition>} />
-      <Route path="/about" element={<PageTransition><AboutPage /></PageTransition>} />
-      <Route path="/posts/:slug" element={<PageTransition><PageErrorBoundary pageName="文章页面"><PostPage /></PageErrorBoundary></PageTransition>} />
-      <Route path="/login" element={<PageTransition><LoginPage /></PageTransition>} />
-      <Route path="/admin" element={<PageTransition><PageErrorBoundary pageName="管理后台"><AdminPage /></PageErrorBoundary></PageTransition>} />
-      <Route path="/admin/config" element={<PageTransition><PageErrorBoundary pageName="配置页面"><ConfigPage /></PageErrorBoundary></PageTransition>} />
-      <Route path="/search" element={<PageTransition><SearchPage /></PageTransition>} />
-      <Route path="/profile" element={<PageTransition><PageErrorBoundary pageName="个人资料"><ProfilePage /></PageErrorBoundary></PageTransition>} />
-      <Route path="/reading-history" element={<PageTransition><PageErrorBoundary pageName="阅读历史"><ReadingHistoryPage /></PageErrorBoundary></PageTransition>} />
-      <Route path="/account-settings" element={<PageTransition><PageErrorBoundary pageName="账号设置"><AccountSettingsPage /></PageErrorBoundary></PageTransition>} />
-      <Route path="/columns/:slug" element={<PageTransition><ColumnPage /></PageTransition>} />
-      <Route path="/categories/:slug" element={<PageTransition><CategoryPage /></PageTransition>} />
-      <Route path="/tags/:slug" element={<PageTransition><TagPage /></PageTransition>} />
-      <Route path="/notifications" element={<PageTransition><PageErrorBoundary pageName="通知中心"><NotificationCenter /></PageErrorBoundary></PageTransition>} />
-      <Route path="/notification-settings" element={<PageTransition><NotificationSettings /></PageTransition>} />
-      <Route path="/messages" element={<PageTransition><PageErrorBoundary pageName="私信"><MessagesPage /></PageErrorBoundary></PageTransition>} />
-      <Route path="/messages/new" element={<PageTransition><NewMessagePage /></PageTransition>} />
-      <Route path="/messages/:threadId" element={<PageTransition><ThreadPage /></PageTransition>} />
-      <Route path="/admin/notifications" element={<PageTransition><PageErrorBoundary pageName="系统通知"><SystemNotificationPage /></PageErrorBoundary></PageTransition>} />
-      
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+    <Suspense fallback={<RouteLoadingFallback />}>
+      <Routes>
+        <Route path="/" element={<PageTransition><HomePage /></PageTransition>} />
+        <Route path="/about" element={<PageTransition><AboutPage /></PageTransition>} />
+        <Route path="/posts/:slug" element={<PageTransition><PageErrorBoundary pageName="文章页面"><PostPage /></PageErrorBoundary></PageTransition>} />
+        <Route path="/login" element={<PageTransition><LoginPage /></PageTransition>} />
+        <Route path="/admin" element={<PageTransition><PageErrorBoundary pageName="管理后台"><AdminPage /></PageErrorBoundary></PageTransition>} />
+        <Route path="/admin/config" element={<PageTransition><PageErrorBoundary pageName="配置页面"><ConfigPage /></PageErrorBoundary></PageTransition>} />
+        <Route path="/search" element={<PageTransition><SearchPage /></PageTransition>} />
+        <Route path="/profile" element={<PageTransition><PageErrorBoundary pageName="个人资料"><ProfilePage /></PageErrorBoundary></PageTransition>} />
+        <Route path="/reading-history" element={<PageTransition><PageErrorBoundary pageName="阅读历史"><ReadingHistoryPage /></PageErrorBoundary></PageTransition>} />
+        <Route path="/account-settings" element={<PageTransition><PageErrorBoundary pageName="账号设置"><AccountSettingsPage /></PageErrorBoundary></PageTransition>} />
+        <Route path="/columns/:slug" element={<PageTransition><ColumnPage /></PageTransition>} />
+        <Route path="/categories/:slug" element={<PageTransition><CategoryPage /></PageTransition>} />
+        <Route path="/tags/:slug" element={<PageTransition><TagPage /></PageTransition>} />
+        <Route path="/notifications" element={<PageTransition><PageErrorBoundary pageName="通知中心"><NotificationCenter /></PageErrorBoundary></PageTransition>} />
+        <Route path="/notification-settings" element={<PageTransition><NotificationSettings /></PageTransition>} />
+        <Route path="/messages" element={<PageTransition><PageErrorBoundary pageName="私信"><MessagesPage /></PageErrorBoundary></PageTransition>} />
+        <Route path="/messages/new" element={<PageTransition><NewMessagePage /></PageTransition>} />
+        <Route path="/messages/:threadId" element={<PageTransition><ThreadPage /></PageTransition>} />
+        <Route path="/admin/notifications" element={<PageTransition><PageErrorBoundary pageName="系统通知"><SystemNotificationPage /></PageErrorBoundary></PageTransition>} />
+        
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </Suspense>
   );
 }
 
