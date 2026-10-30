@@ -476,30 +476,25 @@ export { RateLimiter } from './durableObjects/RateLimiter';
 export const scheduled: ExportedHandlerScheduledHandler<Env> = async (event, env, ctx) => {
   console.log('Scheduled task triggered at:', new Date().toISOString());
   console.log('Cron:', event.cron);
-  
+
+  const now = new Date();
+  // 每 15 分钟触发，只在 8:00 那次做每日清理，避免重复删除
+  const isDailyCleanup = now.getUTCHours() === 8 && now.getUTCMinutes() < 15;
+
   try {
-    const cleanedTokens = await RefreshTokenService.cleanupExpiredTokens(env.DB);
-    if (cleanedTokens > 0) {
-      console.log(`Cleaned up ${cleanedTokens} expired refresh tokens`);
+    // 汇总队列按 scheduled_at 到期时间驱动，两类都扫一遍，未到期项不会被发送
+    for (const digestType of ['daily', 'weekly'] as const) {
+      const result = await processDigestQueue(env.DB, env, digestType);
+      console.log(`${digestType} digest result:`, result);
     }
 
-    if (event.cron === '0 8 * * *') {
-      console.log('Processing daily digest...');
-      const result = await processDigestQueue(env.DB, env, 'daily');
-      console.log('Daily digest result:', result);
-      
+    if (isDailyCleanup) {
+      const cleanedTokens = await RefreshTokenService.cleanupExpiredTokens(env.DB);
+      if (cleanedTokens > 0) {
+        console.log(`Cleaned up ${cleanedTokens} expired refresh tokens`);
+      }
+
       await cleanupSentDigestItems(env.DB, 30);
-    } else if (event.cron === '0 9 * * 1') {
-      console.log('Processing weekly digest...');
-      const result = await processDigestQueue(env.DB, env, 'weekly');
-      console.log('Weekly digest result:', result);
-      
-      await cleanupSentDigestItems(env.DB, 30);
-    } else {
-      console.log('Unknown cron schedule, processing both digests...');
-      const dailyResult = await processDigestQueue(env.DB, env, 'daily');
-      const weeklyResult = await processDigestQueue(env.DB, env, 'weekly');
-      console.log('Digest results:', { daily: dailyResult, weekly: weeklyResult });
     }
   } catch (error) {
     console.error('Scheduled task error:', error);

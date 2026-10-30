@@ -39,9 +39,9 @@ head_sampling_rate = 1
 persist = true
 invocation_logs = true
 
-# 定时任务触发器
+# 定时任务触发器（每 15 分钟扫描一次到期汇总，daily / weekly 在同一任务内处理）
 [triggers]
-crons = ["0 8 * * *", "0 9 * * 1"]
+crons = ["*/15 * * * *"]
 
 # 环境变量（公开的配置）
 [vars]
