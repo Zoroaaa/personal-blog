@@ -243,9 +243,9 @@ bucket_name = "blog-storage"
 [observability]
 enabled = true
 
-# 定时任务触发器（可选）
+# 定时任务触发器（可选，每 15 分钟扫描到期汇总）
 [triggers]
-crons = ["0 8 * * *", "0 9 * * 1"]
+crons = ["*/15 * * * *"]
 
 # 环境变量（公开配置）
 [vars]
