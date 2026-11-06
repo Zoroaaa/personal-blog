@@ -468,12 +468,10 @@ import { processDigestQueue, cleanupSentDigestItems } from './services/digestSer
 // 导入 Refresh Token 清理服务
 import { RefreshTokenService } from './services/refreshTokenService';
 
-export default app;
-
 // 导出 Durable Object 类（限流原子计数器），供 wrangler 绑定引用
 export { RateLimiter } from './durableObjects/RateLimiter';
 
-export const scheduled: ExportedHandlerScheduledHandler<Env> = async (event, env, ctx) => {
+const scheduled: ExportedHandlerScheduledHandler<Env> = async (event, env, ctx) => {
   console.log('Scheduled task triggered at:', new Date().toISOString());
   console.log('Cron:', event.cron);
 
@@ -499,6 +497,13 @@ export const scheduled: ExportedHandlerScheduledHandler<Env> = async (event, env
   } catch (error) {
     console.error('Scheduled task error:', error);
   }
+};
+
+// Cloudflare Modules 格式只识别 default export 上的事件处理器；
+// 具名导出 scheduled 不会被绑定，cron 触发会报 "Handler does not export a scheduled() function"
+export default {
+  fetch: app.fetch,
+  scheduled,
 };
 
 // 重新导出响应工具函数，保持向后兼容
