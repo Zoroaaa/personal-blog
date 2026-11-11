@@ -37,7 +37,7 @@
 - **Cloudflare D1** - SQLite 数据库
 - **Cloudflare KV** - 键值存储（可选，用于缓存）
 - **Cloudflare R2** - 对象存储（图片上传）
-- **Cloudflare Pages** - 前端托管
+- **Workers Static Assets** - 前端静态资源托管（与 API 同域，同一个 Worker）
 
 > 💡 所有服务都有免费额度，足够个人博客使用。
 
@@ -116,35 +116,16 @@ GITHUB_CLIENT_SECRET=your-github-client-secret
 FRONTEND_URL=http://localhost:5173
 ```
 
-#### 3. 配置 `wrangler.toml`
+#### 3. 配置 `backend/wrangler.toml`
+
+仓库只有 `backend/wrangler.toml` 这一份 wrangler 配置（已提交），**不需要**复制或额外创建根目录配置。
 
 ```bash
-cp wrangler.toml.example wrangler.toml
+# 直接查看/编辑真实配置
+code backend/wrangler.toml
 ```
 
-编辑 `wrangler.toml`：
-
-```toml
-name = "personal-blog-backend"
-main = "src/index.ts"
-compatibility_date = "2024-01-01"
-
-[vars]
-ENVIRONMENT = "development"
-
-[[d1_databases]]
-binding = "DB"
-database_name = "personal-blog-dev"
-database_id = "your-database-id"  # 创建数据库后填入
-
-[[r2_buckets]]
-binding = "IMAGES"
-bucket_name = "personal-blog-images-dev"
-
-[[kv_namespaces]]
-binding = "CACHE"
-id = "your-kv-namespace-id"  # 创建KV后填入
-```
+确认 `name = "blog"`（不要改）以及 D1 / KV / R2 的绑定 ID 已就位；本地开发的环境变量写在 `backend/.dev.vars`，不要改 `[vars]`。
 
 ### 数据库初始化
 
@@ -154,7 +135,7 @@ id = "your-kv-namespace-id"  # 创建KV后填入
 wrangler d1 create personal-blog-dev
 ```
 
-执行后会返回数据库 ID，将其填入 `wrangler.toml` 的 `database_id` 字段。
+执行后会返回数据库 ID，将其填入 `backend/wrangler.toml` 的 `database_id` 字段。
 
 #### 2. 执行数据库迁移
 
@@ -238,8 +219,8 @@ cp .env.example .env
 #### 2. 编辑 `.env` 文件
 
 ```env
-# 后端 API 地址（需包含 /api 后缀）
-VITE_API_URL=http://localhost:8787/api
+# API 使用相对路径 /api，开发环境由 vite.config.ts 代理到 http://localhost:8787
+# 不需要配置 VITE_API_URL
 
 # 是否开启调试模式
 VITE_DEBUG=true
@@ -388,9 +369,9 @@ wrangler r2 bucket list
 ### Q: 前端无法连接后端？
 
 **A**: 
-1. 确认后端服务已启动
-2. 检查 `VITE_API_URL` 配置
-3. 检查 CORS 配置
+1. 确认后端服务已启动（`npm run dev:backend`，端口 8787）
+2. 确认 `frontend/vite.config.ts` 中 `/api` 代理指向 `http://localhost:8787`
+3. 生产环境同域部署，不应设置 `VITE_API_URL`
 
 ### Q: 主题设置不生效？
 
