@@ -1,0 +1,84 @@
+name: Verify, Migrate & Deploy
+
+# 唯一的发布入口：typecheck → D1 迁移 → 触发 Workers Builds 部署钩子。
+# 任何一步失败都不会部署。
+#
+# 前提：Workers Builds 侧的 push 自动部署已关闭（Build watch paths 设为永不命中的路径），
+# 生产部署只能由这里调用部署钩子触发，从而保证迁移先于部署。
+# 不配置 paths 过滤：push 不再自动部署，所有改动都必须走这条流水线才会生效。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Type Check, D1 Migrations & Deploy
+    # secrets 上下文不能直接用在 step 的 if 里，所以提到 job 级 env 再判断。
+    # 未配置钩子时钩子步骤显示为 skipped，而不是「绿色的成功但没部署」。
+    env:
+      WORKERS_DEPLOY_HOOK_URL: ${{ secrets.WORKERS_DEPLOY_HOOK_URL }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          # 单仓 workspaces：唯一权威锁文件在仓库根目录
+          cache-dependency-path: 'package-lock.json'
+
+      - name: Install Dependencies
+        # workspaces 依赖统一 hoist 到根 node_modules，必须在仓库根执行 npm ci
+        # npm ci 严格按根 package-lock.json 安装，保证可复现；lock 与 package.json 不一致会直接失败
+        run: |
+          npm ci
+          npx wrangler --version
+
+      - name: Type Check
+        working-directory: ./backend
+        run: npm run typecheck
+
+      - name: Apply D1 Migrations
+        # 部署前先同步生产库结构；脚本为幂等重放，重复执行安全。
+        # 失败即中断，避免旧结构上线新代码。
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: bash scripts/migrate.sh blog-db --remote
+
+      - name: Trigger Workers Builds Deployment
+        # 部署钩子是 POST 请求，无需 Authorization 头，URL 本身即凭证。
+        # 未配置 Secret 时这一步直接 skipped：不会伪装成「成功但没部署」。
+        if: env.WORKERS_DEPLOY_HOOK_URL != ''
+        run: |
+          # 不用 curl --fail：需要拿到状态码与响应体，才能区分「钩子被删/限流」和「URL 写错」。
+          raw=$(curl -sS -X POST -w '\n%{http_code}' "$WORKERS_DEPLOY_HOOK_URL")
+          status=$(printf '%s\n' "$raw" | tail -n1)
+          body=$(printf '%s\n' "$raw" | sed '$d')
+
+          echo "HTTP status: $status"
+          echo "Response body: $body"
+
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "::error::Deploy hook returned HTTP $status. Check that the hook still exists, the URL is correct, and the rate limit (10 builds/min per Worker) is not exceeded."
+            exit 1
+          fi
+
+          if [ "$(printf '%s' "$body" | jq -r '.success')" != "true" ]; then
+            echo "::error::Deploy hook did not return success=true. See the response body above."
+            exit 1
+          fi
+
+          echo "Deployment triggered: build_uuid=$(printf '%s' "$body" | jq -r '.result.build_uuid')"
+          echo "If no build appears in Workers Build history, the Build watch paths rule is also filtering deploy hook builds; see docs/DEPLOYMENT.md 3.2 for the fallback."
+
+      - name: Deployment Skipped Notice
+        # 让「未部署」在 UI 里有一句明确解释，而不是只能看到一个 skipped 步骤。
+        if: env.WORKERS_DEPLOY_HOOK_URL == ''
+        run: echo "::notice title=Deployment skipped::WORKERS_DEPLOY_HOOK_URL is not configured, so no deployment was triggered. Type check and migrations passed."
