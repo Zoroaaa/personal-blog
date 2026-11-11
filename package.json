@@ -1,7 +1,7 @@
 {
   "name": "blog-system-v1",
   "version": "1.0.0",
-  "description": "Modern personal blog system with Cloudflare Workers and Pages",
+  "description": "Modern personal blog system on Cloudflare Workers",
   "private": true,
   "workspaces": [
     "frontend",
@@ -10,13 +10,13 @@
   "scripts": {
     "dev": "npm run dev --workspace=frontend",
     "dev:backend": "npm run dev --workspace=backend",
-    "build": "npm run build --workspaces",
-    "deploy": "npm run deploy --workspaces",
+    "build": "npm run build --workspace=frontend",
+    "deploy": "npm run build --workspace=frontend && wrangler deploy --config backend/wrangler.toml",
     "init": "bash scripts/init.sh",
     "migrate": "bash scripts/migrate.sh",
     "test": "npm run test --workspaces --if-present"
   },
-  "keywords": ["blog", "cloudflare", "workers", "pages"],
+  "keywords": ["blog", "cloudflare", "workers", "d1"],
   "author": "",
   "license": "MIT"
 }

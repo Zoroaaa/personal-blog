@@ -1,6 +1,16 @@
-name = "blog-api"
+name = "blog"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
+# 静态资源挂到同一 Worker 后，导航请求（浏览器深链）优先交给静态资源、
+# 不进入 Worker，避免 Hono 的 JSON 404 覆盖 SPA 的 index.html。
+# 保持 compatibility_date 不变，避免既有运行时行为发生变化。
+compatibility_flags = ["assets_navigation_prefers_asset_serving"]
+
+# 前端静态资源（Vite 产物），与 API 同域部署
+[assets]
+directory = "../frontend/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
 
 
 # D1 数据库
@@ -56,7 +66,7 @@ STORAGE_PUBLIC_URL = "https://storage.blog.wort.uk"
 # wrangler secret put GITHUB_CLIENT_SECRET
 
 # 或者在Cloudflare Dashboard设置:
-# Workers & Pages > blog-api > Settings > Variables
+# Workers & Pages > blog > Settings > Variables
 # 添加以下环境变量（加密）：
 # - JWT_SECRET: 用户认证 JWT 密钥
 # - POST_PASSWORD_SECRET: 文章密码访问 Token 密钥（可选）

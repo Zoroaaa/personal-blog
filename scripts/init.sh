@@ -40,15 +40,15 @@ if [ -z "$JWT_SECRET" ]; then
     echo "生成的JWT_SECRET: $JWT_SECRET"
 fi
 
-echo "$JWT_SECRET" | wrangler secret put JWT_SECRET --name blog-api
+echo "$JWT_SECRET" | wrangler secret put JWT_SECRET --name blog
 
 echo "请输入GitHub Client ID:"
 read GITHUB_CLIENT_ID
-echo "$GITHUB_CLIENT_ID" | wrangler secret put GITHUB_CLIENT_ID --name blog-api
+echo "$GITHUB_CLIENT_ID" | wrangler secret put GITHUB_CLIENT_ID --name blog
 
 echo "请输入GitHub Client Secret:"
 read -s GITHUB_CLIENT_SECRET
-echo "$GITHUB_CLIENT_SECRET" | wrangler secret put GITHUB_CLIENT_SECRET --name blog-api
+echo "$GITHUB_CLIENT_SECRET" | wrangler secret put GITHUB_CLIENT_SECRET --name blog
 
 echo ""
 echo "✅ 初始化完成!"
