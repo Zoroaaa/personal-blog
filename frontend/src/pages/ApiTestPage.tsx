@@ -207,16 +207,16 @@ export default function ApiTestPage() {
               </h2>
               <div className="space-y-3 text-sm text-primary">
                 <div>
-                  <strong>1. 检查环境变量</strong>
-                  <p>确保在 Cloudflare Pages 设置中添加了 VITE_API_URL 环境变量</p>
+                  <strong>1. 检查 API 路径</strong>
+                  <p>前后端同域部署，应使用相对路径 /api，不需要配置 VITE_API_URL</p>
                 </div>
                 <div>
                   <strong>2. 检查后端部署</strong>
-                  <p>访问 https://blogapi.wort.uk/health 确认后端是否正常运行</p>
+                  <p>访问与当前域名同源的 /api/health，确认 Worker 是否正常运行</p>
                 </div>
                 <div>
-                  <strong>3. 检查CORS配置</strong>
-                  <p>确保后端允许 https://blog.wort.uk 的跨域请求</p>
+                  <strong>3. 检查 CORS 配置</strong>
+                  <p>本地开发（localhost:5173）或预览域名需要在 FRONTEND_URL 白名单中</p>
                 </div>
                 <div>
                   <strong>4. 检查浏览器控制台</strong>

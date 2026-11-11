@@ -8,8 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "jest",
-    "deploy": "npm ci && npm run build && wrangler pages deploy dist"
+    "test": "jest"
   },
   "dependencies": {
     "date-fns": "^3.0.6",
