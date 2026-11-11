@@ -387,26 +387,26 @@ personal-blog/
 
 ### 部署架构
 
-- **前端**: Cloudflare Pages
-- **后端**: Cloudflare Workers
+- **运行时**: 单个 Cloudflare Worker（`blog`）
+- **前端**: Worker 静态资源（`frontend/dist`，与 API 同域）
+- **后端 API**: 同一 Worker，路径 `/api/*`
 - **数据库**: Cloudflare D1
 - **缓存**: Cloudflare KV
 - **存储**: Cloudflare R2
 - **邮件**: Resend
+- **部署**: Workers Builds（构建前端后与 Worker 一起上传），push 不自动部署，只由 GitHub Actions 调用部署钩子触发
+- **流水线**: GitHub Actions 先 typecheck、再迁移生产 D1，成功后触发部署钩子；任何一步失败都不部署
 
 详细部署步骤请参考 [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)。
 
 ### 快速部署
 
 ```bash
-# 部署后端
-cd backend
-wrangler deploy
+# 本地手动部署：先构建前端，再连同 Worker 与静态资源一起上传
+npm run deploy
 
-# 部署前端
-cd ../frontend
-pnpm build
-wrangler pages deploy dist
+# 生产库迁移
+npm run migrate -- blog-db --remote
 ```
 
 ---
@@ -418,7 +418,6 @@ wrangler pages deploy dist
 - Cloudflare Workers 免费版
 - Cloudflare D1 免费版（500MB 存储）
 - Cloudflare KV 免费版（1GB 存储）
-- Cloudflare Pages 免费版
 - Cloudflare R2 免费版（10GB 存储）
 
 ### 推荐配置
