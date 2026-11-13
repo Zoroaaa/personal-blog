@@ -15,7 +15,8 @@ import type {
 } from '../types/notifications';
 import { useAuthStore } from '../stores/authStore';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+// 与 api.ts 保持一致：同域部署时基址为相对路径 /api
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 function getRequestConfig(): RequestInit {
   const { token } = useAuthStore.getState();
