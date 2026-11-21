@@ -242,22 +242,49 @@ openssl rand -base64 32
 
 ## 管理员账号
 
-项目**不预置任何默认管理员**，也**不会**把第一个注册的人设为管理员（部署后、你注册之前站点是公开的，先到先得不安全）。管理员由 Secret `ADMIN_EMAIL` 指定：
+项目**不预置默认管理员**，也**不会**把第一个注册的人设为管理员（部署后到你注册之前站点是公开的，先到先得可被抢）。管理员由 Secret `ADMIN_EMAIL` 指定。
 
-- `ADMIN_EMAIL` 填你自己的邮箱，多个用英文逗号分隔，不区分大小写。
-- 该邮箱**验证通过后注册**的账号自动是 `admin`：邮箱注册需验证码验证（要求已配置 `RESEND_API_KEY`），GitHub 登录需该邮箱是 GitHub 已验证的主邮箱。
-- 未配置 `RESEND_API_KEY` 时邮箱无法验证，即使邮箱匹配也只会注册为普通用户（防止有人抢注你的邮箱），请改用下面的 SQL 提权。
-- 只在**注册时**生效：已存在的账号不会因为后加 `ADMIN_EMAIL` 被提权，删掉它也不会降权。
+### 规则
 
-手动提权（本地开发无邮件服务 / 补救已注册账号）：
+- `ADMIN_EMAIL` 填你自己的邮箱；多个用英文逗号分隔，不区分大小写。
+- **只在注册那一刻生效**：邮箱匹配且已验证的新账号，直接是 `admin`。已存在的账号不会因为之后才配置 `ADMIN_EMAIL` 被提权，删掉它也不会降权。
+- **邮箱必须已验证才提权**，否则任何人都能用你的邮箱抢注：
+  - 邮箱注册：需要配置 `RESEND_API_KEY`（配置后注册页强制填 6 位邮箱验证码）。
+  - GitHub 登录：只认 GitHub 已验证的主邮箱。
+  - 没配 `RESEND_API_KEY` 时，即使邮箱匹配也只会注册为普通用户，后端输出一条 warn 日志。这种情况请用下面的 SQL 提权。
+
+### 方式一：新站点（推荐）
+
+顺序不能反：**先配 Secret，再注册**。
+
+1. 在 **Workers & Pages** → **blog** → **Settings** → **Variables** 添加 Encrypted 变量 `ADMIN_EMAIL`，值为你的邮箱；同时确认 `RESEND_API_KEY` 已配置，并且 Resend 已验证发件域名（否则收不到验证码，见故障排除第 10 条）。
+2. 部署使 Secret 生效。
+3. 打开站点，登录页点「注册」，填用户名、密码，邮箱填 `ADMIN_EMAIL` 里的那个。
+4. 点发送验证码，到该邮箱收 6 位验证码，填回注册页并提交。
+5. 注册成功即为管理员，访问 `/admin` 进入后台。
+
+### 方式二：账号已经注册过 / 没有邮件服务
+
+直接改库提权：
 
 ```
-# 本地
-wrangler d1 execute <库名> --config backend/wrangler.toml --command="UPDATE users SET role='admin' WHERE email='you@example.com'"
-# 生产：加 --remote
+# 生产
+wrangler d1 execute blog-db --remote --config backend/wrangler.toml \
+  --command="UPDATE users SET role='admin' WHERE email='you@example.com'"
+
+# 本地：去掉 --remote，库名换成本地库（如 personal-blog-dev）
 ```
 
-旧部署升级：历史 schema 预置过 `admin@example.com`，已存在的库不会被自动清理，处理步骤见 [CHANGELOG_v1.4.1](changelog/CHANGELOG_v1.4.1.md)。
+执行后**必须退出并重新登录**：角色写在登录令牌里，不重新登录仍是旧角色。
+
+### 验证
+
+- 访问 `/admin` 能进入后台。
+- 或查库：`SELECT username, role FROM users WHERE email='you@example.com'` 应为 `admin`。
+
+### 旧部署升级
+
+早期版本的 schema 预置过 `admin@example.com`，已存在的库不会被自动清理（用户外键为 `ON DELETE CASCADE`，直接删会连带删掉它名下的文章）。处理步骤见 [CHANGELOG_v1.4.1](changelog/CHANGELOG_v1.4.1.md)。
 
 ---
 
