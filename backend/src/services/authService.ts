@@ -32,6 +32,7 @@ import { EmailVerificationService, type VerificationEmailType } from './emailVer
 import { RefreshTokenService } from './refreshTokenService';
 import { AUTH_CONSTANTS } from '../config/constants';
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
+
 import type { 
   UserLoginRow, 
   UserBasicRow, 
@@ -43,6 +44,20 @@ import type {
   GitHubUserResponse,
   GitHubEmailResponse
 } from '../types/database';
+import type { Env } from '../types';
+
+/**
+ * 判断邮箱是否在 ADMIN_EMAIL 白名单内（逗号分隔，不区分大小写）。
+ * 调用方必须保证该邮箱已通过所有权验证（邮箱验证码 / GitHub verified primary），
+ * 否则任何人都能用管理员邮箱抢注并获得 admin。
+ */
+function resolveRoleByVerifiedEmail(env: Env, verifiedEmail: string | null | undefined): 'admin' | 'user' {
+  if (!verifiedEmail || !env.ADMIN_EMAIL) return 'user';
+  const target = verifiedEmail.trim().toLowerCase();
+  const admins = env.ADMIN_EMAIL.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+  return admins.includes(target) ? 'admin' : 'user';
+}
+
 
 const BCRYPT_ROUNDS = AUTH_CONSTANTS.BCRYPT_ROUNDS;
 
@@ -241,6 +256,12 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
+    // 仅当邮箱已通过验证码验证（配置了 RESEND_API_KEY）时才允许按 ADMIN_EMAIL 提权
+    const role = emailVerificationRequired ? resolveRoleByVerifiedEmail(env, cleanEmail) : 'user';
+    if (!emailVerificationRequired && resolveRoleByVerifiedEmail(env, cleanEmail) === 'admin') {
+      console.warn('ADMIN_EMAIL matched but email verification is disabled (no RESEND_API_KEY); registered as user');
+    }
+
     const result = await db.prepare(
       `INSERT INTO users (username, email, password_hash, display_name, role, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
@@ -249,7 +270,7 @@ export class AuthService {
       cleanEmail,
       passwordHash,
       cleanDisplayName,
-      'user'
+      role
     ).run();
 
     if (!result.success) {
@@ -264,7 +285,7 @@ export class AuthService {
 
     const token = await generateAccessToken(
       asSecret(env.JWT_SECRET),
-      { userId, username: cleanUsername, role: 'user' },
+      { userId, username: cleanUsername, role },
       AUTH_CONSTANTS.JWT_ACCESS_TOKEN_EXPIRY
     );
 
@@ -273,7 +294,7 @@ export class AuthService {
       env.JWT_SECRET,
       userId,
       cleanUsername,
-      'user'
+      role
     );
 
     return {
@@ -286,7 +307,7 @@ export class AuthService {
         displayName: cleanDisplayName,
         avatarUrl: null,
         bio: null,
-        role: 'user',
+        role,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       },
@@ -414,6 +435,7 @@ export class AuthService {
     let tokenData: any;
     let githubUser: any;
     let githubEmail: string | undefined;
+    let verifiedGithubEmail: string | null = null;
 
     try {
       const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
@@ -476,6 +498,7 @@ export class AuthService {
       }
 
       githubEmail = githubUser.email;
+      verifiedGithubEmail = null;
 
       try {
         const emailResponse = await fetch('https://api.github.com/user/emails', {
@@ -491,6 +514,7 @@ export class AuthService {
           const primaryEmail = emails.find(e => e.primary && e.verified);
           if (primaryEmail) {
             githubEmail = primaryEmail.email;
+            verifiedGithubEmail = primaryEmail.email;
           }
         }
       } catch (emailError) {
@@ -520,6 +544,9 @@ export class AuthService {
         ? `${username}_${Date.now().toString(36)}`
         : username;
 
+      // 仅 GitHub 已验证的主邮箱可触发 ADMIN_EMAIL 提权
+      const oauthRole = resolveRoleByVerifiedEmail(env, verifiedGithubEmail);
+
       try {
         const result = await db.prepare(
           `INSERT INTO users (username, email, display_name, avatar_url, oauth_provider, oauth_id, role, created_at, updated_at)
@@ -531,7 +558,7 @@ export class AuthService {
           githubUser.avatar_url,
           'github',
           githubUser.id.toString(),
-          'user'
+          oauthRole
         ).run();
 
         user = {
@@ -541,7 +568,7 @@ export class AuthService {
           display_name: githubUser.name || finalUsername,
           avatar_url: githubUser.avatar_url,
           bio: null,
-          role: 'user',
+          role: oauthRole,
           status: 'active',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),

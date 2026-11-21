@@ -254,8 +254,17 @@ pnpm dev
 
 1. 访问 `http://localhost:5173`
 2. 点击右上角「登录」
-3. 点击「注册」创建管理员账号
-4. 登录后访问 `/admin` 进入管理后台
+3. 点击「注册」创建账号（注册出来的都是普通用户，**不会**自动成为管理员）
+4. 本地没有邮件服务，用 SQL 把该账号设为管理员，然后重新登录：
+
+   ```
+   cd backend
+   wrangler d1 execute personal-blog-dev --command="UPDATE users SET role='admin' WHERE email='you@example.com'"
+   ```
+
+5. 访问 `/admin` 进入管理后台
+
+> 生产环境不用改库：配置 Secret `ADMIN_EMAIL`，该邮箱验证后注册即为管理员，见 [部署指南](DEPLOYMENT.md#管理员账号)。
 
 ---
 
