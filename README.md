@@ -249,7 +249,8 @@ personal-blog/
 │       ├── CHANGELOG_v1.3.1.md
 │       ├── CHANGELOG_v1.3.2.md
 │       ├── CHANGELOG_v1.3.3.md
-│       └── CHANGELOG_v1.4.0.md
+│       ├── CHANGELOG_v1.4.0.md
+│       └── CHANGELOG_v1.4.1.md
 ├── scripts/                # 工具脚本
 │   ├── init.sh             # 初始化脚本
 │   └── migrate.sh          # 迁移脚本
@@ -461,7 +462,7 @@ npm run migrate -- blog-db --remote
 - [部署指南](./docs/DEPLOYMENT.md) - 详细部署说明
 - [API 文档](./docs/API.md) - 完整接口参考
 - [架构文档](./docs/ARCHITECTURE.md) - 系统设计说明
-- [更新日志](./docs/changelog/CHANGELOG_v1.4.0.md) - 版本更新记录
+- [更新日志](./docs/changelog/CHANGELOG_v1.4.1.md) - 版本更新记录
 
 ---
 

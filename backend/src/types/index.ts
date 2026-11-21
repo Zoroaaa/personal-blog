@@ -31,6 +31,8 @@ export type Env = {
   CACHE_HOMEPAGE_ONLY?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
+  /** 管理员邮箱白名单（逗号分隔）。该邮箱经验证后注册即为 admin */
+  ADMIN_EMAIL?: string;
 };
 
 /**

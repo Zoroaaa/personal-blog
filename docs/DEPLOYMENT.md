@@ -14,6 +14,7 @@
 - [前置准备](#前置准备)
 - [第一步：创建 Cloudflare 资源](#第一步创建-cloudflare-资源)
 - [第二步：配置 Worker](#第二步配置-worker)
+- [管理员账号](#管理员账号)
 - [第三步：连接 Workers Builds](#第三步连接-workers-builds)
 - [第四步：GitHub Actions（校验、迁移、触发部署）](#第四步github-actions校验迁移触发部署)
 - [第五步：域名与 HTTPS](#第五步域名与-https)
@@ -229,12 +230,34 @@ npm run migrate -- blog-db --remote
 | `GITHUB_CLIENT_SECRET` | GitHub OAuth Client Secret | 否 |
 | `RESEND_API_KEY` | Resend API Key | 否 |
 | `RESEND_FROM_EMAIL` | 发件地址 | 否 |
+| `ADMIN_EMAIL` | 管理员邮箱（逗号分隔），验证后注册即为 admin，见「管理员账号」 | 建议 |
 
 生成密钥：
 
 ```bash
 openssl rand -base64 32
 ```
+
+---
+
+## 管理员账号
+
+项目**不预置任何默认管理员**，也**不会**把第一个注册的人设为管理员（部署后、你注册之前站点是公开的，先到先得不安全）。管理员由 Secret `ADMIN_EMAIL` 指定：
+
+- `ADMIN_EMAIL` 填你自己的邮箱，多个用英文逗号分隔，不区分大小写。
+- 该邮箱**验证通过后注册**的账号自动是 `admin`：邮箱注册需验证码验证（要求已配置 `RESEND_API_KEY`），GitHub 登录需该邮箱是 GitHub 已验证的主邮箱。
+- 未配置 `RESEND_API_KEY` 时邮箱无法验证，即使邮箱匹配也只会注册为普通用户（防止有人抢注你的邮箱），请改用下面的 SQL 提权。
+- 只在**注册时**生效：已存在的账号不会因为后加 `ADMIN_EMAIL` 被提权，删掉它也不会降权。
+
+手动提权（本地开发无邮件服务 / 补救已注册账号）：
+
+```
+# 本地
+wrangler d1 execute <库名> --config backend/wrangler.toml --command="UPDATE users SET role='admin' WHERE email='you@example.com'"
+# 生产：加 --remote
+```
+
+旧部署升级：历史 schema 预置过 `admin@example.com`，已存在的库不会被自动清理，处理步骤见 [CHANGELOG_v1.4.1](changelog/CHANGELOG_v1.4.1.md)。
 
 ---
 
@@ -472,6 +495,7 @@ wrangler tail --config backend/wrangler.toml
 | `GITHUB_CLIENT_SECRET` | Secret | 否 | GitHub OAuth Client Secret |
 | `RESEND_API_KEY` | Secret | 否 | Resend API Key |
 | `RESEND_FROM_EMAIL` | Secret | 否 | 发件地址 |
+| `ADMIN_EMAIL` | Secret | 建议 | 管理员邮箱白名单（逗号分隔） |
 | `ENVIRONMENT` | 公开 | 是 | `production` |
 | `FRONTEND_URL` | 公开 | 是 | 博客域名：CORS 白名单 + 邮件链接 |
 | `STORAGE_PUBLIC_URL` | 公开 | 否 | R2 公开访问 URL |
@@ -588,7 +612,8 @@ wrangler deploy --config backend/wrangler.toml --dry-run
 - [ ] `name = "blog"`，与 Dashboard 项目名一致
 - [ ] `[assets]` 指向 `../frontend/dist`，`not_found_handling = "single-page-application"`
 - [ ] `compatibility_flags` 含 `assets_navigation_prefers_asset_serving`
-- [ ] Secrets 已配置（至少 `JWT_SECRET`）
+- [ ] Secrets 已配置（至少 `JWT_SECRET`；建议 `ADMIN_EMAIL`）
+- [ ] 用 `ADMIN_EMAIL` 邮箱注册后能进入 `/admin`
 - [ ] `FRONTEND_URL` 为博客域名
 
 ### Workers Builds
