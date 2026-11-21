@@ -264,7 +264,7 @@ pnpm dev
 
 5. 访问 `/admin` 进入管理后台
 
-> 生产环境不用改库：配置 Secret `ADMIN_EMAIL`，该邮箱验证后注册即为管理员，见 [部署指南](DEPLOYMENT.md#管理员账号)。
+> 生产环境不用改库：**注册前**配置 Secret `ADMIN_EMAIL`，该邮箱验证后注册即为管理员；账号已注册再配置无效。详见 [部署指南](DEPLOYMENT.md#管理员账号)。
 
 ---
 
