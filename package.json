@@ -11,10 +11,18 @@
     "dev": "npm run dev --workspace=frontend",
     "dev:backend": "npm run dev --workspace=backend",
     "build": "npm run build --workspace=frontend",
-    "deploy": "npm run build --workspace=frontend && wrangler deploy --config backend/wrangler.toml",
+    "deploy": "npm run typecheck --workspace=backend && bash scripts/migrate.sh DB --remote wrangler.toml && wrangler deploy --config wrangler.toml",
+    "deploy:manual": "npm run build --workspace=frontend && wrangler deploy --config backend/wrangler.toml",
     "init": "bash scripts/init.sh",
     "migrate": "bash scripts/migrate.sh",
     "test": "npm run test --workspaces --if-present"
+  },
+  "cloudflare": {
+    "bindings": {
+      "JWT_SECRET": {
+        "description": "必填：用 `openssl rand -hex 32` 生成随机密钥，不要提交到 Git。"
+      }
+    }
   },
   "keywords": ["blog", "cloudflare", "workers", "d1"],
   "author": "",

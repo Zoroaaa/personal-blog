@@ -29,7 +29,8 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 DB_DIR="$ROOT_DIR/database"
-WRANGLER_CONFIG="$ROOT_DIR/backend/wrangler.toml"
+# 按钮部署显式使用 Cloudflare 写入资源 ID 的根目录配置。
+WRANGLER_CONFIG="$ROOT_DIR/${3:-backend/wrangler.toml}"
 
 if [ -n "$REMOTE_FLAG" ]; then
     TARGET="远程(生产)"

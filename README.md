@@ -384,7 +384,9 @@ personal-blog/
 
 ## 部署
 
-本项目支持一键部署到 Cloudflare 平台。
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Zoroaaa/personal-blog)
+
+按钮用于新建站点；已有站点继续使用下方的部署流程。首次部署请参考[按钮部署说明](./docs/DEPLOYMENT.md#按钮部署新站点)。
 
 ### 部署架构
 
@@ -404,7 +406,7 @@ personal-blog/
 
 ```bash
 # 本地手动部署：先构建前端，再连同 Worker 与静态资源一起上传
-npm run deploy
+npm run deploy:manual
 
 # 生产库迁移
 npm run migrate -- blog-db --remote
