@@ -26,6 +26,7 @@ import { messageRoutes } from './routes/messages';
 import { userRoutes } from './routes/users';
 import { userNotificationSettingsRoutes } from './routes/users/notificationSettings';
 import { messageSettingsRoutes } from './routes/users/messageSettings';
+import { SeoService } from './services/seoService';
 
 import { requestLogger } from './middleware/requestLogger';
 import { rateLimit } from './middleware/rateLimit';
@@ -376,6 +377,39 @@ app.route('/api/users/notification-settings', userNotificationSettingsRoutes);
 app.route('/api/users/message-settings', messageSettingsRoutes);
 
 app.route('/api/users', userRoutes);
+
+// ============= SEO：站点地图与文章页 meta 注入 =============
+// 为什么在 Worker 侧：SPA 的客户端 meta 注入对不执行 JS 的爬虫无效（微信/微博分享卡片拿不到 OG）。
+// /posts/* 与 /sitemap.xml 在 wrangler.toml 的 run_worker_first 里优先到 Worker，其余导航仍走静态资源。
+
+app.get('/sitemap.xml', async (c) => {
+  const baseUrl = (c.env.FRONTEND_URL || new URL(c.req.url).origin).replace(/\/$/, '');
+  const xml = await SeoService.buildSitemapXml(c.env.DB, baseUrl);
+  return c.body(xml, 200, {
+    'Content-Type': 'application/xml; charset=utf-8',
+    'Cache-Control': 'public, max-age=3600',
+  });
+});
+
+app.get('/posts/:slug', async (c) => {
+  const slug = c.req.param('slug');
+  const baseUrl = (c.env.FRONTEND_URL || new URL(c.req.url).origin).replace(/\/$/, '');
+
+  // 查得到 meta 就注入（公开/密码文章）；查不到也放行 SPA 壳，交给前端 404 页
+  const meta = await SeoService.getPostSeoMeta(c.env.DB, slug).catch(() => null);
+
+  const shellResp = await c.env.ASSETS.fetch(new Request(new URL('/index.html', c.req.url)));
+  if (!shellResp.ok) {
+    return c.notFound();
+  }
+  const html = await shellResp.text();
+  const headTags = SeoService.buildHeadTags(meta, baseUrl);
+
+  return c.html(html.replace('<head>', `<head>${headTags}`), 200, {
+    // 已发布文章 5 分钟边缘缓存；未命中（走 SPA 404）短缓存
+    'Cache-Control': meta ? 'public, max-age=300' : 'public, max-age=60',
+  });
+});
 
 // ============= 错误处理 =============
 

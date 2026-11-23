@@ -16,7 +16,7 @@
 import { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
+import { rehypeHighlightPlugin } from '../utils/markdownPlugins';
 import { getMarkdownComponents, generateToc } from '../utils/markdownRenderer';
 import 'highlight.js/styles/github-dark.css';
 
@@ -61,7 +61,7 @@ export function MarkdownPreview({ content, className = '', showToc = false }: Ma
       <div className="flex-1 min-w-0">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeHighlight]}
+          rehypePlugins={[rehypeHighlightPlugin]}
           components={components}
           className="markdown-body"
         >
@@ -81,7 +81,7 @@ export function SimpleMarkdownPreview({ content, className = '' }: Omit<Markdown
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
-      rehypePlugins={[rehypeHighlight]}
+      rehypePlugins={[rehypeHighlightPlugin]}
       components={components}
       className={className}
     >
@@ -110,7 +110,7 @@ export function SplitPreview({ content, isVisible }: SplitPreviewProps) {
       <div className="max-w-none">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeHighlight]}
+          rehypePlugins={[rehypeHighlightPlugin]}
           components={components}
         >
           {content}

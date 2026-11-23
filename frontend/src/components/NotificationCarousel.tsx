@@ -14,7 +14,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../utils/api';
-import { motion } from 'framer-motion';
+
 
 interface CarouselNotification {
   id: number;
@@ -162,14 +162,12 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
       onMouseLeave={() => setIsPaused(false)}
     >
       {/* 主卡片容器 - 紧凑设计 */}
-      <motion.div
+      {/* 入场/进度动画用 CSS（见 index.css），不再依赖 framer-motion：全仓仅本组件用它 */}
+      <div
         key={currentIndex}
-        initial={{ opacity: 0, y: 10, scale: 0.99 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -10, scale: 0.99 }}
-        transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
         className={`
           relative overflow-hidden
+          animate-fade-in
           bg-card/85 dark:bg-card/85
           backdrop-blur-xl
           rounded-2xl
@@ -197,11 +195,9 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
         {/* 内容区域 - 横向布局，内容保留3行高度 */}
         <div className="relative px-4 py-3 sm:px-5 sm:py-4 flex items-start gap-3 sm:gap-4">
           {/* 类型图标 */}
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.1, duration: 0.2 }}
+          <div
             className={`
+              animate-scale-in
               flex-shrink-0
               inline-flex items-center justify-center
               w-9 h-9 sm:w-10 sm:h-10 rounded-xl mt-0.5
@@ -209,30 +205,26 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
             `}
           >
             {config.icon}
-          </motion.div>
+          </div>
 
           {/* 文本内容 - 内容保留3行高度 */}
           <div className="flex-1 min-w-0">
             {/* 标题 */}
-            <motion.h2
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.05, duration: 0.2 }}
+            <h2
               className="
+                animate-fade-in-left
                 text-base sm:text-lg
                 font-semibold
                 text-foreground
               "
             >
               {displayNotification.title}
-            </motion.h2>
+            </h2>
 
             {/* 内容 - 保留3行高度 */}
-            <motion.p
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1, duration: 0.2 }}
+            <p
               className="
+                animate-fade-in-left
                 text-sm text-muted-foreground
                 mt-1
                 line-clamp-3
@@ -240,23 +232,20 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
               "
             >
               {displayNotification.content}
-            </motion.p>
+            </p>
           </div>
 
           {/* 右侧操作区 */}
           <div className="flex-shrink-0 flex flex-col items-end gap-2">
             {displayNotification.link && (
-              <motion.span
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.2 }}
+              <span
                 className="hidden sm:flex items-center gap-1 text-xs text-primary dark:text-primary font-medium"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
                 查看
-              </motion.span>
+              </span>
             )}
             {displayNotification.createdAt && (
               <span className="hidden md:flex items-center gap-1 text-xs text-muted-foreground">
@@ -269,24 +258,20 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
         {/* 进度条 */}
         {notifications.length > 1 && !isPaused && (
           <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-muted/50 overflow-hidden">
-            <motion.div
-              className={`h-full ${config.accent}`}
-              initial={{ width: '0%' }}
-              animate={{ width: '100%' }}
-              transition={{ duration: CAROUSEL_INTERVAL / 1000, ease: 'linear' }}
+            <div
+              className={`h-full ${config.accent} animate-progress-fill`}
+              style={{ animationDuration: `${CAROUSEL_INTERVAL}ms` }}
               key={currentIndex}
             />
           </div>
         )}
-      </motion.div>
+      </div>
 
       {/* 导航控制 - 紧凑设计 */}
       {notifications.length > 1 && (
         <div className="mt-3 flex items-center justify-center gap-3">
           {/* 上一页按钮 */}
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+          <button
             onClick={prev}
             className="
               p-2 rounded-lg
@@ -297,23 +282,23 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
               hover:text-primary dark:hover:text-primary
               hover:border-primary/50
               transition-all duration-200
+              hover:scale-105 active:scale-95
             "
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-          </motion.button>
+          </button>
 
           {/* 指示器 */}
           <div className="flex items-center gap-1.5">
             {notifications.map((_, index) => (
-              <motion.button
+              <button
                 key={index}
                 onClick={() => goTo(index)}
-                whileHover={{ scale: 1.15 }}
-                whileTap={{ scale: 0.9 }}
                 className={`
                   rounded-full transition-all duration-200
+                  hover:scale-125 active:scale-90
                   ${index === currentIndex
                     ? 'w-5 h-1.5 bg-gradient-to-r from-primary-500 to-primary-700'
                     : 'w-1.5 h-1.5 bg-border/60 hover:bg-border dark:hover:bg-border'
@@ -325,9 +310,7 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
           </div>
 
           {/* 下一页按钮 */}
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+          <button
             onClick={next}
             className="
               p-2 rounded-lg
@@ -338,12 +321,13 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
               hover:text-primary dark:hover:text-primary
               hover:border-primary/50
               transition-all duration-200
+              hover:scale-105 active:scale-95
             "
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
-          </motion.button>
+          </button>
         </div>
       )}
     </div>

@@ -11,10 +11,8 @@
  * @created 2024-01-01
  */
 
-// @ts-ignore - mammoth 和 jszip 是可选依赖
-import mammoth from 'mammoth';
-// @ts-ignore
-import JSZip from 'jszip';
+// mammoth / jszip 体积数百 KB，且只有「导入 Word 文档」一个场景需要：
+// 必须动态 import（见 parseWordDocument），静态引入会把它们打进 AdminPage chunk。
 
 export interface ParsedImage {
   id: string;
@@ -75,6 +73,14 @@ export async function parseMarkdownFile(file: File): Promise<ParsedDocument> {
  */
 export async function parseWordDocument(file: File): Promise<ParsedDocument> {
   const arrayBuffer = await file.arrayBuffer();
+
+  // 动态加载重型解析库（触发场景才付下载成本）
+  // @ts-ignore - mammoth 无类型声明
+  const mammothMod = await import('mammoth');
+  // @ts-ignore - jszip 无类型声明
+  const JSZipMod = await import('jszip');
+  const mammoth = mammothMod.default ?? mammothMod;
+  const JSZip = JSZipMod.default ?? JSZipMod;
 
   // 提取图片
   const images: ParsedImage[] = [];

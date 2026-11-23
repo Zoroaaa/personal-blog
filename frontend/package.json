@@ -13,13 +13,13 @@
   "dependencies": {
     "date-fns": "^3.0.6",
     "dompurify": "^3.4.16",
-    "framer-motion": "^12.34.0",
+    "highlight.js": "^11.11.1",
+    "lowlight": "^3.3.0",
     "mammoth": "^1.11.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-markdown": "^9.0.1",
     "react-router-dom": "^6.21.0",
-    "rehype-highlight": "^7.0.0",
     "remark-gfm": "^4.0.0",
     "zustand": "^4.4.7"
   },

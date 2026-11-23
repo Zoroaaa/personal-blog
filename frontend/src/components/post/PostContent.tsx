@@ -5,7 +5,7 @@
 import { useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
+import { rehypeHighlightPlugin } from '../../utils/markdownPlugins';
 import { getMarkdownComponents, generateToc } from '../../utils/markdownRenderer';
 import type { Post } from '../../types';
 
@@ -86,7 +86,7 @@ export function PostContent({ post }: PostContentProps) {
           <div className="max-w-none mb-8">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeHighlight]}
+              rehypePlugins={[rehypeHighlightPlugin]}
               components={markdownComponents}
             >
               {post.content}

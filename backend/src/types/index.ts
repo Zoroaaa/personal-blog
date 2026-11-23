@@ -20,6 +20,8 @@ export type Env = {
   /** Durable Object 原子限流计数器 */
   RATE_LIMITER: DurableObjectNamespace;
   STORAGE: R2Bucket;
+  /** 同 Worker 托管的前端静态资源（frontend/dist），用于 SPA 出壳前注入 SEO meta */
+  ASSETS: { fetch: (request: Request) => Promise<Response> };
   JWT_SECRET: string;
   POST_PASSWORD_SECRET?: string;
   GITHUB_CLIENT_ID: string;

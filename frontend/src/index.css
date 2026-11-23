@@ -386,6 +386,35 @@
   animation: slide-up 0.3s ease-out;
 }
 
+/* 通知轮播专用：入场位移与进度条填充（等价替代原 framer-motion 动画） */
+@keyframes fade-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-in-left {
+  animation: fade-in-left 0.2s ease-out both;
+}
+
+@keyframes progress-fill {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.animate-progress-fill {
+  animation: progress-fill linear forwards;
+}
+
 @keyframes slideIn {
   from {
     transform: translateX(-100%);

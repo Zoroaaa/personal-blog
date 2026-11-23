@@ -7,10 +7,13 @@ compatibility_date = "2024-01-01"
 compatibility_flags = ["assets_navigation_prefers_asset_serving"]
 
 # 前端静态资源（Vite 产物），与 API 同域部署
+# run_worker_first：API 与 SEO 出口（/posts/* meta 注入、sitemap）必须先经 Worker，
+# 其余导航请求仍由 assets 优先（SPA 深链不被 API 404 吃掉）
 [assets]
 directory = "../frontend/dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/posts/*", "/sitemap.xml"]
 
 
 # D1 数据库
