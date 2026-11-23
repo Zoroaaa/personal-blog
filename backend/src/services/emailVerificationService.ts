@@ -157,6 +157,19 @@ export class EmailVerificationService {
     try {
       const normalizedEmail = email.toLowerCase();
       const kvKey = `email_verify:${type}:${normalizedEmail}`;
+      // 失败计数键：验证码是 6 位数字，不限次尝试即可爆破，必须按「邮箱+类型」计次
+      const attemptKey = `email_verify_attempts:${type}:${normalizedEmail}`;
+
+      // 超限先查：避免已锁定后仍能继续试探
+      const attemptVal = await safeGetCache(cache, attemptKey);
+      const attempts = attemptVal ? parseInt(attemptVal, 10) : 0;
+      if (attempts >= AUTH_CONSTANTS.EMAIL_VERIFY_MAX_ATTEMPTS) {
+        await safeDeleteCache(cache, kvKey);
+        return {
+          success: false,
+          message: '尝试次数过多，验证码已失效，请重新获取'
+        };
+      }
 
       // 从缓存获取存储的验证码
       const storedCode = await safeGetCache(cache, kvKey);
@@ -171,14 +184,27 @@ export class EmailVerificationService {
 
       // 检查验证码是否匹配
       if (storedCode !== String(code).trim()) {
+        const newAttempts = attempts + 1;
+        await safePutCache(cache, attemptKey, String(newAttempts), {
+          expirationTtl: AUTH_CONSTANTS.VERIFICATION_CODE_TTL
+        });
+        // 最后一次失败即作废验证码，重置计数的唯一途径是重新获取
+        if (newAttempts >= AUTH_CONSTANTS.EMAIL_VERIFY_MAX_ATTEMPTS) {
+          await safeDeleteCache(cache, kvKey);
+          return {
+            success: false,
+            message: '尝试次数过多，验证码已失效，请重新获取'
+          };
+        }
         return {
           success: false,
-          message: '验证码错误，请重新输入'
+          message: `验证码错误，请重新输入（还剩 ${AUTH_CONSTANTS.EMAIL_VERIFY_MAX_ATTEMPTS - newAttempts} 次机会）`
         };
       }
 
-      // 验证码正确，删除它（一次性使用）
+      // 验证码正确，删除它（一次性使用）并清零失败计数
       await safeDeleteCache(cache, kvKey);
+      await safeDeleteCache(cache, attemptKey);
 
       return {
         success: true,

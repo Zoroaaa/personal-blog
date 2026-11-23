@@ -198,7 +198,12 @@ authRoutes.post(
           email: email.replace(/(.{2}).*(@.*)/, '$1***$2')
         });
       } catch (emailError) {
+        // 发送失败必须如实返回：否则用户以为已收到码却永远等不到，且无法判断该重试还是换邮箱
         logger.error('Failed to send email', emailError);
+        return c.json(
+          errorResponse('Send failed', '验证码邮件发送失败，请稍后重试'),
+          500
+        );
       }
 
       const msg =
@@ -301,7 +306,13 @@ authRoutes.post(
   }
 );
 
-authRoutes.post('/reset-password', async (c) => {
+authRoutes.post('/reset-password',
+  rateLimit({
+    windowMs: RATE_LIMIT_CONSTANTS.WINDOW_15_MINUTES,
+    maxRequests: RATE_LIMIT_CONSTANTS.RESET_PASSWORD_MAX_REQUESTS,
+    message: '15 分钟内最多尝试重置密码 5 次'
+  }),
+  async (c) => {
   const logger = createLogger(c);
 
   try {
@@ -327,6 +338,26 @@ authRoutes.post('/reset-password', async (c) => {
   }
 });
 
+// 下发 OAuth state（一次性 nonce），发起 GitHub 授权前调用
+authRoutes.get('/github/state',
+  rateLimit({
+    windowMs: RATE_LIMIT_CONSTANTS.WINDOW_5_MINUTES,
+    maxRequests: RATE_LIMIT_CONSTANTS.GITHUB_OAUTH_MAX_REQUESTS,
+    message: '5 分钟内最多获取 10 次 OAuth state'
+  }),
+  async (c) => {
+    const logger = createLogger(c);
+
+    try {
+      const state = await AuthService.issueOAuthState(c.env);
+      return c.json(successResponse({ state }));
+    } catch (error) {
+      logger.error('Issue OAuth state error', error);
+      return c.json(errorResponse('OAuth state failed', '无法初始化登录流程，请稍后重试'), 500);
+    }
+  }
+);
+
 authRoutes.post(
   '/github',
   rateLimit({
@@ -343,8 +374,8 @@ authRoutes.post(
         return c.json(errorResponse('GitHub login disabled', 'GitHub登录已关闭'), 403);
       }
 
-      const { code } = await c.req.json();
-      const result = await AuthService.githubOAuth(c.env.DB, c.env, code);
+      const { code, state } = await c.req.json();
+      const result = await AuthService.githubOAuth(c.env.DB, c.env, code, state);
 
       if (!result.success) {
         return c.json(errorResponse('OAuth failed', result.message), getStatus(result.statusCode, 400));
@@ -393,7 +424,13 @@ authRoutes.post('/logout', requireAuth, async (c) => {
   }
 });
 
-authRoutes.post('/refresh', async (c) => {
+authRoutes.post('/refresh',
+  rateLimit({
+    windowMs: RATE_LIMIT_CONSTANTS.WINDOW_1_MINUTE,
+    maxRequests: RATE_LIMIT_CONSTANTS.TOKEN_REFRESH_MAX_REQUESTS,
+    message: '1 分钟内最多刷新 30 次'
+  }),
+  async (c) => {
   const logger = createLogger(c);
 
   try {
@@ -468,7 +505,9 @@ authRoutes.put('/password', requireAuth, async (c) => {
   try {
     const currentUser = c.get('user');
     const body = await c.req.json();
-    const result = await AuthService.changePassword(c.env.DB, c.env, currentUser.userId, body);
+    // 把当前 access token 传给 service：改密成功后一并拉黑，强制本会话重新登录
+    const accessToken = c.req.header('Authorization')?.substring(7);
+    const result = await AuthService.changePassword(c.env.DB, c.env, currentUser.userId, body, accessToken);
 
     if (!result.success) {
       return c.json(errorResponse('Update failed', result.message), getStatus(result.statusCode, 400));
@@ -488,50 +527,9 @@ authRoutes.delete('/account', requireAuth, async (c) => {
 
   try {
     const currentUser = c.get('user');
-    const body = await c.req.json();
-    const result = await AuthService.deleteAccount(c.env.DB, c.env, currentUser.userId, body);
-
-    if (!result.success) {
-      return c.json(errorResponse('Delete failed', result.message), getStatus(result.statusCode, 400));
-    }
-
-    logger.info('Account soft deleted', { userId: currentUser.userId });
-
-    return c.json(successResponse({ deleted: true }, result.message));
-  } catch (error) {
-    logger.error('Delete account error', error);
-    return c.json(errorResponse('Failed to delete account', 'An error occurred while deleting your account'), 500);
-  }
-});
-
-authRoutes.delete('/delete', requireAuth, async (c) => {
-  const logger = createLogger(c);
-
-  try {
-    const currentUser = c.get('user');
     const body = await c.req.json().catch(() => ({}));
-    const result = await AuthService.deleteAccount(c.env.DB, c.env, currentUser.userId, body);
-
-    if (!result.success) {
-      return c.json(errorResponse('Delete failed', result.message), getStatus(result.statusCode, 400));
-    }
-
-    logger.info('Account soft deleted', { userId: currentUser.userId });
-
-    return c.json(successResponse({ deleted: true }, result.message));
-  } catch (error) {
-    logger.error('Delete account error', error);
-    return c.json(errorResponse('Failed to delete account', 'An error occurred while deleting your account'), 500);
-  }
-});
-
-authRoutes.post('/delete', requireAuth, async (c) => {
-  const logger = createLogger(c);
-
-  try {
-    const currentUser = c.get('user');
-    const body = await c.req.json();
-    const result = await AuthService.deleteAccount(c.env.DB, c.env, currentUser.userId, body);
+    const accessToken = c.req.header('Authorization')?.substring(7);
+    const result = await AuthService.deleteAccount(c.env.DB, c.env, currentUser.userId, body, accessToken);
 
     if (!result.success) {
       return c.json(errorResponse('Delete failed', result.message), getStatus(result.statusCode, 400));

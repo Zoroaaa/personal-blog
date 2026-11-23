@@ -17,9 +17,10 @@ import { Env, Variables } from '../types';
 import { successResponse, errorResponse, getStatus } from '../utils/response';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
+import { rateLimit } from '../middleware/rateLimit';
 import { safeParseInt, pathParam } from '../utils/validation';
 import { AnalyticsService } from '../services/analyticsService';
-import { ANALYTICS_CONSTANTS } from '../config/constants';
+import { ANALYTICS_CONSTANTS, RATE_LIMIT_CONSTANTS } from '../config/constants';
 
 export const analyticsRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -112,7 +113,13 @@ analyticsRoutes.get('/users', requireAdmin, async (c) => {
   }
 });
 
-analyticsRoutes.post('/track', async (c) => {
+analyticsRoutes.post('/track',
+  rateLimit({
+    windowMs: RATE_LIMIT_CONSTANTS.WINDOW_1_MINUTE,
+    maxRequests: RATE_LIMIT_CONSTANTS.ANALYTICS_TRACK_MAX_REQUESTS,
+    message: '1 分钟内最多上报 60 次浏览事件'
+  }),
+  async (c) => {
   const logger = createLogger(c);
 
   try {
@@ -132,11 +139,9 @@ analyticsRoutes.post('/track', async (c) => {
       return c.json(errorResponse(result.message || 'Error'), getStatus(result.statusCode, 400));
     }
 
-    c.executionCtx.waitUntil(
-      c.env.DB.prepare(
-        'UPDATE posts SET view_count = view_count + 1 WHERE id = ?'
-      ).bind(postId).run()
-    );
+    // view_count 只有唯一自增入口：posts.ts 详情页 getPostBySlug 成功后的 waitUntil 自增。
+    // 此处曾同时 +1，详情页一次访问会被双计；track 只负责写 view_history 事件（趋势/去重访客），
+    // 不再动 posts.view_count。
 
     logger.info('Page view tracked', { postId, userId: userId || 'anonymous' });
 

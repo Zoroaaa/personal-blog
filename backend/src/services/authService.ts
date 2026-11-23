@@ -20,13 +20,14 @@
 
 import bcrypt from 'bcryptjs';
 import { generateToken, generateAccessToken, asSecret } from '../utils/jwt';
-import { safePutCache } from '../utils/cache';
+import { safePutCache, safeGetCache, safeDeleteCache } from '../utils/cache';
 import {
   validateUsername,
   validateEmail,
   validatePassword,
   validateMainstreamEmail,
-  sanitizeInput
+  sanitizeInput,
+  generateRandomString
 } from '../utils/validation';
 import { EmailVerificationService, type VerificationEmailType } from './emailVerificationService';
 import { RefreshTokenService } from './refreshTokenService';
@@ -411,15 +412,51 @@ export class AuthService {
     };
   }
 
+  /**
+   * 下发 GitHub OAuth state（一次性 nonce）
+   * 存 KV，回调时消费后即作废；防登录 CSRF（攻击者无法预知受害者的 state）
+   */
+  static async issueOAuthState(env: any): Promise<string> {
+    const state = generateRandomString(32);
+    await safePutCache(env, `oauth_state:${state}`, '1', {
+      expirationTtl: AUTH_CONSTANTS.OAUTH_STATE_TTL
+    });
+    return state;
+  }
+
+  /**
+   * 消费 OAuth state：校验存在性并立即作废（一次性）
+   * 必须在用 code 换 token 之前调用
+   */
+  static async consumeOAuthState(env: any, state: string | undefined): Promise<boolean> {
+    if (!state) return false;
+    const key = `oauth_state:${state}`;
+    const exists = await safeGetCache(env, key);
+    if (!exists) return false;
+    await safeDeleteCache(env, key);
+    return true;
+  }
+
   static async githubOAuth(
     db: any,
     env: any,
-    code: string
+    code: string,
+    state: string | undefined
   ): Promise<GitHubOAuthResult> {
     if (!code) {
       return {
         success: false,
         message: 'GitHub authorization code is required',
+        statusCode: 400
+      };
+    }
+
+    // state 校验先于 code 交换：无效/缺失 state 直接拒绝，code 不会被消费
+    const stateOk = await this.consumeOAuthState(env, state);
+    if (!stateOk) {
+      return {
+        success: false,
+        message: 'Invalid or expired OAuth state, please retry the login',
         statusCode: 400
       };
     }
@@ -733,6 +770,10 @@ export class AuthService {
       'UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
     ).bind(passwordHash, user.id).run();
 
+    // 密码重置意味着凭证已可能泄露过：撤销该用户全部 refresh token，
+    // 防止旧会话（access 2h / refresh 7d）在改密后继续存活
+    await RefreshTokenService.revokeAllUserTokens(db, user.id, 'password_reset');
+
     return {
       success: true,
       message: '密码重置成功，请使用新密码登录',
@@ -955,7 +996,8 @@ export class AuthService {
     db: any,
     env: any,
     userId: number,
-    body: ChangePasswordRequest
+    body: ChangePasswordRequest,
+    accessToken?: string
   ): Promise<{ success: boolean; message: string; statusCode?: 200 | 201 | 400 | 401 | 403 | 404 | 409 | 500 | 503 }> {
     const { currentPassword, newPassword, emailVerificationCode } = body;
 
@@ -1035,6 +1077,15 @@ export class AuthService {
       'UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
     ).bind(passwordHash, userId).run();
 
+    // 改密即全量会话失效（含当前设备，强制重新登录）：
+    // 否则被盗 access token 在改密后仍可存活至过期
+    await RefreshTokenService.revokeAllUserTokens(db, userId, 'password_change');
+    if (accessToken) {
+      await safePutCache(env, `blacklist:${accessToken}`, '1', {
+        expirationTtl: AUTH_CONSTANTS.TOKEN_BLACKLIST_TTL,
+      });
+    }
+
     return {
       success: true,
       message: 'Password updated successfully'
@@ -1045,7 +1096,8 @@ export class AuthService {
     db: any,
     env: any,
     userId: number,
-    body: DeleteAccountRequest
+    body: DeleteAccountRequest,
+    accessToken?: string
   ): Promise<{ success: boolean; message: string; statusCode?: 200 | 201 | 400 | 401 | 403 | 404 | 409 | 500 | 503 }> {
     const { password, confirmation, emailVerificationCode } = body;
 
@@ -1112,6 +1164,15 @@ export class AuthService {
     }
 
     await SoftDeleteHelper.softDelete(db, 'users', userId);
+
+    // 软删后必须同步撤销会话，否则 access token（2h）与 refresh token（7d）
+    // 仍能以「已删除用户」身份读写直到自然过期
+    await RefreshTokenService.revokeAllUserTokens(db, userId, 'account_deleted');
+    if (accessToken) {
+      await safePutCache(env, `blacklist:${accessToken}`, '1', {
+        expirationTtl: AUTH_CONSTANTS.TOKEN_BLACKLIST_TTL,
+      });
+    }
 
     return {
       success: true,

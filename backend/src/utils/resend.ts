@@ -13,6 +13,32 @@ import { URL_CONSTANTS, EMAIL_CONSTANTS } from '../config/constants';
 
 export type VerificationEmailType = 'register' | 'password' | 'delete' | 'forgot_password';
 
+/**
+ * HTML 转义：邮件模板是字符串拼接，用户可控内容（通知标题/正文/用户名，
+ * 含评论里允许的 <a>/<img> 等标签）直接插值会形成邮件 HTML 注入。
+ * 邮件场景一律转义为纯文本展示，不留富文本通道。
+ */
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * 链接白名单：detailLink 来自 relatedData.link（用户可写），
+ * 只放行 http(s) 与站内绝对路径，其余回退站点首页（拦 javascript:/data: 等伪协议）。
+ */
+function safeHref(raw: unknown, fallback: string): string {
+  const url = String(raw ?? '').trim();
+  if (/^https?:\/\//i.test(url) || (url.startsWith('/') && !url.startsWith('//'))) {
+    return url;
+  }
+  return fallback;
+}
+
 function getVerificationEmailHtml(code: string, type: string): string {
   const title = EMAIL_CONSTANTS.TITLES[type as keyof typeof EMAIL_CONSTANTS.TITLES] || '邮箱验证';
   return `
@@ -77,7 +103,11 @@ function getNotificationEmailHtml(
   const typeColor = typeColors[notification.type] || '#64748b';
   const typeLabel = typeLabels[notification.type] || '通知';
 
-  const detailLink = (notification.relatedData as any)?.link || baseUrl;
+  // 标题/内容/用户名均为用户可控，拼模板前统一转义
+  const safeTitle = escapeHtml(notification.title);
+  const safeName = escapeHtml(user.name);
+  const safeContent = notification.content ? escapeHtml(notification.content) : '';
+  const detailLink = safeHref((notification.relatedData as any)?.link, baseUrl);
 
   return `
 <!DOCTYPE html>
@@ -85,7 +115,7 @@ function getNotificationEmailHtml(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${notification.title}</title>
+  <title>${safeTitle}</title>
 </head>
 <body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#f1f5f9;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f1f5f9;padding:40px 20px;">
@@ -94,14 +124,14 @@ function getNotificationEmailHtml(
         <table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:16px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1),0 2px 4px -2px rgba(0,0,0,0.1);overflow:hidden;">
           <tr>
             <td style="background:${typeColor};padding:32px 24px;text-align:center;">
-              <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:600;">${notification.title}</h1>
+              <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:600;">${safeTitle}</h1>
               <p style="margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:14px;">${typeLabel}</p>
             </td>
           </tr>
           <tr>
             <td style="padding:32px 24px;">
-              <p style="margin:0 0 16px;color:#475569;font-size:15px;line-height:1.6;">您好 ${user.name}，</p>
-              ${notification.content ? `<p style="margin:0 0 24px;color:#475569;font-size:15px;line-height:1.6;">${notification.content}</p>` : ''}
+              <p style="margin:0 0 16px;color:#475569;font-size:15px;line-height:1.6;">您好 ${safeName}，</p>
+              ${safeContent ? `<p style="margin:0 0 24px;color:#475569;font-size:15px;line-height:1.6;">${safeContent}</p>` : ''}
               <p style="margin:0 0 24px;color:#64748b;font-size:14px;">此通知发送时间：${notification.createdAt}</p>
               <a href="${detailLink}" style="display:inline-block;background:${typeColor};color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:500;">查看详情</a>
             </td>
@@ -128,12 +158,13 @@ function getDigestEmailHtml(
   baseUrl: string
 ): string {
   const title = digestType === 'daily' ? '每日通知汇总' : '每周通知汇总';
+  // 汇总条目同样来自用户可控内容（评论@、私信标题等），拼模板前转义
   const notificationList = notifications.map(n => `
     <tr>
       <td style="padding:16px;border-bottom:1px solid #e2e8f0;">
-        <p style="margin:0 0 4px;color:#1e293b;font-size:14px;font-weight:500;">${n.title}</p>
-        ${n.content ? `<p style="margin:0 0 8px;color:#64748b;font-size:13px;line-height:1.5;">${n.content.length > 100 ? n.content.substring(0, 100) + '...' : n.content}</p>` : ''}
-        <p style="margin:0;color:#94a3b8;font-size:12px;">${n.created_at}</p>
+        <p style="margin:0 0 4px;color:#1e293b;font-size:14px;font-weight:500;">${escapeHtml(n.title)}</p>
+        ${n.content ? `<p style="margin:0 0 8px;color:#64748b;font-size:13px;line-height:1.5;">${escapeHtml(n.content.length > 100 ? n.content.substring(0, 100) + '...' : n.content)}</p>` : ''}
+        <p style="margin:0;color:#94a3b8;font-size:12px;">${escapeHtml(n.created_at)}</p>
       </td>
     </tr>
   `).join('');
@@ -159,7 +190,7 @@ function getDigestEmailHtml(
           </tr>
           <tr>
             <td style="padding:24px;">
-              <p style="margin:0 0 16px;color:#475569;font-size:15px;line-height:1.6;">您好 ${user.name}，</p>
+              <p style="margin:0 0 16px;color:#475569;font-size:15px;line-height:1.6;">您好 ${escapeHtml(user.name)}，</p>
               <p style="margin:0 0 24px;color:#475569;font-size:15px;line-height:1.6;">以下是您的${digestType === 'daily' ? '今日' : '本周'}通知汇总：</p>
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                 ${notificationList}

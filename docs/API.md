@@ -926,10 +926,17 @@ GET /api/users/search
 ### 删除账号
 
 ```
-DELETE /api/users/account
+DELETE /api/auth/account
 ```
 
 **需要认证**: 是
+
+**请求体**:
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| password | string | 账号密码（密码账号必填） |
+| confirmation | string | 必须为 `DELETE` |
+| emailVerificationCode | string | 6 位邮箱验证码（启用邮件服务时必填） |
 
 ---
 

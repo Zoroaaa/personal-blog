@@ -364,12 +364,18 @@ export const api = {
     }),
 
   /**
-   * GitHub OAuth登录
+   * 获取 GitHub OAuth state（一次性 nonce，发起授权前调用）
    */
-  githubLogin: (code: string) =>
+  getGithubOAuthState: () =>
+    apiRequest<{ state: string }>('/auth/github/state'),
+
+  /**
+   * GitHub OAuth登录（state 必须原样带回，后端校验后才消费 code）
+   */
+  githubLogin: (code: string, state: string) =>
     apiRequest<{ user: User; token: string; refreshToken?: string; expiresIn?: number }>('/auth/github', {
       method: 'POST',
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, state }),
     }),
   
   /**
@@ -1024,10 +1030,11 @@ export const api = {
 
   /**
    * 删除账号（可选邮箱验证码，当后端启用 Resend 时必填）
+   * 唯一端点 DELETE /auth/account（历史上的 /auth/delete 重复端点已收敛）
    */
   deleteAccount: (password: string, emailVerificationCode?: string) =>
-    apiRequest<{ deleted: boolean }>('/auth/delete', {
-      method: 'POST',
+    apiRequest<{ deleted: boolean }>('/auth/account', {
+      method: 'DELETE',
       body: JSON.stringify({
         password,
         confirmation: 'DELETE',

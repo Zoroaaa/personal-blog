@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS users (
     oauth_provider TEXT CHECK(oauth_provider IN ('github', 'google', NULL)),
     oauth_id TEXT,
     
+    -- 【已废弃勿用】post_count / comment_count：无任何维护触发器，恒为 0（死列）。
+    -- 用户文章/评论数一律子查询实时统计（见 userService.getUserProfile、analyticsService.getUserAnalytics）。
+    -- 列保留是因为幂等重放体系不便删列；新代码禁止读取这两列。
     post_count INTEGER DEFAULT 0,
     comment_count INTEGER DEFAULT 0,
     
@@ -473,30 +476,62 @@ CREATE TRIGGER IF NOT EXISTS trg_comments_insert
 AFTER INSERT ON comments
 WHEN NEW.status = 'approved'
 BEGIN
-    UPDATE posts 
+    UPDATE posts
     SET comment_count = comment_count + 1,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = NEW.post_id;
-    
+
     UPDATE comments
     SET reply_count = reply_count + 1,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = NEW.parent_id;
 END;
 
-CREATE TRIGGER IF NOT EXISTS trg_comments_delete
-AFTER DELETE ON comments
+-- 审核流转计数维护：status 在「计入 ↔ 不计入」边界跨越时增减。
+-- 计数口径 = status='approved' 且 deleted_at IS NULL 的评论（与 trg_comments_insert 一致）。
+-- 为什么用触发器而不是 adminService 显式 UPDATE：评论 status 的写入口不止审核接口
+-- （将来用户删评改 status、恢复等路径都会改 status），触发器在数据库层自动维护，
+-- 任何写路径都不会漏计数；显式更新要求每个调用点都记得维护，漂移面更大。
+DROP TRIGGER IF EXISTS trg_comments_status_change;
+CREATE TRIGGER trg_comments_status_change
+AFTER UPDATE OF status ON comments
+WHEN OLD.status IS NOT NEW.status
 BEGIN
-    UPDATE posts 
-    SET comment_count = comment_count - 1,
+    -- 进入计入态（如 pending→approved）：post 计数与父评论 reply_count 各 +1
+    UPDATE posts
+    SET comment_count = comment_count + 1,
         updated_at = CURRENT_TIMESTAMP
-    WHERE id = OLD.post_id;
-    
+    WHERE id = NEW.post_id
+      AND NEW.status = 'approved' AND NEW.deleted_at IS NULL
+      AND NOT (OLD.status = 'approved' AND OLD.deleted_at IS NULL);
+
     UPDATE comments
-    SET reply_count = reply_count - 1,
+    SET reply_count = reply_count + 1,
         updated_at = CURRENT_TIMESTAMP
-    WHERE id = OLD.parent_id;
+    WHERE id = NEW.parent_id AND NEW.parent_id IS NOT NULL
+      AND NEW.status = 'approved' AND NEW.deleted_at IS NULL
+      AND NOT (OLD.status = 'approved' AND OLD.deleted_at IS NULL);
+
+    -- 离开计入态（如 approved→rejected）：各 -1（旧值曾计入才减）
+    UPDATE posts
+    SET comment_count = MAX(0, comment_count - 1),
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = NEW.post_id
+      AND OLD.status = 'approved' AND OLD.deleted_at IS NULL
+      AND NOT (NEW.status = 'approved' AND NEW.deleted_at IS NULL);
+
+    UPDATE comments
+    SET reply_count = MAX(0, reply_count - 1),
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = NEW.parent_id AND NEW.parent_id IS NOT NULL
+      AND OLD.status = 'approved' AND OLD.deleted_at IS NULL
+      AND NOT (NEW.status = 'approved' AND NEW.deleted_at IS NULL);
 END;
+
+-- 原 trg_comments_delete（AFTER DELETE 无条件 -1）已移除：
+-- 它与下方 trg_comments_hard_delete 同为 AFTER DELETE 触发器，硬删一条评论会触发两者、
+-- posts.comment_count 被双减。硬删计数统一由 trg_comments_hard_delete 维护。
+DROP TRIGGER IF EXISTS trg_comments_delete;
 
 CREATE TRIGGER IF NOT EXISTS trg_users_update_timestamp
 AFTER UPDATE ON users
@@ -545,19 +580,24 @@ BEGIN
         AND NEW.deleted_at IS NOT NULL;
 END;
 
-CREATE TRIGGER IF NOT EXISTS trg_comments_soft_delete
+-- 软删仅当 OLD.status='approved' 才回退计数：insert/流转触发器只把 approved 评论计入，
+-- 软删 pending/spam 评论从未计过数，无条件 -1 会把 posts.comment_count 多减。
+DROP TRIGGER IF EXISTS trg_comments_soft_delete;
+CREATE TRIGGER trg_comments_soft_delete
 AFTER UPDATE OF deleted_at ON comments
 WHEN NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL
 BEGIN
     UPDATE posts
     SET comment_count = MAX(0, comment_count - 1),
         updated_at = CURRENT_TIMESTAMP
-    WHERE id = NEW.post_id;
+    WHERE id = NEW.post_id
+      AND OLD.status = 'approved';
 
     UPDATE comments
     SET reply_count = MAX(0, reply_count - 1),
         updated_at = CURRENT_TIMESTAMP
-    WHERE id = NEW.parent_id AND NEW.parent_id IS NOT NULL;
+    WHERE id = NEW.parent_id AND NEW.parent_id IS NOT NULL
+      AND OLD.status = 'approved';
 END;
 
 CREATE TRIGGER IF NOT EXISTS trg_tags_soft_delete
@@ -576,18 +616,23 @@ BEGIN
     WHERE id = NEW.id;
 END;
 
-CREATE TRIGGER IF NOT EXISTS trg_comments_hard_delete
+-- 硬删只在「曾计入计数」时回退：status='approved' 且 deleted_at IS NULL。
+-- 已软删的行（deleted_at 非空）在软删时已回退过，硬删（如 cleanup 清理）不能再减。
+DROP TRIGGER IF EXISTS trg_comments_hard_delete;
+CREATE TRIGGER trg_comments_hard_delete
 AFTER DELETE ON comments
 BEGIN
     UPDATE posts
     SET comment_count = MAX(0, comment_count - 1),
         updated_at = CURRENT_TIMESTAMP
-    WHERE id = OLD.post_id;
+    WHERE id = OLD.post_id
+      AND OLD.status = 'approved' AND OLD.deleted_at IS NULL;
 
     UPDATE comments
     SET reply_count = MAX(0, reply_count - 1),
         updated_at = CURRENT_TIMESTAMP
-    WHERE id = OLD.parent_id AND OLD.parent_id IS NOT NULL;
+    WHERE id = OLD.parent_id AND OLD.parent_id IS NOT NULL
+      AND OLD.status = 'approved' AND OLD.deleted_at IS NULL;
 END;
 
 -- ============= 视图 =============

@@ -379,6 +379,13 @@ export class PostService {
 
 ### 核心表设计
 
+#### 计数与软删规则（与 database/schema-v1.1-base.sql 触发器一致）
+
+- `users.post_count` / `users.comment_count`：**已废弃死列**（无维护触发器恒为 0），代码禁止读取；用户文章/评论数用子查询实时统计（`userService.getUserProfile`、`analyticsService.getUserAnalytics`）。列保留是因幂等重放不便删列。
+- `posts.comment_count`（含父评论 `reply_count`）由触发器统一维护，计数口径 = `status='approved' AND deleted_at IS NULL`：`trg_comments_insert`（approved 才 +1）、`trg_comments_status_change`（审核流转跨计入边界时增减）、`trg_comments_soft_delete`（仅 OLD.status='approved' 才 -1）、`trg_comments_hard_delete`（仅曾计入的行才 -1，`trg_comments_delete` 已并入移除避免双减）。触发器写法为 `DROP TRIGGER IF EXISTS + CREATE` 保证幂等重放可更新定义。
+- `posts.view_count` 唯一自增入口：文章详情页 `getPostBySlug` 成功后的 waitUntil 自增；`analytics/track` 只写 `view_history` 事件，不再自增（避免双计）。
+- 公开文章出口的软删过滤统一走 `postService.buildPostVisibilityWhere`（文章未软删 + 作者未软删），列表/count 同条件，防止被删作者文章漏出、分页 total 虚高。
+
 #### posts 表（文章表）
 
 ```sql

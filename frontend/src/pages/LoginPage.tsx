@@ -77,7 +77,6 @@ export function LoginPage() {
         
         if (response.success && response.data) {
           setGithubClientId(response.data.githubClientId);
-          console.log('GitHub配置加载成功:', response.data.githubClientId);
         } else {
           console.error('获取配置失败:', response);
           setError('无法获取GitHub配置,请稍后再试');
@@ -101,6 +100,7 @@ export function LoginPage() {
     const handleGitHubCallback = async () => {
       const params = new URLSearchParams(location.search);
       const code = params.get('code');
+      const state = params.get('state') || '';
       const errorParam = params.get('error');
       
       if (errorParam) {
@@ -113,8 +113,8 @@ export function LoginPage() {
         setError('');
         
         try {
-          // 调用后端API交换代码获取token
-          const response = await api.githubLogin(code);
+          // 调用后端API交换代码获取token（state 必须原样带回，后端校验一次性 nonce）
+          const response = await api.githubLogin(code, state);
           
           if (response.success && response.data) {
             const { user, token, refreshToken, expiresIn } = response.data;
@@ -140,18 +140,29 @@ export function LoginPage() {
   }, [location.search, navigate, redirectPath, login]);
   
   // 处理GitHub登录
-  const handleGitHubLogin = () => {
+  // state 必须由服务端签发（KV 一次性 nonce），前端不能自造：后端回调时要消费校验防登录 CSRF
+  const handleGitHubLogin = async () => {
     if (!githubClientId) {
       setError('GitHub配置未加载,请刷新页面重试');
       return;
     }
-    
-    const state = Math.random().toString(36).substring(2, 15);
-    const scope = 'user:email user';
-    
-    const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${githubClientId}&redirect_uri=${encodeURIComponent(GITHUB_REDIRECT_URI)}&scope=${scope}&state=${state}`;
-    
-    window.location.href = githubAuthUrl;
+
+    try {
+      const stateResp = await api.getGithubOAuthState();
+      const state = stateResp.data?.state;
+      if (!state) {
+        setError('登录流程初始化失败,请稍后重试');
+        return;
+      }
+
+      const scope = 'user:email user';
+      const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${githubClientId}&redirect_uri=${encodeURIComponent(GITHUB_REDIRECT_URI)}&scope=${scope}&state=${encodeURIComponent(state)}`;
+
+      window.location.href = githubAuthUrl;
+    } catch (err) {
+      console.error('Failed to init OAuth state:', err);
+      setError('登录流程初始化失败,请稍后重试');
+    }
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -168,9 +179,7 @@ export function LoginPage() {
         // 检查响应格式
         if (response.success && response.data) {
           const { user, token, refreshToken, expiresIn } = response.data;
-          
-          console.log('Login successful:', { user, hasToken: !!token });
-          
+
           // 保存到store
           login(user, token, refreshToken, expiresIn);
           

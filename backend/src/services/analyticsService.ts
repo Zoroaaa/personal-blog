@@ -242,12 +242,16 @@ export class AnalyticsService {
   }
 
   static async getUserAnalytics(db: any, limit: number): Promise<AnalyticsResult> {
+    // 不读 users.post_count/comment_count（schema 里的死列，无维护触发器恒为 0），
+    // 与 userService.getUserProfile 一致用子查询实时统计，口径对齐避免排序漂移。
     const { results } = await db.prepare(`
       SELECT u.id, u.username, u.display_name, u.email, u.avatar_url,
-             u.post_count, u.comment_count, u.created_at, u.last_login_at
+             (SELECT COUNT(*) FROM posts WHERE author_id = u.id AND status = 'published' AND deleted_at IS NULL) as post_count,
+             (SELECT COUNT(*) FROM comments WHERE user_id = u.id AND deleted_at IS NULL) as comment_count,
+             u.created_at, u.last_login_at
       FROM users u
       WHERE u.status = 'active' AND u.deleted_at IS NULL
-      ORDER BY (u.post_count + u.comment_count) DESC
+      ORDER BY (post_count + comment_count) DESC
       LIMIT ?
     `).bind(limit).all();
 

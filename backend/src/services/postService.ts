@@ -139,16 +139,40 @@ function extractImageUrls(content: string): string[] {
   return urls;
 }
 
+/**
+ * 从 URL 提取 R2 对象 key（storage.delete 的入参）。
+ *
+ * key 形态由 uploadService.generateFilename 决定：
+ * - 图片：`${timestamp}-${rand}.${ext}`（根级，如 1730000000000-a1b2c3d4.png）
+ * - 附件：`files/${timestamp}-${rand}.${ext}`（带 files/ 前缀，如 files/1730000000000-a1b2c3d4.pdf）
+ * key 必须整体保留、不能截断 files/ 前缀：URL 里 files/ 是 key 的组成部分而非路径噪音，
+ * 截掉后 storage.delete('xxx.pdf') 与真实 key 'files/xxx.pdf' 对不上——附件删不掉，
+ * 还可能误删根级同名对象（删错 key）。故 files/ 前缀与末段文件名一起返回。
+ */
 function extractFilenameFromUrl(url: string): string | null {
+  const keyFromPath = (path: string): string | null => {
+    const segments = path.split('/').filter(Boolean);
+    const last = segments[segments.length - 1];
+    if (!last) return null;
+    return segments[segments.length - 2] === 'files' ? `files/${last}` : last;
+  };
   try {
-    const urlObj = new URL(url);
-    const pathname = urlObj.pathname;
-    const filename = pathname.split('/').pop();
-    return filename || null;
+    return keyFromPath(new URL(url).pathname);
   } catch {
-    const parts = url.split('/');
-    return parts.pop() || null;
+    return keyFromPath(url.split('?')[0]);
   }
+}
+
+/**
+ * 「公开可见文章」的统一软删过滤条件：文章未软删，且作者未软删。
+ *
+ * 为什么必须统一：列表/相邻/推荐/热榜/后台各查询原先各自手写 WHERE 片段，
+ * 漏掉作者软删过滤会让被删作者的文章从公开出口漏出，列表与 count 条件不一致
+ * 会让分页 total 虚高。所有对外可见的文章查询都用这个函数拼条件，禁止再手写。
+ * 用 EXISTS 而非 JOIN：调用方不一定 join users（相邻/推荐/热榜就没有 join），两种场景都适用。
+ */
+function buildPostVisibilityWhere(alias: string = 'p'): string {
+  return `${alias}.deleted_at IS NULL AND EXISTS (SELECT 1 FROM users au WHERE au.id = ${alias}.author_id AND au.deleted_at IS NULL)`;
 }
 
 export class PostService {
@@ -175,7 +199,7 @@ export class PostService {
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN columns col ON p.column_id = col.id
-      WHERE p.status = 'published' AND p.visibility IN ('public', 'password') AND p.deleted_at IS NULL AND u.deleted_at IS NULL
+      WHERE p.status = 'published' AND p.visibility IN ('public', 'password') AND ${buildPostVisibilityWhere('p')}
       AND (col.status IS NULL OR col.status != 'hidden')
     `;
 
@@ -215,7 +239,7 @@ export class PostService {
                     LEFT JOIN categories c ON p.category_id = c.id
                     LEFT JOIN users u ON p.author_id = u.id
                     LEFT JOIN columns col ON p.column_id = col.id
-                    WHERE p.status = 'published' AND p.visibility IN ('public', 'password') AND p.deleted_at IS NULL AND u.deleted_at IS NULL
+                    WHERE p.status = 'published' AND p.visibility IN ('public', 'password') AND ${buildPostVisibilityWhere('p')}
                     AND (col.status IS NULL OR col.status != 'hidden')`;
     const countParams: any[] = [];
 
@@ -275,12 +299,16 @@ export class PostService {
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN columns col ON p.column_id = col.id
-      WHERE p.deleted_at IS NULL AND u.deleted_at IS NULL
+      WHERE ${buildPostVisibilityWhere('p')}
       ORDER BY p.created_at DESC
       LIMIT ? OFFSET ?
     `).bind(limit, offset).all();
 
-    const countResult = await db.prepare('SELECT COUNT(*) as total FROM posts WHERE deleted_at IS NULL').first() as TotalResult | null;
+    // count 必须与列表查询同一份可见性条件（buildPostVisibilityWhere），
+    // 否则被删作者的帖子会「列表看不到、total 里算着」，分页 total 虚高。
+    const countResult = await db.prepare(
+      `SELECT COUNT(*) as total FROM posts p WHERE ${buildPostVisibilityWhere('p')}`
+    ).first() as TotalResult | null;
     const total = countResult?.total || 0;
 
     const postsWithTags = await attachTagsToPosts(db, results);
@@ -1029,6 +1057,9 @@ export class PostService {
 
     await SoftDeleteHelper.softDelete(db, 'posts', postId);
 
+    // TODO(postService): 语义冲突——文章是软删（deleted_at 可恢复），但这里物理删除 R2 图片/附件，
+    // 恢复文章后配图将 404。本次不改行为。触发条件：若上线文章恢复/回收站功能，必须先改为
+    // 延迟物理清理（如按 deleted_at 过期后由清理任务删对象），不能在软删时立即删文件。
     if (imagesToDelete.length > 0 && storage) {
       for (const filename of imagesToDelete) {
         try {
@@ -1307,13 +1338,14 @@ export class PostService {
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN columns col ON p.column_id = col.id
-      WHERE rh.user_id = ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
+      WHERE rh.user_id = ? AND p.status = 'published' AND p.visibility = 'public' AND ${buildPostVisibilityWhere('p')}
       ORDER BY rh.last_read_at DESC
       LIMIT ? OFFSET ?
     `).bind(userId, limit, offset).all();
 
+    // count 与列表同一份可见性条件，避免漏掉作者软删过滤导致 total 虚高
     const countResult = await db.prepare(
-      'SELECT COUNT(*) as total FROM reading_history rh JOIN posts p ON p.id = rh.post_id WHERE rh.user_id = ? AND p.status = ? AND p.visibility = ? AND p.deleted_at IS NULL'
+      `SELECT COUNT(*) as total FROM reading_history rh JOIN posts p ON p.id = rh.post_id WHERE rh.user_id = ? AND p.status = ? AND p.visibility = ? AND ${buildPostVisibilityWhere('p')}`
     ).bind(userId, 'published', 'public').first() as TotalResult | null;
     const total = countResult?.total || 0;
 
@@ -1345,13 +1377,14 @@ export class PostService {
       LEFT JOIN users u ON p.author_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN columns col ON p.column_id = col.id
-      WHERE f.user_id = ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
+      WHERE f.user_id = ? AND p.status = 'published' AND p.visibility = 'public' AND ${buildPostVisibilityWhere('p')}
       ORDER BY f.created_at DESC
       LIMIT ? OFFSET ?
     `).bind(userId, limit, offset).all();
 
+    // count 与列表同一份可见性条件，避免漏掉作者软删过滤导致 total 虚高
     const countResult = await db.prepare(
-      'SELECT COUNT(*) as total FROM favorites f JOIN posts p ON p.id = f.post_id WHERE f.user_id = ? AND p.status = ? AND p.visibility = ? AND p.deleted_at IS NULL'
+      `SELECT COUNT(*) as total FROM favorites f JOIN posts p ON p.id = f.post_id WHERE f.user_id = ? AND p.status = ? AND p.visibility = ? AND ${buildPostVisibilityWhere('p')}`
     ).bind(userId, 'published', 'public').first() as TotalResult | null;
     const total = countResult?.total || 0;
 
@@ -1431,8 +1464,8 @@ export class PostService {
 
     const prevPost = await db.prepare(`
       SELECT id, title, slug, cover_image
-      FROM posts
-      WHERE status = 'published' AND visibility = 'public' AND deleted_at IS NULL
+      FROM posts p
+      WHERE status = 'published' AND visibility = 'public' AND ${buildPostVisibilityWhere('p')}
         AND published_at < ?
       ORDER BY published_at DESC
       LIMIT 1
@@ -1440,8 +1473,8 @@ export class PostService {
 
     const nextPost = await db.prepare(`
       SELECT id, title, slug, cover_image
-      FROM posts
-      WHERE status = 'published' AND visibility = 'public' AND deleted_at IS NULL
+      FROM posts p
+      WHERE status = 'published' AND visibility = 'public' AND ${buildPostVisibilityWhere('p')}
         AND published_at > ?
       ORDER BY published_at ASC
       LIMIT 1
@@ -1479,8 +1512,8 @@ export class PostService {
     if (currentPost.column_id) {
       const columnPosts = await db.prepare(`
         SELECT id, title, slug, summary, cover_image, view_count, like_count, published_at
-        FROM posts
-        WHERE column_id = ? AND id != ? AND status = 'published' AND visibility = 'public' AND deleted_at IS NULL
+        FROM posts p
+        WHERE column_id = ? AND id != ? AND status = 'published' AND visibility = 'public' AND ${buildPostVisibilityWhere('p')}
         ORDER BY RANDOM() LIMIT ?
       `).bind(currentPost.column_id, postId, limit).all() as { results: any[] };
       candidates = candidates.concat(columnPosts.results || []);
@@ -1492,7 +1525,7 @@ export class PostService {
         FROM posts p
         JOIN post_tags pt ON p.id = pt.post_id
         WHERE pt.tag_id IN (${tagIds.map(() => '?').join(',')})
-          AND p.id != ? AND p.status = 'published' AND p.visibility = 'public' AND p.deleted_at IS NULL
+          AND p.id != ? AND p.status = 'published' AND p.visibility = 'public' AND ${buildPostVisibilityWhere('p')}
         ORDER BY RANDOM() LIMIT ?
       `).bind(...tagIds, postId, limit - candidates.length).all() as { results: any[] };
       candidates = candidates.concat(tagPosts.results || []);
@@ -1501,8 +1534,8 @@ export class PostService {
     if (currentPost.category_id && candidates.length < limit) {
       const categoryPosts = await db.prepare(`
         SELECT id, title, slug, summary, cover_image, view_count, like_count, published_at
-        FROM posts
-        WHERE category_id = ? AND id != ? AND status = 'published' AND visibility = 'public' AND deleted_at IS NULL
+        FROM posts p
+        WHERE category_id = ? AND id != ? AND status = 'published' AND visibility = 'public' AND ${buildPostVisibilityWhere('p')}
         ORDER BY RANDOM() LIMIT ?
       `).bind(currentPost.category_id, postId, limit - candidates.length).all() as { results: any[] };
       candidates = candidates.concat(categoryPosts.results || []);
@@ -1524,8 +1557,8 @@ export class PostService {
   ): Promise<{ success: boolean; posts?: any[] }> {
     const { results } = await db.prepare(`
       SELECT id, title, slug, summary, cover_image, view_count, like_count, comment_count, published_at
-      FROM posts
-      WHERE status = 'published' AND visibility = 'public' AND deleted_at IS NULL
+      FROM posts p
+      WHERE status = 'published' AND visibility = 'public' AND ${buildPostVisibilityWhere('p')}
       ORDER BY (view_count * 1 + like_count * 3 + comment_count * 5) DESC, published_at DESC
       LIMIT ?
     `).bind(limit).all();

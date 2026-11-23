@@ -58,6 +58,19 @@ export const AUTH_CONSTANTS = {
   EMAIL_VERIFY_RATE_MAX: 10,
 
   /**
+   * 单个验证码最大校验失败次数
+   * 6 位数字码共 10^6 种组合，不限次校验即可爆破；
+   * 超限后作废当前验证码，强制重新获取（配合 KV 失败计数实现）
+   */
+  EMAIL_VERIFY_MAX_ATTEMPTS: 5,
+
+  /**
+   * GitHub OAuth state 有效期（秒）
+   * state 是一次性 nonce：发起授权时下发、回调时消费后即作废，防登录 CSRF
+   */
+  OAUTH_STATE_TTL: 600,
+
+  /**
    * JWT Access Token 有效期（秒）
    * 用于 API 请求的身份验证
    * 2 小时有效期，平衡安全性和用户体验
@@ -232,50 +245,6 @@ export const NOTIFICATION_CONSTANTS = {
    * - mention: @提及
    */
   INTERACTION_SUBTYPES: ['reply', 'like', 'mention'] as const,
-};
-
-/**
- * 缓存相关常量
- *
- * 用于数据缓存策略，减少数据库查询
- * 涉及文件：queryOptimizer.ts, 各种 service 文件
- */
-export const CACHE_CONSTANTS = {
-  /**
-   * 健康检查缓存 TTL（秒）
-   * 系统健康状态缓存时间
-   */
-  HEALTH_CHECK_TTL: 60,
-
-  /**
-   * 系统配置缓存 TTL（秒）
-   * 系统配置相对稳定，可缓存较长时间
-   */
-  CONFIG_TTL: 3600,
-
-  /**
-   * 用户信息缓存 TTL（秒）
-   * 用户信息可能变更，缓存时间适中
-   */
-  USER_TTL: 1800,
-
-  /**
-   * 文章缓存 TTL（秒）
-   * 已发布文章相对稳定
-   */
-  POST_TTL: 3600,
-
-  /**
-   * 分类缓存 TTL（秒）
-   * 分类结构变化较少
-   */
-  CATEGORY_TTL: 3600,
-
-  /**
-   * 标签缓存 TTL（秒）
-   * 标签变化较少
-   */
-  TAG_TTL: 3600,
 };
 
 /**
@@ -521,6 +490,24 @@ export const RATE_LIMIT_CONSTANTS = {
    * 1 分钟内最多刷新 30 次
    */
   TOKEN_REFRESH_MAX_REQUESTS: 30,
+
+  /**
+   * 密码重置接口限制
+   * 15 分钟内最多尝试 5 次（防止配合验证码爆破）
+   */
+  RESET_PASSWORD_MAX_REQUESTS: 5,
+
+  /**
+   * 文章密码验证限制
+   * 15 分钟内最多尝试 10 次（防止爆破文章访问密码）
+   */
+  PASSWORD_VERIFY_MAX_REQUESTS: 10,
+
+  /**
+   * 浏览统计上报限制
+   * 1 分钟内最多 60 次（正常阅读节奏远低于此，防刷 view_history）
+   */
+  ANALYTICS_TRACK_MAX_REQUESTS: 60,
 
   /**
    * 评论删除限制

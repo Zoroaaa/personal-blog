@@ -310,8 +310,9 @@ export class CommentService {
       };
     }
 
+    // 必须过滤 deleted_at：软删文章不允许再被评论，否则会向已删文章写入评论
     const post = await db.prepare(
-      'SELECT id, status FROM posts WHERE id = ?'
+      'SELECT id, status FROM posts WHERE id = ? AND deleted_at IS NULL'
     ).bind(postId).first() as { id: number; status: string } | null;
 
     if (!post) {

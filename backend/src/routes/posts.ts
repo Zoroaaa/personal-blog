@@ -20,10 +20,11 @@ import type { Env, Variables } from '../types';
 import { successResponse, errorResponse, getStatus } from '../utils/response';
 import { requireAuth, requireAdmin, optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
+import { rateLimit } from '../middleware/rateLimit';
 import { isFeatureEnabled } from './config';
 import { safeParseInt, pathParam } from '../utils/validation';
 import { PostService } from '../services/postService';
-import { POST_CONSTANTS } from '../config/constants';
+import { POST_CONSTANTS, RATE_LIMIT_CONSTANTS } from '../config/constants';
 
 export const postRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -246,6 +247,7 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
       }));
     }
 
+    // view_count 唯一自增入口：详情页每次成功取文 +1（analytics/track 只记 view_history 事件，不重复计数）
     c.executionCtx.waitUntil(
       PostService.incrementViewCount(c.env.DB, postId)
     );
@@ -338,7 +340,14 @@ postRoutes.delete('/:id', requireAuth, requireAdmin, async (c) => {
   }
 });
 
-postRoutes.post('/:id/like', requireAuth, async (c) => {
+postRoutes.post('/:id/like',
+  rateLimit({
+    windowMs: RATE_LIMIT_CONSTANTS.WINDOW_1_MINUTE,
+    maxRequests: RATE_LIMIT_CONSTANTS.LIKE_MAX_REQUESTS,
+    message: '1 分钟内最多点赞 20 次'
+  }),
+  requireAuth,
+  async (c) => {
   const logger = createLogger(c);
 
   try {
@@ -489,7 +498,13 @@ postRoutes.get('/hot/list', async (c) => {
   }
 });
 
-postRoutes.post('/:id/verify-password', async (c) => {
+postRoutes.post('/:id/verify-password',
+  rateLimit({
+    windowMs: RATE_LIMIT_CONSTANTS.WINDOW_15_MINUTES,
+    maxRequests: RATE_LIMIT_CONSTANTS.PASSWORD_VERIFY_MAX_REQUESTS,
+    message: '15 分钟内最多尝试验证文章密码 10 次'
+  }),
+  async (c) => {
   const logger = createLogger(c);
 
   try {
