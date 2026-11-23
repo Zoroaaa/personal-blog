@@ -383,10 +383,10 @@ personal-blog/
 ---
 
 ## 部署
-
+本项目支持一键部署到 Cloudflare 平台。
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Zoroaaa/personal-blog)
 
-按钮暂从含部署配置的 Fork `main` 创建新站点；已有站点继续使用下方的部署流程。首次部署请参考[按钮部署说明](./docs/DEPLOYMENT.md#按钮部署新站点)。
+已有站点继续使用下方的部署流程。首次部署请参考[按钮部署说明](./docs/DEPLOYMENT.md#按钮部署新站点)。
 
 ### 部署架构
 
