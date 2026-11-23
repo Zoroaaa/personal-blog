@@ -8,7 +8,8 @@
     "tail": "wrangler tail",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -22,6 +23,7 @@
     "eslint": "^8.56.0",
     "prettier": "^3.1.1",
     "typescript": "^5.3.3",
+    "vitest": "^5.1.1",
     "wrangler": "^4.65.0"
   },
   "engines": {

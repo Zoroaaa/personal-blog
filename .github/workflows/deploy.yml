@@ -1,6 +1,6 @@
 name: Verify, Migrate & Deploy
 
-# 唯一的发布入口：typecheck → D1 迁移 → 触发 Workers Builds 部署钩子。
+# 唯一的发布入口：typecheck（双端）+ 单元测试 → D1 迁移 → 触发 Workers Builds 部署钩子。
 # 任何一步失败都不会部署。
 #
 # 前提：Workers Builds 侧的 push 自动部署已关闭（Build watch paths 设为永不命中的路径），
@@ -15,7 +15,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    name: Type Check, D1 Migrations & Deploy
+    name: Type Check, Unit Tests, D1 Migrations & Deploy
     # secrets 上下文不能直接用在 step 的 if 里，所以提到 job 级 env 再判断。
     # 未配置钩子时钩子步骤显示为 skipped，而不是「绿色的成功但没部署」。
     env:
@@ -43,6 +43,15 @@ jobs:
       - name: Type Check
         working-directory: ./backend
         run: npm run typecheck
+
+      - name: Type Check Frontend
+        # 前端 tsc 不在 vite build 里（esbuild 不查类型），必须单独跑才拦得住类型回归
+        working-directory: ./frontend
+        run: npm run typecheck
+
+      - name: Unit Tests
+        # vitest 门禁：backend 纯逻辑单测（utils：errors/response/softDeleteHelper/validation/jwt）
+        run: npm run test --workspace=backend
 
       - name: Apply D1 Migrations
         # 部署前先同步生产库结构；脚本为幂等重放，重复执行安全。
@@ -83,4 +92,4 @@ jobs:
       - name: Deployment Skipped Notice
         # 让「未部署」在 UI 里有一句明确解释，而不是只能看到一个 skipped 步骤。
         if: env.WORKERS_DEPLOY_HOOK_URL == ''
-        run: echo "::notice title=Deployment skipped::WORKERS_DEPLOY_HOOK_URL is not configured, so no deployment was triggered. Type check passed."
+        run: echo "::notice title=Deployment skipped::WORKERS_DEPLOY_HOOK_URL is not configured, so no deployment was triggered. Type checks and unit tests passed."
