@@ -31,6 +31,9 @@ import { PostActionsBar } from '../components/post/PostActionsBar';
 import { PostNavigation } from '../components/post/PostNavigation';
 import { RecommendedPosts } from '../components/post/RecommendedPosts';
 import { CommentSection } from '../components/post/CommentSection';
+import { ReadingProgress } from '../components/post/ReadingProgress';
+import { Breadcrumbs } from '../components/Breadcrumbs';
+import { ImageLightbox } from '../components/post/ImageLightbox';
 
 export function PostPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -121,6 +124,8 @@ export function PostPage() {
 
   return (
     <>
+      <ReadingProgress />
+      <ImageLightbox />
       <SEO
         title={post.title}
         description={post.summary || post.content?.substring(0, 200)}
@@ -132,6 +137,15 @@ export function PostPage() {
         modifiedTime={post.updatedAt}
       />
       <div className="max-w-4xl mx-auto px-4 py-12">
+        <Breadcrumbs
+          className="mb-6"
+          items={[
+            ...(post.categoryName
+              ? [{ label: post.categoryName, to: post.categorySlug ? `/categories/${post.categorySlug}` : undefined }]
+              : []),
+            { label: post.title },
+          ]}
+        />
         <article>
           <PostHeader
             post={post}

@@ -19,6 +19,7 @@ import { HotPostsCarousel } from '../components/home/HotPostsCarousel';
 import { HotPostsSidebar } from '../components/home/HotPostsSidebar';
 import { ActiveFilters } from '../components/home/ActiveFilters';
 import { PostList } from '../components/home/PostList';
+import { SortBar } from '../components/home/SortBar';
 import { useHomeData } from '../hooks/useHomeData';
 
 export function HomePage() {
@@ -45,10 +46,14 @@ export function HomePage() {
     handleTagClick,
     clearFilters,
     hasFilters,
+    sortBy,
+    handleSortChange,
   } = useHomeData();
 
   // 移动端侧边栏展开状态
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  // 移动端热门文章默认收起：首屏优先展示文章流，通知/热门退居次级入口
+  const [mobileHotOpen, setMobileHotOpen] = useState(false);
 
   const sidebar = (
     <HomeSidebar
@@ -74,10 +79,9 @@ export function HomePage() {
       <div className="min-h-screen bg-background">
         <div className="max-w-[1600px] mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-6 sm:py-8 lg:py-10">
 
-          {/* 通知轮播 */}
-          <div className="mb-6 sm:mb-8">
-            <NotificationCarousel />
-          </div>
+          {/* 通知轮播：无公告时组件返回 null，className 传给它自行携带间距，
+              避免出现一个只含 margin 的空 div 顶掉首屏空间 */}
+          <NotificationCarousel className="mb-6 sm:mb-8" />
 
           {/* 移动端筛选按钮 */}
           <div className="lg:hidden mb-4">
@@ -121,8 +125,30 @@ export function HomePage() {
 
             {/* 中间: 文章列表 */}
             <div className="lg:col-span-9 xl:col-span-6">
-              {/* 手机端/平板端热门文章 - 横向滚动卡片 */}
-              <HotPostsCarousel hotPosts={hotPosts} />
+              {/* 手机端/平板端热门文章：默认收起，首屏聚焦文章流；桌面端由右侧栏承载热门 */}
+              <div className="xl:hidden mb-4">
+                <button
+                  onClick={() => setMobileHotOpen((v) => !v)}
+                  className="w-full flex items-center justify-between px-4 py-2.5 bg-card/70 border border-border/60 rounded-lg text-sm text-foreground"
+                  aria-expanded={mobileHotOpen}
+                >
+                  <span>🔥 热门文章</span>
+                  <svg
+                    className={`w-4 h-4 transition-transform ${mobileHotOpen ? 'rotate-180' : ''}`}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {mobileHotOpen && (
+                  <div className="mt-3 animate-fade-in">
+                    <HotPostsCarousel hotPosts={hotPosts} />
+                  </div>
+                )}
+              </div>
+
+              {/* 排序切换 */}
+              <SortBar value={sortBy} onChange={handleSortChange} />
 
               {/* 当前过滤标签 */}
               <ActiveFilters

@@ -46,6 +46,7 @@ const NewMessagePage = lazy(() => import('./pages/NewMessagePage'));
 const SystemNotificationPage = lazy(() => import('./pages/admin/SystemNotificationPage').then((m) => ({ default: m.SystemNotificationPage })));
 const ReadingHistoryPage = lazy(() => import('./pages/ReadingHistoryPage').then((m) => ({ default: m.ReadingHistoryPage })));
 const AccountSettingsPage = lazy(() => import('./pages/AccountSettingsPage').then((m) => ({ default: m.AccountSettingsPage })));
+const ArchivePage = lazy(() => import('./pages/ArchivePage').then((m) => ({ default: m.ArchivePage })));
 
 /**
  * 页面过渡包装组件
@@ -111,6 +112,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<PageTransition><HomePage /></PageTransition>} />
         <Route path="/about" element={<PageTransition><AboutPage /></PageTransition>} />
+        <Route path="/archive" element={<PageTransition><ArchivePage /></PageTransition>} />
         <Route path="/posts/:slug" element={<PageTransition><PageErrorBoundary pageName="文章页面"><PostPage /></PageErrorBoundary></PageTransition>} />
         <Route path="/login" element={<PageTransition><LoginPage /></PageTransition>} />
         <Route path="/admin" element={<PageTransition><PageErrorBoundary pageName="管理后台"><AdminPage /></PageErrorBoundary></PageTransition>} />

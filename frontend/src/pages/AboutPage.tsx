@@ -65,24 +65,19 @@ export function AboutPage() {
                   </div>
                 )}
 
+                {/* site_keywords 是给搜索引擎看的元数据，直接展示给读者没有阅读价值，
+                    因此这里只保留面向人的「站点简介」与「主理人」，关键词留给 SEO meta。 */}
                 <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground mb-1">网站描述</h3>
-                  <p className="text-foreground">
-                    {config.site_description || '暂无描述'}
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-1">关于本站</h3>
+                  <p className="text-foreground leading-relaxed">
+                    {config.site_description || '一个记录技术探索与生活思考的地方，欢迎通过下方的社交账号与我交流。'}
                   </p>
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground mb-1">网站关键词</h3>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-1">主理人</h3>
                   <p className="text-foreground">
-                    {config.site_keywords || '暂无关键词'}
-                  </p>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground mb-1">网站作者</h3>
-                  <p className="text-foreground">
-                    {config.site_author || '暂无作者信息'}
+                    {config.site_author || config.site_name || '本站作者'}
                   </p>
                 </div>
               </div>

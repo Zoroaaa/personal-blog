@@ -16,6 +16,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../utils/api';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 import { transformCategory, transformPostList } from '../utils/apiTransformer';
 import type { Category, PostListItem } from '../types';
 
@@ -120,6 +121,9 @@ export function CategoryPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5">
+        <Breadcrumbs items={[{ label: '分类' }, { label: category.name }]} />
+      </div>
       {/* 分类头部 */}
       <div className="relative bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 text-white">
         <div className="absolute inset-0 bg-black/20"></div>

@@ -291,3 +291,15 @@
   .markdown-body h2 { font-size: 1.375em; }
   .markdown-body h3 { font-size: 1.125em; }
 }
+
+/* ============================================================
+   阅读设置：字号 / 行距调节（由 ReadingSettings 写入 CSS 变量）
+   作用域限定在文章容器 #article-content，不影响导航与后台。
+   ID 选择器优先级高于渲染器自带的 Tailwind 类，确保设置真正生效。
+   ============================================================ */
+#article-content p,
+#article-content li,
+#article-content blockquote {
+  font-size: var(--article-font-size, inherit);
+  line-height: var(--article-line-height, inherit);
+}

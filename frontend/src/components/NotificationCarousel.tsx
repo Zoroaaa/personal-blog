@@ -137,6 +137,13 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
   const currentNotification = notifications[currentIndex];
   const config = currentNotification?.type ? typeConfig[currentNotification.type] : typeConfig.info;
 
+  // 无公告时不占位：新站/无公告阶段，首屏应直接进入文章内容，
+  // 而不是常驻一张「探索精彩内容」的假通知卡。间距由外层 className 携带，
+  // 这样返回 null 时不会残留空白 margin。
+  if (!isLoading && notifications.length === 0) {
+    return null;
+  }
+
   if (isLoading) {
     return (
       <div className={`relative ${className}`}>

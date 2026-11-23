@@ -14,6 +14,7 @@
  */
 
 import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useSiteConfig } from '../hooks/useSiteConfig';
 
 /**
@@ -65,16 +66,30 @@ export function Footer() {
           <div>
             <h4 className="text-sm font-semibold mb-3 text-foreground dark:text-foreground">快速链接</h4>
             <ul className="space-y-2 text-sm text-foreground/70 dark:text-foreground/70">
-              {Object.entries(quickLinks).map(([label, url], index) => (
-                <li key={index}>
-                  <a
-                    href={String(url)}
-                    className="hover:text-primary-600 transition-colors"
-                  >
-                    {label}
-                  </a>
-                </li>
-              ))}
+              {Object.entries(quickLinks).map(([label, url], index) => {
+                const href = String(url);
+                // 站内路径（以 / 开头）走 React Router，避免整页刷新丢失 SPA 状态；
+                // 外链/协议链接保持原生 <a>，不影响新标签打开行为。
+                const isInternal = href.startsWith('/') && !href.startsWith('//');
+                return (
+                  <li key={index}>
+                    {isInternal ? (
+                      <Link to={href} className="hover:text-primary transition-colors">
+                        {label}
+                      </Link>
+                    ) : (
+                      <a
+                        href={href}
+                        target={href.startsWith('http') ? '_blank' : undefined}
+                        rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                        className="hover:text-primary transition-colors"
+                      >
+                        {label}
+                      </a>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </div>
 

@@ -1,7 +1,9 @@
 /**
  * 评论区：发表评论表单 + 评论列表（含递归回复）。
+ * 增强：根评论支持「最新 / 最热」切换；深层回复默认折叠，点击展开。
  */
 
+import { useMemo, useState } from 'react';
 import { RichTextEditor } from '../RichTextEditor';
 import { formatDate } from '../../utils/formatDate';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
@@ -37,8 +39,13 @@ function CommentItem({ comment, level, commentsApi }: CommentItemProps) {
     handleSubmitReply,
   } = commentsApi;
 
+  // 深层回复（level >= 2）默认折叠：避免长讨论把版面挤成窄条，
+  // 读者可按需展开。用组件局部状态，每个回复节点互不影响。
+  const [repliesExpanded, setRepliesExpanded] = useState(level < 2);
+  const hasReplies = Boolean(comment.replies && comment.replies.length > 0);
+
   return (
-    <div className={`${level > 0 ? 'ml-8' : ''} border-l-2 border-border pl-4 mb-4`}>
+    <div className={`${level > 0 ? 'ml-4 sm:ml-8' : ''} border-l-2 border-border pl-4 mb-4`}>
       <div className="flex items-start space-x-3">
         {comment.avatarUrl || comment.user?.avatarUrl ? (
           <img
@@ -128,10 +135,19 @@ function CommentItem({ comment, level, commentsApi }: CommentItemProps) {
             </form>
           )}
 
-          {/* 递归渲染回复 */}
-          {comment.replies && comment.replies.length > 0 && (
+          {/* 递归渲染回复：深层默认折叠，展开按钮显示回复数 */}
+          {hasReplies && level >= 2 && (
+            <button
+              onClick={() => setRepliesExpanded((v) => !v)}
+              className="mt-3 text-xs text-primary hover:underline transition-colors"
+              aria-expanded={repliesExpanded}
+            >
+              {repliesExpanded ? '收起回复' : `展开 ${comment.replies!.length} 条回复`}
+            </button>
+          )}
+          {hasReplies && repliesExpanded && (
             <div className="mt-4">
-              {comment.replies.map((reply) => (
+              {comment.replies!.map((reply) => (
                 <CommentItem
                   key={reply.id}
                   comment={reply}
@@ -164,10 +180,41 @@ export function CommentSection({ post, isAuthenticated, commentsApi, onLogin }: 
     handleSubmitComment,
   } = commentsApi;
 
+  // 后端评论接口没有排序参数，这里对「已加载」的根评论做客户端排序。
+  // 注意：排序只作用于当前已加载分页，加载更多后会把新页并入再一起排序。
+  const [sortMode, setSortMode] = useState<'latest' | 'hot'>('latest');
+  const sortedComments = useMemo(() => {
+    const list = [...comments];
+    if (sortMode === 'hot') {
+      return list.sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0));
+    }
+    return list.sort((a, b) => {
+      const ta = new Date(a.createdAt).getTime() || 0;
+      const tb = new Date(b.createdAt).getTime() || 0;
+      return tb - ta;
+    });
+  }, [comments, sortMode]);
+
   return (
     <div className="mt-16 border-t border-border pt-8">
-      {/* 总数用服务端分页 total（根评论数），而非当前已加载条数，翻页加载时计数才不会跳变 */}
-      <h2 className="text-2xl font-bold text-foreground mb-6">评论 ({totalComments})</h2>
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
+        {/* 总数用服务端分页 total（根评论数），而非当前已加载条数，翻页加载时计数才不会跳变 */}
+        <h2 className="text-2xl font-bold text-foreground">评论 ({totalComments})</h2>
+        <div className="inline-flex items-center gap-1 bg-muted rounded-lg p-1">
+          {([['latest', '最新'], ['hot', '最热']] as const).map(([mode, label]) => (
+            <button
+              key={mode}
+              onClick={() => setSortMode(mode)}
+              aria-pressed={sortMode === mode}
+              className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                sortMode === mode ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* 归档文章提示 */}
       {post.status === 'archived' && (
@@ -222,7 +269,7 @@ export function CommentSection({ post, isAuthenticated, commentsApi, onLogin }: 
       {comments.length > 0 ? (
         <div>
           <div className="space-y-6">
-            {comments.map((comment) => (
+            {sortedComments.map((comment) => (
               <CommentItem
                 key={comment.id}
                 comment={comment}

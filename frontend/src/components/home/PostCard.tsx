@@ -34,8 +34,9 @@ export function PostCard({ post, index }: PostCardProps) {
       className="group bg-card/80 backdrop-blur-sm rounded-xl shadow-md border border-border/60 overflow-hidden hover:shadow-xl transition-all duration-300 animate-fade-in flex flex-col"
       style={{ animationDelay: `${index * 50}ms`, isolation: 'auto' }}
     >
-      {/* 封面图 */}
-      {post.coverImage && (
+      {/* 封面图：无封面时保留等高占位，避免同一网格内卡片高度参差不齐。
+          置顶标识统一放在标题前（见下方），这里不再重复渲染。 */}
+      {post.coverImage ? (
         <div className="relative h-32 sm:h-36 overflow-hidden">
           <img
             src={post.coverImage}
@@ -44,15 +45,12 @@ export function PostCard({ post, index }: PostCardProps) {
             className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-400"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-          {/* 置顶标识 */}
-          {(post as any).isPinned && (
-            <div className="absolute top-2 left-2 px-2 py-0.5 bg-gradient-to-r from-red-500 to-orange-500 text-white text-xs font-bold rounded-md shadow-lg flex items-center gap-1">
-              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M9.828.722a.5.5 0 0 1 .354.146l4.95 4.95a.5.5 0 0 1 0 .707c-.48.48-1.072.588-1.503.588-.177 0-.335-.018-.46-.039l-3.134 3.134a5.927 5.927 0 0 1 .16 1.013c.046.702-.032 1.687-.72 2.375a.5.5 0 0 1-.707 0l-2.829-2.828-3.182 3.182c-.195.195-1.219.902-1.414.707-.195-.195.512-1.22.707-1.414l3.182-3.182-2.828-2.829a.5.5 0 0 1 0-.707c.688-.688 1.673-.767 2.375-.72a5.922 5.922 0 0 1 1.013.16l3.134-3.133a2.772 2.772 0 0 1-.04-.461c0-.43.108-1.022.589-1.503a.5.5 0 0 1 .353-.146z"/>
-              </svg>
-              置顶
-            </div>
-          )}
+        </div>
+      ) : (
+        <div className="h-32 sm:h-36 bg-muted/40 flex items-center justify-center" aria-hidden="true">
+          <svg className="w-10 h-10 text-muted-foreground/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
         </div>
       )}
 

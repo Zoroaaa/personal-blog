@@ -6,6 +6,18 @@ export default {
   ],
   darkMode: 'class',
   theme: {
+    // xs/lt 被 PostList、PostCard 的网格类引用，若只在 extend.screens 里追加，
+    // 生成的媒体查询会排到默认断点之后：480px 规则在 768px 之后覆盖 md:grid-cols-3，
+    // 导致平板列数回退。这里按宽度升序完整声明，保证级联顺序正确。
+    screens: {
+      xs: '480px',
+      sm: '640px',
+      md: '768px',
+      lg: '1024px',
+      xl: '1280px',
+      lt: '1440px',
+      '2xl': '1536px',
+    },
     extend: {
       colors: {
         // 使用CSS变量的主色调系统 - 支持 alpha 值

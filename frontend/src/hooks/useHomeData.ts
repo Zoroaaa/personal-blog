@@ -53,6 +53,13 @@ export function useHomeData() {
     searchParams.get('tag')
   );
 
+  // 排序状态：URL 参数 sort 是唯一来源，切换排序后页码归 1。
+  // 服务端仅接受白名单内的字段，这里限定为三个用户可感知的维度。
+  const [sortBy, setSortBy] = useState<'published_at' | 'view_count' | 'like_count'>(() => {
+    const value = searchParams.get('sort');
+    return value === 'view_count' || value === 'like_count' ? value : 'published_at';
+  });
+
   const loadCategories = useCallback(async () => {
     try {
       setCategoriesLoading(true);
@@ -119,6 +126,7 @@ export function useHomeData() {
       if (selectedCategory) params.category = selectedCategory;
       if (selectedColumn) params.column = selectedColumn;
       if (selectedTag) params.tag = selectedTag;
+      params.sortBy = sortBy;
 
       const response = await api.getPosts(params);
 
@@ -138,7 +146,7 @@ export function useHomeData() {
     } finally {
       setLoading(false);
     }
-  }, [page, postsPerPage, selectedCategory, selectedColumn, selectedTag]);
+  }, [page, postsPerPage, selectedCategory, selectedColumn, selectedTag, sortBy]);
 
   useEffect(() => {
     loadCategories();
@@ -167,8 +175,10 @@ export function useHomeData() {
     if (selectedCategory) params.category = selectedCategory;
     if (selectedColumn) params.column = selectedColumn;
     if (selectedTag) params.tag = selectedTag;
+    // 默认排序不写进 URL，保持分享链接简洁
+    if (sortBy !== 'published_at') params.sort = sortBy;
     setSearchParams(params);
-  }, [selectedCategory, selectedColumn, selectedTag, setSearchParams]);
+  }, [selectedCategory, selectedColumn, selectedTag, sortBy, setSearchParams]);
 
   // 处理分类点击（过滤模式）
   const handleCategoryClick = useCallback(
@@ -225,6 +235,11 @@ export function useHomeData() {
 
   const hasFilters = Boolean(selectedCategory || selectedColumn || selectedTag);
 
+  const handleSortChange = useCallback((value: 'published_at' | 'view_count' | 'like_count') => {
+    setSortBy(value);
+    setPage(1);
+  }, []);
+
   return {
     posts,
     loading,
@@ -249,5 +264,7 @@ export function useHomeData() {
     handleTagClick,
     clearFilters,
     hasFilters,
+    sortBy,
+    handleSortChange,
   };
 }

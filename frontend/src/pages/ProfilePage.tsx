@@ -61,10 +61,17 @@ export function ProfilePage() {
     favorites: false
   });
   const [error, setError] = useState<string | null>(null);
-  
+
+  // 点赞/收藏分页：后端接口已带 pagination，这里只维护当前页与是否还有更多。
+  // 首屏各取 20 条，其余通过「加载更多」追加，避免一次拉满。
+  const [likedPage, setLikedPage] = useState(1);
+  const [likesHasMore, setLikesHasMore] = useState(false);
+  const [favPage, setFavPage] = useState(1);
+  const [favHasMore, setFavHasMore] = useState(false);
+
   useEffect(() => {
     if (user) {
-      loadLikedPosts();
+      loadLikedPosts(1, 'replace');
     }
   }, [user]);
 
@@ -99,14 +106,17 @@ export function ProfilePage() {
   };
   
   // 加载用户点赞文章
-  const loadLikedPosts = async () => {
+  const loadLikedPosts = async (pageNum: number = 1, mode: 'replace' | 'append' = 'replace') => {
     try {
       setLoading(prev => ({ ...prev, likes: true }));
       setError(null);
-      const response = await api.getLikedPosts({ page: '1', limit: '20' });
+      const response = await api.getLikedPosts({ page: String(pageNum), limit: '20' });
       if (response.success && response.data) {
         const posts = (response.data.posts || []).map(transformPostListItem);
-        setLikedPosts(posts);
+        setLikedPosts(prev => (mode === 'replace' ? posts : [...prev, ...posts]));
+        const pagination = response.data.pagination;
+        setLikesHasMore(pagination ? pageNum < pagination.totalPages : posts.length === 20);
+        setLikedPage(pageNum);
       }
     } catch (error) {
       console.error('Failed to load liked posts:', error);
@@ -115,15 +125,18 @@ export function ProfilePage() {
       setLoading(prev => ({ ...prev, likes: false }));
     }
   };
-  
-  const loadFavoritePosts = async () => {
+
+  const loadFavoritePosts = async (pageNum: number = 1, mode: 'replace' | 'append' = 'replace') => {
     try {
       setLoading(prev => ({ ...prev, favorites: true }));
       setError(null);
-      const response = await api.getFavorites({ page: '1', limit: '20' });
+      const response = await api.getFavorites({ page: String(pageNum), limit: '20' });
       if (response.success && response.data) {
         const posts = (response.data.posts || []).map(transformPostListItem);
-        setFavoritePosts(posts);
+        setFavoritePosts(prev => (mode === 'replace' ? posts : [...prev, ...posts]));
+        const pagination = response.data.pagination;
+        setFavHasMore(pagination ? pageNum < pagination.totalPages : posts.length === 20);
+        setFavPage(pageNum);
       }
     } catch (error) {
       console.error('Failed to load favorites:', error);
@@ -290,6 +303,7 @@ export function ProfilePage() {
       );
     }
     return (
+      <>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {favoritePosts.map((post) => (
           <div
@@ -324,9 +338,21 @@ export function ProfilePage() {
           </div>
         ))}
       </div>
+      {favHasMore && (
+        <div className="text-center mt-6">
+          <button
+            onClick={() => loadFavoritePosts(favPage + 1, 'append')}
+            disabled={loading.favorites}
+            className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity text-sm"
+          >
+            {loading.favorites ? '加载中...' : '加载更多'}
+          </button>
+        </div>
+      )}
+      </>
     );
   };
-  
+
   // 渲染点赞标签页
   const renderLikesTab = () => {
     if (loading.likes) {
@@ -351,6 +377,7 @@ export function ProfilePage() {
     }
     
     return (
+      <>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {likedPosts.map((post) => (
           <Link 
@@ -381,9 +408,21 @@ export function ProfilePage() {
           </Link>
         ))}
       </div>
+      {likesHasMore && (
+        <div className="text-center mt-6">
+          <button
+            onClick={() => loadLikedPosts(likedPage + 1, 'append')}
+            disabled={loading.likes}
+            className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity text-sm"
+          >
+            {loading.likes ? '加载中...' : '加载更多'}
+          </button>
+        </div>
+      )}
+      </>
     );
   };
-  
+
   // 渲染主内容
   return (
     <div className="max-w-6xl mx-auto px-4 py-12">

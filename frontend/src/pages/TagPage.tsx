@@ -16,6 +16,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../utils/api';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 import { transformTag, transformPostList } from '../utils/apiTransformer';
 import type { Tag, PostListItem } from '../types';
 
@@ -120,6 +121,9 @@ export function TagPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5">
+        <Breadcrumbs items={[{ label: '标签' }, { label: `#${tag.name}` }]} />
+      </div>
       {/* 标签头部 */}
       <div
         className="relative text-white"

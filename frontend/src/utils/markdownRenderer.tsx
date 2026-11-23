@@ -13,6 +13,7 @@
  * @version 2.0.0 - 完整主题适配，保留所有原始功能
  */
 
+import { useEffect, useRef, useState } from 'react';
 import type { Components } from 'react-markdown';
 
 /**
@@ -44,20 +45,73 @@ export const CodeComponent: Components['code'] = ({ node, inline, className, chi
   const match = /language-(\w+)/.exec(className || '');
   const language = match ? match[1] : '';
 
+  // 复制后必须有可见反馈：剪贴板 API 在非 HTTPS / 无权限时会静默失败，
+  // 因此同时处理成功态、降级路径与失败态，避免用户重复点击却不知是否成功。
+  const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (resetTimer.current) clearTimeout(resetTimer.current);
+    };
+  }, []);
+
+  const handleCopy = async () => {
+    const text = String(children).replace(/\n$/, '');
+    let ok = false;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      } else {
+        // 降级：clipboard API 不可用时用隐藏 textarea + execCommand
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        ok = document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+    } catch {
+      ok = false;
+    }
+
+    setCopied(ok);
+    setCopyFailed(!ok);
+    if (resetTimer.current) clearTimeout(resetTimer.current);
+    // 2 秒后恢复按钮，与其他分享组件的反馈时长保持一致
+    resetTimer.current = setTimeout(() => {
+      setCopied(false);
+      setCopyFailed(false);
+    }, 2000);
+  };
+
   if (!inline && match) {
     return (
       <div className="relative group my-4">
         <div className="flex items-center justify-between px-4 py-2 bg-slate-800 rounded-t-lg border-b border-slate-700">
           <span className="text-xs text-slate-400 uppercase font-medium tracking-wider">{language}</span>
           <button
-            onClick={() => navigator.clipboard.writeText(String(children).replace(/\n$/, ''))}
-            className="text-xs text-slate-400 hover:text-slate-100 transition-colors flex items-center gap-1"
-            title="复制代码"
+            onClick={handleCopy}
+            className={`text-xs transition-colors flex items-center gap-1 ${
+              copied ? 'text-green-400' : copyFailed ? 'text-red-400' : 'text-slate-400 hover:text-slate-100'
+            }`}
+            title={copied ? '已复制' : copyFailed ? '复制失败，请手动选择' : '复制代码'}
+            aria-label={copied ? '已复制' : '复制代码'}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-            复制
+            {copied ? (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            )}
+            {copied ? '已复制' : copyFailed ? '复制失败' : '复制'}
           </button>
         </div>
         <pre className="!mt-0 !rounded-t-none bg-slate-900 text-slate-100 p-4 rounded-b-lg overflow-x-auto">
@@ -229,15 +283,21 @@ export const HorizontalRuleComponent: Components['hr'] = ({ node, ...props }) =>
 );
 
 /**
- * 自定义图片组件
+ * 自定义图片组件：点击派发灯箱事件，由 PostPage 挂载的 ImageLightbox 接管放大。
+ * 事件名集中在 ImageLightbox 中定义，避免字符串散落；SSR/无 window 环境安全降级。
  */
 export const ImageComponent: Components['img'] = ({ node, src, alt, ...props }) => (
   <figure className="my-6">
     <img
       src={src}
       alt={alt}
-      className="max-w-full h-auto rounded-lg shadow-md mx-auto border border-border"
+      className="max-w-full h-auto rounded-lg shadow-md mx-auto border border-border cursor-zoom-in"
       loading="lazy"
+      onClick={() => {
+        if (src && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('blog:lightbox', { detail: { src, alt } }));
+        }
+      }}
       {...props}
     />
     {alt && (
