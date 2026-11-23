@@ -104,7 +104,7 @@ export function ColumnPicker({ columns, loading, selectedId, onToggle }: ColumnP
                   : 'border-border hover:border-primary/50'
               }`}
             >
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white text-xs font-bold">
                 {column.name.slice(0, 2)}
               </div>
               <span className="text-sm font-medium text-foreground truncate max-w-full">

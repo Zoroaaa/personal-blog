@@ -25,7 +25,7 @@ export function AboutPage() {
 
           {/* 页面标题 */}
           <div className="text-center mb-12 animate-fade-in">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent mb-4">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-primary-600 to-primary-800 dark:from-primary-400 dark:to-primary-600 bg-clip-text text-transparent mb-4">
               关于我们
             </h1>
             <p className="text-lg text-muted-foreground">

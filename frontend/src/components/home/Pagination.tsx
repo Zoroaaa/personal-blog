@@ -40,7 +40,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
                   onClick={() => onPageChange(pageNum)}
                   className={`px-3 py-1.5 rounded-lg transition-all text-sm font-medium ${
                     page === pageNum
-                      ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white'
+                      ? 'bg-gradient-to-r from-primary-500 to-primary-700 text-white'
                       : 'bg-card border border-border hover:bg-muted'
                   }`}
                 >

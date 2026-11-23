@@ -86,7 +86,7 @@ export function PostPasswordForm({
               <button
                 type="submit"
                 disabled={passwordVerifying || !passwordInput.trim()}
-                className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="w-full px-4 py-3 bg-gradient-to-r from-primary-600 to-primary-800 text-white rounded-lg font-medium hover:from-primary-700 hover:to-primary-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {passwordVerifying ? '验证中...' : '验证密码'}
               </button>

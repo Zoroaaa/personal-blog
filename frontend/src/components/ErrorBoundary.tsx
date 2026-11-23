@@ -69,7 +69,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
                 <pre className="mt-2 text-red-600 whitespace-pre-wrap">
                   {this.state.error.message}
                   {this.state.errorInfo?.componentStack && (
-                    <div className="mt-2 text-gray-600">
+                    <div className="mt-2 text-muted-foreground">
                       {this.state.errorInfo.componentStack}
                     </div>
                   )}

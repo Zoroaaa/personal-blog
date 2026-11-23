@@ -248,3 +248,23 @@ A: 纯装饰性渐变（如彩色标签、头像背景）不需要强制适配�
 
 A: 使用 CSS 覆盖，通过 `.dark` 前缀在 `index.css` 中添加专属暗色覆盖规则。
 
+
+---
+
+## 主题门禁（check-theme.sh）
+
+`bash check-theme.sh`（或 `npm run check-theme`）已在 `npm test` 与 CI（deploy.yml）中强制执行。
+当前拦截两类违规：
+
+1. **硬编码色类**：`bg-white`、`bg/text/border-gray-*`、`bg-blue-*` 等（脚本内完整模式）
+2. **主色替身渐变**：`from-blue-*`、`to-indigo-*`、`via-indigo-*`、`from-purple-*`、`to-purple-*`
+   —— UI 状态渐变（按钮/选中态/页头）必须用 `primary` 色阶（如 `from-primary-500 to-primary-700`）
+
+**例外标记**：确属豁免场景（纯装饰渐变、代码块深色 chrome、按钮 `text-white`），在**同一行**行尾标 `// THEME-OK`。
+注意：标记必须与违规写在同一行，上一行的注释不会被识别（grep 按行过滤）。
+`markdownRenderer.tsx`（代码块渲染器）与 `themeStore.ts`（主色生成器）整体豁免。
+
+**收编批次状态**（详见 docs/UPGRADE_PLAN.md W2.4）：
+- ① 主色替身渐变 → 已全部换 primary 色阶（2026-11）
+- ② 状态语义色（text-red/green/yellow-*）→ 按本文 FAQ 保留，暂不收编
+- ③ `bg-black/50` 遮罩、`text-white` 合法场景 → 待批量补 THEME-OK 标记

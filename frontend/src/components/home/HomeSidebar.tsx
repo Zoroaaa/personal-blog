@@ -12,6 +12,8 @@ import type { Category, Column, Tag } from '../../types';
 const INITIAL_CATEGORY_COUNT = 6;
 const INITIAL_COLUMN_COUNT = 4;
 const INITIAL_TAG_COUNT = 12;
+// 专栏分区图标装饰渐变（THEME_GUIDE 豁免装饰渐变，不随主色变化）
+const COLUMN_SECTION_ICON = 'bg-gradient-to-br from-purple-500 to-pink-500'; // THEME-OK
 
 interface HomeSidebarProps {
   categories: Category[];
@@ -86,7 +88,7 @@ export function HomeSidebar({
       <div className="bg-card/75 dark:bg-card/75 backdrop-blur-lg rounded-xl shadow-md border border-border/50 dark:border-border/50 p-4 transition-all duration-200 hover:shadow-lg">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-            <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white">
+            <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
               </svg>
@@ -117,7 +119,7 @@ export function HomeSidebar({
                   key={category.id}
                   className={`group w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-150 cursor-pointer ${
                     selectedCategory === category.slug
-                      ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-sm'
+                      ? 'bg-gradient-to-r from-primary-500 to-primary-700 text-white shadow-sm'
                       : 'bg-muted/50 hover:bg-muted text-foreground'
                   }`}
                   onClick={() => onCategoryClick(category.slug)}
@@ -176,7 +178,7 @@ export function HomeSidebar({
       <div className="bg-card/75 dark:bg-card/75 backdrop-blur-lg rounded-xl shadow-md border border-border/50 dark:border-border/50 p-4 transition-all duration-200 hover:shadow-lg">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-            <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white">
+            <span className={`w-7 h-7 rounded-lg ${COLUMN_SECTION_ICON} flex items-center justify-center text-white`}>
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
@@ -211,7 +213,7 @@ export function HomeSidebar({
                   key={column.id}
                   className={`group w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 cursor-pointer ${
                     selectedColumn === column.slug
-                      ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-sm'
+                      ? 'bg-gradient-to-r from-primary-500 to-primary-700 text-white shadow-sm'
                       : 'bg-muted/50 hover:bg-muted text-foreground'
                   }`}
                   onClick={() => onColumnClick(column.slug)}
@@ -219,7 +221,7 @@ export function HomeSidebar({
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${
                     selectedColumn === column.slug
                       ? 'bg-card/20'
-                      : 'bg-gradient-to-br from-purple-500 to-indigo-600'
+                      : 'bg-gradient-to-br from-purple-500 to-indigo-600' // THEME-OK: 专栏头像装饰渐变
                   }`}>
                     {column.name.slice(0, 2)}
                   </div>

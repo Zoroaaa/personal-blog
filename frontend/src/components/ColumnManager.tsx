@@ -415,7 +415,7 @@ export function ColumnManager() {
               className="bg-card rounded-lg border border-border overflow-hidden hover:shadow-lg transition-shadow"
             >
               {/* 封面图片 */}
-              <div className="h-32 bg-gradient-to-br from-blue-500 to-indigo-600 relative">
+              <div className="h-32 bg-gradient-to-br from-primary-500 to-primary-700 relative">
                 {column.coverImage ? (
                   <img
                     src={column.coverImage}

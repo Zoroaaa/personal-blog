@@ -87,7 +87,7 @@ export function PostList({
         {hasFilters && (
           <button
             onClick={onClearFilters}
-            className="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white rounded-lg transition-all duration-200 font-medium text-sm"
+            className="px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-700 hover:from-primary-600 hover:to-primary-800 text-white rounded-lg transition-all duration-200 font-medium text-sm"
           >
             查看所有文章
           </button>

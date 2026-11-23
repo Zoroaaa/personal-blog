@@ -38,7 +38,7 @@ const typeConfig = {
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
-    gradient: 'from-blue-500/20 via-indigo-500/10 to-transparent',
+    gradient: 'from-blue-500/20 via-indigo-500/10 to-transparent', // THEME-OK: 通知类型装饰色带
     borderColor: 'border-primary/30',
     iconBg: 'bg-primary/10 text-primary dark:text-primary',
     accent: 'bg-primary/80',
@@ -71,7 +71,7 @@ const typeConfig = {
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
       </svg>
     ),
-    gradient: 'from-purple-500/20 via-violet-500/10 to-transparent',
+    gradient: 'from-purple-500/20 via-violet-500/10 to-transparent', // THEME-OK: 通知类型装饰色带
     borderColor: 'border-purple-400/30',
     iconBg: 'bg-purple-500/20 text-purple-600 dark:text-purple-400',
     accent: 'bg-purple-500',
@@ -315,7 +315,7 @@ export function NotificationCarousel({ className = '' }: NotificationCarouselPro
                 className={`
                   rounded-full transition-all duration-200
                   ${index === currentIndex
-                    ? 'w-5 h-1.5 bg-gradient-to-r from-blue-500 to-indigo-500'
+                    ? 'w-5 h-1.5 bg-gradient-to-r from-primary-500 to-primary-700'
                     : 'w-1.5 h-1.5 bg-border/60 hover:bg-border dark:hover:bg-border'
                   }
                 `}

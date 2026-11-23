@@ -12,13 +12,15 @@ echo "🔍 主题适配检查 - 扫描目录: $SRC_DIR"
 echo "=================================================="
 
 # 定义违规模式（排除合理例外）
+# 覆盖两类：① 硬编码色类（bg-white/text-gray-* 等）
+#          ② 主色替身渐变（from-blue-* to-indigo-* 等，应使用 primary 色阶）
 ISSUES=$(grep -rn \
-  "bg-white\b\|bg-gray-[0-9]\|bg-slate-[0-9]\|text-gray-[3-9]\|text-slate-[0-9]\|border-gray-[0-9]\|border-slate-[0-9]\|bg-blue-[0-9]\|text-blue-[5-9]\|focus:ring-blue-" \
+  "bg-white\b\|bg-gray-[0-9]\|bg-slate-[0-9]\|text-gray-[3-9]\|text-slate-[0-9]\|border-gray-[0-9]\|border-slate-[0-9]\|bg-blue-[0-9]\|text-blue-[5-9]\|focus:ring-blue-\|from-blue-[0-9]\|to-indigo-[0-9]\|via-indigo-[0-9]\|from-indigo-[0-9]\|from-purple-[0-9]\|to-purple-[0-9]" \
   "$SRC_DIR/" \
   --include="*.tsx" --include="*.ts" \
   | grep -v "// THEME-OK" \
   | grep -v "bg-slate-800\|bg-slate-900\|bg-slate-800\|border-slate-700" \
-  | grep -v "themeStore\|THEME_GUIDE\|check-theme" \
+  | grep -v "themeStore\|THEME_GUIDE\|check-theme\|markdownRenderer" \
   | grep -v "node_modules")
 
 if [ -n "$ISSUES" ]; then

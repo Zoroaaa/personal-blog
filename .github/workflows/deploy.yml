@@ -49,6 +49,11 @@ jobs:
         working-directory: ./frontend
         run: npm run typecheck
 
+      - name: Theme Check
+        # 主题门禁：拦截硬编码色与「主色替身」渐变（例外行须标 // THEME-OK）
+        working-directory: ./frontend
+        run: bash check-theme.sh
+
       - name: Unit Tests
         # vitest 门禁：backend 纯逻辑单测（utils：errors/response/softDeleteHelper/validation/jwt）
         run: npm run test --workspace=backend

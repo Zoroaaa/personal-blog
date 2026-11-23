@@ -109,7 +109,7 @@ export function CategoryPage() {
           <p className="text-muted-foreground mb-6">{error || '抱歉，该分类不存在或已被删除'}</p>
           <Link
             to="/"
-            className="px-6 py-3 bg-gradient-to-r from-primary to-indigo-600 hover:from-primary/90 hover:to-indigo-700 text-white rounded-xl transition-all duration-200 font-medium shadow-md hover:shadow-lg"
+            className="px-6 py-3 bg-gradient-to-r from-primary to-primary-700 hover:from-primary/90 hover:to-primary-800 text-white rounded-xl transition-all duration-200 font-medium shadow-md hover:shadow-lg"
           >
             返回首页
           </Link>
@@ -121,7 +121,7 @@ export function CategoryPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* 分类头部 */}
-      <div className="relative bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 text-white">
+      <div className="relative bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 text-white">
         <div className="absolute inset-0 bg-black/20"></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
@@ -256,7 +256,7 @@ export function CategoryPage() {
                           onClick={() => setPage(pageNum)}
                           className={`px-4 py-3 rounded-xl transition-all font-medium shadow-md hover:shadow-lg ${
                             page === pageNum
-                              ? 'bg-gradient-to-r from-primary to-indigo-600 text-white'
+                              ? 'bg-gradient-to-r from-primary to-primary-700 text-white'
                               : 'bg-card border border-border hover:bg-muted'
                           }`}
                         >

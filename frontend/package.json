@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check-theme": "bash check-theme.sh"
   },
   "dependencies": {
     "date-fns": "^3.0.6",

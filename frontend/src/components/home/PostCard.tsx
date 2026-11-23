@@ -149,7 +149,8 @@ export function PostCard({ post, index }: PostCardProps) {
             <button
               onClick={(e) => post.categorySlug && handlePostCategoryClick(e, post.categorySlug)}
               className="px-2 py-0.5 rounded text-white text-xs font-medium hover:opacity-80 transition-opacity"
-              style={{ backgroundColor: post.categoryColor || '#3B82F6' }}
+              // 回退色用主题变量：硬编码 hex 在暗色模式/自定义主色下失真
+              style={{ backgroundColor: post.categoryColor || 'var(--primary-600)' }}
             >
               {post.categoryName}
             </button>
@@ -161,9 +162,9 @@ export function PostCard({ post, index }: PostCardProps) {
               onClick={(e) => handlePostTagClick(e, tag.slug)}
               className="px-1.5 py-0.5 rounded-full text-xs font-medium border hover:scale-105 transition-transform"
               style={{
-                backgroundColor: tag.color ? `${tag.color}15` : '#F3F4F6',
-                borderColor: tag.color || '#E5E7EB',
-                color: tag.color || '#6B7280'
+                backgroundColor: tag.color ? `${tag.color}15` : 'rgb(var(--color-muted))',
+                borderColor: tag.color || 'rgb(var(--color-border))',
+                color: tag.color || 'rgb(var(--color-muted-foreground))'
               }}
             >
               #{tag.name}

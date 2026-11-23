@@ -109,7 +109,7 @@ export function TagPage() {
           <p className="text-muted-foreground mb-6">{error || '抱歉，该标签不存在或已被删除'}</p>
           <Link
             to="/"
-            className="px-6 py-3 bg-gradient-to-r from-primary to-indigo-600 hover:from-primary/90 hover:to-indigo-700 text-white rounded-xl transition-all duration-200 font-medium shadow-md hover:shadow-lg"
+            className="px-6 py-3 bg-gradient-to-r from-primary to-primary-700 hover:from-primary/90 hover:to-primary-800 text-white rounded-xl transition-all duration-200 font-medium shadow-md hover:shadow-lg"
           >
             返回首页
           </Link>
@@ -256,7 +256,7 @@ export function TagPage() {
                           onClick={() => setPage(pageNum)}
                           className={`px-4 py-3 rounded-xl transition-all font-medium shadow-md hover:shadow-lg ${
                             page === pageNum
-                              ? 'bg-gradient-to-r from-primary to-indigo-600 text-white'
+                              ? 'bg-gradient-to-r from-primary to-primary-700 text-white'
                               : 'bg-card border border-border hover:bg-muted'
                           }`}
                         >
