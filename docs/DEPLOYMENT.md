@@ -9,6 +9,7 @@
 
 ## 目录
 
+- [按钮部署新站点](#按钮部署新站点)
 - [部署架构](#部署架构)
 - [一次 push 的完整链路](#一次-push-的完整链路)
 - [前置准备](#前置准备)
@@ -25,6 +26,16 @@
 - [部署检查清单](#部署检查清单)
 
 ---
+
+## 按钮部署新站点
+
+1. 点击 README 的 **Deploy to Cloudflare**，授权 GitHub 和 Cloudflare，在向导中选择目标 GitHub 账号及新仓库名。按钮必须指向包含根目录 `wrangler.toml` 的仓库默认分支；上游合并前使用 Fork。首次使用 R2 的账号须先在 Cloudflare 控制台开通 R2。
+2. 让 Cloudflare 创建新的 D1、KV 和 R2 资源。按钮读取根目录的 `wrangler.toml`，Cloudflare 会把新资源 ID 写到生成的仓库；不要复用已有站点的生产资源。
+3. 在 Secrets 填写 `JWT_SECRET`，可用 `openssl rand -hex 32` 生成。若向导未显示该输入项，在 Worker 的 **Settings → Variables and Secrets** 添加同名 Secret，不要提交到 Git。
+4. 构建根目录选仓库根，Build command 为 `npm run build`，Deploy command 为 `npm run deploy`。部署命令会先做类型检查，再通过 `DB` 绑定按原有顺序应用 SQL，最后发布 Worker。新站点由 Workers Builds 自动发布，不用为 GitHub Actions 配 API Token 或部署钩子。
+5. 打开 `workers.dev` 地址，按[管理员账号](#管理员账号)设置管理员。默认通过同一个 Worker 读取私有 R2 桶，图片可直接显示，普通附件只提供下载，不必启用 R2 公开地址。启用邮件前设置 `FRONTEND_URL`；如需独立的 R2 公开域名，可选填 `STORAGE_PUBLIC_URL`。这些变量写在生成仓库根目录的 `wrangler.toml` 中，不带尾部 `/`。
+
+以下是已有站点的手动配置和 Deploy Hook 流程，继续使用 `backend/wrangler.toml`。
 
 ## 部署架构
 
@@ -306,9 +317,7 @@ Workers Builds 负责**构建前端并把 Worker 与静态资源一起部署**�
 | Deploy command | `npx wrangler deploy --config backend/wrangler.toml` |
 | Build variables | 不需要设置 `VITE_API_URL` |
 
-> Deploy command **必须带 `--config backend/wrangler.toml`**。构建根目录是仓库根，根目录没有 `wrangler.toml`，直接 `npx wrangler deploy` 会报 `Missing entry-point to Worker script or to assets directory`。
->
-> 仓库只有 `backend/wrangler.toml` 这一份配置，**不要**复制或软链到仓库根。
+> 此流程的 Deploy command **必须带 `--config backend/wrangler.toml`**。根目录的 `wrangler.toml` 专供 Cloudflare 按钮新建站点，不要用于已有站点。
 >
 > Build command 在仓库根安装依赖（workspaces 的唯一锁文件在根目录）并构建出 `frontend/dist`，否则 Worker 会带上缺失或过期的静态资源。
 
@@ -449,7 +458,7 @@ Cloudflare Dashboard → **SSL/TLS**：
 日常发布走「push → Actions → 部署钩子」，不需要手动操作。应急时可在本地部署，**必须从仓库根目录**执行：
 
 ```bash
-npm run deploy
+npm run deploy:manual
 ```
 
 等价于：
@@ -555,7 +564,7 @@ wrangler tail --config backend/wrangler.toml
 
 **原因**：构建时没有生成最新的 `frontend/dist`。
 
-**解决**：确认 Build command 为 `npm ci && npm run build`、Root directory 是仓库根、Deploy command 带 `--config backend/wrangler.toml`；本地手动部署用根目录 `npm run deploy`。
+**解决**：确认 Build command 为 `npm ci && npm run build`、Root directory 是仓库根、Deploy command 带 `--config backend/wrangler.toml`；本地手动部署用根目录 `npm run deploy:manual`。
 
 ### 3. push 之后什么都没部署
 
@@ -572,7 +581,7 @@ Dashboard 的 Worker 名必须与 `wrangler.toml` 的 `name`（`blog`）一致�
 
 ### 5. 构建成功但报 `Missing entry-point to Worker script or to assets directory`
 
-Deploy command 在仓库根执行了 `npx wrangler deploy`，而根目录没有 `wrangler.toml`。改为 `npx wrangler deploy --config backend/wrangler.toml`。
+如果是已有站点，请确认 Deploy command 为 `npx wrangler deploy --config backend/wrangler.toml`，避免误用根目录的按钮配置。
 
 ### 6. 迁移失败：D1 权限不足
 

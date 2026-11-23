@@ -95,7 +95,8 @@ app.use('*', requestLogger);
 app.use('*', (c, next) => {
   // 获取允许的源
   const allowedOriginsList = getAllowedOrigins(c.env);
-  const baseUrl = getBaseUrl(c.env);
+  const requestOrigin = new URL(c.req.url).origin;
+  const baseUrl = getBaseUrl(c.env, requestOrigin);
 
   // 应用CORS中间件
   const corsMiddleware = cors({
@@ -120,7 +121,7 @@ app.use('*', (c, next) => {
         const url = new URL(origin);
         const baseUrlObj = new URL(baseUrl);
         // 检查是否为同一个域名或其子域名
-        if (url.hostname === baseUrlObj.hostname || url.hostname.endsWith('.' + baseUrlObj.hostname)) {
+        if (c.env.FRONTEND_URL && (url.hostname === baseUrlObj.hostname || url.hostname.endsWith('.' + baseUrlObj.hostname))) {
           return origin;
         }
       } catch (error) {
@@ -310,6 +311,28 @@ app.route('/api/columns', columnRoutes);
  * 文件上传路由
  */
 app.route('/api/upload', uploadRoutes);
+
+// R2 不必开启公开域名。主动内容只允许下载，不能在博客源内执行。
+app.get('/api/media/*', async (c) => {
+  const path = new URL(c.req.url).pathname.slice('/api/media/'.length);
+  const key = path.split('/').map((part) => {
+    try { return decodeURIComponent(part); } catch { return ''; }
+  }).join('/');
+  if (!/^(?:files\/)?\d+-[a-z0-9]{8}\.[^/\\]+$/i.test(key)) return c.notFound();
+
+  const object = await c.env.STORAGE.get(key);
+  if (!object) return c.notFound();
+  const type = object.httpMetadata?.contentType ?? '';
+  const inline = !key.startsWith('files/') && ['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(type);
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': inline ? type : 'application/octet-stream',
+      'Content-Disposition': inline ? 'inline' : 'attachment',
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
+});
 
 /**
  * 数据分析路由

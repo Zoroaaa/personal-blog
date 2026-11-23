@@ -1,0 +1,50 @@
+# 仅供 Deploy to Cloudflare 按钮读取。现有部署仍使用 backend/wrangler.toml。
+name = "blog"
+main = "backend/src/index.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["assets_navigation_prefers_asset_serving"]
+workers_dev = true
+
+[assets]
+directory = "frontend/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+# Cloudflare 会在新仓库的配置中替换资源 ID。
+[[d1_databases]]
+binding = "DB"
+database_name = "blog-db"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "00000000000000000000000000000000"
+
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "blog-storage"
+
+[[durable_objects.bindings]]
+name = "RATE_LIMITER"
+class_name = "RateLimiter"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RateLimiter"]
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[triggers]
+crons = ["*/15 * * * *"]
+
+[vars]
+ENVIRONMENT = "production"

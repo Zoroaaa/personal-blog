@@ -118,7 +118,7 @@ FRONTEND_URL=http://localhost:5173
 
 #### 3. 配置 `backend/wrangler.toml`
 
-仓库只有 `backend/wrangler.toml` 这一份 wrangler 配置（已提交），**不需要**复制或额外创建根目录配置。
+本地开发使用 `backend/wrangler.toml`。根目录的 `wrangler.toml` 仅供 Cloudflare 按钮部署新站点。
 
 ```bash
 # 直接查看/编辑真实配置

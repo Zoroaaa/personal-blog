@@ -50,6 +50,8 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        # 按钮创建的仓库由 Workers Builds 迁移，不需要 GitHub 凭据。
+        if: env.CLOUDFLARE_API_TOKEN != '' || env.WORKERS_DEPLOY_HOOK_URL != ''
         run: bash scripts/migrate.sh blog-db --remote
 
       - name: Trigger Workers Builds Deployment
@@ -81,4 +83,4 @@ jobs:
       - name: Deployment Skipped Notice
         # 让「未部署」在 UI 里有一句明确解释，而不是只能看到一个 skipped 步骤。
         if: env.WORKERS_DEPLOY_HOOK_URL == ''
-        run: echo "::notice title=Deployment skipped::WORKERS_DEPLOY_HOOK_URL is not configured, so no deployment was triggered. Type check and migrations passed."
+        run: echo "::notice title=Deployment skipped::WORKERS_DEPLOY_HOOK_URL is not configured, so no deployment was triggered. Type check passed."
