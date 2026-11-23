@@ -16,6 +16,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { Pagination } from '../components/home/Pagination';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 
@@ -58,15 +59,10 @@ export function AdminPage() {
   // 当前活动的标签页
   const [activeTab, setActiveTab] = useState<AdminTab>(getTabFromUrl());
   
-  // 文章创建状态 (保留状态但使用下划线前缀表示暂时未使用)
-  const [_title, _setTitle] = useState('');
-  const [_content, _setContent] = useState('');
-  const [_summary, _setSummary] = useState('');
-  const [_coverImage, _setCoverImage] = useState('');
-  const [_postStatus, _setPostStatus] = useState<'draft' | 'published'>('draft');
+  // 文章创建状态
+  // 注：_loading/_error 仅取用 setter（作为请求中/失败标志），值未被渲染
   const [_loading, setLoading] = useState(false);
   const [_error, setError] = useState('');
-  const [_success, _setSuccess] = useState(false);
   const [editingPostId, setEditingPostId] = useState<number | null>(null);
   
   // 文章列表状态
@@ -79,11 +75,15 @@ export function AdminPage() {
   const [comments, setComments] = useState<any[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsError, setCommentsError] = useState('');
+  const [commentsPage, setCommentsPage] = useState(1);
+  const [commentsTotalPages, setCommentsTotalPages] = useState(1);
   
   // 用户管理状态
   const [users, setUsers] = useState<any[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState('');
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersTotalPages, setUsersTotalPages] = useState(1);
   
   // 数据分析状态
   const [analytics, setAnalytics] = useState<any>(null);
@@ -138,13 +138,6 @@ export function AdminPage() {
       
       const response = await api.getPostById(postId);
       if (response.success && response.data) {
-        const post = transformPost(response.data);
-        // 这些状态变量暂时未使用，但保留以备将来需要
-        _setTitle(post.title);
-        _setContent(post.content);
-        _setSummary(post.summary || '');
-        _setCoverImage(post.coverImage || '');
-        _setPostStatus(post.status as 'draft' | 'published');
         setEditingPostId(postId);
         setShowCreateForm(true);
       }
@@ -194,19 +187,19 @@ export function AdminPage() {
     }
   };
   
-  // 加载评论数据
+  // 加载评论数据（翻页时也重新拉取）
   useEffect(() => {
     if (activeTab === 'comments') {
-      loadComments();
+      loadComments(commentsPage);
     }
-  }, [activeTab]);
-  
-  // 加载用户数据
+  }, [activeTab, commentsPage]);
+
+  // 加载用户数据（翻页时也重新拉取）
   useEffect(() => {
     if (activeTab === 'users') {
-      loadUsers();
+      loadUsers(usersPage);
     }
-  }, [activeTab]);
+  }, [activeTab, usersPage]);
   
   // 加载分析数据
   useEffect(() => {
@@ -217,13 +210,15 @@ export function AdminPage() {
   
 
   
-  // 加载评论
-  const loadComments = async () => {
+  // 加载评论（分页：此前写死 page=1&limit=10，超过 10 条的评论永远无法管理）
+  const loadComments = async (page: number = commentsPage) => {
     setCommentsLoading(true);
     setCommentsError('');
     try {
-      const response = await api.getAdminComments({ page: '1', limit: '10' });
+      const response = await api.getAdminComments({ page: String(page), limit: '10' });
       setComments(transformCommentList(response.data?.comments || []));
+      setCommentsPage(response.data?.pagination?.page || page);
+      setCommentsTotalPages(response.data?.pagination?.totalPages || 1);
     } catch (err: any) {
       setCommentsError(err.message || '加载评论失败');
     } finally {
@@ -231,13 +226,15 @@ export function AdminPage() {
     }
   };
 
-  // 加载用户
-  const loadUsers = async () => {
+  // 加载用户（分页，理由同上）
+  const loadUsers = async (page: number = usersPage) => {
     setUsersLoading(true);
     setUsersError('');
     try {
-      const response = await api.getAdminUsers({ page: '1', limit: '10' });
+      const response = await api.getAdminUsers({ page: String(page), limit: '10' });
       setUsers(transformUserList(response.data?.users || []));
+      setUsersPage(response.data?.pagination?.page || page);
+      setUsersTotalPages(response.data?.pagination?.totalPages || 1);
     } catch (err: any) {
       setUsersError(err.message || '加载用户失败');
     } finally {
@@ -547,9 +544,14 @@ export function AdminPage() {
                 </tbody>
               </table>
             </div>
+            <Pagination
+              page={commentsPage}
+              totalPages={commentsTotalPages}
+              onPageChange={(p) => setCommentsPage(p)}
+            />
           </div>
         );
-      
+
       case 'users':
         return (
           <div className="space-y-6">
@@ -653,9 +655,14 @@ export function AdminPage() {
                 </tbody>
               </table>
             </div>
+            <Pagination
+              page={usersPage}
+              totalPages={usersTotalPages}
+              onPageChange={(p) => setUsersPage(p)}
+            />
           </div>
         );
-      
+
       case 'analytics':
         return (
           <div className="space-y-6">

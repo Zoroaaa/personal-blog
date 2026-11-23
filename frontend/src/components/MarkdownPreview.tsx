@@ -106,7 +106,8 @@ export function SplitPreview({ content, isVisible }: SplitPreviewProps) {
 
   return (
     <div className="h-full overflow-auto bg-card rounded-lg border border-border p-6">
-      <div className="prose prose-lg dark:prose-invert max-w-none">
+      {/* 样式来自 src/styles/markdown.css；prose 类无 typography 插件支撑，是无效类 */}
+      <div className="max-w-none">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           rehypePlugins={[rehypeHighlight]}

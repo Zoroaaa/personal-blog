@@ -82,7 +82,8 @@ export function PostContent({ post }: PostContentProps) {
 
         {/* 正文内容 */}
         <div className="flex-1 min-w-0">
-          <div className="prose prose-lg dark:prose-invert max-w-none mb-8">
+          {/* 样式来自 src/styles/markdown.css；不装 @tailwindcss/typography，prose 类是无效类 */}
+          <div className="max-w-none mb-8">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeHighlight]}

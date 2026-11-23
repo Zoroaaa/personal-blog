@@ -13,29 +13,16 @@ import type {
   NotificationFilter,
   PartialNotificationSettings,
 } from '../types/notifications';
-import { useAuthStore } from '../stores/authStore';
+// 统一走 api.ts 唯一客户端：自带 Bearer、401 静默刷新与错误解包。
+// 曾经这里 8 个裸 fetch 自行拼 header，token 过期后通知静默失败且不登出。
+import { apiRequest } from './api';
 
-// 与 api.ts 保持一致：同域部署时基址为相对路径 /api
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
-
-function getRequestConfig(): RequestInit {
-  const { token } = useAuthStore.getState();
-  return {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  };
-}
-
-async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({
-      message: '请求失败',
-    }));
-    throw new Error(error.message || `HTTP ${response.status}`);
+/** apiRequest 成功时 data 基本必有；类型上是可选，这里统一收窄并兜底报错 */
+function unwrap<T>(res: { data?: T }): T {
+  if (res.data === undefined || res.data === null) {
+    throw new Error('服务器返回数据为空');
   }
-  return response.json();
+  return res.data;
 }
 
 export async function getNotifications(
@@ -54,87 +41,46 @@ export async function getNotifications(
     params.append('isRead', String(filter.isRead));
   }
 
-  const response = await fetch(
-    `${API_BASE_URL}/notifications?${params.toString()}`,
-    getRequestConfig()
+  const result = await apiRequest<NotificationListResponse>(
+    `/notifications?${params.toString()}`
   );
-
-  const result = await handleResponse<{ success: boolean; data: NotificationListResponse }>(response);
-  return result.data;
+  return unwrap(result);
 }
 
 export async function getUnreadCount(): Promise<UnreadCountResponse> {
-  const response = await fetch(
-    `${API_BASE_URL}/notifications/unread-count`,
-    getRequestConfig()
-  );
-
-  const result = await handleResponse<{ success: boolean; data: UnreadCountResponse }>(response);
-  return result.data;
+  const result = await apiRequest<UnreadCountResponse>('/notifications/unread-count');
+  return unwrap(result);
 }
 
 export async function markAsRead(notificationId: number): Promise<void> {
-  const response = await fetch(
-    `${API_BASE_URL}/notifications/${notificationId}/read`,
-    {
-      ...getRequestConfig(),
-      method: 'PUT',
-    }
-  );
-
-  await handleResponse(response);
+  await apiRequest(`/notifications/${notificationId}/read`, { method: 'PUT' });
 }
 
 export async function markAllAsRead(type?: string): Promise<{ markedCount: number }> {
-  const response = await fetch(
-    `${API_BASE_URL}/notifications/read-all`,
-    {
-      ...getRequestConfig(),
-      method: 'PUT',
-      body: JSON.stringify({ type }),
-    }
-  );
-
-  const result = await handleResponse<{ success: boolean; data: { markedCount: number } }>(response);
-  return result.data;
+  const result = await apiRequest<{ markedCount: number }>('/notifications/read-all', {
+    method: 'PUT',
+    body: JSON.stringify({ type }),
+  });
+  return unwrap(result);
 }
 
 export async function deleteNotification(notificationId: number): Promise<void> {
-  const response = await fetch(
-    `${API_BASE_URL}/notifications/${notificationId}`,
-    {
-      ...getRequestConfig(),
-      method: 'DELETE',
-    }
-  );
-
-  await handleResponse(response);
+  await apiRequest(`/notifications/${notificationId}`, { method: 'DELETE' });
 }
 
 export async function getNotificationSettings(): Promise<NotificationSettings> {
-  const response = await fetch(
-    `${API_BASE_URL}/users/notification-settings`,
-    getRequestConfig()
-  );
-
-  const result = await handleResponse<{ success: boolean; data: NotificationSettings }>(response);
-  return result.data;
+  const result = await apiRequest<NotificationSettings>('/users/notification-settings');
+  return unwrap(result);
 }
 
 export async function updateNotificationSettings(
   settings: PartialNotificationSettings
 ): Promise<NotificationSettings> {
-  const response = await fetch(
-    `${API_BASE_URL}/users/notification-settings`,
-    {
-      ...getRequestConfig(),
-      method: 'PUT',
-      body: JSON.stringify(settings),
-    }
-  );
-
-  const result = await handleResponse<{ success: boolean; data: NotificationSettings }>(response);
-  return result.data;
+  const result = await apiRequest<NotificationSettings>('/users/notification-settings', {
+    method: 'PUT',
+    body: JSON.stringify(settings),
+  });
+  return unwrap(result);
 }
 
 export function getNotificationIcon(type: string, subtype?: string): string {

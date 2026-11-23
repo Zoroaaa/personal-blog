@@ -97,38 +97,6 @@ export function isValidUrl(url: string): boolean {
 }
 
 /**
- * 获取链接预览数据（使用 fetch 获取 Open Graph 数据）
- * 注意：由于 CORS 限制，实际项目中可能需要后端代理
- */
-export async function fetchLinkPreview(url: string): Promise<Partial<LinkInfo>> {
-  try {
-    // 尝试获取页面内容
-    await fetch(url, {
-      method: 'GET',
-      mode: 'no-cors', // 注意：no-cors 模式下无法读取响应内容
-      headers: {
-        'Accept': 'text/html',
-      }
-    });
-    
-    // 由于 CORS 限制，这里返回基本信息
-    const urlObj = new URL(url);
-    return {
-      url,
-      displayText: url,
-      title: urlObj.hostname,
-      favicon: `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=32`,
-    };
-  } catch (error) {
-    console.warn('Failed to fetch link preview:', error);
-    return {
-      url,
-      displayText: url,
-    };
-  }
-}
-
-/**
  * 生成链接的 favicon URL
  */
 export function getFaviconUrl(url: string): string {
