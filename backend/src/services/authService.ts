@@ -42,7 +42,6 @@ import type {
   UserLoginRow, 
   UserBasicRow, 
   UserPasswordRow, 
-  OAuthTokenRow,
   OAuthUserRow,
   CountResult,
   GitHubTokenResponse,
@@ -1185,53 +1184,6 @@ export class AuthService {
       success: true,
       message: 'Account deleted successfully'
     };
-  }
-
-  static async refreshOAuthToken(
-    db: any,
-    userId: number,
-    provider: string
-  ): Promise<{ success: boolean; accessToken?: string; message?: string }> {
-    try {
-      const tokenData = await db.prepare(
-        'SELECT * FROM oauth_tokens WHERE user_id = ? AND provider = ?'
-      ).bind(userId, provider).first() as OAuthTokenRow | null;
-
-      if (!tokenData) {
-        return {
-          success: false,
-          message: '未找到OAuth令牌'
-        };
-      }
-
-      const now = new Date();
-      const expiresAt = tokenData.expires_at ? new Date(tokenData.expires_at) : null;
-
-      if (!expiresAt || expiresAt.getTime() - now.getTime() > 5 * 60 * 1000) {
-        return {
-          success: true,
-          accessToken: tokenData.access_token
-        };
-      }
-
-      if (provider === 'github') {
-        return {
-          success: false,
-          message: 'GitHub令牌已过期，需要重新授权'
-        };
-      }
-
-      return {
-        success: false,
-        message: '该认证提供商不支持令牌刷新'
-      };
-    } catch (error) {
-      logger.error('OAuth令牌刷新失败:', error);
-      return {
-        success: false,
-        message: 'OAuth令牌刷新失败'
-      };
-    }
   }
 }
 

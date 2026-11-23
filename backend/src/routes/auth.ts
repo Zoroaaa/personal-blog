@@ -31,7 +31,6 @@ import { sendVerificationEmail } from '../utils/resend';
 import type { VerificationEmailType } from '../utils/resend';
 import { EmailVerificationService } from '../services/emailVerificationService';
 import { AuthService, validateVerificationType } from '../services/authService';
-import { RefreshTokenService } from '../services/refreshTokenService';
 import { AUTH_CONSTANTS, RATE_LIMIT_CONSTANTS } from '../config/constants';
 
 export const authRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();

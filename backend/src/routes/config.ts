@@ -434,33 +434,9 @@ configRoutes.put('/', requireAuth, requireAdmin, async (c) => {
   }
 });
 
-// ============= 重置配置 =============
-
-/**
- * POST /api/config/:key/reset
- * 重置单个配置为默认值
- * 需要管理员权限
- */
-configRoutes.post('/:key/reset', requireAuth, requireAdmin, async (c) => {
-  const logger = createLogger(c);
-  
-  try {
-    const key = c.req.param('key');
-    
-    // 这里可以定义默认值映射
-    // 或者从初始化脚本中读取默认值
-    
-    logger.info('Config reset requested', { key });
-    
-    return c.json(successResponse({ key }, 'Config reset feature not implemented yet'));
-    
-  } catch (error) {
-    logger.error('Reset config error', error);
-    return c.json(errorResponse(
-      'Failed to reset config',
-      'An error occurred while resetting configuration'
-    ), 500);
-  }
-});
+// 已移除 POST /:key/reset 占位路由：
+// 该接口无前端入口、无默认值映射、始终返回 "not implemented yet"，
+// 属于未完成实现。site_config 表也没有 default_value 列可作为恢复来源。
+// 若将来需要重置能力，应先在 schema 中引入默认值再新增真实实现。
 
 

@@ -360,22 +360,31 @@ export class PostService {
 
 | 表名 | 说明 | 主要字段 |
 |------|------|---------|
-| users | 用户表 | id, email, password, role, is_deleted |
-| posts | 文章表 | id, title, content, is_pinned, view_count |
-| columns | 专栏表 | id, name, description, post_count |
-| categories | 分类表 | id, name, slug |
-| tags | 标签表 | id, name, slug |
-| comments | 评论表 | id, post_id, user_id, content, parent_id |
-| post_likes | 点赞表 | id, post_id, user_id |
-| post_favorites | 收藏表 | id, post_id, user_id |
-| reading_history | 阅读历史 | id, user_id, post_id, read_at |
-| notifications | 通知表 | id, user_id, type, content, is_read |
-| messages | 私信表 | id, thread_id, sender_id, content, is_recalled |
-| message_threads | 会话表 | id, participant_ids, last_message_at |
-| notification_settings | 通知设置 | id, user_id, settings |
-| message_settings | 私信设置 | id, user_id, allow_strangers |
-| system_notifications | 系统通知 | id, title, content, is_active |
-| config | 系统配置 | id, key, value |
+> 以 `database/schema-v1.1-base.sql` + `v1.3` + `v1.4` 的实际 CREATE TABLE 为准（共 21 张表，含 FTS 虚拟表）。
+
+| 表名 | 用途 | 关键字段 |
+| --- | --- | --- |
+| users | 用户表 | id, username, email, password_hash, role, status, deleted_at |
+| oauth_tokens | OAuth 令牌 | id, user_id, provider, access_token, token_type |
+| posts | 文章表 | id, title, slug, content, author_id, status, visibility, view_count, is_pinned |
+| posts_fts | 全文检索虚拟表 | title, content（FTS5，触发器维护） |
+| post_tags | 文章-标签关联 | post_id, tag_id |
+| comments | 评论表 | id, post_id, user_id, parent_id, content, status, reply_count |
+| likes | 点赞表（文章/评论共用） | id, user_id, post_id, comment_id |
+| favorites | 收藏表 | id, user_id, post_id |
+| view_history | 浏览事件 | id, post_id, user_id, ip_address, created_at |
+| reading_history | 阅读历史 | id, user_id, post_id, last_read_at, read_percentage |
+| categories | 分类表 | id, name, slug, post_count |
+| tags | 标签表 | id, name, slug, post_count |
+| columns | 专栏表 | id, name, slug, author_id, post_count, total_view_count |
+| site_config | 站点配置 | id, key, value, type, category |
+| notifications | 通知表（系统公告 user_id=0 + 互动通知） | id, user_id, type, subtype, is_read, is_active, deleted_at |
+| notification_reads | 系统公告每用户已读回执 | id, notification_id, user_id, is_read, UNIQUE(notification_id,user_id) |
+| notification_settings | 通知设置 | id, user_id, system_email, interaction_*, dnd_*, digest_* |
+| messages | 私信表 | id, sender_id, recipient_id, thread_id, reply_to_id, is_recalled, message_type |
+| message_settings | 私信设置 | id, user_id, email_notification, respect_dnd, allow_strangers |
+| email_digest_queue | 邮件汇总队列 | id, user_id, notification_id, digest_type, scheduled_at, is_sent |
+| refresh_tokens | 刷新令牌 | id, user_id, token_hash, expires_at, revoked_at |
 
 ### 核心表设计
 

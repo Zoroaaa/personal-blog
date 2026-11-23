@@ -12,9 +12,8 @@
  */
 
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
-import { safeParseInt } from '../utils/validation';
 import { PAGINATION_CONSTANTS, DATABASE_CONSTANTS, COMMENT_STATUS_CONSTANTS } from '../config/constants';
-import type { TotalResult, CommentRow, UserRow } from '../types/database';
+import type { TotalResult } from '../types/database';
 
 export interface AdminCommentListQuery {
   page?: number;

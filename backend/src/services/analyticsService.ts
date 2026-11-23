@@ -202,29 +202,10 @@ export class AnalyticsService {
 
     const viewTrend = await this.getViewTrend(db, postId, 7);
 
-    const { results: referrerStats } = await db.prepare(`
-      SELECT 
-        CASE 
-          WHEN referrer LIKE '%google%' THEN 'Google'
-          WHEN referrer LIKE '%bing%' THEN 'Bing'
-          WHEN referrer LIKE '%yahoo%' THEN 'Yahoo'
-          WHEN referrer LIKE '%baidu%' THEN 'Baidu'
-          WHEN referrer LIKE '%facebook%' THEN 'Facebook'
-          WHEN referrer LIKE '%twitter%' THEN 'Twitter'
-          WHEN referrer LIKE '%linkedin%' THEN 'LinkedIn'
-          WHEN referrer LIKE '%instagram%' THEN 'Instagram'
-          WHEN referrer LIKE '%reddit%' THEN 'Reddit'
-          WHEN referrer LIKE '%github%' THEN 'GitHub'
-          WHEN referrer IS NULL OR referrer = '' THEN 'Direct'
-          ELSE 'Other'
-        END as source,
-        COUNT(*) as count
-      FROM view_history
-      WHERE post_id = ?
-      GROUP BY source
-      ORDER BY count DESC
-      LIMIT 10
-    `).bind(postId).all();
+    // 流量来源（referrer）维度已废弃：view_history 表从未建立 referrer 列，
+    // 该查询历史上必然抛 "no such column: referrer"，导致整个单篇分析接口 500。
+    // 在任何 schema 版本里都没有该字段，前端也没有消费 referrerStats，故直接移除。
+    // 若将来要恢复来源统计，需先在 schema 中加列并同步前端展示。
 
     return {
       success: true,
@@ -235,8 +216,7 @@ export class AnalyticsService {
           slug: post.slug
         },
         stats: postStats[0] || {},
-        viewTrend,
-        referrerStats
+        viewTrend
       }
     };
   }
@@ -264,7 +244,9 @@ export class AnalyticsService {
     };
   }
 
-  static async trackView(db: any, postId: string, userId: number | null, ip: string, referrer: string | null): Promise<AnalyticsResult> {
+  static async trackView(db: any, postId: string, userId: number | null, ip: string, _referrer?: string | null): Promise<AnalyticsResult> {
+    // _referrer 保留为可选参数以兼容调用方签名，但不再写入：
+    // view_history 表没有 referrer 列，历史上的 INSERT 会抛 "no such column" 使埋点静默失败。
     if (!postId) {
       return {
         success: false,
@@ -286,9 +268,9 @@ export class AnalyticsService {
     }
 
     await db.prepare(`
-      INSERT INTO view_history (post_id, user_id, ip_address, referrer, created_at)
-      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `).bind(postId, userId, ip, referrer || null).run();
+      INSERT INTO view_history (post_id, user_id, ip_address, created_at)
+      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    `).bind(postId, userId, ip).run();
 
     return {
       success: true,

@@ -52,6 +52,27 @@ CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
 CREATE INDEX IF NOT EXISTS idx_notifications_is_active ON notifications(is_active);
 CREATE INDEX IF NOT EXISTS idx_notifications_active ON notifications(id) WHERE deleted_at IS NULL;
 
+-- ============= 系统公告已读回执表 =============
+-- 系统公告以 user_id = 0 单条存储、对所有用户可见，因此 is_read 不能放在公告行上，
+-- 否则一个用户已读会让所有人显示已读。这里按 (notification_id, user_id) 记录每用户回执。
+-- notificationService.getNotifications/getUnreadCount/markAsRead/markAllAsRead/
+-- deleteNotification 共 13 处依赖本表；历史上漏建导致系统公告已读状态全部失效。
+CREATE TABLE IF NOT EXISTS notification_reads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    notification_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    is_read INTEGER DEFAULT 0,
+    read_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE(notification_id, user_id),
+    FOREIGN KEY (notification_id) REFERENCES notifications(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_notification_reads_user_id ON notification_reads(user_id);
+CREATE INDEX IF NOT EXISTS idx_notification_reads_notification_id ON notification_reads(notification_id);
+
 -- ============= 通知设置表 =============
 
 CREATE TABLE IF NOT EXISTS notification_settings (

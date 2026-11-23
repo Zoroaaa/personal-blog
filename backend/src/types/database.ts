@@ -120,29 +120,42 @@ export interface ColumnRow {
 export interface NotificationRow {
   id: number;
   user_id: number;
-  type: 'system' | 'interaction' | 'private_message';
+  // private_message 已在 v1.3 移除（私信改为独立系统），schema CHECK 仅允许这两个值
+  type: 'system' | 'interaction';
   subtype: string | null;
   title: string;
   content: string | null;
   related_data: string | null;
   is_read: number;
   read_at: string | null;
+  deleted_at: string | null;
+  is_in_app_sent: number;
+  is_email_sent: number;
+  is_active: number;
   created_at: string;
+  updated_at: string;
 }
 
+// 字段名严格对齐 schema-v1.3 的 messages 表：recipient_id / reply_to_id，
+// 且没有 updated_at / deleted_at 列。旧的 receiver_id / parent_id 是臆造字段。
 export interface MessageRow {
   id: number;
   sender_id: number;
-  receiver_id: number;
-  thread_id: string | null;
-  parent_id: number | null;
+  recipient_id: number;
+  subject: string | null;
   content: string;
+  thread_id: string | null;
+  reply_to_id: number | null;
   is_read: number;
   read_at: string | null;
+  is_recalled: number;
   recalled_at: string | null;
+  message_type: 'text' | 'image' | 'attachment' | 'mixed';
+  attachment_url: string | null;
+  attachment_filename: string | null;
+  attachment_size: number | null;
+  attachment_mime_type: string | null;
   created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
 }
 
 export interface RefreshTokenRow {
@@ -232,6 +245,7 @@ export interface OAuthTokenRow {
   provider: string;
   access_token: string;
   refresh_token: string | null;
+  token_type: string;
   scopes: string | null;
   expires_at: string | null;
   created_at: string;

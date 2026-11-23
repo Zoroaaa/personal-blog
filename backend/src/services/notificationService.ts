@@ -614,23 +614,6 @@ export async function updateChannelStatus(
   }
 }
 
-export async function cleanupOldNotifications(
-  db: D1Database,
-  days: number = 90
-): Promise<number> {
-  try {
-    const result = await db.prepare(
-      `DELETE FROM notifications 
-       WHERE created_at < datetime('now', '-${days} days')`
-    ).run();
-
-    return result.meta?.changes || 0;
-  } catch (error) {
-    logger.error('Cleanup old notifications error:', error);
-    return 0;
-  }
-}
-
 function mapNotificationFromRow(row: any): Notification {
   return {
     id: row.id,
@@ -664,27 +647,6 @@ export async function createInteractionNotification(
   return createNotification(db, {
     userId: params.userId,
     type: 'interaction',
-    subtype: params.subtype,
-    title: params.title,
-    content: params.content,
-    relatedData: params.relatedData,
-  }, {}, env);
-}
-
-export async function createSystemNotification(
-  db: D1Database,
-  params: {
-    userId: number;
-    subtype: 'maintenance' | 'update' | 'announcement';
-    title: string;
-    content?: string;
-    relatedData?: NotificationRelatedData;
-  },
-  env?: Env
-): Promise<Notification | null> {
-  return createNotification(db, {
-    userId: params.userId,
-    type: 'system',
     subtype: params.subtype,
     title: params.title,
     content: params.content,

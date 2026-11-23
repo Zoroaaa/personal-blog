@@ -118,28 +118,12 @@ export async function initializeMessageSettings(
   }
 }
 
-export async function isEmailNotificationEnabled(
-  db: D1Database,
-  userId: number
-): Promise<boolean> {
-  const settings = await getMessageSettings(db, userId);
-  return settings.emailNotification;
-}
-
 export async function isStrangerMessageAllowed(
   db: D1Database,
   userId: number
 ): Promise<boolean> {
   const settings = await getMessageSettings(db, userId);
   return settings.allowStrangers;
-}
-
-export async function shouldRespectDnd(
-  db: D1Database,
-  userId: number
-): Promise<boolean> {
-  const settings = await getMessageSettings(db, userId);
-  return settings.respectDnd;
 }
 
 function mapSettingsFromRow(row: any, userId: number): MessageSettings {

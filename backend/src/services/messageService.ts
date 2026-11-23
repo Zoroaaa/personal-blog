@@ -27,7 +27,6 @@ import {
   PAGINATION_CONSTANTS,
   MESSAGE_TYPE_CONSTANTS,
 } from '../config/constants';
-import type { MessageRow } from '../types/database';
 
 export type MessageType = 'text' | 'image' | 'attachment' | 'mixed';
 
@@ -652,33 +651,6 @@ export async function resendMessage(
   } catch (error) {
     logger.error('Resend message error:', error);
     return { success: false, error: '重新发送消息时发生错误' };
-  }
-}
-
-export async function canRecallMessage(
-  db: D1Database,
-  messageId: number,
-  userId: number
-): Promise<boolean> {
-  try {
-    const message = await db.prepare(`
-      SELECT sender_id, created_at, is_recalled
-      FROM messages 
-      WHERE id = ?
-    `).bind(messageId).first() as { sender_id: number; created_at: string; is_recalled: number } | null;
-
-    if (!message) return false;
-    if (message.sender_id !== userId) return false;
-    if (message.is_recalled === 1) return false;
-
-    const createdAt = new Date(message.created_at);
-    const now = new Date();
-    const timeDiff = now.getTime() - createdAt.getTime();
-
-    return timeDiff <= MESSAGE_CONSTANTS.RECALL_TIME_LIMIT;
-  } catch (error) {
-    logger.error('Check recall status error:', error);
-    return false;
   }
 }
 

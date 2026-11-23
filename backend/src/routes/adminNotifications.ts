@@ -208,7 +208,7 @@ adminNotificationRoutes.get('/list', requireAuth, requireAdmin, async (c) => {
 // ============= 系统通知管理（首页轮播）=============
 
 /**
- * GET /api/admin/system-notifications
+ * GET /api/admin/notifications/system-notifications
  * 获取系统通知列表（用于首页轮播）
  *
  * 查询参数：
@@ -244,7 +244,7 @@ adminNotificationRoutes.get('/system-notifications', requireAuth, requireAdmin, 
 });
 
 /**
- * POST /api/admin/system-notifications
+ * POST /api/admin/notifications/system-notifications
  * 创建系统通知
  */
 adminNotificationRoutes.post('/system-notifications', requireAuth, requireAdmin, async (c) => {
@@ -296,7 +296,7 @@ adminNotificationRoutes.post('/system-notifications', requireAuth, requireAdmin,
 });
 
 /**
- * PUT /api/admin/system-notifications/:id
+ * PUT /api/admin/notifications/system-notifications/:id
  * 更新系统通知
  */
 adminNotificationRoutes.put('/system-notifications/:id', requireAuth, requireAdmin, async (c) => {
@@ -346,7 +346,7 @@ adminNotificationRoutes.put('/system-notifications/:id', requireAuth, requireAdm
 });
 
 /**
- * DELETE /api/admin/system-notifications/:id
+ * DELETE /api/admin/notifications/system-notifications/:id
  * 删除系统通知
  */
 adminNotificationRoutes.delete('/system-notifications/:id', requireAuth, requireAdmin, async (c) => {

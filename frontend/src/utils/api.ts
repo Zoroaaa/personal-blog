@@ -408,12 +408,9 @@ export const api = {
   getAdminConfig: () =>
     apiRequest<{ config: Record<string, any[]>; total: number }>('/config/admin'),
   
-  /**
-   * 获取存储配置信息
-   */
-  getStorageConfig: () =>
-    apiRequest<{ storagePublicUrl: string }>('/config/storage'),
-  
+  // 已移除 getStorageConfig：调用 /config/storage，后端从未注册该路由，
+  // 且无任何前端调用方。存储公开域名由 useSiteConfig 从站点配置读取。
+
   // ============= 文章相关 =============
   
   /**
@@ -1013,20 +1010,8 @@ export const api = {
   getRecommendedPosts: (postId: number, limit?: number) =>
     apiRequest<{ posts: PostListItem[] }>(`/posts/${postId}/recommended?limit=${limit || 5}`),
   
-  /**
-   * 获取系统设置
-   */
-  getSystemSettings: () =>
-    apiRequest<Record<string, any>>('/admin/settings'),
-  
-  /**
-   * 更新系统设置
-   */
-  updateSystemSettings: (settings: Record<string, any>) =>
-    apiRequest<{ updated: boolean }>('/admin/settings', {
-      method: 'PUT',
-      body: JSON.stringify(settings),
-    }),
+  // 已移除 getSystemSettings / updateSystemSettings：
+  // 后端只有 GET /admin/settings 且前端无任何调用方；PUT /admin/settings 从未实现。
 
   /**
    * 删除账号（可选邮箱验证码，当后端启用 Resend 时必填）

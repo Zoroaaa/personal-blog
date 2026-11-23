@@ -228,16 +228,6 @@ export async function initializeSettings(
   }
 }
 
-export async function isNotificationEnabled(
-  db: D1Database,
-  userId: number,
-  type: 'system' | 'interaction'
-): Promise<boolean> {
-  const settings = await getNotificationSettings(db, userId);
-  const typeSettings = settings[type];
-  return typeSettings.frequency !== 'off';
-}
-
 export async function isInteractionSubtypeEnabled(
   db: D1Database,
   userId: number,
