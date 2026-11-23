@@ -99,9 +99,10 @@ interface SplitPreviewProps {
 }
 
 export function SplitPreview({ content, isVisible }: SplitPreviewProps) {
-  if (!isVisible) return null;
-
+  // Hook 必须在任何 early return 之前调用，否则切换可见性会改变 Hook 顺序导致崩溃
   const components = useMemo(() => getMarkdownComponents(), []);
+
+  if (!isVisible) return null;
 
   return (
     <div className="h-full overflow-auto bg-card rounded-lg border border-border p-6">

@@ -17,7 +17,7 @@ import { Env, Variables } from '../types';
 import { successResponse, errorResponse, getStatus } from '../utils/response';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
-import { safeParseInt } from '../utils/validation';
+import { safeParseInt, pathParam } from '../utils/validation';
 import { AnalyticsService } from '../services/analyticsService';
 import { ANALYTICS_CONSTANTS } from '../config/constants';
 
@@ -80,7 +80,7 @@ analyticsRoutes.get('/post/:id', requireAdmin, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const postId = c.req.param('id');
+    const postId = pathParam(c.req.param('id'), 'id');
     const result = await AnalyticsService.getPostAnalytics(c.env.DB, postId);
 
     if (!result.success) {

@@ -18,7 +18,7 @@ import { Env, Variables } from '../types';
 import { successResponse, errorResponse, getStatus } from '../utils/response';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
-import { safeParseInt } from '../utils/validation';
+import { safeParseInt, pathParam } from '../utils/validation';
 import { ColumnService } from '../services/columnService';
 import { COLUMN_CONSTANTS } from '../config/constants';
 
@@ -126,7 +126,7 @@ columnRoutes.put('/:id', requireAuth, requireAdmin, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const id = c.req.param('id');
+    const id = pathParam(c.req.param('id'), 'id');
     const body = await c.req.json();
     const result = await ColumnService.updateColumn(c.env.DB, id, body);
 
@@ -147,7 +147,7 @@ columnRoutes.delete('/:id', requireAuth, requireAdmin, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const id = c.req.param('id');
+    const id = pathParam(c.req.param('id'), 'id');
     const result = await ColumnService.deleteColumn(c.env.DB, id);
 
     if (!result.success) {
@@ -167,7 +167,7 @@ columnRoutes.post('/:id/refresh-stats', requireAuth, requireAdmin, async (c) => 
   const logger = createLogger(c);
 
   try {
-    const id = c.req.param('id');
+    const id = pathParam(c.req.param('id'), 'id');
     const result = await ColumnService.refreshStats(c.env.DB, id);
 
     if (!result.success) {

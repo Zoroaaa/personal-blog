@@ -13,6 +13,7 @@
 import { Hono } from 'hono';
 import type { Env, Variables } from '../types';
 import { successResponse, errorResponse } from '../utils/response';
+import { pathParam } from '../utils/validation';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { createNotification, getNotifications } from '../services/notificationService';
@@ -447,7 +448,7 @@ adminNotificationRoutes.put('/system-notifications/:id', requireAuth, requireAdm
   const logger = createLogger(c);
 
   try {
-    const id = parseInt(c.req.param('id'));
+    const id = parseInt(pathParam(c.req.param('id'), 'id'));
     if (isNaN(id)) {
       return c.json(errorResponse('Invalid ID', '无效的通知ID'), 400);
     }
@@ -534,7 +535,7 @@ adminNotificationRoutes.delete('/system-notifications/:id', requireAuth, require
   const logger = createLogger(c);
 
   try {
-    const id = parseInt(c.req.param('id'));
+    const id = parseInt(pathParam(c.req.param('id'), 'id'));
     if (isNaN(id)) {
       return c.json(errorResponse('Invalid ID', '无效的通知ID'), 400);
     }

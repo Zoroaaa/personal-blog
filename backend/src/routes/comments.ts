@@ -18,7 +18,7 @@ import { Env, Variables } from '../types';
 import { successResponse, errorResponse, getStatus } from '../utils/response';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
-import { safeParseInt } from '../utils/validation';
+import { safeParseInt, pathParam } from '../utils/validation';
 import { isFeatureEnabled, getConfigValue } from './config';
 import { CommentService } from '../services/commentService';
 import { COMMENT_CONSTANTS, RATE_LIMIT_CONSTANTS } from '../config/constants';
@@ -117,7 +117,7 @@ commentRoutes.delete('/:id', requireAuth, rateLimit({
 
   try {
     const user = c.get('user');
-    const id = c.req.param('id');
+    const id = pathParam(c.req.param('id'), 'id');
 
     const result = await CommentService.deleteComment(c.env.DB, user.userId, user.role, id);
 
@@ -147,7 +147,7 @@ commentRoutes.post('/:id/like', requireAuth, rateLimit({
 
   try {
     const user = c.get('user');
-    const commentId = parseInt(c.req.param('id'));
+    const commentId = parseInt(pathParam(c.req.param('id'), 'id'));
 
     const result = await CommentService.toggleLike(
       c.env.DB,

@@ -15,6 +15,7 @@ import {
   VALIDATION_CONSTANTS,
   USER_PROFILE_CONSTANTS,
 } from '../config/constants';
+import { ValidationError } from './errors';
 
 // ============= 验证函数 =============
 
@@ -479,6 +480,20 @@ export function isValidDate(date: any): boolean {
 /**
  * 安全地解析整数
  */
+/**
+ * 读取路由路径参数并收窄为 string。
+ *
+ * 为什么需要：hono 4.13 起未显式建模路由参数的上下文里 c.req.param() 返回
+ * string | undefined；而路径模式（如 /:id）匹配成功后该段必然存在。
+ * 统一经此收窄，既满足类型，又在缺失时立即 400 兜底（不会静默传 undefined 进 service）。
+ */
+export function pathParam(value: string | undefined, name: string = 'id'): string {
+  if (value === undefined || value === '') {
+    throw new ValidationError(`路径参数缺失: ${name}`);
+  }
+  return value;
+}
+
 export function safeParseInt(value: any, defaultValue: number = 0): number {
   const parsed = parseInt(value, 10);
   return isNaN(parsed) ? defaultValue : parsed;

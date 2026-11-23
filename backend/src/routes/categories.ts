@@ -17,7 +17,7 @@ import { Env, Variables } from '../types';
 import { successResponse, errorResponse, getStatus } from '../utils/response';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
-import { safeParseInt } from '../utils/validation';
+import { safeParseInt, pathParam } from '../utils/validation';
 import { CategoryService, TagService } from '../services/categoryService';
 import { CATEGORY_CONSTANTS } from '../config/constants';
 
@@ -97,7 +97,7 @@ categoryRoutes.put('/tags/:id', requireAuth, requireAdmin, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const id = c.req.param('id');
+    const id = pathParam(c.req.param('id'), 'id');
     const body = await c.req.json();
     const result = await TagService.updateTag(c.env.DB, id, body);
 
@@ -118,7 +118,7 @@ categoryRoutes.put('/:id', requireAuth, requireAdmin, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const id = c.req.param('id');
+    const id = pathParam(c.req.param('id'), 'id');
     const body = await c.req.json();
     const result = await CategoryService.updateCategory(c.env.DB, id, body);
 
@@ -139,7 +139,7 @@ categoryRoutes.delete('/:id', requireAuth, requireAdmin, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const id = c.req.param('id');
+    const id = pathParam(c.req.param('id'), 'id');
     const result = await CategoryService.deleteCategory(c.env.DB, id);
 
     if (!result.success) {
@@ -159,7 +159,7 @@ categoryRoutes.delete('/tags/:id', requireAuth, requireAdmin, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const id = c.req.param('id');
+    const id = pathParam(c.req.param('id'), 'id');
     const result = await TagService.deleteTag(c.env.DB, id);
 
     if (!result.success) {

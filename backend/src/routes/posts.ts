@@ -21,7 +21,7 @@ import { successResponse, errorResponse, getStatus } from '../utils/response';
 import { requireAuth, requireAdmin, optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { isFeatureEnabled } from './config';
-import { safeParseInt } from '../utils/validation';
+import { safeParseInt, pathParam } from '../utils/validation';
 import { PostService } from '../services/postService';
 import { POST_CONSTANTS } from '../config/constants';
 
@@ -89,7 +89,7 @@ postRoutes.get('/admin/:id', requireAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const id = c.req.param('id');
+    const id = pathParam(c.req.param('id'), 'id');
     const user = c.get('user');
 
     const result = await PostService.getAdminPostDetail(c.env.DB, id, user.userId, user.role);
@@ -220,7 +220,7 @@ postRoutes.get('/:slug', optionalAuth, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const slug = c.req.param('slug');
+    const slug = pathParam(c.req.param('slug'), 'slug');
     const currentUser = c.get('user');
     const postToken = c.req.header('X-Post-Token');
 
@@ -293,7 +293,7 @@ postRoutes.put('/:id', requireAuth, async (c) => {
 
   try {
     const user = c.get('user');
-    const id = c.req.param('id');
+    const id = pathParam(c.req.param('id'), 'id');
     const body = await c.req.json();
 
     const result = await PostService.updatePost(c.env.DB, user.userId, user.role, id, body);
@@ -315,7 +315,7 @@ postRoutes.delete('/:id', requireAuth, requireAdmin, async (c) => {
   const logger = createLogger(c);
 
   try {
-    const id = c.req.param('id');
+    const id = pathParam(c.req.param('id'), 'id');
 
     const result = await PostService.deletePost(c.env.DB, c.env.STORAGE, id);
 
@@ -343,7 +343,7 @@ postRoutes.post('/:id/like', requireAuth, async (c) => {
 
   try {
     const user = c.get('user');
-    const postId = c.req.param('id');
+    const postId = pathParam(c.req.param('id'), 'id');
 
     const result = await PostService.toggleLike(c.env.DB, c.env, user.userId, user, postId, isFeatureEnabled);
 
@@ -365,7 +365,7 @@ postRoutes.post('/:id/reading-progress', requireAuth, async (c) => {
 
   try {
     const user = c.get('user');
-    const postId = c.req.param('id');
+    const postId = pathParam(c.req.param('id'), 'id');
     const body = await c.req.json().catch(() => ({}));
 
     const result = await PostService.recordReadingProgress(
@@ -394,7 +394,7 @@ postRoutes.post('/:id/favorite', requireAuth, async (c) => {
 
   try {
     const user = c.get('user');
-    const postId = c.req.param('id');
+    const postId = pathParam(c.req.param('id'), 'id');
 
     const result = await PostService.toggleFavorite(c.env.DB, c.env, user.userId, user, postId);
 
@@ -493,7 +493,7 @@ postRoutes.post('/:id/verify-password', async (c) => {
   const logger = createLogger(c);
 
   try {
-    const postId = c.req.param('id');
+    const postId = pathParam(c.req.param('id'), 'id');
     const body = await c.req.json();
     const { password } = body;
 

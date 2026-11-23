@@ -44,10 +44,9 @@ const ALLOWED_FILE_TYPES = [
   'text/markdown',
   'application/zip',
   'application/x-rar-compressed',
-  'text/javascript',
-  'application/json',
-  'text/html',
-  'text/css'
+  // 不放行 html/js/css：文件会经公开 R2 域（STORAGE_PUBLIC_URL）直出，
+  // 受信任子域托管可执行内容 = 存储型 XSS / 钓鱼页面
+  'application/json'
 ];
 
 const FILE_SIGNATURES: { [key: string]: number[] } = {

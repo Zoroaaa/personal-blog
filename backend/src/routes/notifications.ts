@@ -15,6 +15,7 @@
 import { Hono } from 'hono';
 import type { Env, Variables } from '../types';
 import { successResponse, errorResponse } from '../utils/response';
+import { pathParam } from '../utils/validation';
 import { requireAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import {
@@ -149,7 +150,7 @@ notificationRoutes.put('/:id/read', requireAuth, async (c) => {
 
   try {
     const currentUser = c.get('user');
-    const notificationId = parseInt(c.req.param('id'));
+    const notificationId = parseInt(pathParam(c.req.param('id'), 'id'));
 
     if (isNaN(notificationId)) {
       return c.json(
@@ -236,7 +237,7 @@ notificationRoutes.delete('/:id', requireAuth, async (c) => {
 
   try {
     const currentUser = c.get('user');
-    const notificationId = parseInt(c.req.param('id'));
+    const notificationId = parseInt(pathParam(c.req.param('id'), 'id'));
 
     if (isNaN(notificationId)) {
       return c.json(

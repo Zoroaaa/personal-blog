@@ -25,6 +25,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useSiteConfig } from '../hooks/useSiteConfig';
 import { api } from '../utils/api';
+import { safeRedirectPath } from '../utils/safeRedirect';
 import { useVerificationCountdown } from '../hooks/useVerificationCountdown';
 import { useToast } from '../components/Toast';
 
@@ -59,10 +60,10 @@ export function LoginPage() {
   const { login } = useAuthStore();
   const { showSuccess, showError } = useToast();
   
-  // 获取重定向路径
+  // 获取重定向路径（用户可控，必须先经 safeRedirectPath 白名单化再交给 navigate）
   const from = (location.state as any)?.from?.pathname || '/';
   const redirectParam = new URLSearchParams(location.search).get('redirect');
-  const redirectPath = redirectParam || from;
+  const redirectPath = safeRedirectPath(redirectParam, from);
   
   // GitHub OAuth配置
   const [githubClientId, setGithubClientId] = useState('');
@@ -161,12 +162,9 @@ export function LoginPage() {
     try {
       if (isLogin) {
         // ===== 登录 =====
-        console.log('Attempting login...', { username });
-        
+        // 不打日志：登录响应含 token/refreshToken，控制台会被浏览器插件、共享屏幕读走
         const response = await api.login({ username, password });
-        
-        console.log('Login response:', response);
-        
+
         // 检查响应格式
         if (response.success && response.data) {
           const { user, token, refreshToken, expiresIn } = response.data;
