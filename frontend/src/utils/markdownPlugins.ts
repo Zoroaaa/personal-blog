@@ -65,12 +65,16 @@ function toPlainText(node: any): string {
 }
 
 /**
- * rehype 插件（transformer 形态，可直接放入 rehypePlugins 数组）：
+ * rehype 插件（attacher 形态）：unified 会先调用本函数（无参），
+ * 再用其返回的 transformer 处理语法树。直接把 transformer 放进 rehypePlugins
+ * 会让 tree 为 undefined 而崩溃（文章页 ErrorBoundary 报错的根因）。
  * 命中 pre>code 且语言在白名单内时用 lowlight 高亮，其余原样保留。
  * 高亮异常不阻塞渲染，降级为纯代码块。
  */
-export function rehypeHighlightPlugin(tree: any): void {
-  walk(tree);
+export function rehypeHighlightPlugin() {
+  return (tree: any): void => {
+    walk(tree);
+  };
 
   function walk(node: any) {
     if (node.type === 'element' && node.tagName === 'pre' && Array.isArray(node.children)) {
