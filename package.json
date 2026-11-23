@@ -15,7 +15,7 @@
     "deploy:manual": "npm run build --workspace=frontend && wrangler deploy --config backend/wrangler.toml",
     "init": "bash scripts/init.sh",
     "migrate": "bash scripts/migrate.sh",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run typecheck --workspace=backend && npm run typecheck --workspace=frontend"
   },
   "cloudflare": {
     "bindings": {

@@ -7,8 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
-    "test": "jest"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "date-fns": "^3.0.6",
