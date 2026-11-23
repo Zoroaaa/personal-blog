@@ -32,6 +32,9 @@ out/
 *.swo
 *~
 
+# AI 助手工作区（本地记忆与任务数据，不入库）
+.workbuddy/
+
 # OS
 .DS_Store
 .DS_Store?
