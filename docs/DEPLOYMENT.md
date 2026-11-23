@@ -29,11 +29,11 @@
 
 ## 按钮部署新站点
 
-1. 点击 README 的 **Deploy to Cloudflare**，授权 GitHub 和 Cloudflare。首次使用 R2 的账号须先在 Cloudflare 控制台开通 R2。
+1. 点击 README 的 **Deploy to Cloudflare**，授权 GitHub 和 Cloudflare，在向导中选择目标 GitHub 账号及新仓库名。按钮必须指向包含根目录 `wrangler.toml` 的仓库默认分支；上游合并前使用 Fork。首次使用 R2 的账号须先在 Cloudflare 控制台开通 R2。
 2. 让 Cloudflare 创建新的 D1、KV 和 R2 资源。按钮读取根目录的 `wrangler.toml`，Cloudflare 会把新资源 ID 写到生成的仓库；不要复用已有站点的生产资源。
 3. 在 Secrets 填写 `JWT_SECRET`，可用 `openssl rand -hex 32` 生成。若向导未显示该输入项，在 Worker 的 **Settings → Variables and Secrets** 添加同名 Secret，不要提交到 Git。
 4. 构建根目录选仓库根，Build command 为 `npm run build`，Deploy command 为 `npm run deploy`。部署命令会先做类型检查，再通过 `DB` 绑定按原有顺序应用 SQL，最后发布 Worker。新站点由 Workers Builds 自动发布，不用为 GitHub Actions 配 API Token 或部署钩子。
-5. 打开 `workers.dev` 地址，按[管理员账号](#管理员账号)设置管理员。使用邮件和图片上传前，请配置 `FRONTEND_URL`；图片上传还需为 R2 配置公开访问地址并填入 `STORAGE_PUBLIC_URL`。这些变量写在生成仓库根目录的 `wrangler.toml` 中，不带尾部 `/`。
+5. 打开 `workers.dev` 地址，按[管理员账号](#管理员账号)设置管理员。默认通过同一个 Worker 读取私有 R2 桶，图片可直接显示，普通附件只提供下载，不必启用 R2 公开地址。启用邮件前设置 `FRONTEND_URL`；如需独立的 R2 公开域名，可选填 `STORAGE_PUBLIC_URL`。这些变量写在生成仓库根目录的 `wrangler.toml` 中，不带尾部 `/`。
 
 以下是已有站点的手动配置和 Deploy Hook 流程，继续使用 `backend/wrangler.toml`。
 

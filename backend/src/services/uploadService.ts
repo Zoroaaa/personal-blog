@@ -159,7 +159,7 @@ export class UploadService {
       };
     }
 
-    const url = `${storageUrl}/${filename}`;
+    const url = `${storageUrl}/${filename.split('/').map(encodeURIComponent).join('/')}`;
 
     return {
       success: true,
@@ -213,7 +213,7 @@ export class UploadService {
       };
     }
 
-    const url = `${storageUrl}/${filename}`;
+    const url = `${storageUrl}/${filename.split('/').map(encodeURIComponent).join('/')}`;
 
     return {
       success: true,
@@ -294,7 +294,7 @@ export class UploadService {
       success: true,
       data: {
         filename,
-        url: `${storageUrl}/${filename}`,
+        url: `${storageUrl}/${filename.split('/').map(encodeURIComponent).join('/')}`,
         size: object.size,
         type: object.httpMetadata?.contentType,
         uploadedAt: object.customMetadata?.uploadedAt,

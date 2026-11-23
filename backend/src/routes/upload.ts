@@ -67,7 +67,7 @@ uploadRoutes.post('/', uploadRateLimit, requireAuth, async (c) => {
       return c.json(errorResponse('No file provided', 'Please select a file to upload'), 400);
     }
 
-    const storageUrl = c.env.STORAGE_PUBLIC_URL || 'https://storage.your-domain.com';
+    const storageUrl = c.env.STORAGE_PUBLIC_URL || `${c.env.FRONTEND_URL || new URL(c.req.url).origin}/api/media`;
     const result = await UploadService.uploadImage(c.env.STORAGE, file, user.userId, storageUrl, limits.maxImageSizeBytes);
 
     if (!result.success) {
@@ -124,7 +124,7 @@ uploadRoutes.get('/:filename', requireAuth, async (c) => {
       return c.json(errorResponse('Invalid filename'), 400);
     }
 
-    const storageUrl = c.env.STORAGE_PUBLIC_URL || 'https://storage.your-domain.com';
+    const storageUrl = c.env.STORAGE_PUBLIC_URL || `${c.env.FRONTEND_URL || new URL(c.req.url).origin}/api/media`;
     const result = await UploadService.getFileInfo(c.env.STORAGE, filename, storageUrl);
 
     if (!result.success) {
@@ -157,7 +157,7 @@ uploadRoutes.post('/file', uploadRateLimit, requireAuth, async (c) => {
       return c.json(errorResponse('No file provided', '请选择要上传的文件'), 400);
     }
 
-    const storageUrl = c.env.STORAGE_PUBLIC_URL || 'https://storage.your-domain.com';
+    const storageUrl = c.env.STORAGE_PUBLIC_URL || `${c.env.FRONTEND_URL || new URL(c.req.url).origin}/api/media`;
     const result = await UploadService.uploadFile(c.env.STORAGE, file, user.userId, storageUrl, limits.maxFileSizeBytes);
 
     if (!result.success) {
