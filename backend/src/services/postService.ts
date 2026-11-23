@@ -17,6 +17,9 @@
  */
 
 import bcrypt from 'bcryptjs';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('post');
 import { generateToken, asSecret, asJWTToken, verifyToken } from '../utils/jwt';
 import {
   validateLength,
@@ -1065,7 +1068,7 @@ export class PostService {
         try {
           await storage.delete(filename);
         } catch (error) {
-          console.warn('Failed to delete image:', filename, error);
+          logger.warn('Failed to delete image:', filename, error);
         }
       }
     }
@@ -1154,7 +1157,7 @@ export class PostService {
           }
         }
       } catch (notifyError) {
-        console.error('Send like notification error:', notifyError);
+        logger.error('Send like notification error:', notifyError);
       }
     }
 
@@ -1225,7 +1228,7 @@ export class PostService {
           }
         }
       } catch (notifyError) {
-        console.error('Send favorite notification error:', notifyError);
+        logger.error('Send favorite notification error:', notifyError);
       }
     }
 
@@ -1575,7 +1578,7 @@ export class PostService {
         'UPDATE posts SET view_count = view_count + 1 WHERE id = ?'
       ).bind(postId).run();
     } catch (error) {
-      console.error('Failed to increment view count:', error);
+      logger.error('Failed to increment view count:', error);
     }
   }
 }

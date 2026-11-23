@@ -19,6 +19,9 @@ import {
   sanitizeCommentContent
 } from '../utils/validation';
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('comment');
 import { createInteractionNotification } from './notificationService';
 import { isInteractionSubtypeEnabled } from './notificationSettingsService';
 import { detectMentions, createMentionNotifications } from './mentionService';
@@ -459,7 +462,7 @@ export class CommentService {
         }
       }
     } catch (notifyError) {
-      console.error('Send comment notification error:', notifyError);
+      logger.error('Send comment notification error:', notifyError);
     }
 
     try {
@@ -500,7 +503,7 @@ export class CommentService {
         );
       }
     } catch (mentionError) {
-      console.error('Mention detection error:', mentionError);
+      logger.error('Mention detection error:', mentionError);
     }
 
     return {
@@ -642,7 +645,7 @@ export class CommentService {
           }
         }
       } catch (notifyError) {
-        console.error('Send like notification error:', notifyError);
+        logger.error('Send like notification error:', notifyError);
       }
     }
 

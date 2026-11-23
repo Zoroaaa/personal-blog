@@ -21,7 +21,7 @@ import { successResponse, errorResponse, getStatus } from '../utils/response';
 import { requireAuth, requireAdmin, optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { rateLimit } from '../middleware/rateLimit';
-import { isFeatureEnabled } from './config';
+import { isFeatureEnabled } from '../services/configService';
 import { safeParseInt, pathParam } from '../utils/validation';
 import { PostService } from '../services/postService';
 import { POST_CONSTANTS, RATE_LIMIT_CONSTANTS } from '../config/constants';

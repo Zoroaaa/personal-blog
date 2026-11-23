@@ -13,6 +13,9 @@
  */
 
 import { AUTH_CONSTANTS } from '../config/constants';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('email');
 import { safeGetCache, safePutCache, safeDeleteCache } from '../utils/cache';
 
 /**
@@ -130,7 +133,7 @@ export class EmailVerificationService {
         data: { code, ttl: AUTH_CONSTANTS.VERIFICATION_CODE_TTL }
       };
     } catch (error) {
-      console.error('Failed to send verification code:', error);
+      logger.error('Failed to send verification code:', error);
       return {
         success: false,
         message: '发送验证码失败，请稍后重试'
@@ -211,7 +214,7 @@ export class EmailVerificationService {
         message: '验证成功'
       };
     } catch (error) {
-      console.error('Failed to verify code:', error);
+      logger.error('Failed to verify code:', error);
       return {
         success: false,
         message: '验证过程出错，请稍后重试'
@@ -269,7 +272,7 @@ export class EmailVerificationService {
         .first();
       return !!user;
     } catch (error) {
-      console.error('Failed to check email existence:', error);
+      logger.error('Failed to check email existence:', error);
       return false;
     }
   }
@@ -286,7 +289,7 @@ export class EmailVerificationService {
 
       return !!user?.oauth_provider;
     } catch (error) {
-      console.error('Failed to check OAuth status:', error);
+      logger.error('Failed to check OAuth status:', error);
       return false;
     }
   }
@@ -323,7 +326,7 @@ export class EmailVerificationService {
     }
 
     // 这是一个占位符，实际的清除操作取决于KV的API支持
-    console.log('Clearing all verification codes in development mode');
+    logger.info('Clearing all verification codes in development mode');
   }
 }
 

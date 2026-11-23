@@ -11,6 +11,10 @@
  * @created 2026-02-13
  */
 
+import { createModuleLogger } from './logger';
+
+const logger = createModuleLogger('db');
+
 /**
  * 软删除查询条件
  */
@@ -99,7 +103,7 @@ export class SoftDeleteHelper {
 
       return result.success;
     } catch (error) {
-      console.error(`Failed to soft delete from ${table}:`, error);
+      logger.error(`Failed to soft delete from ${table}:`, error);
       return false;
     }
   }
@@ -122,7 +126,7 @@ export class SoftDeleteHelper {
 
       return result.success;
     } catch (error) {
-      console.error(`Failed to hard delete from ${table}:`, error);
+      logger.error(`Failed to hard delete from ${table}:`, error);
       return false;
     }
   }
@@ -144,7 +148,7 @@ export class SoftDeleteHelper {
 
       return result.success;
     } catch (error) {
-      console.error(`Failed to restore from ${table}:`, error);
+      logger.error(`Failed to restore from ${table}:`, error);
       return false;
     }
   }
@@ -166,7 +170,7 @@ export class SoftDeleteHelper {
 
       return result?.deleted_at !== null && result?.deleted_at !== undefined;
     } catch (error) {
-      console.error(`Failed to check delete status in ${table}:`, error);
+      logger.error(`Failed to check delete status in ${table}:`, error);
       return false;
     }
   }
@@ -194,7 +198,7 @@ export class SoftDeleteHelper {
 
       return result.meta.changes || 0;
     } catch (error) {
-      console.error(`Failed to cleanup ${table}:`, error);
+      logger.error(`Failed to cleanup ${table}:`, error);
       return 0;
     }
   }
@@ -229,7 +233,7 @@ export class SoftDeleteHelper {
         active: stats?.active || 0
       };
     } catch (error) {
-      console.error(`Failed to get stats from ${table}:`, error);
+      logger.error(`Failed to get stats from ${table}:`, error);
       return { total: 0, deleted: 0, active: 0 };
     }
   }
@@ -254,10 +258,10 @@ await SoftDeleteHelper.restore(db, 'posts', postId);
 
 // 获取统计信息
 const stats = await SoftDeleteHelper.getStats(db, 'posts');
-console.log(`总数: ${stats.total}, 活跃: ${stats.active}, 已删除: ${stats.deleted}`);
+logger.info(`总数: ${stats.total}, 活跃: ${stats.active}, 已删除: ${stats.deleted}`);
 
 // 清理30天前删除的文章
 const cleaned = await SoftDeleteHelper.cleanup(db, 'posts', 30);
-console.log(`清理了 ${cleaned} 条记录`);
+logger.info(`清理了 ${cleaned} 条记录`);
 
 */

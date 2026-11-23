@@ -15,7 +15,13 @@
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('message');
 import { isStrangerMessageAllowed } from './messageSettingsService';
+// 业务失败抛 AppError 交由 onError 统一映射；sendMessage 的历史吞错 catch
+// 曾把 404/403 全部压成 null → 路由 400，是错误码错归类的根因
+import { NotFoundError, ValidationError, ForbiddenError } from '../utils/errors';
 import {
   MESSAGE_CONSTANTS,
   PAGINATION_CONSTANTS,
@@ -120,11 +126,11 @@ export async function sendMessage(
     ).bind(recipientId).first();
 
     if (!recipient) {
-      throw new Error('Recipient not found');
+      throw new NotFoundError('收件人不存在或已注销');
     }
 
     if (senderId === recipientId) {
-      throw new Error('Cannot send message to yourself');
+      throw new ValidationError('不能给自己发送私信');
     }
 
     const allowStrangers = await isStrangerMessageAllowed(db, recipientId);
@@ -140,7 +146,7 @@ export async function sendMessage(
       ).first();
 
       if (!existingThread) {
-        throw new Error('Recipient does not accept messages from strangers');
+        throw new ForbiddenError('对方设置了不接受陌生人私信');
       }
     }
 
@@ -152,7 +158,7 @@ export async function sendMessage(
       ).bind(replyToId).first() as { id: number; thread_id: string | null } | null;
 
       if (!originalMessage || originalMessage.thread_id !== threadId) {
-        throw new Error('Invalid reply target');
+        throw new NotFoundError('回复目标无效');
       }
     }
 
@@ -186,8 +192,11 @@ export async function sendMessage(
     
     return message;
   } catch (error) {
-    console.error('Send message error:', error);
-    return null;
+    // 日志留痕后必须原样抛出：AppError 由 onError 映射出 404/403/400，
+    // 未知错误由路由层兜底 500。旧实现在此 return null，
+    // 把所有业务语义错误压成路由层的通用 400（错误码错归类的根因）
+    logger.error('Send message error:', error);
+    throw error;
   }
 }
 
@@ -217,7 +226,7 @@ export async function getMessageById(
 
     return mapMessageFromRow(row);
   } catch (error) {
-    console.error('Get message by id error:', error);
+    logger.error('Get message by id error:', error);
     return null;
   }
 }
@@ -275,7 +284,7 @@ export async function getInbox(
       },
     };
   } catch (error) {
-    console.error('Get inbox error:', error);
+    logger.error('Get inbox error:', error);
     return {
       messages: [],
       pagination: { page: 1, limit: PAGINATION_CONSTANTS.DEFAULT_LIMIT, total: 0, totalPages: 0 },
@@ -336,7 +345,7 @@ export async function getOutbox(
       },
     };
   } catch (error) {
-    console.error('Get outbox error:', error);
+    logger.error('Get outbox error:', error);
     return {
       messages: [],
       pagination: { page: 1, limit: PAGINATION_CONSTANTS.DEFAULT_LIMIT, total: 0, totalPages: 0 },
@@ -470,7 +479,7 @@ export async function getThreads(
       },
     };
   } catch (error) {
-    console.error('Get threads error:', error);
+    logger.error('Get threads error:', error);
     return {
       threads: [],
       pagination: { page: 1, limit: PAGINATION_CONSTANTS.DEFAULT_LIMIT, total: 0, totalPages: 0 },
@@ -492,7 +501,7 @@ export async function markAsRead(
 
     return result.success && (result.meta?.changes || 0) > 0;
   } catch (error) {
-    console.error('Mark message as read error:', error);
+    logger.error('Mark message as read error:', error);
     return false;
   }
 }
@@ -511,7 +520,7 @@ export async function markThreadAsRead(
 
     return result.meta?.changes || 0;
   } catch (error) {
-    console.error('Mark thread as read error:', error);
+    logger.error('Mark thread as read error:', error);
     return 0;
   }
 }
@@ -560,7 +569,7 @@ export async function recallMessage(
 
     return { success: false, error: '撤回失败' };
   } catch (error) {
-    console.error('Recall message error:', error);
+    logger.error('Recall message error:', error);
     return { success: false, error: '撤回消息时发生错误' };
   }
 }
@@ -641,7 +650,7 @@ export async function resendMessage(
 
     return { success: false, error: '重新发送失败' };
   } catch (error) {
-    console.error('Resend message error:', error);
+    logger.error('Resend message error:', error);
     return { success: false, error: '重新发送消息时发生错误' };
   }
 }
@@ -668,7 +677,7 @@ export async function canRecallMessage(
 
     return timeDiff <= MESSAGE_CONSTANTS.RECALL_TIME_LIMIT;
   } catch (error) {
-    console.error('Check recall status error:', error);
+    logger.error('Check recall status error:', error);
     return false;
   }
 }
@@ -686,7 +695,7 @@ export async function getUnreadCount(
 
     return (result?.count as number) || 0;
   } catch (error) {
-    console.error('Get unread count error:', error);
+    logger.error('Get unread count error:', error);
     return 0;
   }
 }
@@ -743,7 +752,7 @@ export async function getThreadMessages(
       },
     };
   } catch (error) {
-    console.error('Get thread messages error:', error);
+    logger.error('Get thread messages error:', error);
     return {
       messages: [],
       pagination: { page: 1, limit: PAGINATION_CONSTANTS.DEFAULT_LIMIT, total: 0, totalPages: 0 },

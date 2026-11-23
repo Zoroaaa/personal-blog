@@ -245,6 +245,14 @@ export const NOTIFICATION_CONSTANTS = {
    * - mention: @提及
    */
   INTERACTION_SUBTYPES: ['reply', 'like', 'mention'] as const,
+
+  /**
+   * 群发通知的批量写入大小（每人一行 INSERT 为一条语句，db.batch 按批提交）。
+   * 为什么是 50：db.batch 是原子事务——批越大，单条失败的回滚面越大、单次
+   * 请求的 payload 也越重；50 人/批在 1000 人上限下只要 20 次往返，就能把
+   * 写入次数从「每人数条 SQL」压到「每 50 人一次事务」，足够削掉热点又稳妥。
+   */
+  BATCH_WRITE_SIZE: 50,
 };
 
 /**
@@ -325,6 +333,28 @@ export const DATABASE_CONSTANTS = {
    * 支持的第三方登录平台
    */
   OAUTH_PROVIDERS: ['github', 'google'] as const,
+};
+
+/**
+ * 站点配置缓存常量
+ *
+ * 用于 site_config 表读取的 KV 缓存（services/configService.ts）
+ */
+export const CONFIG_CACHE_CONSTANTS = {
+  /**
+   * 站点配置 KV 缓存 TTL（秒）。
+   * 为什么是 60：配置是低频写、高频读——评论/点赞/搜索等热路径每次请求都要读
+   * feature_* 开关；60 秒把每个 key 的 D1 查询从每请求一次降到每分钟一次。
+   * 同时配置变更（管理员改站点设置）希望尽快全站生效：写入端会主动失效对应缓存
+   * key（正常路径秒级生效），KV 最终一致的残余脏读最坏也只存活 60 秒即自愈，
+   * 兼顾「热路径减负」与「变更尽快生效」。
+   */
+  TTL_SECONDS: 60,
+
+  /**
+   * KV key 前缀，与 utils/cache.ts 的缓存清单保持一致
+   */
+  KEY_PREFIX: 'site_config:',
 };
 
 /**
@@ -860,6 +890,13 @@ export const URL_CONSTANTS = {
    * 用于标识 OAuth 请求来源
    */
   USER_AGENT_OAUTH: 'Personal Blog OAuth App',
+
+  /**
+   * 外部 HTTP 调用超时（毫秒）
+   * Resend 发信与 GitHub OAuth 的统一超时：Workers 无请求级默认超时，外部服务挂起
+   * 会一直占住 Worker 与 waitUntil 预算；10s 覆盖两家正常 P99，超时按可重试网络故障分类
+   */
+  EXTERNAL_API_TIMEOUT_MS: 10_000,
 };
 
 /**

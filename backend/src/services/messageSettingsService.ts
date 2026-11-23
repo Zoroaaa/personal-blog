@@ -12,6 +12,9 @@
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('message');
 
 export interface MessageSettings {
   id?: number;
@@ -51,7 +54,7 @@ export async function getMessageSettings(
 
     return mapSettingsFromRow(row, userId);
   } catch (error) {
-    console.error('Get message settings error:', error);
+    logger.error('Get message settings error:', error);
     return { ...DEFAULT_MESSAGE_SETTINGS, userId };
   }
 }
@@ -82,13 +85,13 @@ export async function updateMessageSettings(
     ).run();
 
     if (!result.success) {
-      console.error('Failed to update message settings');
+      logger.error('Failed to update message settings');
       return null;
     }
 
     return newSettings;
   } catch (error) {
-    console.error('Update message settings error:', error);
+    logger.error('Update message settings error:', error);
     return null;
   }
 }
@@ -110,7 +113,7 @@ export async function initializeMessageSettings(
 
     return result.success;
   } catch (error) {
-    console.error('Initialize message settings error:', error);
+    logger.error('Initialize message settings error:', error);
     return false;
   }
 }

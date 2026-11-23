@@ -15,6 +15,8 @@
  * @updated 2026-02-18 - 添加 Refresh Token 支持
  */
 
+import { UnauthorizedError, TokenExpiredError } from './errors';
+
 export interface JWTPayload {
   userId: number;
   username: string;
@@ -177,36 +179,38 @@ export async function verifyToken(
   token: JWTToken | string,
   secret: Secret | string
 ): Promise<TokenPayload> {
+  // 鉴权失败统一抛 AppError：中间件与 onError 按 statusCode/code 映射，
+  // 不再依赖 err.message 字符串匹配（历史缺陷 index.ts includes('expired') 的根因）
   if (!token || !token.includes('.')) {
-    throw new Error('Invalid token: must be in JWT format (xxx.yyy.zzz)');
+    throw new UnauthorizedError('Invalid token: must be in JWT format (xxx.yyy.zzz)');
   }
-  
+
   if (!secret || secret.includes('.')) {
-    throw new Error('Invalid secret: must not be in JWT format');
+    throw new UnauthorizedError('Invalid secret: must not be in JWT format');
   }
-  
+
   const parts = token.split('.');
   if (parts.length !== 3) {
-    throw new Error('Invalid token format');
+    throw new UnauthorizedError('Invalid token format');
   }
-  
+
   const [encodedHeader, encodedPayload, signature] = parts;
-  
+
   const expectedSignature = await sign(
     `${encodedHeader}.${encodedPayload}`,
     secret
   );
-  
+
   if (signature !== expectedSignature) {
-    throw new Error('Invalid signature');
+    throw new UnauthorizedError('Invalid signature');
   }
-  
+
   const payload = JSON.parse(base64urlDecode(encodedPayload)) as TokenPayload;
-  
+
   if ((payload as any).exp < Math.floor(Date.now() / 1000)) {
-    throw new Error('Token expired');
+    throw new TokenExpiredError();
   }
-  
+
   return payload;
 }
 

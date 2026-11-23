@@ -28,6 +28,16 @@ export class UnauthorizedError extends AppError {
   }
 }
 
+/**
+ * Token 过期。与 UnauthorizedError 分开成类的目的：
+ * 前端 401 处理要区分「过期→静默刷新」与「无效→重新登录」，靠 code 而非 message 字符串匹配。
+ */
+export class TokenExpiredError extends AppError {
+  constructor(message: string = 'Token expired') {
+    super(message, 401, 'TOKEN_EXPIRED');
+  }
+}
+
 export class ForbiddenError extends AppError {
   constructor(message: string = 'Forbidden') {
     super(message, 403, 'FORBIDDEN');

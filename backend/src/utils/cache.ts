@@ -29,6 +29,12 @@
  *    - 用途: 检查 KV 连接状态
  *    - 注意: 只读检查，不影响业务
  *
+ * 5. 站点配置缓存 (services/configService.ts)
+ *    - 用途: site_config 表读取缓存，给评论/点赞/搜索等热路径的 feature 开关减负
+ *    - Key: site_config:{key}（前缀常量见 config/constants.ts CONFIG_CACHE_CONSTANTS）
+ *    - TTL: 60秒（写入端 PUT /api/config 会主动失效对应 key）
+ *    - 函数: safeGetCache, safePutCache, safeDeleteCache
+ *
  * ============================================
  * 
  * @author 博客系统
@@ -37,6 +43,9 @@
  */
 
 import type { Env } from '../types';
+import { createModuleLogger } from './logger';
+
+const logger = createModuleLogger('cache');
 
 /**
  * 安全地从KV缓存获取数据
@@ -52,7 +61,7 @@ export async function safeGetCache(env: Env, key: string): Promise<string | null
     }
     return null;
   } catch (error) {
-    console.error('Error getting cache:', error);
+    logger.error('Error getting cache:', error);
     return null;
   }
 }
@@ -79,7 +88,7 @@ export async function safePutCache(
     }
     return false;
   } catch (error) {
-    console.error('Error putting cache:', error);
+    logger.error('Error putting cache:', error);
     return false;
   }
 }
@@ -97,7 +106,7 @@ export async function safeDeleteCache(env: Env, key: string): Promise<boolean> {
     }
     return false;
   } catch (error) {
-    console.error('Error deleting cache:', error);
+    logger.error('Error deleting cache:', error);
     return false;
   }
 }

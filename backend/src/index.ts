@@ -34,10 +34,13 @@ import { rateLimit } from './middleware/rateLimit';
 import type { Env, ApiResponse } from './types';
 
 import { getAllowedOrigins, getBaseUrl, APP_CONSTANTS, RATE_LIMIT_CONSTANTS } from './config/constants';
-import { isAppError, UnauthorizedError, ForbiddenError, NotFoundError, ValidationError, ConflictError, RateLimitError, ServiceUnavailableError } from './utils/errors';
+import { isAppError, UnauthorizedError, TokenExpiredError, ForbiddenError, NotFoundError, ValidationError, ConflictError, RateLimitError, ServiceUnavailableError } from './utils/errors';
 import { createModuleLogger } from './utils/logger';
 
 const appLogger = createModuleLogger('config');
+// 系统级日志：健康检查 / CORS / cron 等非请求上下文统一走这里。
+// 不能叫 logger——hono/logger 的请求日志中间件已占用该名（app.use('*', logger())）
+const sysLogger = createModuleLogger('app');
 
 export type { Env, ApiResponse } from './types';
 
@@ -126,7 +129,7 @@ app.use('*', (c, next) => {
           return origin;
         }
       } catch (error) {
-        console.error('Invalid origin URL:', origin);
+        sysLogger.error('Invalid origin URL:', origin);
       }
 
       // 默认返回基础URL（拒绝跨域）
@@ -205,11 +208,11 @@ app.get('/health', async (c) => {
       services.database = 'healthy';
     } else {
       services.database = 'not configured';
-      console.error('Database binding not found');
+      sysLogger.error('Database binding not found');
     }
   } catch (error) {
     services.database = 'unhealthy';
-    console.error('Database health check failed:', error);
+    sysLogger.error('Database health check failed:', error);
   }
 
   // 检查KV缓存（可选）
@@ -219,7 +222,7 @@ app.get('/health', async (c) => {
       services.cache = 'healthy';
     } catch (error) {
       services.cache = 'unhealthy';
-      console.error('Cache health check failed:', error);
+      sysLogger.error('Cache health check failed:', error);
     }
   } else {
     services.cache = 'not configured';
@@ -233,7 +236,7 @@ app.get('/health', async (c) => {
       services.storage = 'healthy';
     } else {
       services.storage = 'not configured';
-      console.error('Storage binding not found');
+      sysLogger.error('Storage binding not found');
     }
   } catch (error) {
     // R2的head对不存在的对象会返回null，这是正常的
@@ -468,6 +471,10 @@ app.onError((err, c) => {
       case UnauthorizedError:
         userFacingMessage = 'Authentication failed. Please log in again.';
         break;
+      case TokenExpiredError:
+        // 过期单独给文案：前端按 code=TOKEN_EXPIRED 走静默刷新，用户提示语义不同
+        userFacingMessage = 'Your session has expired. Please log in again.';
+        break;
       case ForbiddenError:
         userFacingMessage = 'You do not have permission to access this resource.';
         break;
@@ -489,12 +496,9 @@ app.onError((err, c) => {
       default:
         userFacingMessage = err.message;
     }
-  } else if (err.message.includes('expired')) {
-    statusCode = 401;
-    errorMessage = 'Token expired';
-    errorCode = 'TOKEN_EXPIRED';
-    userFacingMessage = 'Your session has expired. Please log in again.';
   }
+  // 历史 else if (err.message.includes('expired')) 分支已删：
+  // verifyToken 现抛 TokenExpiredError（见 utils/jwt.ts），由上方 switch 统一映射
 
   const responseData: any = {
     success: false,
@@ -529,8 +533,8 @@ import { RefreshTokenService } from './services/refreshTokenService';
 export { RateLimiter } from './durableObjects/RateLimiter';
 
 const scheduled: ExportedHandlerScheduledHandler<Env> = async (event, env, ctx) => {
-  console.log('Scheduled task triggered at:', new Date().toISOString());
-  console.log('Cron:', event.cron);
+  sysLogger.info('Scheduled task triggered at:', new Date().toISOString());
+  sysLogger.info('Cron:', event.cron);
 
   const now = new Date();
   // 每 15 分钟触发，只在 8:00 那次做每日清理，避免重复删除
@@ -540,19 +544,19 @@ const scheduled: ExportedHandlerScheduledHandler<Env> = async (event, env, ctx) 
     // 汇总队列按 scheduled_at 到期时间驱动，两类都扫一遍，未到期项不会被发送
     for (const digestType of ['daily', 'weekly'] as const) {
       const result = await processDigestQueue(env.DB, env, digestType);
-      console.log(`${digestType} digest result:`, result);
+      sysLogger.info(`${digestType} digest result:`, result);
     }
 
     if (isDailyCleanup) {
       const cleanedTokens = await RefreshTokenService.cleanupExpiredTokens(env.DB);
       if (cleanedTokens > 0) {
-        console.log(`Cleaned up ${cleanedTokens} expired refresh tokens`);
+        sysLogger.info(`Cleaned up ${cleanedTokens} expired refresh tokens`);
       }
 
       await cleanupSentDigestItems(env.DB, 30);
     }
   } catch (error) {
-    console.error('Scheduled task error:', error);
+    sysLogger.error('Scheduled task error:', error);
   }
 };
 

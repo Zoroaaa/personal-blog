@@ -32,6 +32,7 @@ export function RecommendedPosts({ posts }: RecommendedPostsProps) {
                 <img
                   src={recPost.cover_image}
                   alt={recPost.title}
+                  loading="lazy"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
               </div>

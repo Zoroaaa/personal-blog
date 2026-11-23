@@ -8,6 +8,9 @@
  */
 
 import type { Env } from '../types';
+import { createModuleLogger } from './logger';
+
+const logger = createModuleLogger('email');
 import type { Notification, DigestType } from '../types/notifications';
 import { URL_CONSTANTS, EMAIL_CONSTANTS } from '../config/constants';
 
@@ -83,6 +86,19 @@ function getVerificationEmailHtml(code: string, type: string): string {
 </body>
 </html>
   `.trim();
+}
+
+/**
+ * 外部调用异常分类记录：超时/中止按「可重试网络故障」单列，与业务性失败区分，
+ * 排障时能直接分辨「Resend 挂了」还是「参数/配额问题」。
+ */
+function logExternalError(scope: string, error: unknown): void {
+  const name = error instanceof Error ? error.name : '';
+  if (name === 'TimeoutError' || name === 'AbortError') {
+    logger.error(`${scope}: 外部请求超时（EXTERNAL_API_TIMEOUT_MS 内未响应），可重试`);
+  } else {
+    logger.error(`${scope}:`, error);
+  }
 }
 
 function getNotificationEmailHtml(
@@ -223,7 +239,7 @@ export async function sendVerificationEmail(
 ): Promise<boolean> {
   const apiKey = env.RESEND_API_KEY;
   if (!apiKey) {
-    console.error('RESEND_API_KEY is not configured');
+    logger.error('RESEND_API_KEY is not configured');
     return false;
   }
 
@@ -238,6 +254,7 @@ export async function sendVerificationEmail(
   const html = getVerificationEmailHtml(code, type);
 
   const res = await fetch(URL_CONSTANTS.RESEND_API, {
+    signal: AbortSignal.timeout(URL_CONSTANTS.EXTERNAL_API_TIMEOUT_MS),
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -253,7 +270,7 @@ export async function sendVerificationEmail(
 
   if (!res.ok) {
     const err = await res.text();
-    console.error('Resend API error:', res.status, err);
+    logger.error('Resend API error:', res.status, err);
     throw new Error('发送验证码邮件失败，请稍后重试');
   }
   return true;
@@ -266,7 +283,7 @@ export async function sendNotificationEmail(
 ): Promise<boolean> {
   const apiKey = env.RESEND_API_KEY;
   if (!apiKey) {
-    console.error('RESEND_API_KEY is not configured');
+    logger.error('RESEND_API_KEY is not configured');
     return false;
   }
 
@@ -278,6 +295,7 @@ export async function sendNotificationEmail(
 
   try {
     const res = await fetch(URL_CONSTANTS.RESEND_API, {
+      signal: AbortSignal.timeout(URL_CONSTANTS.EXTERNAL_API_TIMEOUT_MS),
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -293,12 +311,12 @@ export async function sendNotificationEmail(
 
     if (!res.ok) {
       const err = await res.text();
-      console.error('Resend API error for notification:', res.status, err);
+      logger.error('Resend API error for notification:', res.status, err);
       return false;
     }
     return true;
   } catch (error) {
-    console.error('Failed to send notification email:', error);
+    logExternalError('发送通知邮件失败', error);
     return false;
   }
 }
@@ -311,7 +329,7 @@ export async function sendDigestEmail(
 ): Promise<boolean> {
   const apiKey = env.RESEND_API_KEY;
   if (!apiKey) {
-    console.error('RESEND_API_KEY is not configured');
+    logger.error('RESEND_API_KEY is not configured');
     return false;
   }
 
@@ -329,6 +347,7 @@ export async function sendDigestEmail(
 
   try {
     const res = await fetch(URL_CONSTANTS.RESEND_API, {
+      signal: AbortSignal.timeout(URL_CONSTANTS.EXTERNAL_API_TIMEOUT_MS),
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -344,12 +363,12 @@ export async function sendDigestEmail(
 
     if (!res.ok) {
       const err = await res.text();
-      console.error('Resend API error for digest:', res.status, err);
+      logger.error('Resend API error for digest:', res.status, err);
       return false;
     }
     return true;
   } catch (error) {
-    console.error('Failed to send digest email:', error);
+    logExternalError('发送汇总邮件失败', error);
     return false;
   }
 }

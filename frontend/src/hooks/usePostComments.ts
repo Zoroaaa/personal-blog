@@ -1,13 +1,18 @@
 /**
  * 文章评论 hook
  *
- * 负责：评论列表加载、发表评论/回复、评论点赞、@提及用户、评论图片上传。
+ * 负责：评论列表分页加载（按页拉取 + 加载更多）、发表评论/回复、评论点赞、@提及用户、评论图片上传。
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../utils/api';
 import { transformCommentList } from '../utils/apiTransformer';
 import type { Comment, Post, User } from '../types';
+
+// 每页根评论数。取 10 而非后端默认的 20：根评论会带整棵回复树渲染，DOM 节点数可能是
+// 评论条数的好几倍，长评论页一次性渲染是滚动卡顿主因。首屏 10 条已足够铺满视口，
+// 其余内容靠「加载更多」渐进追加，避免长任务阻塞主线程。
+const COMMENT_PAGE_SIZE = 10;
 
 interface CommentConfig {
   upload_max_image_size_mb?: number;
@@ -53,6 +58,12 @@ export function usePostComments({
   showError,
 }: UsePostCommentsOptions) {
   const [comments, setComments] = useState<Comment[]>([]);
+  const [totalComments, setTotalComments] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // 已加载页数用 ref 记录：发评论后要「重拉当前已加载的全部页」，若放进 useCallback
+  // 依赖会让提交函数身份随翻页变化；ref 与 comments 列表同步维护即可
+  const loadedPagesRef = useRef(1);
   const [newComment, setNewComment] = useState('');
   const [commentLoading, setCommentLoading] = useState(false);
   const [commentLiking, setCommentLiking] = useState<number | null>(null);
@@ -63,17 +74,82 @@ export function usePostComments({
   const [mentionedUserIds, setMentionedUserIds] = useState<Set<number>>(new Set());
   const [replyMentionedUserIds, setReplyMentionedUserIds] = useState<Set<number>>(new Set());
 
-  const loadComments = useCallback(async (postId: number) => {
+  // 按页拉取评论。mode='replace' 覆盖列表（首屏/换文章），'append' 追加（加载更多）。
+  // 后端分页以根评论为单位（parent_id IS NULL），回复树随所属根评论整棵返回，
+  // 所以 total/totalPages 反映的是根评论数，不是含回复的总条数。
+  const fetchCommentPage = useCallback(async (postId: number, page: number, mode: 'replace' | 'append') => {
     try {
-      const response = await api.getComments({ postId: postId.toString() });
-
-      console.log('Comments response:', response);
+      const response = await api.getComments({
+        postId: postId.toString(),
+        page,
+        limit: COMMENT_PAGE_SIZE,
+      });
 
       if (response.success && response.data) {
-        setComments(transformCommentList(response.data.comments || []));
+        const list = transformCommentList(response.data.comments || []);
+        const pagination = response.data.pagination;
+
+        setComments((prev) => (mode === 'append' ? [...prev, ...list] : list));
+        if (pagination) {
+          setTotalComments(pagination.total);
+          setHasMore(page < pagination.totalPages);
+        } else {
+          // 后端契约成功响应必带 pagination；缺失时按末页兜底，防止「加载更多」空转
+          setHasMore(false);
+        }
+        loadedPagesRef.current = page;
       }
     } catch (err) {
       console.error('Failed to load comments:', err);
+    }
+  }, []);
+
+  const loadComments = useCallback(async (postId: number) => {
+    await fetchCommentPage(postId, 1, 'replace');
+  }, [fetchCommentPage]);
+
+  // 「加载更多」：追加下一页。hasMore/loadingMore 双重守卫防止重复点击触发并发请求
+  const loadMoreComments = useCallback(async () => {
+    if (!post?.id || !hasMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      await fetchCommentPage(post.id, loadedPagesRef.current + 1, 'append');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [post?.id, hasMore, loadingMore, fetchCommentPage]);
+
+  // 发评论/回复后刷新「已加载的全部页」，而不是只刷第 1 页：
+  // 新评论按 created_at DESC 会落到第 1 页，新回复挂在其根评论所在的任意页——
+  // 重拉 1..N 页保证两者都可见，同时不丢用户已翻出来的内容。
+  const reloadLoadedPages = useCallback(async (postId: number) => {
+    const pages = loadedPagesRef.current;
+    try {
+      const responses = await Promise.all(
+        Array.from({ length: pages }, (_, i) =>
+          api.getComments({ postId: postId.toString(), page: i + 1, limit: COMMENT_PAGE_SIZE })
+        )
+      );
+
+      const list: Comment[] = [];
+      let total = 0;
+      let totalPages = 1;
+      for (const response of responses) {
+        if (response.success && response.data) {
+          list.push(...transformCommentList(response.data.comments || []));
+          if (response.data.pagination) {
+            total = response.data.pagination.total;
+            totalPages = response.data.pagination.totalPages;
+          }
+        }
+      }
+
+      setComments(list);
+      setTotalComments(total);
+      setHasMore(pages < totalPages);
+      loadedPagesRef.current = pages;
+    } catch (err) {
+      console.error('Failed to reload comments:', err);
     }
   }, []);
 
@@ -192,8 +268,8 @@ export function usePostComments({
       if (response.success) {
         setNewComment('');
         setMentionedUserIds(new Set());
-        // 重新加载评论列表
-        await loadComments(post.id);
+        // 重新加载已加载的评论页（新评论落在第 1 页，保持分页状态下可见）
+        await reloadLoadedPages(post.id);
         showSuccess('评论发表成功');
       } else {
         throw new Error(response.error || '发表评论失败');
@@ -204,7 +280,7 @@ export function usePostComments({
     } finally {
       setCommentLoading(false);
     }
-  }, [newComment, post, isAuthenticated, navigate, mentionedUserIds, loadComments, showSuccess, showError]);
+  }, [newComment, post, isAuthenticated, navigate, mentionedUserIds, reloadLoadedPages, showSuccess, showError]);
 
   // 处理回复提交
   const handleSubmitReply = useCallback(async (e: React.FormEvent, parentId: number) => {
@@ -231,8 +307,8 @@ export function usePostComments({
         setReplyContent('');
         setReplyingTo(null);
         setReplyMentionedUserIds(new Set());
-        // 重新加载评论列表
-        await loadComments(post.id);
+        // 重新加载已加载的评论页（新回复挂在对应根评论所在页，整段刷新保证可见）
+        await reloadLoadedPages(post.id);
         showSuccess('回复发表成功');
       } else {
         throw new Error(response.error || '发表回复失败');
@@ -243,10 +319,14 @@ export function usePostComments({
     } finally {
       setCommentLoading(false);
     }
-  }, [replyContent, post, isAuthenticated, navigate, replyMentionedUserIds, loadComments, showSuccess, showError]);
+  }, [replyContent, post, isAuthenticated, navigate, replyMentionedUserIds, reloadLoadedPages, showSuccess, showError]);
 
   return {
     comments,
+    totalComments,
+    hasMore,
+    loadingMore,
+    loadMoreComments,
     newComment,
     setNewComment,
     commentLoading,

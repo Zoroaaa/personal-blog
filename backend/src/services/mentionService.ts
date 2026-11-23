@@ -13,6 +13,9 @@
  */
 
 import { createInteractionNotification } from './notificationService';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('mention');
 import { isInteractionSubtypeEnabled } from './notificationSettingsService';
 import type { Env } from '../types';
 
@@ -87,7 +90,7 @@ export async function getUserIdByName(
 
     return user?.id || null;
   } catch (error) {
-    console.error(`Failed to get user ID for name ${name}:`, error);
+    logger.error(`Failed to get user ID for name ${name}:`, error);
     return null;
   }
 }
@@ -134,7 +137,7 @@ export async function getUserByName(
 
     return null;
   } catch (error) {
-    console.error(`Failed to get user for name ${name}:`, error);
+    logger.error(`Failed to get user for name ${name}:`, error);
     return null;
   }
 }
@@ -202,7 +205,7 @@ export async function createMentionNotifications(
       .first() as { id: number; username: string; display_name: string; avatar_url: string } | undefined;
 
     if (!mentioner) {
-      console.error(`Mentioner user ${mentionerUserId} not found`);
+      logger.error(`Mentioner user ${mentionerUserId} not found`);
       return;
     }
 
@@ -274,10 +277,10 @@ export async function createMentionNotifications(
         },
       }, env);
 
-      console.log(`Mention notification created for user ${targetUser.id} (${targetUser.username})`);
+      logger.info(`Mention notification created for user ${targetUser.id} (${targetUser.username})`);
     }
   } catch (error) {
-    console.error('Failed to create mention notifications:', error);
+    logger.error('Failed to create mention notifications:', error);
   }
 }
 
@@ -313,7 +316,7 @@ export async function createMentionNotificationsByIds(
       .first() as { id: number; username: string; display_name: string; avatar_url: string } | undefined;
 
     if (!mentioner) {
-      console.error(`Mentioner user ${mentionerUserId} not found`);
+      logger.error(`Mentioner user ${mentionerUserId} not found`);
       return;
     }
 
@@ -393,10 +396,10 @@ export async function createMentionNotificationsByIds(
         },
       }, env);
 
-      console.log(`Mention notification created for user ${targetUser.id} (${targetUser.username}) by ID`);
+      logger.info(`Mention notification created for user ${targetUser.id} (${targetUser.username}) by ID`);
     }
   } catch (error) {
-    console.error('Failed to create mention notifications by IDs:', error);
+    logger.error('Failed to create mention notifications by IDs:', error);
   }
 }
 

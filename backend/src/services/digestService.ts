@@ -13,6 +13,9 @@
 
 import type { D1Database } from '@cloudflare/workers-types';
 import type { Env } from '../types';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('digest');
 import type { Notification, DigestType } from '../types/notifications';
 import { sendDigestEmail } from '../utils/resend';
 
@@ -124,14 +127,14 @@ export async function processDigestQueue(
           failed += notifications.length;
         }
       } catch (error) {
-        console.error(`Failed to send digest to user ${userId}:`, error);
+        logger.error(`Failed to send digest to user ${userId}:`, error);
         failed += notifications.length;
       }
     }
 
     return { processed, failed };
   } catch (error) {
-    console.error('Process digest queue error:', error);
+    logger.error('Process digest queue error:', error);
     return { processed: 0, failed: 0 };
   }
 }
@@ -149,7 +152,7 @@ export async function cleanupSentDigestItems(
 
     return result.meta?.changes || 0;
   } catch (error) {
-    console.error('Cleanup sent digest items error:', error);
+    logger.error('Cleanup sent digest items error:', error);
     return 0;
   }
 }
@@ -188,7 +191,7 @@ export async function getDigestStats(
       },
     };
   } catch (error) {
-    console.error('Get digest stats error:', error);
+    logger.error('Get digest stats error:', error);
     return {
       daily: { pending: 0, sent: 0 },
       weekly: { pending: 0, sent: 0 },

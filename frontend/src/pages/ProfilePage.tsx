@@ -200,6 +200,7 @@ export function ProfilePage() {
                       <img
                         src={comment.post.coverImage}
                         alt={comment.post?.title || ''}
+                        loading="lazy"
                         className="w-16 h-12 object-cover rounded flex-shrink-0"
                       />
                     )}
@@ -298,7 +299,7 @@ export function ProfilePage() {
             <Link to={`/posts/${post.slug || post.id}`}>
               {post.coverImage && (
                 <div className="h-40 overflow-hidden">
-                  <img src={post.coverImage} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  <img src={post.coverImage} alt={post.title} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                 </div>
               )}
               <div className="p-4">
@@ -359,9 +360,10 @@ export function ProfilePage() {
           >
             {post.coverImage && (
               <div className="h-40 overflow-hidden">
-                <img 
-                  src={post.coverImage} 
-                  alt={post.title} 
+                <img
+                  src={post.coverImage}
+                  alt={post.title}
+                  loading="lazy"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
               </div>

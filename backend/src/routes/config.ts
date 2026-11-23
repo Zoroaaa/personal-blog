@@ -20,67 +20,18 @@ import type { Env, Variables } from '../types';
 import { successResponse, errorResponse } from '../utils/response';
 import { createLogger } from '../middleware/requestLogger';
 import { requireAuth, requireAdmin } from '../middleware/auth';
+import { getConfigValue, invalidateConfigCache } from '../services/configService';
+import { createModuleLogger } from '../utils/logger';
+
+// 模块级 logger：供请求上下文之外的辅助函数使用；请求处理器内用 createLogger(c) 局部变量
+const logger = createModuleLogger('config');
+
+// isFeatureEnabled / getConfigValue 已迁至 services/configService.ts（带 KV TTL 缓存）。
+// routes 只保留 HTTP 端点与响应整形；其他文件请从 services/configService 引用，
+// 不要在 routes 层重新导出，避免依赖方向再次模糊。
 
 
 export const configRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
-
-/**
- * 检查功能是否启用
- * @param env 环境变量
- * @param featureKey 功能配置键名 (如 'feature_comments')
- * @returns 是否启用 (默认启用，查询失败也返回true避免误杀)
- */
-export async function isFeatureEnabled(env: Env, featureKey: string): Promise<boolean> {
-  try {
-    const result = await env.DB.prepare(
-      'SELECT value FROM site_config WHERE key = ?'
-    ).bind(featureKey).first() as { value: string } | null;
-    
-    // 如果没有找到配置，默认启用
-    if (!result) return true;
-    
-    // 解析布尔值
-    return result.value === 'true' || result.value === '1';
-  } catch (error) {
-    console.error(`Failed to check feature ${featureKey}:`, error);
-    return true; // 出错时默认启用，避免误杀
-  }
-}
-
-/**
- * 获取配置值
- * @param env 环境变量
- * @param key 配置键名
- * @param defaultValue 默认值
- * @returns 配置值
- */
-export async function getConfigValue<T>(env: Env, key: string, defaultValue: T): Promise<T> {
-  try {
-    const result = await env.DB.prepare(
-      'SELECT value, type FROM site_config WHERE key = ?'
-    ).bind(key).first() as { value: string; type: string } | null;
-    
-    if (!result) return defaultValue;
-    
-    switch (result.type) {
-      case 'boolean':
-        return (result.value === 'true' || result.value === '1') as unknown as T;
-      case 'number':
-        return parseFloat(result.value) as unknown as T;
-      case 'json':
-        try {
-          return JSON.parse(result.value) as T;
-        } catch {
-          return defaultValue;
-        }
-      default:
-        return result.value as unknown as T;
-    }
-  } catch (error) {
-    console.error(`Failed to get config ${key}:`, error);
-    return defaultValue;
-  }
-}
 
 export interface UploadLimits {
   maxImageSizeMB: number;
@@ -179,7 +130,7 @@ function parseConfigValue(item: ConfigItem): any {
       try {
         return JSON.parse(value);
       } catch (e) {
-        console.error('Failed to parse JSON config:', item.key, e);
+        logger.error('Failed to parse JSON config:', item.key, e);
         return value;
       }
     case 'string':
@@ -210,7 +161,7 @@ async function fetchConfigFromDB(env: Env, keysFilter?: string[]): Promise<Confi
     
     return config;
   } catch (error) {
-    console.error('Failed to fetch config from DB:', error);
+    logger.error('Failed to fetch config from DB:', error);
     return {};
   }
 }
@@ -362,6 +313,10 @@ configRoutes.put('/:key', requireAuth, requireAdmin, async (c) => {
       'UPDATE site_config SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ?'
     ).bind(processedValue, key).run();
 
+    // 写后失效读缓存：热路径（feature 开关等）读的是 KV 缓存，不失效会改了不生效。
+    // 路由模式 /:key 保证 key 必存在，Hono 参数类型未收窄故此处断言
+    await invalidateConfigCache(c.env, key!);
+
     logger.info('Config updated', { key, value: processedValue });
     
     return c.json(successResponse({ 
@@ -454,6 +409,10 @@ configRoutes.put('/', requireAuth, requireAdmin, async (c) => {
         'UPDATE site_config SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ?'
       ).bind(value, key).run();
     }
+
+    // 逐 key 失效读缓存（同单个更新端点）；safeDeleteCache 内部吞错，失败只影响
+    // 该 key 的生效延迟（最多一个 TTL），不阻塞批量更新结果
+    await Promise.all(updates.map(({ key }) => invalidateConfigCache(c.env, key)));
 
     logger.info('Configs batch updated', {
       updated: updates.length,

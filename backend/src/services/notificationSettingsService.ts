@@ -19,6 +19,9 @@
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('notification');
 import type {
   NotificationSettings,
   UpdateNotificationSettingsRequest,
@@ -71,8 +74,44 @@ export async function getNotificationSettings(
 
     return mapSettingsFromRow(row, userId);
   } catch (error) {
-    console.error('Get notification settings error:', error);
+    logger.error('Get notification settings error:', error);
     return getDefaultSettings(userId);
+  }
+}
+
+/**
+ * 批量获取多用户的通知设置（群发场景专用，一次 IN 查询替代逐用户单查）。
+ *
+ * 与单条 getNotificationSettings 的差异：设置行缺失时直接用默认值、不补建行。
+ * 原因：单条路径的 initializeSettings 在并发群发下可能与用户侧建行撞 user_id
+ * 唯一键，而批量写入常与通知行同事务，一条冲突会让整批回滚；默认值与初始化后的
+ * 行计算结果等价，用户下次单条读取设置时仍会正常建行，行为无损。
+ */
+export async function getNotificationSettingsBulk(
+  db: D1Database,
+  userIds: number[]
+): Promise<Map<number, NotificationSettings>> {
+  const map = new Map<number, NotificationSettings>();
+  if (userIds.length === 0) return map;
+
+  try {
+    const { results } = await db.prepare(`
+      SELECT * FROM notification_settings WHERE user_id IN (${userIds.map(() => '?').join(',')})
+    `).bind(...userIds).all();
+
+    const rowByUser = new Map((results as any[]).map((row) => [row.user_id, row]));
+    for (const userId of userIds) {
+      const row = rowByUser.get(userId);
+      map.set(userId, row ? mapSettingsFromRow(row, userId) : getDefaultSettings(userId));
+    }
+    return map;
+  } catch (error) {
+    // 查询失败按默认值兜底，与单条路径 catch 的行为一致（宁可少发不误发）
+    logger.error('Get notification settings bulk error:', error);
+    for (const userId of userIds) {
+      map.set(userId, getDefaultSettings(userId));
+    }
+    return map;
   }
 }
 
@@ -132,13 +171,13 @@ export async function updateNotificationSettings(
     ).run();
 
     if (!result.success) {
-      console.error('Failed to update notification settings');
+      logger.error('Failed to update notification settings');
       return null;
     }
 
     return newSettings;
   } catch (error) {
-    console.error('Update notification settings error:', error);
+    logger.error('Update notification settings error:', error);
     return null;
   }
 }
@@ -184,7 +223,7 @@ export async function initializeSettings(
 
     return result.success;
   } catch (error) {
-    console.error('Initialize notification settings error:', error);
+    logger.error('Initialize notification settings error:', error);
     return false;
   }
 }

@@ -139,3 +139,37 @@ npm run migrate -- blog-db                  # 动 schema 时：本地跑两遍�
 ```
 
 > 约束提醒（AGENTS.md）：发布只走 `.github/workflows/deploy.yml`；agent 不执行 deploy / `--remote` 迁移 / `wrangler secret put`。
+
+---
+
+## 执行进度（2026-11-23）
+
+| 波次 | 状态 | 备注 |
+| --- | --- | --- |
+| W0 止血 | ✅ 完成 | deploy 守卫替代「改指向/删除」（按钮部署链路依赖根 wrangler.toml） |
+| W1 安全与数据 | ✅ 完成 | 含触发器回归 12 项；修复中另发现 trg_comments_delete 双减缺陷 |
+| W2 质量门禁 | ✅ 大部完成 | W2.1 补了鉴权安全回归测试（7 用例）；W2.4 按 ① 渐变收编完成，②③ 按 THEME_GUIDE 豁免/暂缓 |
+| W3 性能与SEO | ✅ 完成 | bundle 三刀 + Worker SEO 注入；评论分页（按页+加载更多）；热路径减负（configService KV 缓存迁移 + adminNotifications 群发批量化）；W3.3 核实封面图布局盒已全部预留（h-32/h-48/w-24 等固定容器 + object-cover），仅补 2 处漏掉的 loading=lazy，width/height 属性在固定容器下冗余不加 |
+| W4 架构治理 | 🔶 大部完成 | 见下方明细；剩余项为渐进收编类，见「W4 遗留」 |
+
+### W4 已落地明细（2026-11-23 第二轮）
+
+- **W4.1 AppError 统一（核心链路 + 两个点名缺陷）**：
+  - `utils/jwt.ts` verifyToken 全部改抛 AppError（`TokenExpiredError` 新增于 errors.ts，code=TOKEN_EXPIRED）；
+  - `middleware/auth.ts` catch 用 instanceof 替代 `includes('expired')`；`index.ts` onError 删字符串匹配分支、switch 补 TokenExpiredError 映射；
+  - `messageService.sendMessage` 吞错 catch 改 rethrow + typed 抛错（NotFoundError/ForbiddenError/ValidationError），修掉「收件人不存在→400」错归类；`routes/messages.ts` 的死代码字符串匹配分支删除，AppError 放行给 onError。
+- **W4.2 分层归位（adminNotifications 部分）**：SQL 与群发编排全部下沉 `services/adminNotificationService.ts`；路由只留校验+响应。
+- **W3.5 群发批量化（与上同文件）**：逐用户 createNotification 循环 → 批量读设置（getNotificationSettingsBulk 首次接线）→ 内存决策 → `db.batch` 分批（50 条/批）→ realtime 邮件 `waitUntil` 限并发（5）异步发送 + 批量回写 is_email_sent。**顺带修复隐藏 bug：旧路由漏传 env 第 4 参，群发的 realtime 邮件从未发出过**；/send 响应新增 skippedCount（用户关闭 system 通知≠失败）。
+- **W4.3 日志收敛**：后端裸 console 114 → 0（logger.ts/requestLogger.ts 自身除外），16 个文件统一 `createModuleLogger(模块名)`；`utils/resend.ts` 与 GitHub OAuth 三处 fetch 加 `AbortSignal.timeout(10s)`（常量 `URL_CONSTANTS.EXTERNAL_API_TIMEOUT_MS`）+ 超时/网络错误分类记录。
+- W2.2 的 admin 后台分页已于第一轮完成。
+
+### W4 遗留（低优先，渐进收编，不阻塞上线）
+
+- routes 层 40 处 try/catch 模板 → 逐模块改「service throw AppError + 路由放行」；本次已修 messageService 这个最疼的点，其余按模块顺手做
+- 分页查询公共 helper 收拢（现存 4 份复制）
+- index.ts `appLogger`（'config' 模块名）命名清理
+
+依赖决策执行：audit 高危清零（移除零引用 eslint 链）；framer-motion 移除；rehype-highlight 移除（自建白名单插件）；
+react19/router7/zustand5/tailwind4 维持不升。
+
+验证记录（2026-11-23 第二轮）：`npm test` 双端 typecheck + 62 用例全过；`npm run build` 通过（PostPage 77KB/AdminPage 130KB chunk）；`check-theme.sh` 通过。

@@ -15,6 +15,9 @@
  */
 
 import { generateRandomString } from '../utils/validation';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('upload');
 import { UPLOAD_CONSTANTS } from '../config/constants';
 
 export interface UploadResult {
@@ -150,7 +153,7 @@ export class UploadService {
         }
       });
     } catch (error) {
-      console.error('R2 upload failed:', error);
+      logger.error('R2 upload failed:', error);
       return {
         success: false,
         message: 'Failed to upload file to storage',
@@ -204,7 +207,7 @@ export class UploadService {
         }
       });
     } catch (error) {
-      console.error('R2 upload failed:', error);
+      logger.error('R2 upload failed:', error);
       return {
         success: false,
         message: '文件上传失败',

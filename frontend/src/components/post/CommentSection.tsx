@@ -150,6 +150,10 @@ function CommentItem({ comment, level, commentsApi }: CommentItemProps) {
 export function CommentSection({ post, isAuthenticated, commentsApi, onLogin }: CommentSectionProps) {
   const {
     comments,
+    totalComments,
+    hasMore,
+    loadingMore,
+    loadMoreComments,
     newComment,
     setNewComment,
     commentLoading,
@@ -162,7 +166,8 @@ export function CommentSection({ post, isAuthenticated, commentsApi, onLogin }: 
 
   return (
     <div className="mt-16 border-t border-border pt-8">
-      <h2 className="text-2xl font-bold text-foreground mb-6">评论 ({comments.length})</h2>
+      {/* 总数用服务端分页 total（根评论数），而非当前已加载条数，翻页加载时计数才不会跳变 */}
+      <h2 className="text-2xl font-bold text-foreground mb-6">评论 ({totalComments})</h2>
 
       {/* 归档文章提示 */}
       {post.status === 'archived' && (
@@ -213,17 +218,32 @@ export function CommentSection({ post, isAuthenticated, commentsApi, onLogin }: 
         )
       )}
 
-      {/* 评论列表 */}
+      {/* 评论列表（按页拉取，见 usePostComments 的分页说明） */}
       {comments.length > 0 ? (
-        <div className="space-y-6">
-          {comments.map((comment) => (
-            <CommentItem
-              key={comment.id}
-              comment={comment}
-              level={0}
-              commentsApi={commentsApi}
-            />
-          ))}
+        <div>
+          <div className="space-y-6">
+            {comments.map((comment) => (
+              <CommentItem
+                key={comment.id}
+                comment={comment}
+                level={0}
+                commentsApi={commentsApi}
+              />
+            ))}
+          </div>
+          {/* 「加载更多」而非页码控件：评论是自上而下的连续阅读流，
+              底部追加更贴合现有布局，也让已加载内容保持在原位不跳页 */}
+          {hasMore && (
+            <div className="mt-8 text-center">
+              <button
+                onClick={loadMoreComments}
+                disabled={loadingMore}
+                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loadingMore ? '加载中...' : '加载更多评论'}
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="text-center py-12 bg-muted rounded-lg">

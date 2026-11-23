@@ -19,7 +19,7 @@ import { successResponse, errorResponse, getStatus } from '../utils/response';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { safeParseInt, pathParam } from '../utils/validation';
-import { isFeatureEnabled, getConfigValue } from './config';
+import { isFeatureEnabled, getConfigValue } from '../services/configService';
 import { CommentService } from '../services/commentService';
 import { COMMENT_CONSTANTS, RATE_LIMIT_CONSTANTS } from '../config/constants';
 import { rateLimit } from '../middleware/rateLimit';

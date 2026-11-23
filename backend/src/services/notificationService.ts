@@ -20,6 +20,9 @@
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('notification');
 import type {
   Notification,
   CreateNotificationRequest,
@@ -31,6 +34,7 @@ import type {
   SendNotificationOptions,
   NotificationRelatedData,
   NotificationFrequency,
+  NotificationSettings,
 } from '../types/notifications';
 import type { Env } from '../types';
 import { getNotificationSettings } from './notificationSettingsService';
@@ -55,7 +59,7 @@ export async function createNotification(
     } = data;
 
     if (type !== 'system' && type !== 'interaction') {
-      console.error('Invalid notification type:', type);
+      logger.error('Invalid notification type:', type);
       return null;
     }
 
@@ -97,7 +101,7 @@ export async function createNotification(
     ).run();
 
     if (!result.success) {
-      console.error('Failed to create notification:', result.error);
+      logger.error('Failed to create notification:', result.error);
       return null;
     }
 
@@ -125,7 +129,7 @@ export async function createNotification(
           }
         }
       } catch (error) {
-        console.error('Failed to send notification email:', error);
+        logger.error('Failed to send notification email:', error);
       }
     } else if ((frequency === 'daily' || frequency === 'weekly') && shouldSendEmail) {
       await queueNotificationForDigest(db, notificationId, userId, frequency, settings);
@@ -133,9 +137,51 @@ export async function createNotification(
 
     return notification;
   } catch (error) {
-    console.error('Create notification error:', error);
+    logger.error('Create notification error:', error);
     return null;
   }
+}
+
+/**
+ * 计算汇总邮件的下次发送时间（纯函数，无副作用）。
+ *
+ * 单条路径（queueNotificationForDigest）与群发批量路径共用，保证「daily/weekly
+ * 汇总入队」的调度语义只有一份实现。注意：这里按服务器本地时间（Workers 为 UTC）
+ * 取小时/分钟，历史行为如此；改动前需先核对 digestService 扫描端的时区解释。
+ */
+export function computeDigestScheduledAt(
+  digestTime: NotificationSettings['digestTime'],
+  frequency: NotificationFrequency,
+  now: Date = new Date()
+): Date {
+  let scheduledAt: Date;
+
+  if (frequency === 'daily') {
+    const [hours, minutes] = digestTime.daily.split(':').map(Number);
+    scheduledAt = new Date(now);
+    scheduledAt.setHours(hours, minutes, 0, 0);
+
+    if (scheduledAt <= now) {
+      scheduledAt.setDate(scheduledAt.getDate() + 1);
+    }
+  } else {
+    const targetDay = digestTime.weeklyDay;
+    const [hours, minutes] = digestTime.weeklyTime.split(':').map(Number);
+    scheduledAt = new Date(now);
+    scheduledAt.setHours(hours, minutes, 0, 0);
+
+    const currentDay = scheduledAt.getDay();
+    let daysUntilTarget = targetDay - currentDay;
+    if (daysUntilTarget <= 0) {
+      daysUntilTarget += 7;
+    }
+    if (daysUntilTarget === 0 && scheduledAt <= now) {
+      daysUntilTarget = 7;
+    }
+    scheduledAt.setDate(scheduledAt.getDate() + daysUntilTarget);
+  }
+
+  return scheduledAt;
 }
 
 async function queueNotificationForDigest(
@@ -146,35 +192,8 @@ async function queueNotificationForDigest(
   settings: any
 ): Promise<void> {
   try {
-    const digestTime = settings.digestTime;
-    const now = new Date();
-    
-    let scheduledAt: Date;
-    
-    if (frequency === 'daily') {
-      const [hours, minutes] = digestTime.daily.split(':').map(Number);
-      scheduledAt = new Date(now);
-      scheduledAt.setHours(hours, minutes, 0, 0);
-      
-      if (scheduledAt <= now) {
-        scheduledAt.setDate(scheduledAt.getDate() + 1);
-      }
-    } else {
-      const targetDay = digestTime.weeklyDay;
-      const [hours, minutes] = digestTime.weeklyTime.split(':').map(Number);
-      scheduledAt = new Date(now);
-      scheduledAt.setHours(hours, minutes, 0, 0);
-      
-      const currentDay = scheduledAt.getDay();
-      let daysUntilTarget = targetDay - currentDay;
-      if (daysUntilTarget <= 0) {
-        daysUntilTarget += 7;
-      }
-      if (daysUntilTarget === 0 && scheduledAt <= now) {
-        daysUntilTarget = 7;
-      }
-      scheduledAt.setDate(scheduledAt.getDate() + daysUntilTarget);
-    }
+    // 调度时间计算收敛到 computeDigestScheduledAt（与群发批量路径共用）
+    const scheduledAt = computeDigestScheduledAt(settings.digestTime, frequency);
 
     await db.prepare(
       `INSERT INTO email_digest_queue (
@@ -187,7 +206,7 @@ async function queueNotificationForDigest(
       scheduledAt.toISOString()
     ).run();
   } catch (error) {
-    console.error('Failed to queue notification for digest:', error);
+    logger.error('Failed to queue notification for digest:', error);
   }
 }
 
@@ -209,7 +228,7 @@ export async function getNotificationById(
 
     return mapNotificationFromRow(row);
   } catch (error) {
-    console.error('Get notification by id error:', error);
+    logger.error('Get notification by id error:', error);
     return null;
   }
 }
@@ -337,7 +356,7 @@ export async function getNotifications(
       },
     };
   } catch (error) {
-    console.error('Get notifications error:', error);
+    logger.error('Get notifications error:', error);
     return {
       notifications: [],
       pagination: {
@@ -409,7 +428,7 @@ export async function getUnreadCount(
 
     return { total, byType };
   } catch (error) {
-    console.error('Get unread count error:', error);
+    logger.error('Get unread count error:', error);
     return {
       total: 0,
       byType: {
@@ -459,7 +478,7 @@ export async function markAsRead(
 
     return result.success && (result.meta?.changes || 0) > 0;
   } catch (error) {
-    console.error('Mark as read error:', error);
+    logger.error('Mark as read error:', error);
     return false;
   }
 }
@@ -520,7 +539,7 @@ export async function markAllAsRead(
 
     return markedCount;
   } catch (error) {
-    console.error('Mark all as read error:', error);
+    logger.error('Mark all as read error:', error);
     return 0;
   }
 }
@@ -564,7 +583,7 @@ export async function deleteNotification(
 
     return result.success && (result.meta?.changes || 0) > 0;
   } catch (error) {
-    console.error('Delete notification error:', error);
+    logger.error('Delete notification error:', error);
     return false;
   }
 }
@@ -590,7 +609,7 @@ export async function updateChannelStatus(
 
     return result.success;
   } catch (error) {
-    console.error('Update channel status error:', error);
+    logger.error('Update channel status error:', error);
     return false;
   }
 }
@@ -607,7 +626,7 @@ export async function cleanupOldNotifications(
 
     return result.meta?.changes || 0;
   } catch (error) {
-    console.error('Cleanup old notifications error:', error);
+    logger.error('Cleanup old notifications error:', error);
     return 0;
   }
 }

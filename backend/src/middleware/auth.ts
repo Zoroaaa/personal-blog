@@ -19,6 +19,7 @@
 import { Context, Next } from 'hono';
 import { Env, Variables } from '../types';
 import { errorResponse } from '../utils/response';
+import { TokenExpiredError } from '../utils/errors';
 import { verifyToken, JWTPayload, TokenPayload, asSecret, asJWTToken } from '../utils/jwt';
 
 type AppContext = Context<{ Bindings: Env; Variables: Variables }>;
@@ -62,9 +63,9 @@ export async function requireAuth(c: AppContext, next: Next) {
     await next();
 
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Invalid token';
-
-    if (errorMessage.includes('expired')) {
+    // verifyToken 已统一抛 AppError；按类型区分「过期→引导刷新」与「无效→重新登录」，
+    // 替代历史上的 err.message.includes('expired') 字符串匹配
+    if (error instanceof TokenExpiredError) {
       return c.json(errorResponse(
         'Token expired',
         'Your session has expired. Please login again.'

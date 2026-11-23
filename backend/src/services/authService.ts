@@ -19,6 +19,9 @@
  */
 
 import bcrypt from 'bcryptjs';
+import { createModuleLogger } from '../utils/logger';
+
+const logger = createModuleLogger('auth');
 import { generateToken, generateAccessToken, asSecret } from '../utils/jwt';
 import { safePutCache, safeGetCache, safeDeleteCache } from '../utils/cache';
 import {
@@ -31,7 +34,8 @@ import {
 } from '../utils/validation';
 import { EmailVerificationService, type VerificationEmailType } from './emailVerificationService';
 import { RefreshTokenService } from './refreshTokenService';
-import { AUTH_CONSTANTS } from '../config/constants';
+import { isFeatureEnabled } from './configService';
+import { AUTH_CONSTANTS, URL_CONSTANTS } from '../config/constants';
 import { SoftDeleteHelper } from '../utils/softDeleteHelper';
 
 import type { 
@@ -159,12 +163,12 @@ export interface DeleteAccountRequest {
 
 export class AuthService {
   static async checkRegistrationEnabled(env: any): Promise<boolean> {
-    const { isFeatureEnabled } = await import('../routes/config');
+    // isFeatureEnabled 已迁至 services/configService（带缓存）；这里曾用动态
+    // import('../routes/config') 绕开 services→routes 反向依赖，现改为静态引用
     return isFeatureEnabled(env, 'feature_registration');
   }
 
   static async checkOAuthEnabled(env: any): Promise<boolean> {
-    const { isFeatureEnabled } = await import('../routes/config');
     return isFeatureEnabled(env, 'feature_oauth_github');
   }
 
@@ -260,7 +264,7 @@ export class AuthService {
     // 仅当邮箱已通过验证码验证（配置了 RESEND_API_KEY）时才允许按 ADMIN_EMAIL 提权
     const role = emailVerificationRequired ? resolveRoleByVerifiedEmail(env, cleanEmail) : 'user';
     if (!emailVerificationRequired && resolveRoleByVerifiedEmail(env, cleanEmail) === 'admin') {
-      console.warn('ADMIN_EMAIL matched but email verification is disabled (no RESEND_API_KEY); registered as user');
+      logger.warn('ADMIN_EMAIL matched but email verification is disabled (no RESEND_API_KEY); registered as user');
     }
 
     const result = await db.prepare(
@@ -476,6 +480,7 @@ export class AuthService {
 
     try {
       const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+        signal: AbortSignal.timeout(URL_CONSTANTS.EXTERNAL_API_TIMEOUT_MS),
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -508,6 +513,7 @@ export class AuthService {
       }
 
       const userResponse = await fetch('https://api.github.com/user', {
+        signal: AbortSignal.timeout(URL_CONSTANTS.EXTERNAL_API_TIMEOUT_MS),
         headers: {
           'Authorization': `Bearer ${tokenData.access_token}`,
           'Accept': 'application/json',
@@ -539,6 +545,7 @@ export class AuthService {
 
       try {
         const emailResponse = await fetch('https://api.github.com/user/emails', {
+          signal: AbortSignal.timeout(URL_CONSTANTS.EXTERNAL_API_TIMEOUT_MS),
           headers: {
             'Authorization': `Bearer ${tokenData.access_token}`,
             'Accept': 'application/json',
@@ -555,7 +562,7 @@ export class AuthService {
           }
         }
       } catch (emailError) {
-        console.warn('Error fetching GitHub emails:', emailError);
+        logger.warn('Error fetching GitHub emails:', emailError);
       }
     } catch (error) {
       return {
@@ -658,7 +665,7 @@ export class AuthService {
         expiresAt
       ).run();
     } catch (tokenError) {
-      console.error('Failed to store OAuth token:', tokenError);
+      logger.error('Failed to store OAuth token:', tokenError);
     }
 
     const token = await generateAccessToken(
@@ -1219,7 +1226,7 @@ export class AuthService {
         message: '该认证提供商不支持令牌刷新'
       };
     } catch (error) {
-      console.error('OAuth令牌刷新失败:', error);
+      logger.error('OAuth令牌刷新失败:', error);
       return {
         success: false,
         message: 'OAuth令牌刷新失败'

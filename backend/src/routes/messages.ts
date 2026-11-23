@@ -17,6 +17,7 @@
 import { Hono } from 'hono';
 import { Env, Variables } from '../types';
 import { successResponse, errorResponse } from '../utils/response';
+import { isAppError } from '../utils/errors';
 import { requireAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/requestLogger';
 import { validateLength, sanitizeInput, safeParseInt } from '../utils/validation';
@@ -138,10 +139,12 @@ messageRoutes.post('/', requireAuth, rateLimit({
     const message = await sendMessage(c.env.DB, user.userId, messageData);
 
     if (!message) {
+      // 罕见边界：插入成功但回读失败（getMessageById 内部吞错返回 null）。
+      // 消息已落库，按读回失败 500 而非 400 更符合真实状态
       return c.json(errorResponse(
-        'Failed to send message',
-        'Unable to send message. Please check the recipient exists.'
-      ), 400);
+        'Failed to load sent message',
+        '私信已发送，但读取回显失败，请刷新会话查看'
+      ), 500);
     }
 
     logger.info('Message sent successfully', {
@@ -155,16 +158,13 @@ messageRoutes.post('/', requireAuth, rateLimit({
 
   } catch (error) {
     logger.error('Send message error', error);
-    
-    if (error instanceof Error) {
-      if (error.message === 'Recipient does not accept messages from strangers') {
-        return c.json(errorResponse(
-          'Message rejected',
-          '对方设置了不接受陌生人私信'
-        ), 403);
-      }
+
+    // 业务语义错误（404 收件人不存在 / 403 陌生人限制 / 400 自发）交全局 onError 统一映射。
+    // 旧实现按 error.message 字符串匹配 403，但 service 吞错后根本到不了这里（死代码）
+    if (isAppError(error)) {
+      throw error;
     }
-    
+
     return c.json(errorResponse(
       'Failed to send message',
       'An error occurred while sending the message'
